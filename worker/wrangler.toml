@@ -1,0 +1,24 @@
+name = "threadkeeper-worker"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+MONGODB_AI_GEOGRAPHY = "unscoped"
+MAX_DAILY_REQUESTS_PER_USER = "100"
+MAX_DAILY_TOKENS_PER_USER = "120000"
+ENABLE_CLEF = "false"
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "USAGE_QUOTA"
+class_name = "UsageQuotaDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UsageQuotaDO"]
+
+[alias]
+zod = "./node_modules/zod"
+

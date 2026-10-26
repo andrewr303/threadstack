@@ -1,0 +1,416 @@
+{
+  "id": "PERF-10",
+  "label": "SYNTHETIC 10,000-THREAD + 200,000-MESSAGE BENCHMARK (Clearly labeled synthetic dataset)",
+  "timestamp": "2026-10-26T01:40:03.646Z",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v26.12.1",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i7-13700H",
+    "cpuCores": 20,
+    "totalMemoryGb": 15.83
+  },
+  "dataset": {
+    "synthetic": true,
+    "threadCount": 10000,
+    "messageCount": 200000,
+    "messagesPerThread": 20,
+    "generationMs": 89.341,
+    "coldIndexBuildMs": 184.912
+  },
+  "warmOpenMetadataLibrary": {
+    "goalMs": 500,
+    "sampleCount": 20,
+    "samplesMs": [
+      8.33,
+      0.995,
+      0.591,
+      0.544,
+      0.508,
+      0.5,
+      2.455,
+      0.904,
+      0.553,
+      0.502,
+      0.496,
+      0.486,
+      0.556,
+      0.509,
+      0.467,
+      0.495,
+      0.489,
+      0.488,
+      0.489,
+      0.502
+    ],
+    "p50Ms": 0.502,
+    "p95Ms": 2.455,
+    "maxMs": 8.33,
+    "missesOver500ms": 0,
+    "passesGoal": true
+  },
+  "repeatedLocalSearch": {
+    "goalMs": 150,
+    "sampleCount": 50,
+    "queryCount": 50,
+    "minMs": 13.157,
+    "p50Ms": 15.429,
+    "p95Ms": 20.359,
+    "maxMs": 25.165,
+    "meanMs": 15.987,
+    "missesOver150ms": [],
+    "passesGoal": true,
+    "samples": [
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 25.165,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_239",
+        "elapsedMs": 18.155,
+        "hitCount": 13,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-436",
+        "elapsedMs": 17.899,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_33",
+        "elapsedMs": 21.971,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_30",
+        "elapsedMs": 17.732,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 15.24,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_1224",
+        "elapsedMs": 13.65,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-1421",
+        "elapsedMs": 15.247,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_18",
+        "elapsedMs": 16.717,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_15",
+        "elapsedMs": 16.582,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 15.399,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_2209",
+        "elapsedMs": 13.408,
+        "hitCount": 5,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-2406",
+        "elapsedMs": 14.812,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_3",
+        "elapsedMs": 20.359,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_0",
+        "elapsedMs": 16.432,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 15.293,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_3194",
+        "elapsedMs": 13.157,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-3391",
+        "elapsedMs": 14.372,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_188",
+        "elapsedMs": 16.196,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_185",
+        "elapsedMs": 15.761,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 14.51,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_4179",
+        "elapsedMs": 13.293,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-4376",
+        "elapsedMs": 14.903,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_173",
+        "elapsedMs": 16.129,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_170",
+        "elapsedMs": 15.12,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 15.801,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_5164",
+        "elapsedMs": 14.257,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-5361",
+        "elapsedMs": 16.096,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_158",
+        "elapsedMs": 18.208,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_155",
+        "elapsedMs": 17.127,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 15.429,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_6149",
+        "elapsedMs": 13.317,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-6346",
+        "elapsedMs": 14.102,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_143",
+        "elapsedMs": 17.139,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_140",
+        "elapsedMs": 15.238,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 14.483,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_7134",
+        "elapsedMs": 13.371,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-7331",
+        "elapsedMs": 14.142,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_128",
+        "elapsedMs": 15.813,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_125",
+        "elapsedMs": 15.349,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 14.804,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_8119",
+        "elapsedMs": 16.31,
+        "hitCount": 6,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-8316",
+        "elapsedMs": 16.649,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_113",
+        "elapsedMs": 16.059,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_110",
+        "elapsedMs": 18.223,
+        "hitCount": 3,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-quartz-calibrator-4242",
+        "elapsedMs": 15.45,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "body_token_alpha_9104",
+        "elapsedMs": 13.624,
+        "hitCount": 5,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "meridian-body-calibrator-9301",
+        "elapsedMs": 14.515,
+        "hitCount": 50,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "scrubber_frame_budget_98",
+        "elapsedMs": 18.989,
+        "hitCount": 1,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      },
+      {
+        "query": "msgpack_delta_window_95",
+        "elapsedMs": 17.363,
+        "hitCount": 1,
+        "candidateSetSize": 10000,
+        "totalScopedCandidates": 10000
+      }
+    ]
+  }
+}
