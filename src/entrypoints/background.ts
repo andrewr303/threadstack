@@ -4,12 +4,95 @@ import {
   upsertThread,
   processResumableJobs,
 } from '../core/db.js';
-import { buildThreadKey } from '../core/schema.js';
+import { buildThreadKey, type SettingsRecord } from '../core/schema.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import { validateRuntimeMessageSender } from '../core/messaging.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
+import { isProviderId, type CaptureProviderId } from '../core/providers.js';
+import {
+  nextDueAnalysisAt,
+  processThreadLocally,
+  runAnalysisJobs,
+} from '../core/pipeline.js';
+import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
 
 const db = new ThreadkeeperDB();
+
+const ANALYSIS_DUE_ALARM = 'tk-analysis-due';
+const ANALYSIS_SWEEP_ALARM = 'tk-analysis-sweep';
+const AI_PAGE_RE =
+  /^https:\/\/(chatgpt\.com|chat\.openai\.com|claude\.ai|grok\.com|gemini\.google\.com|(www\.)?perplexity\.ai|chat\.deepseek\.com|chat\.mistral\.ai|copilot\.microsoft\.com)\//i;
+
+let organizeCtxCache: { ctx: OrganizeContext; at: number } | null = null;
+let analysisRun: Promise<unknown> | null = null;
+
+async function getOrganizeContext(settings: SettingsRecord): Promise<OrganizeContext> {
+  if (organizeCtxCache && Date.now() - organizeCtxCache.at < 60_000) return organizeCtxCache.ctx;
+  const ctx = await loadOrganizeContext(db, settings);
+  organizeCtxCache = { ctx, at: Date.now() };
+  return ctx;
+}
+
+/** Tell open manager / side panel pages that the library changed. */
+function broadcastLibraryChanged(threadKey?: string): void {
+  try {
+    void chrome.runtime.sendMessage({ type: 'LIBRARY_CHANGED', threadKey }).catch(() => undefined);
+  } catch {
+    // no listeners open
+  }
+}
+
+/** Toolbar button: side panel by default; overlay or tab when chosen in Settings. */
+async function applyLaunchBehavior(settings?: SettingsRecord): Promise<void> {
+  const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
+  if (chrome.sidePanel?.setPanelBehavior) {
+    try {
+      await chrome.sidePanel.setPanelBehavior({
+        openPanelOnActionClick: s.launchSurface === 'side_panel',
+      });
+    } catch {
+      // side panel unsupported in this browser build; action.onClicked handles it
+    }
+  }
+}
+
+async function scheduleAnalysisAlarm(): Promise<void> {
+  if (!chrome.alarms) return;
+  const due = await nextDueAnalysisAt(db);
+  if (due === null) return;
+  await chrome.alarms.create(ANALYSIS_DUE_ALARM, { when: Math.max(due, Date.now() + 1000) });
+}
+
+/** Drain due AI analysis jobs; one run at a time per service-worker lifetime. */
+function kickAnalysis(): Promise<unknown> {
+  if (analysisRun) return analysisRun;
+  analysisRun = (async () => {
+    try {
+      const summary = await runAnalysisJobs(db, { maxJobs: 8, timeBudgetMs: 240_000 });
+      if (summary.processed > 0) {
+        organizeCtxCache = null;
+        broadcastLibraryChanged();
+      }
+      return summary;
+    } finally {
+      analysisRun = null;
+      await scheduleAnalysisAlarm();
+    }
+  })();
+  return analysisRun;
+}
+
+async function openManagerTab(query?: Record<string, string>): Promise<number | undefined> {
+  const params = new URLSearchParams({ surface: 'page', ...(query ?? {}) });
+  const targetUrl = chrome.runtime.getURL(`manager.html?${params.toString()}`);
+  const existingTabs = await chrome.tabs.query({ url: `${chrome.runtime.getURL('manager.html')}*` });
+  if (existingTabs.length > 0 && existingTabs[0].id !== undefined) {
+    await chrome.tabs.update(existingTabs[0].id, { active: true, ...(query ? { url: targetUrl } : {}) });
+    return existingTabs[0].id;
+  }
+  const created = await chrome.tabs.create({ url: targetUrl });
+  return created.id;
+}
 const securityRejectionLog: Array<{ timestamp: string; reason: string }> = [];
 type HandshakeEntry = { token: string; redeemed: boolean };
 const tabHandshakeTokens = new Map<number, HandshakeEntry>();
@@ -104,9 +187,7 @@ export async function invokeOverlayOnTab(
   }
 
   const canInjectOverlay =
-    typeof tabId === 'number' &&
-    typeof tabUrl === 'string' &&
-    /^https:\/\/(chatgpt\.com|chat\.openai\.com|claude\.ai)\//i.test(tabUrl);
+    typeof tabId === 'number' && typeof tabUrl === 'string' && AI_PAGE_RE.test(tabUrl);
 
   if (canInjectOverlay && tabId !== undefined) {
     const handshakeToken = generateHandshakeToken();
@@ -144,25 +225,40 @@ export async function invokeOverlayOnTab(
     }
   }
 
-  const managerUrl = chrome.runtime.getURL('manager.html?surface=page');
-  const existingTabs = await chrome.tabs.query({ url: `${ chrome.runtime.getURL('manager.html') }*` });
-  if (existingTabs.length > 0 && existingTabs[0].id !== undefined) {
-    await chrome.tabs.update(existingTabs[0].id, { active: true });
-    return { mode: 'full_page_tab', tabId: existingTabs[0].id };
-  }
-  const created = await chrome.tabs.create({ url: managerUrl });
-  return { mode: 'full_page_tab', tabId: created.id };
+  const tabIdOpened = await openManagerTab();
+  return { mode: 'full_page_tab', tabId: tabIdOpened };
 }
 
-// Deliberate user invocation ONLY: toolbar click or keyboard command
+// Deliberate user invocation ONLY: toolbar click or keyboard command.
+// In side-panel mode Chrome opens the panel itself and onClicked does not fire.
 if (typeof chrome !== 'undefined' && chrome.action?.onClicked) {
   chrome.action.onClicked.addListener((tab) => {
-    void invokeOverlayOnTab(tab.id, tab.url, 'toolbar_action');
+    void (async () => {
+      const settings = await ensureStarterCollectionsAndSettings(db);
+      if (settings.launchSurface === 'tab') {
+        await openManagerTab();
+      } else {
+        await invokeOverlayOnTab(tab.id, tab.url, 'toolbar_action');
+      }
+    })();
   });
 }
 
 if (typeof chrome !== 'undefined' && chrome.commands?.onCommand) {
-  chrome.commands.onCommand.addListener(async (command) => {
+  chrome.commands.onCommand.addListener(async (command, tab) => {
+    if (command === 'open-side-panel') {
+      const windowId = tab?.windowId;
+      if (chrome.sidePanel?.open && typeof windowId === 'number') {
+        try {
+          await chrome.sidePanel.open({ windowId });
+          return;
+        } catch {
+          // fall through to the full-page manager
+        }
+      }
+      await openManagerTab();
+      return;
+    }
     if (command === 'toggle-threadkeeper' || command === 'toggle-overlay') {
       const [activeTab] = await chrome.tabs.query({
         active: true,
@@ -179,17 +275,26 @@ if (typeof chrome !== 'undefined' && chrome.commands?.onCommand) {
   });
 }
 
-// Install & Startup: initialize IndexedDB starter areas and alarm silently — NEVER open UI or seed synthetic demo data
+// Install & Startup: initialize IndexedDB starter areas and alarms silently — NEVER open UI or seed synthetic demo data
+async function initializeBackground(): Promise<void> {
+  const settings = await ensureStarterCollectionsAndSettings(db);
+  await applyLaunchBehavior(settings);
+  if (chrome.alarms) {
+    await chrome.alarms.create('threadkeeper-resumable-jobs', { periodInMinutes: 5 });
+    await chrome.alarms.create(ANALYSIS_SWEEP_ALARM, { periodInMinutes: 3 });
+  }
+  await scheduleAnalysisAlarm();
+}
+
 if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
-    void (async () => {
-      await ensureStarterCollectionsAndSettings(db);
-      if (chrome.alarms) {
-        await chrome.alarms.create('threadkeeper-resumable-jobs', {
-          periodInMinutes: 5,
-        });
-      }
-    })();
+    void initializeBackground();
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.runtime?.onStartup) {
+  chrome.runtime.onStartup.addListener(() => {
+    void initializeBackground();
   });
 }
 
@@ -201,6 +306,8 @@ if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
           await requestThreadEnrichment(db, job.threadKey);
         }
       });
+    } else if (alarm.name === ANALYSIS_DUE_ALARM || alarm.name === ANALYSIS_SWEEP_ALARM) {
+      void kickAnalysis();
     }
   });
 }
@@ -224,7 +331,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
       if (message.type === 'GET_CAPTURE_AUTH_STATE') {
         const settings = await ensureStarterCollectionsAndSettings(db);
-        const provider = message.provider as 'chatgpt' | 'claude';
+        const provider = message.provider as CaptureProviderId;
         const authorized = Boolean(settings.authorizedHosts[provider]);
         sendResponse({
           ok: true,
@@ -236,7 +343,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
       if (message.type === 'PASSIVE_DOM_CAPTURE') {
         const settings = await ensureStarterCollectionsAndSettings(db);
-        const provider = message.payload.provider as 'chatgpt' | 'claude';
+        const rawProvider = message.payload?.provider;
+        if (!isProviderId(rawProvider) || rawProvider === 'imported') {
+          sendResponse({ ok: false, error: 'Unknown capture provider' });
+          return;
+        }
+        const provider: CaptureProviderId = rawProvider;
         if (!settings.authorizedHosts[provider] && !message.explicitInvoke) {
           sendResponse({
             ok: false,
@@ -254,6 +366,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         });
         const result = await upsertThread(db, {
           ...message.payload,
+          provider,
           threadKey,
           accountId: bound.accountId,
           workspaceId: bound.workspaceId,
@@ -264,6 +377,54 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           threadKey,
           coverage: result.record?.coverage,
         });
+        if (result.status === 'stored') {
+          // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
+          try {
+            const outcome = await processThreadLocally(db, threadKey, {
+              settings,
+              ctx: await getOrganizeContext(settings),
+            });
+            if (outcome.createdProject) organizeCtxCache = null;
+            if (outcome.enqueued) await scheduleAnalysisAlarm();
+          } catch (err) {
+            console.warn('[threadkeeper] local organize failed', err);
+          }
+          broadcastLibraryChanged(threadKey);
+        }
+        return;
+      }
+
+      if (message.type === 'OVERLAY_FRAME_STATUS') {
+        const tabId = sender.tab?.id;
+        const entry = typeof tabId === 'number' ? await getTabHandshake(tabId) : undefined;
+        sendResponse({ ok: true, redeemed: Boolean(entry?.redeemed) });
+        return;
+      }
+
+      if (message.type === 'OPEN_MANAGER_FALLBACK') {
+        // The in-page overlay could not load (blocked by the browser or the page); open the full library instead.
+        securityRejectionLog.push({
+          timestamp: new Date().toISOString(),
+          reason: `Overlay frame did not load on tab ${sender.tab?.id ?? '?'}; opened full-page manager`,
+        });
+        if (typeof sender.tab?.id === 'number') await deleteTabHandshake(sender.tab.id);
+        const openedTab = await openManagerTab();
+        sendResponse({ ok: true, tabId: openedTab });
+        return;
+      }
+
+      if (message.type === 'SETTINGS_CHANGED') {
+        organizeCtxCache = null;
+        await applyLaunchBehavior();
+        await scheduleAnalysisAlarm();
+        sendResponse({ ok: true });
+        return;
+      }
+
+      if (message.type === 'RUN_ANALYSIS_NOW') {
+        organizeCtxCache = null;
+        void kickAnalysis();
+        sendResponse({ ok: true });
         return;
       }
 
@@ -344,29 +505,23 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       }
 
       if (message.type === 'OPEN_FULL_PAGE_MANAGER') {
-        const params = new URLSearchParams({ surface: 'page' });
-        if (message.threadKey) params.set('threadKey', message.threadKey);
-        if (message.query) params.set('q', message.query);
-        const targetUrl = chrome.runtime.getURL(`manager.html?${params.toString()}`);
+        const query: Record<string, string> = {};
+        if (message.threadKey) query.threadKey = message.threadKey;
+        if (message.query) query.q = message.query;
         const existingTabs = await chrome.tabs.query({
           url: `${chrome.runtime.getURL('manager.html')}*`,
         });
-        if (existingTabs.length > 0 && existingTabs[0].id !== undefined) {
-          await chrome.tabs.update(existingTabs[0].id, {
-            url: targetUrl,
-            active: true,
-          });
-          sendResponse({ ok: true, tabId: existingTabs[0].id, reused: true });
-        } else {
-          const created = await chrome.tabs.create({ url: targetUrl });
-          sendResponse({ ok: true, tabId: created.id, reused: false });
-        }
+        const openedTab = await openManagerTab(query);
+        sendResponse({ ok: true, tabId: openedTab, reused: existingTabs.length > 0 });
         return;
       }
 
       if (message.type === 'OPEN_ORIGINAL_THREAD') {
         const settings = await ensureStarterCollectionsAndSettings(db);
-        const bound = settings.boundAccounts[message.provider as 'chatgpt' | 'claude' | 'imported'];
+        const requestedProvider: unknown = message.provider;
+        const bound = isProviderId(requestedProvider)
+          ? settings.boundAccounts[requestedProvider]
+          : undefined;
         if (
           bound &&
           (bound.accountId !== message.expectedAccountId ||
@@ -382,6 +537,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
               workspaceId: message.expectedWorkspaceId,
             },
           });
+          return;
+        }
+        if (typeof message.canonicalUrl !== 'string' || !/^https:\/\//i.test(message.canonicalUrl)) {
+          sendResponse({ ok: false, status: 'no_web_url' });
           return;
         }
         const allTabs = await chrome.tabs.query({});
@@ -462,6 +621,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   invokeOverlayOnTab;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperGetSecurityRejections =
   () => [...securityRejectionLog];
+(globalThis as unknown as Record<string, unknown>).__threadkeeperDb = db;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperClearInMemoryHandshakes =
   () => {
     tabHandshakeTokens.clear();

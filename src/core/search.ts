@@ -310,6 +310,8 @@ export class MemorySearchIndex {
     messages?: MessageRecord[];
     messagesByThread?: Map<string, MessageRecord[]>;
     summaries?: StructuredSummaryRecord[];
+    /** Extra searchable metadata per thread (insight gist, summary, topics, entities, provider project). */
+    extraMetaByThread?: Map<string, string>;
   }): void {
     this.conversations = params.conversations;
     this.messagesByThread.clear();
@@ -373,7 +375,7 @@ export class MemorySearchIndex {
       this.titleTrigramsByThread.set(c.threadKey, computeTrigrams(display));
       this.lowerMetaByThread.set(
         c.threadKey,
-        `${c.project} ${c.tags.join(' ')} ${c.manualNotes} ${c.latestDecisionText ?? ''} ${c.nextStepText ?? ''}`.toLowerCase()
+        `${c.project} ${c.tags.join(' ')} ${c.manualNotes} ${c.latestDecisionText ?? ''} ${c.nextStepText ?? ''} ${c.providerProjectName ?? ''} ${params.extraMetaByThread?.get(c.threadKey) ?? ''}`.toLowerCase()
       );
     }
   }
@@ -489,7 +491,7 @@ export class MemorySearchIndex {
         `${conv.project} ${conv.tags.join(' ')} ${conv.manualNotes} ${conv.latestDecisionText ?? ''} ${conv.nextStepText ?? ''}`.toLowerCase();
       if (metaLower.includes(cleanQuery)) {
         lexicalScore += 18;
-        matchReasons.push('Project, tag, or decision metadata match');
+        matchReasons.push('Summary, topic, or project match');
         if (!supportingExcerpt) {
           supportingExcerpt =
             conv.latestDecisionText ||

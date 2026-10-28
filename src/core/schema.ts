@@ -1,6 +1,13 @@
 import { containsPromptInjectionAttempt } from '../../shared/cloud.js';
+import {
+  CAPTURE_PROVIDER_IDS,
+  PROVIDER_IDS,
+  isProviderId,
+  type CaptureProviderId,
+  type ProviderId,
+} from './providers.js';
 
-export type ProviderId = 'chatgpt' | 'claude' | 'imported';
+export type { ProviderId, CaptureProviderId } from './providers.js';
 
 export type CoverageState =
   | 'full'
@@ -67,7 +74,7 @@ export function parseThreadKey(threadKey: string): ThreadIdentity | null {
   const parts = threadKey.split(':');
   if (parts.length !== 5) return null;
   const [provider, accountId, workspaceId, sourceConversationId, branchId] = parts;
-  if (provider !== 'chatgpt' && provider !== 'claude' && provider !== 'imported') {
+  if (!isProviderId(provider)) {
     return null;
   }
   return {
@@ -117,7 +124,32 @@ export interface ConversationRecord {
   nextStepText: string | null;
   nextStepMsgIndex: number | null;
   nextStepSpeaker: 'user_committed' | 'assistant_suggested' | null;
+  /** Project/folder the provider itself files this thread under (ChatGPT/Claude Projects, CLI repo). */
+  providerProjectName?: string | null;
+  /** Working directory of a CLI coding session (Claude Code, Codex CLI). */
+  workspacePath?: string | null;
+  gitBranch?: string | null;
+  /** Model the conversation ran on, when the provider exposes it. */
+  modelSlug?: string | null;
+  /** Shell command that resumes a CLI session, e.g. `claude --resume <id>`. */
+  resumeCommand?: string | null;
+  /** Where the current project assignment came from; manual/locked assignments are never overridden. */
+  projectSource?: ProjectSource;
+  /** Human-readable reason for an automatic project assignment. */
+  projectReason?: string | null;
+  /** Whether workflowState was set by the user or inferred automatically. */
+  workflowStateSource?: 'auto' | 'manual';
 }
+
+export type ProjectSource =
+  | 'default'
+  | 'import'
+  | 'provider'
+  | 'ai'
+  | 'rules'
+  | 'similar'
+  | 'cluster'
+  | 'manual';
 
 export interface MessageRecord {
   messageKey: string;
@@ -275,6 +307,7 @@ export function verifyExtensionSummaryEvidence(
 }
 
 export type RelationType =
+  | 'related'
   | 'continues'
   | 'supersedes'
   | 'contradicts'
@@ -300,6 +333,10 @@ export interface CollectionRecord {
   isStarterArea: boolean;
   cloudExcluded: boolean;
   createdAt: string;
+  /** Terms that route a thread into this project during automatic filing. */
+  keywords?: string[];
+  /** Who created the project: starter set, the user, the auto-organizer or a provider project. */
+  origin?: 'starter' | 'user' | 'auto' | 'provider';
 }
 
 export interface TagRecord {
@@ -312,7 +349,7 @@ export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancel
 
 export interface JobRecord {
   jobId: string;
-  jobType: 'enrich_thread' | 'embed_thread' | 'reconcile_index';
+  jobType: 'enrich_thread' | 'embed_thread' | 'reconcile_index' | 'analyze_thread';
   threadKey: string;
   targetRevision: number;
   status: JobStatus;
@@ -321,6 +358,102 @@ export interface JobRecord {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Earliest time the job may run (debounces analysis while a chat is still active). */
+  notBefore?: string;
+  /** Lease expiry for a claimed job so the service worker and manager never double-process. */
+  leaseUntil?: string | null;
+}
+
+export const THREAD_KINDS = [
+  'coding',
+  'debugging',
+  'writing',
+  'research',
+  'planning',
+  'brainstorming',
+  'learning',
+  'data',
+  'design',
+  'business',
+  'personal',
+  'other',
+] as const;
+
+export type ThreadKind = (typeof THREAD_KINDS)[number];
+
+export const THREAD_KIND_LABELS: Record<ThreadKind, string> = {
+  coding: 'Building',
+  debugging: 'Debugging',
+  writing: 'Writing',
+  research: 'Research',
+  planning: 'Planning',
+  brainstorming: 'Ideas',
+  learning: 'Learning',
+  data: 'Data & analysis',
+  design: 'Design',
+  business: 'Business',
+  personal: 'Personal',
+  other: 'General',
+};
+
+export type ArtifactKind = 'code' | 'document' | 'design' | 'data' | 'link' | 'other';
+
+/**
+ * What a thread is about, beyond its title. `local` insights are computed
+ * instantly on-device; `ai` insights come from Claude and win when current.
+ */
+export interface ThreadInsight {
+  insightKey: string;
+  threadKey: string;
+  source: 'local' | 'ai';
+  model: string;
+  sourceRevision: number;
+  contentHash: string;
+  generatedAt: string;
+  title: string;
+  gist: string;
+  summary: string;
+  userGoal: string | null;
+  outcome: string | null;
+  kind: ThreadKind;
+  topics: string[];
+  entities: string[];
+  languages: string[];
+  artifacts: Array<{ label: string; kind: ArtifactKind; messageIndex: number | null }>;
+  lastUserAsk: string | null;
+  suggestedStatus: WorkflowState | null;
+  statusReason: string | null;
+  suggestedProject: {
+    name: string;
+    isNew: boolean;
+    confidence: number;
+    reason: string;
+  } | null;
+  userTurns: number;
+  hasCode: boolean;
+}
+
+export function insightKeyFor(source: ThreadInsight['source'], threadKey: string): string {
+  return `${source}|${threadKey}`;
+}
+
+/** One embedding per thread per vector space, used for semantic search, auto-filing and related threads. */
+export interface ThreadVectorRecord {
+  vectorKey: string;
+  space: string;
+  threadKey: string;
+  sourceRevision: number;
+  docHash: string;
+  embedding: number[];
+  updatedAt: string;
+}
+
+export interface StoredHandleRecord {
+  id: string;
+  kind: 'claude_code_projects' | 'codex_sessions';
+  handle: unknown;
+  label: string;
+  lastSyncedAt: string | null;
 }
 
 export interface ChangeLogEntry {
@@ -336,7 +469,11 @@ export interface ChangeLogEntry {
     previousManualTags: string[];
     previousWorkflowState: WorkflowState;
     previousManualTitleOverride: string | null;
+    previousProjectSource?: ProjectSource;
+    previousWorkflowStateSource?: 'auto' | 'manual';
   }>;
+  /** Projects created by this change; removed on undo when empty. */
+  createdCollections?: string[];
 }
 
 export interface TombstoneRecord {
@@ -348,17 +485,38 @@ export interface TombstoneRecord {
   lastKnownContentHash: string;
 }
 
+export type AiModelId =
+  | 'claude-opus-5-5'
+  | 'claude-sonnet-5-5'
+  | 'claude-haiku-5-5'
+  | 'claude-fable-5-1';
+
+export type EmbeddingProviderId = 'local' | 'voyage' | 'openai' | 'ollama';
+
+export interface AutoOrganizeSettings {
+  /** Run the on-device analyzer on every capture/import (instant, free). */
+  localAnalysis: boolean;
+  /** Queue Claude analysis for new or changed threads when an API key is set. */
+  aiAnalysis: boolean;
+  /** File threads into projects automatically (never touches locked/manual assignments). */
+  autoFile: boolean;
+  /** Allow new projects to be created from provider projects, repos and AI suggestions. */
+  autoCreateProjects: boolean;
+  /** Infer workflow status (active / needs review / done / paused) unless set manually. */
+  autoStatus: boolean;
+  /** Add topic tags automatically. */
+  autoTags: boolean;
+  /** Seconds a thread must be quiet before AI analysis runs (avoids re-analyzing mid-chat). */
+  aiDebounceSeconds: number;
+  /** Maximum Claude analyses per UTC day (0 = unlimited). */
+  dailyAiAnalysisLimit: number;
+}
+
 export interface SettingsRecord {
   id: 'default';
-  authorizedHosts: {
-    chatgpt: boolean;
-    claude: boolean;
-  };
-  boundAccounts: {
-    chatgpt: { accountId: string; workspaceId: string };
-    claude: { accountId: string; workspaceId: string };
-    imported: { accountId: string; workspaceId: string };
-  };
+  settingsVersion?: number;
+  authorizedHosts: Record<CaptureProviderId, boolean>;
+  boundAccounts: Record<ProviderId, { accountId: string; workspaceId: string }>;
   cloudEnabled: boolean;
   workerEndpointUrl: string;
   workerBearerToken: string;
@@ -379,19 +537,63 @@ export interface SettingsRecord {
   lastSearchQuery: string;
   lastActiveArea: string;
   lastActiveQueue: ResurfaceQueue | 'all';
+  /** Toolbar button behaviour: side panel (default), in-page overlay, or a full tab. */
+  launchSurface: 'side_panel' | 'overlay' | 'tab';
+  anthropicApiKey: string;
+  aiModel: AiModelId;
+  aiEffort: 'low' | 'medium' | 'high';
+  aiAnalysesToday: number;
+  aiAnalysesDate: string;
+  embeddingProvider: EmbeddingProviderId;
+  voyageApiKey: string;
+  voyageModel: 'voyage-4-lite' | 'voyage-4' | 'voyage-4-large' | 'voyage-code-4';
+  openaiApiKey: string;
+  openaiEmbeddingModel: 'text-embedding-3-small' | 'text-embedding-3-large';
+  ollamaUrl: string;
+  ollamaEmbeddingModel: string;
+  autoOrganize: AutoOrganizeSettings;
+  /** Last background AI failure, surfaced in the manager so silent failures are visible. */
+  lastAiError?: string | null;
+  lastAiErrorAt?: string | null;
 }
+
+const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
+  chatgpt: 'acct_chatgpt_primary',
+  claude: 'acct_claude_primary',
+  claude_code: 'acct_claude_code_primary',
+  codex: 'acct_codex_primary',
+  grok: 'acct_grok_primary',
+  gemini: 'acct_gemini_primary',
+  perplexity: 'acct_perplexity_primary',
+  deepseek: 'acct_deepseek_primary',
+  mistral: 'acct_mistral_primary',
+  copilot: 'acct_copilot_primary',
+  imported: 'acct_imported_primary',
+};
+
+export const DEFAULT_AUTO_ORGANIZE: AutoOrganizeSettings = {
+  localAnalysis: true,
+  aiAnalysis: true,
+  autoFile: true,
+  autoCreateProjects: true,
+  autoStatus: true,
+  autoTags: true,
+  aiDebounceSeconds: 90,
+  dailyAiAnalysisLimit: 150,
+};
 
 export const DEFAULT_SETTINGS: SettingsRecord = {
   id: 'default',
-  authorizedHosts: {
-    chatgpt: false,
-    claude: false,
-  },
-  boundAccounts: {
-    chatgpt: { accountId: 'acct_chatgpt_primary', workspaceId: 'ws_personal' },
-    claude: { accountId: 'acct_claude_primary', workspaceId: 'ws_personal' },
-    imported: { accountId: 'acct_imported_primary', workspaceId: 'ws_personal' },
-  },
+  settingsVersion: 2,
+  authorizedHosts: Object.fromEntries(
+    CAPTURE_PROVIDER_IDS.map((id) => [id, true])
+  ) as Record<CaptureProviderId, boolean>,
+  boundAccounts: Object.fromEntries(
+    PROVIDER_IDS.map((id) => [
+      id,
+      { accountId: DEFAULT_ACCOUNT_IDS[id], workspaceId: 'ws_personal' },
+    ])
+  ) as Record<ProviderId, { accountId: string; workspaceId: string }>,
   cloudEnabled: false,
   workerEndpointUrl: '',
   workerBearerToken: '',
@@ -405,14 +607,53 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   rerankModel: 'rerank-3-lite',
   enableClefRouting: false,
   density: 'comfortable',
-  theme: 'light',
+  theme: 'system',
   sidebarCollapsed: false,
   viewMode: 'list',
   lastSelectedThreadKey: null,
   lastSearchQuery: '',
   lastActiveArea: 'All threads',
   lastActiveQueue: 'all',
+  launchSurface: 'side_panel',
+  anthropicApiKey: '',
+  aiModel: 'claude-opus-5-5',
+  aiEffort: 'low',
+  aiAnalysesToday: 0,
+  aiAnalysesDate: '',
+  embeddingProvider: 'local',
+  voyageApiKey: '',
+  voyageModel: 'voyage-4-lite',
+  openaiApiKey: '',
+  openaiEmbeddingModel: 'text-embedding-3-small',
+  ollamaUrl: 'http://localhost:11434',
+  ollamaEmbeddingModel: 'nomic-embed-text',
+  autoOrganize: { ...DEFAULT_AUTO_ORGANIZE },
 };
+
+/**
+ * Merge a stored (possibly older) settings record over the defaults so every
+ * field and every provider entry exists. Unknown legacy values are kept.
+ */
+export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefined): SettingsRecord {
+  const base = raw ?? {};
+  return {
+    ...DEFAULT_SETTINGS,
+    ...base,
+    id: 'default',
+    authorizedHosts: {
+      ...DEFAULT_SETTINGS.authorizedHosts,
+      ...(base.authorizedHosts ?? {}),
+    },
+    boundAccounts: {
+      ...DEFAULT_SETTINGS.boundAccounts,
+      ...(base.boundAccounts ?? {}),
+    },
+    autoOrganize: {
+      ...DEFAULT_AUTO_ORGANIZE,
+      ...(base.autoOrganize ?? {}),
+    },
+  };
+}
 
 export function computeDeterministicHash(input: string): string {
   let h1 = 0xdeadbeef ^ input.length;

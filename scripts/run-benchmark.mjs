@@ -7,8 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(rootDir, '..');
-const evidenceDir = path.join(repoRoot, 'evidence', 'acceptance');
+const evidenceDir = path.join(rootDir, 'evidence', 'acceptance');
 
 function percentile(sortedValues, p) {
   if (sortedValues.length === 0) return 0;

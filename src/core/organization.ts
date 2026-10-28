@@ -1,12 +1,15 @@
 import {
   getDisplayTitle,
+  type CollectionRecord,
   type ConversationRecord,
+  type ProjectSource,
   type StructuredSummaryRecord,
   type ResurfaceQueue,
   type ChangeLogEntry,
   type WorkflowState,
 } from './schema.js';
 import type { ThreadkeeperDB } from './db.js';
+import { findMatchingProject } from './project-match.js';
 
 const TAG_SYNONYM_MAP: Record<string, string> = {
   'brand-id': 'branding',
@@ -158,6 +161,10 @@ export interface OrganizeProposalItem {
   excludedByInstruction: boolean;
   reason: string;
   confidence: number;
+  /** Provenance recorded on the thread when the proposal is applied. */
+  source?: ProjectSource;
+  /** Set when proposedProject does not exist yet and must be created on apply. */
+  newProject?: { name: string; description: string; keywords: string[] } | null;
 }
 
 function inferProjectFromKeywords(text: string): string | null {
@@ -182,7 +189,12 @@ function inferProjectFromKeywords(text: string): string | null {
 
 export function previewNaturalLanguageOrganize(
   instruction: string,
-  conversations: ConversationRecord[]
+  conversations: ConversationRecord[],
+  options: {
+    collections?: CollectionRecord[];
+    /** Extra searchable text per thread (gist, summary, topics) beyond title/tags. */
+    extraText?: Map<string, string>;
+  } = {}
 ): OrganizeProposalItem[] {
   const raw = instruction.trim();
   if (!raw) return [];
@@ -224,7 +236,15 @@ export function previewNaturalLanguageOrganize(
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !stopWords.has(w));
 
-  const targetProject = inferProjectFromKeywords(includeClause);
+  const targetProject =
+    inferProjectFromKeywords(includeClause) ??
+    (options.collections
+      ? findMatchingProject(includeKeywords.join(' '), options.collections)?.name ??
+        includeKeywords
+          .map((k) => findMatchingProject(k, options.collections!)?.name)
+          .find((n): n is string => Boolean(n)) ??
+        null
+      : null);
   const derivedTags = normalizeTags(
     includeKeywords.filter(
       (k) =>
@@ -238,7 +258,7 @@ export function previewNaturalLanguageOrganize(
 
   for (const conv of conversations) {
     if (conv.isSyntheticBenchmark) continue;
-    const haystack = `${getDisplayTitle(conv)} ${conv.tags.join(' ')} ${conv.manualNotes} ${conv.latestDecisionText ?? ''}`.toLowerCase();
+    const haystack = `${getDisplayTitle(conv)} ${conv.tags.join(' ')} ${conv.manualNotes} ${conv.latestDecisionText ?? ''} ${conv.providerProjectName ?? ''} ${options.extraText?.get(conv.threadKey) ?? ''}`.toLowerCase();
 
     const matchesInclude =
       includeKeywords.length > 0 &&
@@ -298,6 +318,7 @@ export function previewNaturalLanguageOrganize(
       excludedByInstruction: false,
       reason: `Matched "${includeKeywords.join(' ')}" → file under ${targetProject ?? conv.project}`,
       confidence: 0.91,
+      source: 'manual',
     });
   }
 
@@ -311,8 +332,23 @@ export async function applyOrganizeProposals(
 ): Promise<ChangeLogEntry> {
   const actionable = proposals.filter((p) => !p.excludedByInstruction);
   const snapshots: ChangeLogEntry['snapshots'] = [];
+  const createdCollections: string[] = [];
 
-  await db.transaction('rw', [db.conversations, db.changeLogs], async () => {
+  await db.transaction('rw', [db.conversations, db.changeLogs, db.collections], async () => {
+    for (const item of actionable) {
+      if (item.newProject && item.proposedProject && !(await db.collections.get(item.proposedProject))) {
+        await db.collections.put({
+          name: item.proposedProject,
+          description: item.newProject.description,
+          isStarterArea: false,
+          cloudExcluded: false,
+          createdAt: new Date().toISOString(),
+          keywords: item.newProject.keywords.map((k) => k.toLowerCase()).slice(0, 12),
+          origin: 'auto',
+        });
+        createdCollections.push(item.proposedProject);
+      }
+    }
     for (const item of actionable) {
       const existing = await db.conversations.get(item.threadKey);
       if (!existing) continue;
@@ -325,12 +361,13 @@ export async function applyOrganizeProposals(
         previousManualTags: [...existing.manualTags],
         previousWorkflowState: existing.workflowState,
         previousManualTitleOverride: existing.manualTitleOverride,
+        previousProjectSource: existing.projectSource,
+        previousWorkflowStateSource: existing.workflowStateSource,
       });
 
-      const nextProject =
-        existing.categoryLocked || !item.proposedProject
-          ? existing.project
-          : item.proposedProject;
+      const projectChanges =
+        !existing.categoryLocked && Boolean(item.proposedProject) && item.proposedProject !== existing.project;
+      const nextProject = projectChanges ? item.proposedProject! : existing.project;
 
       const nextTags = normalizeTags([
         ...existing.tags,
@@ -341,8 +378,11 @@ export async function applyOrganizeProposals(
       await db.conversations.put({
         ...existing,
         project: nextProject,
+        projectSource: projectChanges ? item.source ?? 'manual' : existing.projectSource,
+        projectReason: projectChanges ? item.reason : existing.projectReason,
         tags: nextTags,
         workflowState: item.proposedState ?? existing.workflowState,
+        workflowStateSource: item.proposedState ? 'manual' : existing.workflowStateSource,
       });
     }
   });
@@ -353,6 +393,7 @@ export async function applyOrganizeProposals(
     description,
     undone: false,
     snapshots,
+    createdCollections,
   };
   await db.changeLogs.put(entry);
   return entry;
@@ -368,7 +409,7 @@ export async function undoChangeLog(
   }
 
   let restoredCount = 0;
-  await db.transaction('rw', [db.conversations, db.changeLogs], async () => {
+  await db.transaction('rw', [db.conversations, db.changeLogs, db.collections], async () => {
     for (const snap of entry.snapshots) {
       const existing = await db.conversations.get(snap.threadKey);
       if (!existing) continue;
@@ -380,8 +421,15 @@ export async function undoChangeLog(
         manualTags: snap.previousManualTags,
         workflowState: snap.previousWorkflowState,
         manualTitleOverride: snap.previousManualTitleOverride,
+        projectSource: snap.previousProjectSource ?? existing.projectSource,
+        workflowStateSource: snap.previousWorkflowStateSource ?? existing.workflowStateSource,
       });
       restoredCount += 1;
+    }
+    // Remove projects this change created if nothing is filed in them any more.
+    for (const name of entry.createdCollections ?? []) {
+      const stillUsed = await db.conversations.where('project').equals(name).count();
+      if (stillUsed === 0) await db.collections.delete(name);
     }
     await db.changeLogs.put({
       ...entry,

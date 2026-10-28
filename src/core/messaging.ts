@@ -9,12 +9,16 @@ export type PrivilegedCommandType =
   | 'DELETE_THREAD'
   | 'EXPORT_BUNDLE'
   | 'UPDATE_SETTINGS'
-  | 'RUN_RESUMABLE_JOBS';
+  | 'RUN_RESUMABLE_JOBS'
+  | 'SETTINGS_CHANGED'
+  | 'RUN_ANALYSIS_NOW';
 
 export type ContentScriptCommandType =
   | 'PASSIVE_DOM_CAPTURE'
   | 'OVERLAY_STATE_CHANGED'
-  | 'GET_CAPTURE_AUTH_STATE';
+  | 'GET_CAPTURE_AUTH_STATE'
+  | 'OVERLAY_FRAME_STATUS'
+  | 'OPEN_MANAGER_FALLBACK';
 
 export type ExtensionMessage =
   | {
@@ -67,6 +71,16 @@ const PRIVILEGED_TYPES = new Set<string>([
   'EXPORT_BUNDLE',
   'UPDATE_SETTINGS',
   'RUN_RESUMABLE_JOBS',
+  'SETTINGS_CHANGED',
+  'RUN_ANALYSIS_NOW',
+]);
+
+const CONTENT_SCRIPT_TYPES = new Set<string>([
+  'PASSIVE_DOM_CAPTURE',
+  'GET_CAPTURE_AUTH_STATE',
+  'OVERLAY_STATE_CHANGED',
+  'OVERLAY_FRAME_STATUS',
+  'OPEN_MANAGER_FALLBACK',
 ]);
 
 export function validateRuntimeMessageSender(
@@ -86,12 +100,14 @@ export function validateRuntimeMessageSender(
   }
 
   if (PRIVILEGED_TYPES.has(message.type)) {
-    const expectedPrefix = `chrome-extension://${expectedExtensionId}/manager.html`;
     const senderUrl = sender.url ?? '';
+    const isOwnManagerPage = new RegExp(
+      `^chrome-extension://${expectedExtensionId}/(manager|sidepanel)\\.html(?:$|[?#])`
+    ).test(senderUrl);
     const isDynamicExtensionManagerUrl =
       sender.id === expectedExtensionId &&
-      /^chrome-extension:\/\/[a-z0-9-]+\/manager\.html(?:$|\?)/i.test(senderUrl);
-    if (!senderUrl.startsWith(expectedPrefix) && !isDynamicExtensionManagerUrl) {
+      /^chrome-extension:\/\/[a-z0-9-]+\/(manager|sidepanel)\.html(?:$|[?#])/i.test(senderUrl);
+    if (!isOwnManagerPage && !isDynamicExtensionManagerUrl) {
       return {
         allowed: false,
         reason: `Rejected privileged action "${message.type}" from non-manager origin: ${senderUrl || 'unknown'}`,
@@ -114,11 +130,7 @@ export function validateRuntimeMessageSender(
     return { allowed: true };
   }
 
-  if (
-    message.type === 'PASSIVE_DOM_CAPTURE' ||
-    message.type === 'GET_CAPTURE_AUTH_STATE' ||
-    message.type === 'OVERLAY_STATE_CHANGED'
-  ) {
+  if (CONTENT_SCRIPT_TYPES.has(message.type)) {
     if (!sender.tab && !sender.url) {
       return {
         allowed: false,

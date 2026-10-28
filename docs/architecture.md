@@ -2,7 +2,18 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
-## Decisions
+## v0.2 changes (2026-10-28)
+
+1. **Edge fix — no `use_dynamic_url`.** `manager.html` was web-accessible only through a per-session dynamic ID. Chrome 153 returns that dynamic URL from `chrome.runtime.getURL()` in content scripts, but Microsoft Edge returns the static extension ID, and a static URL for a dynamic-URL resource is refused with `ERR_BLOCKED_BY_CLIENT` ("`<id>` is blocked"). The flag is gone; framing safety rests on the one-time handshake (unauthenticated frames still render only the rejection notice). Accepted cost: any website can now detect that the extension is installed by probing `chrome-extension://<id>/manager.html` (the dynamic URL used to hide this); it learns nothing else. A content-script watchdog replaces an overlay whose frame never redeems its handshake with the full-page library.
+2. **Side panel is the default surface.** The toolbar button opens the browser side panel (`sidePanel.setPanelBehavior`), which needs no page frame at all; the overlay (`Alt+Shift+K`) and full page (`Alt+Shift+M`) remain. Chosen in Settings.
+3. **Capture is on by default for every supported provider** (ChatGPT, Claude, Claude Code web, Codex web, Grok, Gemini, Perplexity, DeepSeek, Le Chat, Copilot). v1 shipped opt-in with every host off, so nothing was captured or organized automatically; the v2 Dexie migration turns capture on. Per-provider toggles remain in Settings.
+4. **Provider registry.** `src/core/providers.ts` defines hosts, URL identity and labels; the manifest's host permissions and content-script matches are generated from it.
+5. **Two analysis tiers.** An on-device analyzer runs synchronously after every capture (gist, kind, topics, entities, artifacts, grounded decisions / next steps / open questions, status). With the user's Anthropic key, a debounced job queue (alarm-driven in the service worker, leased so the manager page can also drain it) sends the thread to Claude through the official SDK with structured outputs and the server-side refusal fallback; ungrounded items are dropped rather than failing the summary.
+6. **Automatic filing precedence:** manual/locked > provider project or repository > Claude > keyword routing > k-NN over confidently filed threads. A weaker signal never overrides or relabels a stronger one; every automatic assignment records its source and reason.
+7. **Embeddings per space.** One vector per thread per embedding space (`threadVectors`). A local hashed space is always maintained; Voyage, OpenAI or Ollama add a hosted space. Vectors are compared only within one space.
+8. **Privacy model unchanged in spirit:** local-only threads, and threads already in a local-only project, are never sent to Claude, embedding APIs or the Worker (eligibility is checked when a thread is analyzed, so an unfiled new conversation can be sent before Claude files it into a local-only project); keys live in extension IndexedDB; a daily analysis limit caps spend. No localhost or wildcard host permissions.
+
+## Decisions (v1)
 
 1. **A quiet MV3 extension, not a toolbar popup.** The action and configurable command invoke a generous overlay on supported ChatGPT/Claude pages. Other pages open an extension-owned manager tab. Installation, startup, capture and job events never open UI or show page controls. Persist view state, never visibility.
 2. **Extension-origin reader.** A lazily created extension iframe renders captured messages. Website DOM contains only the temporary dialog/frame, never transcripts from other providers. A host can remove or obscure that frame; this is not a defense against a malicious website impersonating UI. The privileged operation boundary is extension runtime sender validation, not CSS isolation. No generic page-to-extension bridge is exposed. Embedding is admitted only after an invocation-specific authorization, not merely because the frame URL is web-accessible.
@@ -35,23 +46,23 @@ Use neutral layered surfaces with a restrained teal accent, 4px spacing rhythm, 
 - [Chrome storage](https://developer.chrome.com/docs/extensions/develop/concepts/storage-and-cookies): content-script web storage belongs to the host, not the extension. Extension iframes share their extension-origin storage partition.
 - [Chrome service-worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle): persist work, register listeners synchronously, use alarms; no keepalive tricks.
 
-## Adapter capability matrix (v1)
+## Adapter capability matrix
 
 `Y` = implemented, `P` = partial by design, `N` = not supported and must be shown as unsupported in the UI.
 
-| Capability | ChatGPT web (DOM) | Claude web (DOM) | ChatGPT export | Claude export | Threadkeeper portable | Gemini / Grok / cloud coding tasks |
-|---|---|---|---|---|---|---|
-| Account identification | P — user-bound label only | P — user-bound label only | P — user declares the archive's account | P — user declares | Y — carried in the file | N |
-| Thread discovery | P — only threads the user opens | P — only opened threads | Y — every conversation in the file | Y | Y | N |
-| Content capture | P — rendered messages only | P — rendered messages only | Y | Y | Y | N |
-| History backfill | N — no undocumented endpoints | N | Y — complete within the file | Y | Y | N |
-| Branch handling | P — one observed path, no sibling discovery | P — one observed path | Y — current path plus materially different sibling subtrees as separate records | P — follows the current leaf; siblings not reconstructed | Y — as exported | N |
-| Attachments | P — names/kinds visible in the DOM only | P — names/kinds only | P — metadata only, contents never fetched | P — metadata only | Y — as exported | N |
-| Observed task status | N | N | N | N | N | N |
-| Source navigation | Y | Y | Y — canonical URL only; may not resolve if the thread is gone | Y | Y | N |
+| Capability | Web DOM capture (ChatGPT, Claude, Claude Code web, Codex web, Grok, Gemini, Perplexity, DeepSeek, Le Chat, Copilot) | ChatGPT / Claude export | Claude Code / Codex CLI sessions | Threadkeeper portable |
+|---|---|---|---|---|
+| Account identification | P — user-bound label only | P — user declares the archive's account | P — bound per provider | Y — carried in the file |
+| Thread discovery | P — only threads the user opens | Y — every conversation in the file | Y — every session file in the picked folder | Y |
+| Content capture | P — rendered messages only | Y | Y — user, assistant, condensed tool calls/results | Y |
+| History backfill | N — no undocumented endpoints | Y | Y | Y |
+| Branch handling | P — one observed path | Y (ChatGPT) / P (Claude) | P — main chain; sidechains (subagents) skipped | Y |
+| Provider project | P — ChatGPT/Claude Projects, repository link on coding-agent pages | N | Y — working directory / repository | Y |
+| Source navigation | Y | Y — canonical URL | P — copyable resume command | Y |
+| Observed task status | N | N | N | N |
 
 Consequences the UI must honour: a DOM-captured thread never shows `full` coverage; "history backfill" is only claimed for exports; a missing sidebar item or a failed open is never treated as deletion; and no adapter ever displays a cloud-task execution state, because none is observed.
 
 ## Non-goals and authority boundaries
 
-No terminal/CLI session management, public sharing links, private competitor APIs, source bulk deletion, provider account switching, arbitrary website permissions, graph launch feature, telemetry, payment/upsell code, or competitor assets. Additional chat and cloud-task products require separate adapters and capability evidence. A cloud agent claiming completion is not proof of completed work. Browsing history disappearing does not authorize deleting captured records.
+No terminal/CLI session control (sessions are imported read-only; resuming is the user's own command), public sharing links, private competitor APIs, source bulk deletion, provider account switching, arbitrary website permissions, graph launch feature, telemetry, payment/upsell code, or competitor assets. Additional chat and cloud-task products require separate adapters and capability evidence. A cloud agent claiming completion is not proof of completed work. Browsing history disappearing does not authorize deleting captured records.

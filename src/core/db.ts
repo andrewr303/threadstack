@@ -1,7 +1,8 @@
 import Dexie, { type Table } from 'dexie';
+import { PROVIDER_IDS, CAPTURE_PROVIDER_IDS } from './providers.js';
 import {
   STARTER_AREAS,
-  DEFAULT_SETTINGS,
+  normalizeSettings,
   computeDeterministicHash,
   verifyExtensionSummaryEvidence as verifyStructuredSummaryEvidence,
   type ExtensionSummaryOutput as StructuredSummaryOutput,
@@ -21,6 +22,10 @@ import {
   type CaptureSource,
   type ProviderId,
   type WorkflowState,
+  type ThreadInsight,
+  type ThreadVectorRecord,
+  type StoredHandleRecord,
+  type ProjectSource,
 } from './schema.js';
 
 export class ThreadkeeperDB extends Dexie {
@@ -36,6 +41,9 @@ export class ThreadkeeperDB extends Dexie {
   changeLogs!: Table<ChangeLogEntry, string>;
   tombstones!: Table<TombstoneRecord, string>;
   settings!: Table<SettingsRecord, string>;
+  insights!: Table<ThreadInsight, string>;
+  threadVectors!: Table<ThreadVectorRecord, string>;
+  handles!: Table<StoredHandleRecord, string>;
 
   constructor(dbName = 'ThreadkeeperDB') {
     super(dbName);
@@ -55,15 +63,60 @@ export class ThreadkeeperDB extends Dexie {
       tombstones: 'threadKey, [provider+sourceConversationId+branchId], deletedAt',
       settings: 'id',
     });
+    this.version(2)
+      .stores({
+        insights: 'insightKey, threadKey, source, kind',
+        threadVectors: 'vectorKey, threadKey, space',
+        handles: 'id',
+      })
+      .upgrade(async (tx) => {
+        // v1 shipped with capture opt-in and off for every host, so nothing was
+        // captured or organized automatically. Automatic capture is now the default.
+        await tx
+          .table('settings')
+          .toCollection()
+          .modify((raw: Partial<SettingsRecord>) => {
+            const next = normalizeSettings(raw);
+            for (const id of CAPTURE_PROVIDER_IDS) {
+              next.authorizedHosts[id] = true;
+            }
+            next.settingsVersion = 2;
+            Object.assign(raw, next);
+          });
+        await tx
+          .table('conversations')
+          .toCollection()
+          .modify((conv: ConversationRecord) => {
+            if (!conv.projectSource) {
+              conv.projectSource = conv.categoryLocked
+                ? 'manual'
+                : conv.project === UNFILED_PROJECT
+                  ? 'default'
+                  : 'import';
+            }
+            if (!conv.workflowStateSource) {
+              conv.workflowStateSource = conv.workflowState === 'active' ? 'auto' : 'manual';
+            }
+          });
+        await tx
+          .table('collections')
+          .toCollection()
+          .modify((col: CollectionRecord) => {
+            if (!col.origin) col.origin = col.isStarterArea ? 'starter' : 'user';
+            if (!col.keywords) col.keywords = [];
+          });
+      });
   }
 }
+
+export const UNFILED_PROJECT = 'Unfiled / Uncertain';
 
 export async function ensureStarterCollectionsAndSettings(
   db: ThreadkeeperDB
 ): Promise<SettingsRecord> {
   const existingSettings = await db.settings.get('default');
   if (!existingSettings) {
-    await db.settings.put({ ...DEFAULT_SETTINGS });
+    await db.settings.put(normalizeSettings(null));
   }
   const existingCollections = await db.collections.count();
   if (existingCollections === 0) {
@@ -85,10 +138,35 @@ export async function ensureStarterCollectionsAndSettings(
         isStarterArea: true,
         cloudExcluded: name === 'Personal',
         createdAt: now,
+        keywords: STARTER_AREA_KEYWORDS[name] ?? [],
+        origin: 'starter' as const,
       }))
     );
   }
-  return (await db.settings.get('default')) ?? { ...DEFAULT_SETTINGS };
+  return normalizeSettings(await db.settings.get('default'));
+}
+
+/** Seed routing keywords for the starter areas; users and the auto-organizer extend these. */
+export const STARTER_AREA_KEYWORDS: Record<string, string[]> = {
+  HypeStake: ['hypestake', 'sportsbook', 'odds', 'betting', 'wager', 'parlay'],
+  'Velotic / FrameConcepts': ['velotic', 'frameconcepts', 'frame concepts', 'shader', 'motion pipeline'],
+  'Daydock / Meridian': ['daydock', 'meridian'],
+  'General research': [],
+  Personal: [],
+  'Unfiled / Uncertain': [],
+};
+
+/** Persist a settings patch and return the normalized result. */
+export async function saveSettingsPatch(
+  db: ThreadkeeperDB,
+  patch: Partial<SettingsRecord>
+): Promise<SettingsRecord> {
+  return db.transaction('rw', db.settings, async () => {
+    const current = normalizeSettings(await db.settings.get('default'));
+    const updated = normalizeSettings({ ...current, ...patch });
+    await db.settings.put(updated);
+    return updated;
+  });
 }
 
 export interface UpsertThreadInput {
@@ -121,6 +199,12 @@ export interface UpsertThreadInput {
   nextStepText?: string | null;
   nextStepMsgIndex?: number | null;
   nextStepSpeaker?: 'user_committed' | 'assistant_suggested' | null;
+  providerProjectName?: string | null;
+  workspacePath?: string | null;
+  gitBranch?: string | null;
+  modelSlug?: string | null;
+  resumeCommand?: string | null;
+  projectSource?: ProjectSource;
   messages: Array<{
     sourceMessageId: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
@@ -327,7 +411,12 @@ export async function upsertThread(
 
       const effectiveProject = existing?.categoryLocked
         ? existing.project
-        : input.project ?? existing?.project ?? 'Unfiled / Uncertain';
+        : input.project ?? existing?.project ?? UNFILED_PROJECT;
+      const effectiveProjectSource: ProjectSource = existing?.categoryLocked
+        ? existing.projectSource ?? 'manual'
+        : input.project !== undefined && input.project !== existing?.project
+          ? input.projectSource ?? 'import'
+          : existing?.projectSource ?? input.projectSource ?? (effectiveProject === UNFILED_PROJECT ? 'default' : 'import');
 
       const now = new Date().toISOString();
       const record: ConversationRecord = {
@@ -376,6 +465,17 @@ export async function upsertThread(
         nextStepText: input.nextStepText ?? existing?.nextStepText ?? null,
         nextStepMsgIndex: input.nextStepMsgIndex ?? existing?.nextStepMsgIndex ?? null,
         nextStepSpeaker: input.nextStepSpeaker ?? existing?.nextStepSpeaker ?? null,
+        providerProjectName:
+          input.providerProjectName ?? existing?.providerProjectName ?? null,
+        workspacePath: input.workspacePath ?? existing?.workspacePath ?? null,
+        gitBranch: input.gitBranch ?? existing?.gitBranch ?? null,
+        modelSlug: input.modelSlug ?? existing?.modelSlug ?? null,
+        resumeCommand: input.resumeCommand ?? existing?.resumeCommand ?? null,
+        projectSource: effectiveProjectSource,
+        // An explicit non-default state arriving with an import was set by a person; keep it.
+        workflowStateSource:
+          existing?.workflowStateSource ??
+          (input.workflowState && input.workflowState !== 'active' ? 'manual' : 'auto'),
       };
 
       await db.conversations.put(record);
@@ -446,6 +546,18 @@ export async function updateManualThreadFields(
 
     const updated: ConversationRecord = {
       ...existing,
+      projectSource:
+        patch.project !== undefined && patch.project !== existing.project
+          ? 'manual'
+          : patch.categoryLocked === true
+            ? 'manual'
+            : existing.projectSource,
+      projectReason:
+        patch.project !== undefined && patch.project !== existing.project
+          ? 'Filed by you'
+          : existing.projectReason,
+      workflowStateSource:
+        patch.workflowState !== undefined ? 'manual' : existing.workflowStateSource,
       manualTitleOverride:
         patch.manualTitleOverride !== undefined
           ? patch.manualTitleOverride
@@ -700,6 +812,8 @@ export async function deleteConversationCascade(
       db.relationships,
       db.jobs,
       db.tombstones,
+      db.insights,
+      db.threadVectors,
     ],
     async () => {
       const existing = await db.conversations.get(threadKey);
@@ -720,6 +834,8 @@ export async function deleteConversationCascade(
       await db.chunks.where('threadKey').equals(threadKey).delete();
       await db.vectors.where('threadKey').equals(threadKey).delete();
       await db.summaries.delete(threadKey);
+      await db.insights.where('threadKey').equals(threadKey).delete();
+      await db.threadVectors.where('threadKey').equals(threadKey).delete();
       await db.relationships.where('fromThreadKey').equals(threadKey).delete();
       await db.relationships.where('toThreadKey').equals(threadKey).delete();
 
@@ -764,11 +880,9 @@ export async function reconcileLibraryCounts(
   for (const area of STARTER_AREAS) {
     projectCounts[area] = 0;
   }
-  const providerCounts: Record<ProviderId, number> = {
-    chatgpt: 0,
-    claude: 0,
-    imported: 0,
-  };
+  const providerCounts = Object.fromEntries(
+    PROVIDER_IDS.map((id) => [id, 0])
+  ) as Record<ProviderId, number>;
   const coverageCounts: Record<CoverageState, number> = {
     full: 0,
     partial: 0,
@@ -794,9 +908,9 @@ export async function reconcileLibraryCounts(
     if (options?.workspaceId && conv.workspaceId !== options.workspaceId) continue;
 
     totalThreads += 1;
-    const proj = conv.project || 'Unfiled / Uncertain';
+    const proj = conv.project || UNFILED_PROJECT;
     projectCounts[proj] = (projectCounts[proj] ?? 0) + 1;
-    if (proj === 'Unfiled / Uncertain') {
+    if (proj === UNFILED_PROJECT) {
       unfiledCount += 1;
     } else {
       filedCount += 1;

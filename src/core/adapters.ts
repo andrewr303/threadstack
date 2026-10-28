@@ -78,6 +78,58 @@ export const CAPABILITY_MATRIX: AdapterCapabilityRow[] = [
     notes:
       'Imports full exported conversation history and ISO timestamps.',
   },
+  ...(
+    [
+      ['claude_code_web', 'Claude Code on the web (claude.ai/code)'],
+      ['codex_web', 'Codex cloud tasks (chatgpt.com/codex)'],
+      ['grok_dom', 'Grok (grok.com)'],
+      ['gemini_dom', 'Gemini (gemini.google.com)'],
+      ['perplexity_dom', 'Perplexity (perplexity.ai)'],
+      ['deepseek_dom', 'DeepSeek (chat.deepseek.com)'],
+      ['mistral_dom', 'Le Chat (chat.mistral.ai)'],
+      ['copilot_dom', 'Microsoft Copilot (copilot.microsoft.com)'],
+    ] as const
+  ).map(
+    ([adapterId, label]): AdapterCapabilityRow => ({
+      adapterId,
+      label,
+      visibleDom: 'P',
+      fullExport: 'N',
+      branchHistory: 'N',
+      timestamps: 'P',
+      artifacts: 'P',
+      cloudTaskStatus: 'N',
+      openOriginal: 'Y',
+      notes:
+        'Captures rendered turns of the open conversation with honest partial coverage; selectors fall back to generic role heuristics when the site changes.',
+    })
+  ),
+  {
+    adapterId: 'claude_code_cli',
+    label: 'Claude Code CLI sessions (~/.claude/projects/*.jsonl)',
+    visibleDom: 'N',
+    fullExport: 'Y',
+    branchHistory: 'P',
+    timestamps: 'Y',
+    artifacts: 'P',
+    cloudTaskStatus: 'N',
+    openOriginal: 'P',
+    notes:
+      'Imports full local transcripts with working directory and git branch; reopen via the copied `claude --resume` command.',
+  },
+  {
+    adapterId: 'codex_cli',
+    label: 'Codex CLI sessions (~/.codex/sessions/**/*.jsonl)',
+    visibleDom: 'N',
+    fullExport: 'Y',
+    branchHistory: 'N',
+    timestamps: 'Y',
+    artifacts: 'P',
+    cloudTaskStatus: 'N',
+    openOriginal: 'P',
+    notes:
+      'Imports local rollout transcripts with working directory and repository; reopen via the copied `codex resume` command.',
+  },
   {
     adapterId: 'portable_bundle',
     label: 'Threadkeeper Portable JSON / Markdown',
@@ -318,8 +370,19 @@ export interface ClaudeExportConversation {
     uuid?: string;
     sender?: 'human' | 'assistant' | string;
     text?: string;
+    content?: Array<{ type?: string; text?: string }>;
     created_at?: string | null;
   }>;
+}
+
+function claudeExportMessageText(m: NonNullable<ClaudeExportConversation['chat_messages']>[number]): string {
+  const direct = (m.text ?? '').trim();
+  if (direct) return direct;
+  return (m.content ?? [])
+    .filter((c) => c && c.type === 'text' && typeof c.text === 'string')
+    .map((c) => c.text as string)
+    .join('\n')
+    .trim();
 }
 
 export function parseClaudeExport(
@@ -332,11 +395,11 @@ export function parseClaudeExport(
     const createdAt = unixToIsoOrNull(item.created_at);
     const updatedAt = unixToIsoOrNull(item.updated_at) ?? createdAt;
     const messages = (item.chat_messages ?? [])
-      .filter((m) => (m.text ?? '').trim().length > 0)
+      .filter((m) => claudeExportMessageText(m).length > 0)
       .map((m, mIdx) => ({
         sourceMessageId: m.uuid || `${convId}_m_${mIdx}`,
         role: (m.sender === 'human' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: (m.text ?? '').trim(),
+        content: claudeExportMessageText(m),
         createdAt: unixToIsoOrNull(m.created_at),
         branchPath: 'main',
       }));
@@ -558,158 +621,10 @@ export function exportThreadToMarkdown(
   return lines.join('\n');
 }
 
-export interface DomExtractionResult {
-  provider: ProviderId;
-  sourceConversationId: string;
-  branchId: string;
-  canonicalUrl: string;
-  title: string;
-  coverage: 'partial' | 'title_only';
-  messages: UpsertThreadInput['messages'];
-}
-
-export function detectProviderFromUrl(url: string): ProviderId | null {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    if (host.includes('chatgpt.com') || host.includes('chat.openai.com')) {
-      return 'chatgpt';
-    }
-    if (host.includes('claude.ai')) {
-      return 'claude';
-    }
-    if (parsed.searchParams.get('tk_provider') === 'chatgpt') return 'chatgpt';
-    if (parsed.searchParams.get('tk_provider') === 'claude') return 'claude';
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function extractConversationIdFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const chatgptMatch = parsed.pathname.match(/\/c\/([a-zA-Z0-9_-]+)/);
-    if (chatgptMatch) return chatgptMatch[1];
-    const claudeMatch = parsed.pathname.match(/\/chat\/([a-zA-Z0-9_-]+)/);
-    if (claudeMatch) return claudeMatch[1];
-    const paramId = parsed.searchParams.get('tk_conv_id');
-    if (paramId) return paramId;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function extractVisibleDomConversation(
-  doc: Document,
-  locationHref: string
-): DomExtractionResult | null {
-  const providerAttr = doc.documentElement.getAttribute('data-tk-provider');
-  const provider: ProviderId | null =
-    providerAttr === 'chatgpt' || providerAttr === 'claude'
-      ? providerAttr
-      : detectProviderFromUrl(locationHref);
-
-  if (!provider) return null;
-
-  const convIdAttr =
-    doc.documentElement.getAttribute('data-tk-conversation-id') ||
-    doc.querySelector('[data-conversation-id]')?.getAttribute('data-conversation-id');
-  const sourceConversationId =
-    convIdAttr || extractConversationIdFromUrl(locationHref);
-
-  if (!sourceConversationId) return null;
-
-  const branchAttr =
-    doc.querySelector('[data-branch-id]')?.getAttribute('data-branch-id') ||
-    doc.documentElement.getAttribute('data-tk-branch-id') ||
-    'main';
-  const branchId = branchAttr.trim() || 'main';
-
-  const rawTitle =
-    doc.querySelector('[data-conversation-title]')?.textContent ||
-    doc.title.replace(/\s*[-|]\s*(ChatGPT|Claude).*$/i, '') ||
-    'Untitled conversation';
-  const title = rawTitle.trim() || 'Untitled conversation';
-
-  // Select only completed turn elements, explicitly excluding composer inputs and active streaming nodes
-  const turnElements = Array.from(
-    doc.querySelectorAll(
-      '[data-message-author-role], [data-testid^="conversation-turn"], [data-tk-message-role]'
-    )
-  );
-
-  const messages: UpsertThreadInput['messages'] = [];
-
-  for (let i = 0; i < turnElements.length; i++) {
-    const el = turnElements[i];
-
-    // Never capture inside a composer form or contenteditable draft
-    if (
-      el.closest('form') ||
-      el.closest('[data-testid="composer"]') ||
-      el.getAttribute('contenteditable') === 'true'
-    ) {
-      continue;
-    }
-
-    // Never capture an in-progress streaming response
-    if (
-      el.getAttribute('data-streaming') === 'true' ||
-      el.classList.contains('result-streaming') ||
-      el.querySelector('[data-streaming="true"], .result-streaming')
-    ) {
-      continue;
-    }
-
-    const roleAttr =
-      el.getAttribute('data-message-author-role') ||
-      el.getAttribute('data-tk-message-role') ||
-      el
-        .querySelector('[data-message-author-role]')
-        ?.getAttribute('data-message-author-role') ||
-      (el.classList.contains('font-user-message') ? 'user' : 'assistant');
-
-    const role: 'user' | 'assistant' | 'tool' =
-      roleAttr === 'user' || roleAttr === 'human'
-        ? 'user'
-        : roleAttr === 'tool'
-          ? 'tool'
-          : 'assistant';
-
-    const sourceMessageId =
-      el.getAttribute('data-message-id') ||
-      el.querySelector('[data-message-id]')?.getAttribute('data-message-id') ||
-      `${sourceConversationId}_${branchId}_m_${i}`;
-
-    // Clone or read text excluding button/toolbar children
-    const bodyNode = el.querySelector('[data-message-content]') ?? el;
-    const text = (bodyNode.textContent ?? '').trim();
-    if (!text) continue;
-
-    const timeEl = el.querySelector('time[datetime]');
-    const explicitTs =
-      el.getAttribute('data-message-timestamp') ||
-      timeEl?.getAttribute('datetime') ||
-      null;
-
-    messages.push({
-      sourceMessageId,
-      role,
-      content: text,
-      createdAt: unixToIsoOrNull(explicitTs),
-      branchPath: branchId,
-    });
-  }
-
-  return {
-    provider,
-    sourceConversationId,
-    branchId,
-    canonicalUrl: locationHref,
-    title,
-    coverage: messages.length > 0 ? 'partial' : 'title_only',
-    messages,
-  };
-}
+export {
+  extractVisibleDomConversation,
+  extractReadableText,
+  canonicalizeConversationUrl,
+  type DomExtractionResult,
+} from './dom-capture.js';
+export { detectProviderFromUrl, extractConversationIdFromUrl } from './providers.js';
