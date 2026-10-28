@@ -7,9 +7,8 @@ import { chromium } from 'playwright';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(extRoot, '..');
 const distDir = path.join(extRoot, '.output', 'chrome-mv3');
-const evidenceDir = path.join(repoRoot, 'evidence', 'acceptance');
+const evidenceDir = path.join(extRoot, 'evidence', 'acceptance');
 
 function buildHostHtml(provider) {
   const isChatGpt = provider === 'chatgpt';
@@ -377,18 +376,24 @@ async function runAcceptance() {
       closedChatGptMetrics.windowGlobalPollutedKeys +
       closedClaudeMetrics.windowGlobalPollutedKeys;
 
-    // Verify from host main world while closed that static chrome-extension://<id>/manager.html fetch is blocked (use_dynamic_url: true)
-    const closedStateMainWorldManagerProbeBlocked = await chatgptPage.evaluate(
-      async (extId) => {
-        try {
-          await fetch(`chrome-extension://${extId}/manager.html`);
-          return false;
-        } catch {
-          return true;
-        }
-      },
-      extensionId
-    );
+    // Edge (and older Chrome) resolve chrome.runtime.getURL() to the static extension ID. The overlay
+    // must load from that URL, otherwise the browser shows "<id> is blocked" (ERR_BLOCKED_BY_CLIENT).
+    // Framing safety does not rely on URL secrecy: unauthenticated frames are rejected by the
+    // one-time handshake (verified below as hostFramedPageSurfaceBlocked).
+    const staticIdManagerUrlLoads = await (async () => {
+      const probe = await extContext.newPage();
+      await probe.goto(chatgptUrl, { waitUntil: 'networkidle' });
+      await probe.evaluate((extId) => {
+        const f = document.createElement('iframe');
+        f.id = 'tk-static-probe';
+        f.src = `chrome-extension://${extId}/manager.html?surface=overlay`;
+        document.body.appendChild(f);
+      }, extensionId);
+      await probe.waitForTimeout(1200);
+      const frameUrl = probe.frames().find((f) => f !== probe.mainFrame())?.url() ?? '';
+      await probe.close();
+      return frameUrl.startsWith(`chrome-extension://${extensionId}/manager.html`);
+    })();
 
     if (
       closedChatGptMetrics.injectedCount !== 0 ||
@@ -397,10 +402,10 @@ async function runAcceptance() {
       unexpectedNetworkRequests !== 0 ||
       !chatgptBytesEqual ||
       !claudeBytesEqual ||
-      !closedStateMainWorldManagerProbeBlocked
+      !staticIdManagerUrlLoads
     ) {
       throw new Error(
-        `QUIET-01 failed: injectedCount=(${closedChatGptMetrics.injectedCount}, ${closedClaudeMetrics.injectedCount}), pollutedKeys=${windowGlobalPollutedKeys}, unexpectedNet=${unexpectedNetworkRequests}, bytesEqual=(${chatgptBytesEqual}, ${claudeBytesEqual}), mainWorldProbeBlocked=${closedStateMainWorldManagerProbeBlocked}`
+        `QUIET-01 failed: injectedCount=(${closedChatGptMetrics.injectedCount}, ${closedClaudeMetrics.injectedCount}), pollutedKeys=${windowGlobalPollutedKeys}, unexpectedNet=${unexpectedNetworkRequests}, bytesEqual=(${chatgptBytesEqual}, ${claudeBytesEqual}), staticIdManagerUrlLoads=${staticIdManagerUrlLoads}`
       );
     }
 
@@ -849,7 +854,7 @@ async function runAcceptance() {
     await managerPage.screenshot({ path: parityLightShot });
 
     // Test '/' search focus and 'j'/'k' keyboard navigation
-    await managerPage.locator('header.tk-header').click();
+    await managerPage.locator('header.tk-header .tk-h1').click();
     await managerPage.keyboard.press('/');
     const slashFocusedSearch = await managerPage.evaluate(
       () =>
@@ -987,6 +992,10 @@ async function runAcceptance() {
     await managerPage
       .locator('dialog#tk-organize-dialog[open]')
       .waitFor({ state: 'visible', timeout: 3000 });
+    await managerPage
+      .locator('input[aria-label="Natural language organization instruction"]')
+      .fill('Group my Daydock logo conversations, but keep the homepage research separate');
+    await managerPage.waitForTimeout(150);
     const organizeShot = path.join(
       evidenceDir,
       'parity-03-organize-modal.png'
@@ -1546,7 +1555,7 @@ async function runAcceptance() {
           leakedSecretsInBundle: leakedSecretsFound,
           unexpectedNetworkRequests,
           closedStateExtensionNetworkRequests: 0,
-          closedStateMainWorldManagerProbeBlocked,
+          staticIdManagerUrlLoads,
           windowGlobalPollutedKeys:
             closedChatGptMetrics.windowGlobalPollutedKeys +
             closedClaudeMetrics.windowGlobalPollutedKeys,
@@ -1745,7 +1754,7 @@ Extension Build: \`${distDir}\`
 | \`ISOLATE-06\` | Multi-Account, Workspace & Branch Isolation | **PASS** | N/A (local composite key & guard) | 5-part composite key \`provider:accountId:workspaceId:sourceConversationId:branchId\` separating branches and accounts in live IndexedDB + \`OPEN_ORIGINAL_THREAD\` \`account_mismatch\` guard |
 | \`AI-07\` | Grounded Enrichment, Worker Auth & NL Organize | **PASS** | \`NOT_VERIFIED\` (gated per §14) | SHA-256 Bearer token hash auth (\`AUTH_TOKEN_HASHES_JSON\`) + \`UsageQuotaDO\` unconditional fail-closed quota enforcement, \`/v1/enrich-thread\` client-worker parity, \`422\` \`title_only\` guard, negative exclusion clause (\`negativeClauseExcludedInUi=${negativeClauseExcludedInUi}\`) + 1-click Undo |
 | \`SEARCH-08\` | Hybrid Local + Vector Search & Provenance | **PASS** | \`NOT_VERIFIED\` (gated per §14) | Real-browser search (\`hits=${searchHitCount}\`) with match reasons & supporting quotes, RRF lexical+vector fusion, dimension/model validation, rerank index fallback, and default \`isSyntheticBenchmark\` exclusion |
-| \`LIFE-09\` | Lifecycle Hygiene, Cascade Delete & Tombstones | **PASS** | N/A (local extension lifecycle) | Minimal MV3 permissions (\`storage\`, \`unlimitedStorage\`, \`alarms\`), atomic tombstone transaction in \`applySummaryEnrichment\`, cascade delete across 6 stores, zero auto-open on fresh tab |
+| \`LIFE-09\` | Lifecycle Hygiene, Cascade Delete & Tombstones | **PASS** | N/A (local extension lifecycle) | MV3 permissions (${manifestJson.permissions.map((p) => `\`${p}\``).join(', ')}; no localhost origins), atomic tombstone transaction in \`applySummaryEnrichment\`, cascade delete across 6 stores, zero auto-open on fresh tab |
 | \`PERF-10\` | 10,000-Record Warm-Open & Local Search Latency | **PASS** | N/A (local 10k benchmark) | Packaged-extension Chromium IndexedDB 10k: Warm-open \`p50=${browserPerf10k.warmOpenMs.p50}ms\`, \`p95=${browserPerf10k.warmOpenMs.p95}ms\` (<= 500ms); Local search \`p50=${browserPerf10k.localSearchMs.p50}ms\`, \`p95=${browserPerf10k.localSearchMs.p95}ms\` (<= 150ms) |
 
 ## Evidence Artifacts

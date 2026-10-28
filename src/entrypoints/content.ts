@@ -1,4 +1,4 @@
-import { extractVisibleDomConversation } from '../core/adapters.js';
+import { extractVisibleDomConversation } from '../core/dom-capture.js';
 import { validateWindowPostMessage } from '../core/messaging.js';
 
 const OVERLAY_DIALOG_ID = 'threadkeeper-overlay-root';
@@ -19,6 +19,8 @@ interface SavedHostState {
 
 let activeHandshakeToken = '';
 let savedHostState: SavedHostState | null = null;
+let overlayWatchdog: ReturnType<typeof setTimeout> | null = null;
+const OVERLAY_LOAD_TIMEOUT_MS = 5000;
 let captureDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastCapturedFingerprint = '';
 
@@ -137,6 +139,10 @@ function restoreHostPageState(state: SavedHostState | null): void {
 }
 
 export function closeOverlayAndRestore(): void {
+  if (overlayWatchdog) {
+    clearTimeout(overlayWatchdog);
+    overlayWatchdog = null;
+  }
   const existing = document.getElementById(OVERLAY_DIALOG_ID);
   if (existing) {
     if (existing instanceof HTMLDialogElement && existing.open) {
@@ -224,8 +230,35 @@ export function openOrToggleOverlay(handshakeToken: string): {
     dialog.setAttribute('open', 'true');
   }
   iframe.focus();
+  armOverlayWatchdog(handshakeToken);
 
   return { state: 'opened' };
+}
+
+/**
+ * Self-healing: if the manager frame has not redeemed its handshake in time it
+ * never loaded (blocked by the browser, an extension or the page), so swap the
+ * dead overlay for the full-page library instead of leaving an error page.
+ */
+function armOverlayWatchdog(token: string): void {
+  if (overlayWatchdog) clearTimeout(overlayWatchdog);
+  overlayWatchdog = setTimeout(() => {
+    overlayWatchdog = null;
+    if (activeHandshakeToken !== token || !document.getElementById(OVERLAY_DIALOG_ID)) return;
+    try {
+      chrome.runtime.sendMessage(
+        { type: 'OVERLAY_FRAME_STATUS' },
+        (resp: { ok?: boolean; redeemed?: boolean } | undefined) => {
+          if (chrome.runtime.lastError || !resp?.ok || resp.redeemed) return;
+          if (activeHandshakeToken !== token) return;
+          closeOverlayAndRestore();
+          chrome.runtime.sendMessage({ type: 'OPEN_MANAGER_FALLBACK', reason: 'overlay_frame_blocked' });
+        }
+      );
+    } catch {
+      // extension context invalidated (reloaded); nothing to fall back to
+    }
+  }, OVERLAY_LOAD_TIMEOUT_MS);
 }
 
 let pendingExplicitInvoke = false;
@@ -247,7 +280,7 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
     );
     if (!extracted) return;
 
-    const fingerprint = `${extracted.provider}:${extracted.sourceConversationId}:${extracted.branchId}:${extracted.title}:${extracted.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
+    const fingerprint = `${extracted.provider}:${extracted.sourceConversationId}:${extracted.branchId}:${extracted.title}:${extracted.providerProjectName ?? ''}:${extracted.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
     if (!useExplicit && fingerprint === lastCapturedFingerprint) return;
 
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -267,6 +300,8 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
               coverage: extracted.coverage,
               captureSource: 'dom_observer',
               messages: extracted.messages,
+              providerProjectName: extracted.providerProjectName,
+              modelSlug: extracted.modelSlug,
             },
           },
           (resp: { ok?: boolean } | undefined) => {
@@ -279,7 +314,7 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
         // Ignore if extension context invalidated
       }
     }
-  }, isExplicit ? 50 : 450);
+  }, isExplicit ? 50 : 900);
 }
 
 const ISOLATED_WORLD_GUARD = Symbol.for('threadkeeper.contentScriptInitialized');

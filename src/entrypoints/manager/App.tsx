@@ -1,53 +1,69 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  STARTER_AREAS,
+  THREAD_KINDS,
+  THREAD_KIND_LABELS,
   getDisplayTitle,
-  type ConversationRecord,
-  type MessageRecord,
-  type StructuredSummaryRecord,
-  type RelationshipRecord,
-  type SettingsRecord,
   type ChangeLogEntry,
-  type ResurfaceQueue,
-  type WorkflowState,
-  type ProviderId,
+  type CollectionRecord,
+  type ConversationRecord,
   type CoverageState,
+  type MessageRecord,
+  type ProviderId,
+  type RelationshipRecord,
+  type ResurfaceQueue,
+  type SettingsRecord,
+  type StructuredSummaryRecord,
+  type ThreadInsight,
+  type ThreadKind,
+  type ThreadVectorRecord,
+  type WorkflowState,
 } from '../../core/schema.js';
 import {
-  ThreadkeeperDB,
-  ensureStarterCollectionsAndSettings,
-  updateManualThreadFields,
+  UNFILED_PROJECT,
   deleteConversationCascade,
+  ensureStarterCollectionsAndSettings,
   reconcileLibraryCounts,
+  saveSettingsPatch,
+  updateManualThreadFields,
   type LibraryReconciledCounts,
 } from '../../core/db.js';
-import {
-  CAPABILITY_MATRIX,
-  parseChatGPTExport,
-  parseClaudeExport,
-  exportPortableBundle,
-  importPortableBundle,
-  exportThreadToMarkdown,
-  type ChatGPTExportConversation,
-  type ClaudeExportConversation,
-  type PortableBundle,
-} from '../../core/adapters.js';
+import { exportThreadToMarkdown } from '../../core/adapters.js';
 import { MemorySearchIndex, type SearchHit } from '../../core/search.js';
 import {
-  computeResurfacingQueueItems,
-  previewNaturalLanguageOrganize,
   applyOrganizeProposals,
-  undoChangeLog,
+  computeResurfacingQueueItems,
   normalizeTags,
+  previewNaturalLanguageOrganize,
+  undoChangeLog,
   type OrganizeProposalItem,
 } from '../../core/organization.js';
-import {
-  seedSyntheticWorkbenchLibrary,
-  generate652ChatGPTExportFixture,
-} from '../../core/synthetic-fixtures.js';
+import { seedSyntheticWorkbenchLibrary } from '../../core/synthetic-fixtures.js';
 import { requestThreadEnrichment } from '../../core/cloud-client.js';
-
-const sharedDb = new ThreadkeeperDB();
+import { PROVIDER_IDS, detectProviderFromUrl, extractConversationIdFromUrl, providerLabel } from '../../core/providers.js';
+import { getSmartTitle, resolveInsight } from '../../core/insights.js';
+import { LOCAL_SPACE, cosine, localHashEmbedding, primarySpace } from '../../core/embeddings.js';
+import { hasClaudeKey } from '../../core/ai/claude.js';
+import {
+  analyzeThreadRemotely,
+  countPendingAnalysis,
+  enqueueLibraryAnalysis,
+  processThreadsLocally,
+  runAnalysisJobs,
+} from '../../core/pipeline.js';
+import { planLibraryOrganization } from '../../core/library-organize.js';
+import {
+  CoverageTick,
+  KindLabel,
+  StatusPill,
+  notifyBackground,
+  openModal,
+  relativeTime,
+  sharedDb,
+} from './shared.js';
+import { SettingsDialog } from './SettingsDialog.js';
+import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.js';
+import { AskPanel } from './AskPanel.js';
+import { SemanticNeighbors, ThreadOverview, type RelatedThread } from './ThreadOverview.js';
 
 const RESURFACE_QUEUE_LABELS: Record<ResurfaceQueue, string> = {
   continue_working: 'Continue working',
@@ -58,70 +74,57 @@ const RESURFACE_QUEUE_LABELS: Record<ResurfaceQueue, string> = {
   worth_revisiting: 'Worth revisiting',
 };
 
-function CoverageTick({ coverage }: { coverage: CoverageState }) {
-  const filledCount =
-    coverage === 'full' ? 3 : coverage === 'partial' ? 2 : 1;
-  return (
-    <span
-      className="tk-coverage-tick"
-      title={`Capture coverage: ${coverage} (${filledCount}/3)`}
-    >
-      <span className="tk-coverage-bars" aria-hidden="true">
-        <span className="tk-coverage-bar" data-filled={filledCount >= 1} />
-        <span className="tk-coverage-bar" data-filled={filledCount >= 2} />
-        <span className="tk-coverage-bar" data-filled={filledCount >= 3} />
-      </span>
-      <span>{coverage}</span>
-    </span>
-  );
+const TRANSCRIPT_PAGE = 80;
+
+type Surface = 'overlay' | 'page' | 'sidepanel';
+
+interface AnalysisProgress {
+  running: boolean;
+  processed: number;
+  analyzed: number;
+  current: string | null;
+  note: string | null;
 }
 
-function StatusPill({ state }: { state: WorkflowState }) {
-  const labels: Record<WorkflowState, string> = {
-    active: 'Active',
-    needs_review: 'Needs review',
-    waiting: 'Waiting',
-    paused: 'Paused',
-    done: 'Done',
-    archived: 'Archived',
-  };
-  return (
-    <span className="tk-status-pill">
-      <span className="tk-status-dot" data-state={state} aria-hidden="true" />
-      <span>{labels[state]}</span>
-    </span>
+function useEffectiveTheme(theme: SettingsRecord['theme'] | undefined): 'light' | 'dark' {
+  const query = useMemo(
+    () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null),
+    []
   );
+  const [systemDark, setSystemDark] = useState(Boolean(query?.matches));
+  useEffect(() => {
+    if (!query) return;
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, [query]);
+  if (theme === 'dark') return 'dark';
+  if (theme === 'light') return 'light';
+  return systemDark ? 'dark' : 'light';
 }
 
 export function App() {
-  const urlParams = useMemo(
-    () => new URLSearchParams(window.location.search),
-    []
-  );
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const isFramed = typeof window !== 'undefined' && window.top !== window.self;
-  const requestedSurface = urlParams.get('surface');
+  const requestedSurface =
+    urlParams.get('surface') ?? document.documentElement.getAttribute('data-surface');
   const isUnauthenticatedFrame = isFramed && requestedSurface !== 'overlay';
-  const surface: 'overlay' | 'page' =
-    isFramed || requestedSurface === 'overlay' ? 'overlay' : 'page';
+  const surface: Surface =
+    isFramed || requestedSurface === 'overlay'
+      ? 'overlay'
+      : requestedSurface === 'sidepanel'
+        ? 'sidepanel'
+        : 'page';
   const handshakeToken = useMemo(() => urlParams.get('token') ?? '', [urlParams]);
-  const [overlayHandshakeState, setOverlayHandshakeState] = useState<
-    'pending' | 'authorized' | 'rejected'
-  >(
-    isUnauthenticatedFrame
-      ? 'rejected'
-      : surface === 'overlay'
-        ? 'pending'
-        : 'authorized'
+  const [overlayHandshakeState, setOverlayHandshakeState] = useState<'pending' | 'authorized' | 'rejected'>(
+    isUnauthenticatedFrame ? 'rejected' : surface === 'overlay' ? 'pending' : 'authorized'
   );
   const [overlayHandshakeError, setOverlayHandshakeError] = useState<string | null>(
-    isUnauthenticatedFrame
-      ? 'Framing manager.html without surface=overlay is forbidden'
-      : null
+    isUnauthenticatedFrame ? 'Framing manager.html without surface=overlay is forbidden' : null
   );
-  const handshakeAuthorizedRef = useRef<boolean>(
-    !isFramed && surface === 'page'
-  );
+  const handshakeAuthorizedRef = useRef<boolean>(!isFramed && surface !== 'overlay');
 
+  // ---- Library data ----
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [allMessages, setAllMessages] = useState<MessageRecord[]>([]);
@@ -129,129 +132,141 @@ export function App() {
   const [relationships, setRelationships] = useState<RelationshipRecord[]>([]);
   const [changeLogs, setChangeLogs] = useState<ChangeLogEntry[]>([]);
   const [counts, setCounts] = useState<LibraryReconciledCounts | null>(null);
+  const [insightRows, setInsightRows] = useState<ThreadInsight[]>([]);
+  const [collections, setCollections] = useState<CollectionRecord[]>([]);
+  const [vectorRows, setVectorRows] = useState<ThreadVectorRecord[]>([]);
+  const [pendingAnalysis, setPendingAnalysis] = useState(0);
 
+  // ---- UI state ----
   const [searchQuery, setSearchQuery] = useState('');
+  const [listMode, setListMode] = useState<'search' | 'ask'>('search');
   const [activeArea, setActiveArea] = useState<string>('All threads');
   const [activeQueue, setActiveQueue] = useState<ResurfaceQueue | 'all'>('all');
   const [providerFilter, setProviderFilter] = useState<ProviderId | 'all'>('all');
   const [stateFilter, setStateFilter] = useState<WorkflowState | 'all'>('all');
   const [coverageFilter, setCoverageFilter] = useState<CoverageState | 'all'>('all');
+  const [kindFilter, setKindFilter] = useState<ThreadKind | 'all'>('all');
   const [selectedThreadKey, setSelectedThreadKey] = useState<string | null>(null);
   const [mobileDetailVisible, setMobileDetailVisible] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [statusAnnouncement, setStatusAnnouncement] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisProgress>({ running: false, processed: 0, analyzed: 0, current: null, note: null });
+  const [analyzingThread, setAnalyzingThread] = useState<string | null>(null);
+  const [newProjectDraft, setNewProjectDraft] = useState<string | null>(null);
+  const [showAllMessages, setShowAllMessages] = useState(false);
+  const [activeTabThreadKey, setActiveTabThreadKey] = useState<string | null>(null);
 
-  // Editable fields for selected thread
   const [titleDraft, setTitleDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
   const [tagInputDraft, setTagInputDraft] = useState('');
 
-  // Native <dialog> refs
   const organizeDialogRef = useRef<HTMLDialogElement | null>(null);
   const importDialogRef = useRef<HTMLDialogElement | null>(null);
   const settingsDialogRef = useRef<HTMLDialogElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const selectedKeyRef = useRef<string | null>(null);
+  const initialLoadDoneRef = useRef(false);
+  const backfillStartedRef = useRef(false);
+  const analysisAbortRef = useRef<AbortController | null>(null);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Organize dialog state
-  const [organizeInstruction, setOrganizeInstruction] = useState(
-    'Group my Daydock logo conversations, but keep the homepage research separate'
+  const [organizeInstruction, setOrganizeInstruction] = useState('');
+  const [organizeProposals, setOrganizeProposals] = useState<OrganizeProposalItem[]>([]);
+  const [organizeNotes, setOrganizeNotes] = useState<string[]>([]);
+  const [organizeBusy, setOrganizeBusy] = useState<string | null>(null);
+  const [organizeDeselected, setOrganizeDeselected] = useState<Set<string>>(new Set());
+
+  const authorized = () => !(surface === 'overlay' && !handshakeAuthorizedRef.current);
+
+  const reloadAll = useCallback(
+    async (preserveSelectionKey?: string | null) => {
+      if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
+      const loadedSettings = await ensureStarterCollectionsAndSettings(sharedDb);
+      if (urlParams.get('seed') === '1' && !initialLoadDoneRef.current) {
+        await seedSyntheticWorkbenchLibrary(sharedDb);
+      }
+      const space = primarySpace(loadedSettings);
+      const [convs, msgs, sums, rels, logs, reconciled, insights, cols, vecs, pending] = await Promise.all([
+        sharedDb.conversations.toArray(),
+        sharedDb.messages.toArray(),
+        sharedDb.summaries.toArray(),
+        sharedDb.relationships.toArray(),
+        sharedDb.changeLogs.orderBy('createdAt').reverse().toArray(),
+        reconcileLibraryCounts(sharedDb),
+        sharedDb.insights.toArray(),
+        sharedDb.collections.toArray(),
+        sharedDb.threadVectors.where('space').anyOf(Array.from(new Set([LOCAL_SPACE, space.id]))).toArray(),
+        countPendingAnalysis(sharedDb),
+      ]);
+
+      setSettings(loadedSettings);
+      setConversations(convs);
+      setAllMessages(msgs);
+      setSummaries(sums);
+      setRelationships(rels);
+      setChangeLogs(logs);
+      setCounts(reconciled);
+      setInsightRows(insights);
+      setCollections(cols);
+      setVectorRows(vecs);
+      setPendingAnalysis(pending);
+
+      if (!initialLoadDoneRef.current) {
+        initialLoadDoneRef.current = true;
+        const urlQuery = urlParams.get('q');
+        setSearchQuery(urlQuery !== null ? urlQuery : loadedSettings.lastSearchQuery);
+        setActiveArea(loadedSettings.lastActiveArea || 'All threads');
+        setActiveQueue(loadedSettings.lastActiveQueue || 'all');
+      }
+
+      const targetKey =
+        preserveSelectionKey !== undefined
+          ? preserveSelectionKey
+          : urlParams.get('threadKey') ||
+            loadedSettings.lastSelectedThreadKey ||
+            convs.find((c) => !c.isSyntheticBenchmark)?.threadKey ||
+            null;
+      selectedKeyRef.current = targetKey;
+      setSelectedThreadKey(targetKey);
+    },
+    [surface, urlParams]
   );
-  const [organizeProposals, setOrganizeProposals] = useState<
-    OrganizeProposalItem[]
-  >([]);
 
-  // Import/Export state
-  const [importJsonText, setImportJsonText] = useState('');
-  const [importFormat, setImportFormat] = useState<
-    'chatgpt' | 'claude' | 'portable'
-  >('chatgpt');
-  const [exportedPreviewText, setExportedPreviewText] = useState('');
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => void reloadAll(selectedKeyRef.current), 700);
+  }, [reloadAll]);
 
-  const reloadAll = async (preserveSelectionKey?: string | null) => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) {
-      return;
-    }
-    const loadedSettings = await ensureStarterCollectionsAndSettings(sharedDb);
-    if (urlParams.get('seed') === '1') {
-      await seedSyntheticWorkbenchLibrary(sharedDb);
-    }
-    const [convs, msgs, sums, rels, logs, reconciled] = await Promise.all([
-      sharedDb.conversations.toArray(),
-      sharedDb.messages.toArray(),
-      sharedDb.summaries.toArray(),
-      sharedDb.relationships.toArray(),
-      sharedDb.changeLogs.orderBy('createdAt').reverse().toArray(),
-      reconcileLibraryCounts(sharedDb),
-    ]);
-
-    setSettings(loadedSettings);
-    setConversations(convs);
-    setAllMessages(msgs);
-    setSummaries(sums);
-    setRelationships(rels);
-    setChangeLogs(logs);
-    setCounts(reconciled);
-
-    const urlQuery = urlParams.get('q');
-    const urlThreadKey = urlParams.get('threadKey');
-
-    const initialQuery =
-      urlQuery !== null ? urlQuery : loadedSettings.lastSearchQuery;
-    setSearchQuery(initialQuery);
-    setActiveArea(loadedSettings.lastActiveArea || 'All threads');
-    setActiveQueue(loadedSettings.lastActiveQueue || 'all');
-
-    const targetKey =
-      preserveSelectionKey !== undefined
-        ? preserveSelectionKey
-        : urlThreadKey ||
-          loadedSettings.lastSelectedThreadKey ||
-          convs.find((c) => !c.isSyntheticBenchmark)?.threadKey ||
-          null;
-
-    setSelectedThreadKey(targetKey);
-  };
-
+  // ---- Overlay handshake ----
   useEffect(() => {
     if (isUnauthenticatedFrame) {
       setOverlayHandshakeState('rejected');
-      setOverlayHandshakeError(
-        'Framing manager.html without surface=overlay is forbidden'
-      );
+      setOverlayHandshakeError('Framing manager.html without surface=overlay is forbidden');
       return;
     }
-
     if (surface !== 'overlay') {
       handshakeAuthorizedRef.current = true;
       void reloadAll();
       return;
     }
-
-    // Immediately scrub token query param from URL inside the overlay frame
     try {
       const cleanParams = new URLSearchParams(window.location.search);
       cleanParams.delete('token');
-      const nextUrl = `${window.location.pathname}?${cleanParams.toString()}`;
-      window.history.replaceState(null, '', nextUrl);
+      window.history.replaceState(null, '', `${window.location.pathname}?${cleanParams.toString()}`);
     } catch {
       // ignore replaceState failure
     }
-
     if (!handshakeToken || handshakeToken.length < 16) {
       setOverlayHandshakeState('rejected');
       setOverlayHandshakeError('Missing or invalid overlay handshakeToken');
       return;
     }
-
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage(
-        {
-          type: 'REDEEM_OVERLAY_HANDSHAKE',
-          handshakeToken,
-        },
+        { type: 'REDEEM_OVERLAY_HANDSHAKE', handshakeToken },
         (resp: { ok?: boolean; error?: string } | undefined) => {
           if (resp?.ok) {
             handshakeAuthorizedRef.current = true;
@@ -260,9 +275,7 @@ export function App() {
           } else {
             handshakeAuthorizedRef.current = false;
             setOverlayHandshakeState('rejected');
-            setOverlayHandshakeError(
-              resp?.error ?? 'Overlay handshake token rejected'
-            );
+            setOverlayHandshakeError(resp?.error ?? 'Overlay handshake token rejected');
           }
         }
       );
@@ -273,27 +286,49 @@ export function App() {
     }
   }, []);
 
-  // Apply theme & density to documentElement
+  // ---- Live updates from the service worker (captures, background analysis) ----
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
+    const listener = (message: { type?: string }) => {
+      if (message?.type === 'LIBRARY_CHANGED' && handshakeAuthorizedRef.current) scheduleReload();
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    const onFocus = () => handshakeAuthorizedRef.current && scheduleReload();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [scheduleReload]);
+
+  const effectiveTheme = useEffectiveTheme(settings?.theme);
   useEffect(() => {
     if (!settings) return;
-    const effectiveTheme =
-      settings.theme === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', effectiveTheme);
     document.documentElement.setAttribute('data-density', settings.density);
-  }, [settings?.theme, settings?.density]);
+  }, [effectiveTheme, settings?.density]);
 
-  const persistSettingPatch = async (patch: Partial<SettingsRecord>) => {
+  const persistSettingPatch = useCallback(async (patch: Partial<SettingsRecord>) => {
     if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    const current = await ensureStarterCollectionsAndSettings(sharedDb);
-    const updated: SettingsRecord = { ...current, ...patch };
-    await sharedDb.settings.put(updated);
+    const updated = await saveSettingsPatch(sharedDb, patch);
     setSettings(updated);
-  };
+    const affectsBackground = [
+      'launchSurface',
+      'anthropicApiKey',
+      'aiModel',
+      'autoOrganize',
+      'embeddingProvider',
+      'voyageApiKey',
+      'openaiApiKey',
+      'ollamaUrl',
+      'ollamaEmbeddingModel',
+      'authorizedHosts',
+    ].some((k) => k in patch);
+    if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
+  }, [surface]);
 
-  const summariesByThread = useMemo(
-    () => new Map(summaries.map((s) => [s.threadKey, s])),
-    [summaries]
-  );
+  // ---- Derived data ----
+  const summariesByThread = useMemo(() => new Map(summaries.map((s) => [s.threadKey, s])), [summaries]);
 
   const messagesByThread = useMemo(() => {
     const map = new Map<string, MessageRecord[]>();
@@ -302,59 +337,115 @@ export function App() {
       list.push(m);
       map.set(m.threadKey, list);
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.ordinal - b.ordinal);
-    }
+    for (const list of map.values()) list.sort((a, b) => a.ordinal - b.ordinal);
     return map;
   }, [allMessages]);
 
+  const insightsByThread = useMemo(() => {
+    const local = new Map<string, ThreadInsight>();
+    const ai = new Map<string, ThreadInsight>();
+    for (const i of insightRows) (i.source === 'ai' ? ai : local).set(i.threadKey, i);
+    const resolved = new Map<string, ThreadInsight>();
+    for (const c of conversations) {
+      const r = resolveInsight(c, local.get(c.threadKey), ai.get(c.threadKey));
+      if (r) resolved.set(c.threadKey, r);
+    }
+    return resolved;
+  }, [insightRows, conversations]);
+
+  const vectorsByThread = useMemo(() => {
+    const map = new Map<string, Map<string, number[]>>();
+    for (const v of vectorRows) {
+      const m = map.get(v.threadKey) ?? new Map<string, number[]>();
+      m.set(v.space, v.embedding);
+      map.set(v.threadKey, m);
+    }
+    return map;
+  }, [vectorRows]);
+
+  const projectNames = useMemo(() => {
+    const names = new Set<string>(collections.map((c) => c.name));
+    for (const c of conversations) if (c.project) names.add(c.project);
+    const countOf = (n: string) => counts?.projectCounts[n] ?? 0;
+    return Array.from(names)
+      .filter((n) => n !== UNFILED_PROJECT)
+      .sort((a, b) => countOf(b) - countOf(a) || a.localeCompare(b))
+      .concat(UNFILED_PROJECT);
+  }, [collections, conversations, counts]);
+
+  const collectionByName = useMemo(() => new Map(collections.map((c) => [c.name, c])), [collections]);
+
   const searchIndex = useMemo(() => {
     const idx = new MemorySearchIndex();
-    idx.loadSnapshot({
-      conversations,
-      messages: allMessages,
-      summaries,
-    });
+    const extra = new Map<string, string>();
+    for (const [k, i] of insightsByThread) {
+      extra.set(k, `${i.title} ${i.gist} ${i.summary} ${i.topics.join(' ')} ${i.entities.join(' ')} ${THREAD_KIND_LABELS[i.kind]}`);
+    }
+    idx.loadSnapshot({ conversations, messages: allMessages, summaries, extraMetaByThread: extra });
     return idx;
-  }, [conversations, allMessages, summaries]);
+  }, [conversations, allMessages, summaries, insightsByThread]);
+
+  const scope = useMemo(
+    () => ({
+      provider: providerFilter,
+      project: activeArea,
+      workflowState: stateFilter,
+      coverage: coverageFilter,
+      includeSyntheticBenchmark: false,
+    }),
+    [providerFilter, activeArea, stateFilter, coverageFilter]
+  );
 
   const searchResults = useMemo(() => {
-    return searchIndex.searchLocal(
-      searchQuery,
-      {
-        provider: providerFilter,
-        project: activeArea,
-        workflowState: stateFilter,
-        coverage: coverageFilter,
-        includeSyntheticBenchmark: false,
-      },
-      700
-    );
-  }, [
-    searchIndex,
-    searchQuery,
-    providerFilter,
-    activeArea,
-    stateFilter,
-    coverageFilter,
-  ]);
+    const lexical = searchIndex.searchLocal(searchQuery, scope, 5000);
+    const q = searchQuery.trim();
+    if (!q || q.length < 3 || vectorRows.length === 0) return lexical;
+    // Fuse lexical ranks with on-device semantic ranks (reciprocal rank fusion).
+    const scoped = new Map(searchIndex.searchLocal('', scope, 100000).hits.map((h) => [h.conversation.threadKey, h]));
+    const qv = localHashEmbedding(q);
+    const semantic: Array<[string, number]> = [];
+    for (const [threadKey, bySpace] of vectorsByThread) {
+      const v = bySpace.get(LOCAL_SPACE);
+      if (!v || !scoped.has(threadKey)) continue;
+      const sim = cosine(qv, v);
+      if (sim >= 0.18) semantic.push([threadKey, sim]);
+    }
+    semantic.sort((a, b) => b[1] - a[1]);
+    const fused = new Map<string, SearchHit>();
+    lexical.hits.forEach((h, rank) => fused.set(h.conversation.threadKey, { ...h, score: 1 / (60 + rank + 1) }));
+    semantic.slice(0, 40).forEach(([threadKey, sim], rank) => {
+      const rrf = 1 / (60 + rank + 1);
+      const existing = fused.get(threadKey);
+      if (existing) {
+        existing.score += rrf;
+        existing.vectorScore = sim;
+      } else {
+        const base = scoped.get(threadKey)!;
+        fused.set(threadKey, {
+          ...base,
+          score: rrf * 0.8,
+          lexicalScore: 0,
+          vectorScore: sim,
+          matchReasons: ['Similar meaning'],
+          supportingExcerpt: insightsByThread.get(threadKey)?.gist ?? base.supportingExcerpt,
+        });
+      }
+    });
+    return { ...lexical, hits: Array.from(fused.values()).sort((a, b) => b.score - a.score) };
+  }, [searchIndex, searchQuery, scope, vectorsByThread, vectorRows.length, insightsByThread]);
 
   const queueItemsMap = useMemo(() => {
     if (activeQueue === 'all') return null;
-    const items = computeResurfacingQueueItems(
-      conversations,
-      summariesByThread,
-      activeQueue
-    );
+    const items = computeResurfacingQueueItems(conversations, summariesByThread, activeQueue);
     return new Map(items.map((i) => [i.conversation.threadKey, i]));
   }, [conversations, summariesByThread, activeQueue]);
 
   const displayedHits: SearchHit[] = useMemo(() => {
-    if (!queueItemsMap) return searchResults.hits;
-    return searchResults.hits.filter((h) =>
-      queueItemsMap.has(h.conversation.threadKey)
-    );
-  }, [searchResults.hits, queueItemsMap]);
+    let hits = searchResults.hits;
+    if (queueItemsMap) hits = hits.filter((h) => queueItemsMap.has(h.conversation.threadKey));
+    if (kindFilter !== 'all') hits = hits.filter((h) => insightsByThread.get(h.conversation.threadKey)?.kind === kindFilter);
+    return hits;
+  }, [searchResults.hits, queueItemsMap, kindFilter, insightsByThread]);
 
   const selectedConversation = useMemo(
     () =>
@@ -370,35 +461,133 @@ export function App() {
     setNotesDraft(selectedConversation.manualNotes);
     setTagInputDraft(selectedConversation.tags.join(', '));
     setActiveEvidenceId(null);
-  }, [selectedConversation?.threadKey, selectedConversation?.manualTitleOverride, selectedConversation?.manualNotes, selectedConversation?.tags.join(',')]);
+  }, [
+    selectedConversation?.threadKey,
+    selectedConversation?.manualTitleOverride,
+    selectedConversation?.manualNotes,
+    selectedConversation?.tags.join(','),
+  ]);
+
+  useEffect(() => setShowAllMessages(false), [selectedConversation?.threadKey]);
 
   const selectedMessages = useMemo(
-    () =>
-      selectedConversation
-        ? messagesByThread.get(selectedConversation.threadKey) ?? []
-        : [],
+    () => (selectedConversation ? messagesByThread.get(selectedConversation.threadKey) ?? [] : []),
     [selectedConversation, messagesByThread]
   );
-
   const selectedSummary = useMemo(
-    () =>
-      selectedConversation
-        ? summariesByThread.get(selectedConversation.threadKey) ?? null
-        : null,
+    () => (selectedConversation ? summariesByThread.get(selectedConversation.threadKey) ?? null : null),
     [selectedConversation, summariesByThread]
   );
+  const selectedInsight = selectedConversation ? insightsByThread.get(selectedConversation.threadKey) ?? null : null;
 
   const selectedRelationships = useMemo(() => {
     if (!selectedConversation) return [];
     return relationships.filter(
       (r) =>
-        (r.fromThreadKey === selectedConversation.threadKey ||
-          r.toThreadKey === selectedConversation.threadKey) &&
+        (r.fromThreadKey === selectedConversation.threadKey || r.toThreadKey === selectedConversation.threadKey) &&
         !r.dismissedByUser
     );
   }, [relationships, selectedConversation]);
 
+  const semanticNeighbors: RelatedThread[] = useMemo(() => {
+    if (!selectedConversation || !settings) return [];
+    const space = primarySpace(settings);
+    const own = vectorsByThread.get(selectedConversation.threadKey);
+    const spaceId = own?.has(space.id) ? space.id : LOCAL_SPACE;
+    const threshold = spaceId === space.id ? space.relatedThreshold : 0.3;
+    const qv = own?.get(spaceId);
+    if (!qv) return [];
+    const byKey = new Map(conversations.map((c) => [c.threadKey, c]));
+    const out: RelatedThread[] = [];
+    for (const [threadKey, bySpace] of vectorsByThread) {
+      if (threadKey === selectedConversation.threadKey) continue;
+      const conv = byKey.get(threadKey);
+      if (!conv || conv.isSyntheticBenchmark || conv.sourceConversationId === selectedConversation.sourceConversationId) continue;
+      const v = bySpace.get(spaceId);
+      if (!v) continue;
+      const sim = cosine(qv, v);
+      if (sim >= threshold) out.push({ conv, similarity: sim });
+    }
+    return out.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
+  }, [selectedConversation, vectorsByThread, conversations, settings]);
+
+  const providerOptions = useMemo(
+    () => PROVIDER_IDS.filter((id) => (counts?.providerCounts[id] ?? 0) > 0 || id === providerFilter),
+    [counts, providerFilter]
+  );
+
+  const aiReady = settings ? hasClaudeKey(settings) : false;
+
+  // ---- One-time background work when the library opens ----
+  useEffect(() => {
+    if (!settings || backfillStartedRef.current || !handshakeAuthorizedRef.current) return;
+    backfillStartedRef.current = true;
+    void (async () => {
+      // Threads captured before automatic analysis existed (or by an older version) get organized now.
+      const localKeys = new Set(insightRows.filter((i) => i.source === 'local').map((i) => i.threadKey));
+      const missing = conversations.filter((c) => !c.isSyntheticBenchmark && !localKeys.has(c.threadKey)).map((c) => c.threadKey);
+      if (missing.length > 0) {
+        setBusy(`Organizing ${missing.length} thread(s)…`);
+        const r = await processThreadsLocally(sharedDb, missing, {
+          aiDelaySeconds: 5,
+          onProgress: (done, total) => setBusy(`Organizing ${done}/${total} threads…`),
+        });
+        setBusy(null);
+        setStatusAnnouncement(`Organized ${r.analyzed} threads (${r.filed} filed automatically).`);
+        notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+        await reloadAll(selectedKeyRef.current);
+      }
+      if (surface !== 'overlay') {
+        try {
+          const report = await syncSavedFolders(settings, { interactive: false });
+          if (report && report.imported > 0) {
+            setStatusAnnouncement(describeReport(report));
+            await reloadAll(selectedKeyRef.current);
+          }
+        } catch {
+          // folder permission not granted this session; the Import dialog offers "Sync now"
+        }
+      }
+    })();
+  }, [settings, conversations, insightRows]);
+
+  // ---- Side panel: follow the conversation open in the active tab ----
+  useEffect(() => {
+    if (surface === 'overlay' || typeof chrome === 'undefined' || !chrome.tabs?.query) return;
+    const update = async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        const url = tab?.url ?? '';
+        const provider = detectProviderFromUrl(url);
+        const convId = extractConversationIdFromUrl(url);
+        if (!provider || !convId) {
+          setActiveTabThreadKey(null);
+          return;
+        }
+        const match = (await sharedDb.conversations.where('sourceConversationId').equals(convId).toArray()).find(
+          (c) => c.provider === provider && c.branchId === 'main'
+        );
+        setActiveTabThreadKey(match?.threadKey ?? null);
+      } catch {
+        setActiveTabThreadKey(null);
+      }
+    };
+    void update();
+    const onActivated = () => void update();
+    const onUpdated = (_id: number, info: { url?: string; status?: string }) => {
+      if (info.url || info.status === 'complete') void update();
+    };
+    chrome.tabs.onActivated?.addListener(onActivated);
+    chrome.tabs.onUpdated?.addListener(onUpdated);
+    return () => {
+      chrome.tabs.onActivated?.removeListener(onActivated);
+      chrome.tabs.onUpdated?.removeListener(onUpdated);
+    };
+  }, [surface, conversations.length]);
+
+  // ---- Handlers ----
   const handleSelectThread = (threadKey: string) => {
+    selectedKeyRef.current = threadKey;
     setSelectedThreadKey(threadKey);
     setMobileDetailVisible(true);
     void persistSettingPatch({ lastSelectedThreadKey: threadKey });
@@ -420,26 +609,15 @@ export function App() {
     setActiveQueue(queue);
     setActiveArea('All threads');
     setMobileDrawerOpen(false);
-    void persistSettingPatch({
-      lastActiveQueue: queue,
-      lastActiveArea: 'All threads',
-    });
+    void persistSettingPatch({ lastActiveQueue: queue, lastActiveArea: 'All threads' });
   };
 
   const handleSaveManualEdits = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    if (!selectedConversation) return;
-    const parsedTags = normalizeTags(
-      tagInputDraft
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-    );
+    if (!authorized() || !selectedConversation) return;
+    const parsedTags = normalizeTags(tagInputDraft.split(',').map((s) => s.trim()).filter(Boolean));
     await updateManualThreadFields(sharedDb, selectedConversation.threadKey, {
       manualTitleOverride:
-        titleDraft.trim() && titleDraft.trim() !== selectedConversation.title
-          ? titleDraft.trim()
-          : null,
+        titleDraft.trim() && titleDraft.trim() !== selectedConversation.title ? titleDraft.trim() : null,
       manualNotes: notesDraft,
       manualTags: parsedTags,
     });
@@ -448,42 +626,55 @@ export function App() {
   };
 
   const handleProjectChange = async (nextProject: string) => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    if (!selectedConversation) return;
-    await updateManualThreadFields(sharedDb, selectedConversation.threadKey, {
-      project: nextProject,
-      categoryLocked: true,
-    });
+    if (!authorized() || !selectedConversation) return;
+    await updateManualThreadFields(sharedDb, selectedConversation.threadKey, { project: nextProject, categoryLocked: true });
     await reloadAll(selectedConversation.threadKey);
     setStatusAnnouncement(`Filed under ${nextProject} (locked).`);
   };
 
   const handleToggleLock = async (locked: boolean) => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    if (!selectedConversation) return;
-    await updateManualThreadFields(sharedDb, selectedConversation.threadKey, {
-      categoryLocked: locked,
-    });
+    if (!authorized() || !selectedConversation) return;
+    await updateManualThreadFields(sharedDb, selectedConversation.threadKey, { categoryLocked: locked });
     await reloadAll(selectedConversation.threadKey);
   };
 
   const handleWorkflowStateChange = async (nextState: WorkflowState) => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    if (!selectedConversation) return;
-    await updateManualThreadFields(sharedDb, selectedConversation.threadKey, {
-      workflowState: nextState,
-    });
+    if (!authorized() || !selectedConversation) return;
+    await updateManualThreadFields(sharedDb, selectedConversation.threadKey, { workflowState: nextState });
     await reloadAll(selectedConversation.threadKey);
     setStatusAnnouncement(`Updated status to ${nextState}.`);
   };
 
   const handleDeleteSelected = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    if (!selectedConversation) return;
+    if (!authorized() || !selectedConversation) return;
     const deletedTitle = getDisplayTitle(selectedConversation);
     await deleteConversationCascade(sharedDb, selectedConversation.threadKey);
     await reloadAll(null);
     setStatusAnnouncement(`Deleted "${deletedTitle}" and recorded tombstone.`);
+  };
+
+  const handleCreateProject = async (name: string) => {
+    const clean = name.trim();
+    if (!clean || !authorized()) return;
+    if (!(await sharedDb.collections.get(clean))) {
+      await sharedDb.collections.put({
+        name: clean,
+        description: '',
+        isStarterArea: false,
+        cloudExcluded: false,
+        createdAt: new Date().toISOString(),
+        keywords: [clean.toLowerCase()],
+        origin: 'user',
+      });
+    }
+    setNewProjectDraft(null);
+    await reloadAll(selectedKeyRef.current);
+    setStatusAnnouncement(`Created project ${clean}. Threads that mention it are filed there automatically.`);
+  };
+
+  const copyText = (text: string, label: string) => {
+    void navigator.clipboard?.writeText(text);
+    setStatusAnnouncement(`${label} copied to clipboard.`);
   };
 
   const lastInnerModalCloseAtRef = useRef<number>(0);
@@ -491,10 +682,7 @@ export function App() {
   const handleCloseOverlay = () => {
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
-        chrome.runtime.sendMessage({
-          type: 'CLOSE_THREADKEEPER_OVERLAY',
-          handshakeToken,
-        });
+        chrome.runtime.sendMessage({ type: 'CLOSE_THREADKEEPER_OVERLAY', handshakeToken });
       } catch {
         // ignore if extension context invalidated
       }
@@ -503,59 +691,43 @@ export function App() {
 
   useEffect(() => {
     const getOpenInnerModal = () =>
-      [
-        organizeDialogRef.current,
-        importDialogRef.current,
-        settingsDialogRef.current,
-      ].find((d) => d && (d.open || d.hasAttribute('open')));
+      [organizeDialogRef.current, importDialogRef.current, settingsDialogRef.current].find(
+        (d) => d && (d.open || d.hasAttribute('open'))
+      );
 
     const handleEscapeStep = () => {
-      const openModal = getOpenInnerModal();
-      if (openModal) {
+      const openModalEl = getOpenInnerModal();
+      if (openModalEl) {
         lastInnerModalCloseAtRef.current = Date.now();
-        openModal.close();
+        openModalEl.close();
         return;
       }
-      if (Date.now() - lastInnerModalCloseAtRef.current < 150) {
-        return;
-      }
-      if (surface === 'overlay') {
-        handleCloseOverlay();
-      }
+      if (Date.now() - lastInnerModalCloseAtRef.current < 150) return;
+      if (surface === 'overlay') handleCloseOverlay();
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      const openModal = getOpenInnerModal();
-
+      const openModalEl = getOpenInnerModal();
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         handleEscapeStep();
         return;
       }
-
-      if (openModal) return;
-
+      if (openModalEl) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
-      const isEditing =
-        tag === 'input' ||
-        tag === 'textarea' ||
-        tag === 'select' ||
-        Boolean(target?.isContentEditable);
-
+      const isEditing = tag === 'input' || tag === 'textarea' || tag === 'select' || Boolean(target?.isContentEditable);
       if (!isEditing && e.key === '/') {
         e.preventDefault();
+        setListMode('search');
         searchInputRef.current?.focus();
         return;
       }
-
       if (!isEditing && (e.key === 'j' || e.key === 'k')) {
         if (displayedHits.length === 0) return;
         e.preventDefault();
-        const curIdx = displayedHits.findIndex(
-          (h) => h.conversation.threadKey === selectedConversation?.threadKey
-        );
+        const curIdx = displayedHits.findIndex((h) => h.conversation.threadKey === selectedConversation?.threadKey);
         const nextIdx =
           e.key === 'j'
             ? Math.min(displayedHits.length - 1, Math.max(0, curIdx + 1))
@@ -569,11 +741,7 @@ export function App() {
     };
 
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as {
-        source?: string;
-        handshakeToken?: string;
-        action?: string;
-      } | null;
+      const data = event.data as { source?: string; handshakeToken?: string; action?: string } | null;
       if (
         data &&
         data.source === 'threadkeeper-host-overlay' &&
@@ -590,21 +758,12 @@ export function App() {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('message', onMessage);
     };
-  }, [
-    surface,
-    handshakeToken,
-    displayedHits,
-    selectedConversation?.threadKey,
-  ]);
+  }, [surface, handshakeToken, displayedHits, selectedConversation?.threadKey]);
 
   const handleOpenFullPage = () => {
     const params = new URLSearchParams({ surface: 'page' });
-    if (selectedConversation) {
-      params.set('threadKey', selectedConversation.threadKey);
-    }
-    if (searchQuery) {
-      params.set('q', searchQuery);
-    }
+    if (selectedConversation) params.set('threadKey', selectedConversation.threadKey);
+    if (searchQuery) params.set('q', searchQuery);
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({
         type: 'OPEN_FULL_PAGE_MANAGER',
@@ -617,127 +776,161 @@ export function App() {
     }
   };
 
-  const openOrganizeModal = () => {
-    const proposals = previewNaturalLanguageOrganize(
-      organizeInstruction,
-      conversations
-    );
-    setOrganizeProposals(proposals);
-    if (organizeDialogRef.current) {
-      if (typeof organizeDialogRef.current.showModal === 'function') {
-        organizeDialogRef.current.showModal();
-      } else {
-        organizeDialogRef.current.setAttribute('open', 'true');
-      }
+  // ---- Claude analysis runner (in-page, with progress and cancel) ----
+  const startAnalysis = async (options: { enqueueAll?: boolean } = {}) => {
+    if (!authorized() || analysis.running) return;
+    if (!settings || (!aiReady && settings.embeddingProvider === 'local')) {
+      openModal(settingsDialogRef);
+      return;
     }
+    if (options.enqueueAll) await enqueueLibraryAnalysis(sharedDb, { onlyMissing: true });
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
+    setAnalysis({ running: true, processed: 0, analyzed: 0, current: null, note: null });
+    let lastReload = Date.now();
+    const summary = await runAnalysisJobs(sharedDb, {
+      maxJobs: 2000,
+      signal: controller.signal,
+      onProgress: (s, current) => {
+        setAnalysis({ running: true, processed: s.processed, analyzed: s.analyzed, current, note: null });
+        if (Date.now() - lastReload > 4000) {
+          lastReload = Date.now();
+          void reloadAll(selectedKeyRef.current);
+        }
+      },
+    });
+    analysisAbortRef.current = null;
+    setAnalysis({
+      running: false,
+      processed: summary.processed,
+      analyzed: summary.analyzed,
+      current: null,
+      note: summary.stoppedReason,
+    });
+    setStatusAnnouncement(
+      `Claude analyzed ${summary.analyzed} thread(s)${summary.stoppedReason ? ` — ${summary.stoppedReason}` : ''}.`
+    );
+    await reloadAll(selectedKeyRef.current);
+  };
+
+  const handleAnalyzeSelected = async () => {
+    if (!selectedConversation || !authorized()) return;
+    setAnalyzingThread(selectedConversation.threadKey);
+    try {
+      const res = await analyzeThreadRemotely(sharedDb, selectedConversation.threadKey, { ignoreDailyLimit: true });
+      setStatusAnnouncement(res.status === 'skipped' ? `Skipped: ${res.reason}` : 'Thread analyzed by Claude.');
+    } catch (err) {
+      setStatusAnnouncement(`Analysis failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (settings) await persistSettingPatch({ lastAiError: err instanceof Error ? err.message : String(err), lastAiErrorAt: new Date().toISOString() });
+    } finally {
+      setAnalyzingThread(null);
+      await reloadAll(selectedConversation.threadKey);
+    }
+  };
+
+  // ---- Organize (natural language + automatic) ----
+  const localPreview = (instruction: string) => {
+    const extraText = new Map<string, string>();
+    for (const [k, i] of insightsByThread) extraText.set(k, `${i.gist} ${i.summary} ${i.topics.join(' ')}`);
+    return previewNaturalLanguageOrganize(instruction, conversations, { collections, extraText });
+  };
+
+  const openOrganizeModal = () => {
+    setOrganizeProposals(organizeInstruction.trim() ? localPreview(organizeInstruction) : []);
+    setOrganizeNotes([]);
+    setOrganizeDeselected(new Set());
+    openModal(organizeDialogRef);
+  };
+
+  const planOrganize = async (preferAi: boolean) => {
+    setOrganizeBusy(preferAi ? 'Claude is planning…' : 'Planning…');
+    try {
+      const plan = await planLibraryOrganization(sharedDb, { instruction: organizeInstruction, preferAi });
+      setOrganizeProposals(plan.proposals);
+      setOrganizeNotes(plan.notes);
+      setOrganizeDeselected(new Set());
+    } catch (err) {
+      setOrganizeNotes([`Planning failed: ${err instanceof Error ? err.message : String(err)}`]);
+    } finally {
+      setOrganizeBusy(null);
+    }
+  };
+
+  const handleAutoOrganize = async () => {
+    if (!authorized()) return;
+    setOrganizeInstruction('');
+    setOrganizeProposals([]);
+    setOrganizeNotes([]);
+    setOrganizeDeselected(new Set());
+    openModal(organizeDialogRef);
+    setOrganizeBusy('Analyzing every thread on-device…');
+    const keys = conversations.filter((c) => !c.isSyntheticBenchmark).map((c) => c.threadKey);
+    const local = await processThreadsLocally(sharedDb, keys, {
+      aiDelaySeconds: 0,
+      onProgress: (done, total) => setOrganizeBusy(`Analyzing ${done}/${total} threads on-device…`),
+    });
+    await reloadAll(selectedKeyRef.current);
+    setOrganizeBusy(aiReady ? 'Claude is planning projects for your library…' : 'Grouping similar threads…');
+    try {
+      const plan = await planLibraryOrganization(sharedDb, { preferAi: aiReady });
+      setOrganizeProposals(plan.proposals);
+      setOrganizeNotes([
+        `Filed ${local.filed} thread(s) automatically while analyzing${local.createdProjects.length ? `; created ${local.createdProjects.join(', ')}` : ''}.`,
+        ...plan.notes,
+      ]);
+    } catch (err) {
+      setOrganizeNotes([`Planning failed: ${err instanceof Error ? err.message : String(err)}`]);
+    } finally {
+      setOrganizeBusy(null);
+    }
+    if (aiReady && settings?.autoOrganize.aiAnalysis) void startAnalysis({ enqueueAll: true });
   };
 
   const handleApplyOrganize = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
+    if (!authorized()) return;
+    const chosen = organizeProposals.filter((p) => p.excludedByInstruction || !organizeDeselected.has(p.threadKey));
     const entry = await applyOrganizeProposals(
       sharedDb,
-      organizeInstruction,
-      organizeProposals
+      organizeInstruction.trim() || 'Auto-organize library',
+      chosen
     );
     organizeDialogRef.current?.close();
-    await reloadAll(selectedConversation?.threadKey);
-    setStatusAnnouncement(
-      `Applied organization to ${entry.snapshots.length} conversations.`
-    );
+    await reloadAll(selectedKeyRef.current);
+    setStatusAnnouncement(`Applied organization to ${entry.snapshots.length} conversations.`);
   };
 
   const handleUndoLastOrganize = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
+    if (!authorized()) return;
     const latestActive = changeLogs.find((c) => !c.undone);
     if (!latestActive) return;
     const res = await undoChangeLog(sharedDb, latestActive.changeId);
-    await reloadAll(selectedConversation?.threadKey);
+    await reloadAll(selectedKeyRef.current);
     setStatusAnnouncement(`Undid changes across ${res.restoredCount} threads.`);
   };
 
-  const handleLoad652Fixture = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    const raw652 = generate652ChatGPTExportFixture();
-    const bound = settings?.boundAccounts.chatgpt ?? {
-      accountId: 'acct_chatgpt_primary',
-      workspaceId: 'ws_personal',
-    };
-    const parsed = parseChatGPTExport(raw652, bound);
-    for (const item of parsed) {
-      await sharedDb.conversations.get(item.threadKey);
-    }
-    // Bulk upsert via upsertThread
-    const { upsertThread } = await import('../../core/db.js');
-    for (const item of parsed) {
-      await upsertThread(sharedDb, item);
-    }
-    importDialogRef.current?.close();
-    await reloadAll(selectedConversation?.threadKey);
-    setStatusAnnouncement('Imported 652 ChatGPT fixture conversations.');
+  const handleRebuildVectors = () => {
+    void (async () => {
+      setBusy('Rebuilding vectors…');
+      const keys = conversations.filter((c) => !c.isSyntheticBenchmark).map((c) => c.threadKey);
+      await processThreadsLocally(sharedDb, keys, { force: true, aiDelaySeconds: 0 });
+      const queued = await enqueueLibraryAnalysis(sharedDb, { onlyMissing: false });
+      setBusy(null);
+      await reloadAll(selectedKeyRef.current);
+      setStatusAnnouncement(`Rebuilt on-device vectors; ${queued} thread(s) queued for hosted embeddings / analysis.`);
+      if (queued > 0) void startAnalysis();
+    })();
   };
 
-  const handleImportJsonSubmit = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    if (!importJsonText.trim()) return;
-    try {
-      const data = JSON.parse(importJsonText);
-      const { upsertThread } = await import('../../core/db.js');
-      if (importFormat === 'chatgpt') {
-        const arr = (Array.isArray(data) ? data : [data]) as ChatGPTExportConversation[];
-        const bound = settings?.boundAccounts.chatgpt ?? {
-          accountId: 'acct_chatgpt_primary',
-          workspaceId: 'ws_personal',
-        };
-        const parsed = parseChatGPTExport(arr, bound);
-        for (const item of parsed) {
-          await upsertThread(sharedDb, item);
-        }
-        setStatusAnnouncement(`Imported ${parsed.length} ChatGPT records.`);
-      } else if (importFormat === 'claude') {
-        const arr = (Array.isArray(data) ? data : [data]) as ClaudeExportConversation[];
-        const bound = settings?.boundAccounts.claude ?? {
-          accountId: 'acct_claude_primary',
-          workspaceId: 'ws_personal',
-        };
-        const parsed = parseClaudeExport(arr, bound);
-        for (const item of parsed) {
-          await upsertThread(sharedDb, item);
-        }
-        setStatusAnnouncement(`Imported ${parsed.length} Claude records.`);
-      } else {
-        const res = await importPortableBundle(sharedDb, data as PortableBundle);
-        setStatusAnnouncement(
-          `Imported ${res.importedCount} portable records (${res.skippedTombstones} deleted skipped).`
-        );
-      }
-      await reloadAll(selectedConversation?.threadKey);
-    } catch (err) {
-      setStatusAnnouncement(
-        `Import error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  };
-
-  const handleExportPortable = async () => {
-    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
-    const bundle = await exportPortableBundle(sharedDb);
-    setExportedPreviewText(JSON.stringify(bundle, null, 2));
-  };
-
-  const renderEvidencePassage = (
-    evidenceId: string,
-    messageIndexes: number[]
-  ) => {
+  const renderEvidencePassage = (evidenceId: string, messageIndexes: number[]) => {
     if (activeEvidenceId !== evidenceId || !selectedConversation) return null;
     const cited = messageIndexes
       .map((ord) => selectedMessages.find((m) => m.ordinal === ord))
       .filter((m): m is MessageRecord => Boolean(m));
-
     return (
       <div className="tk-evidence-passage-box" role="region" aria-label="Source passage">
         <div className="tk-tabular" style={{ fontWeight: 600, marginBottom: 4 }}>
-          Captured evidence · sourceRevision r{selectedConversation.sourceRevision} ·{' '}
-          {selectedConversation.coverage} coverage
+          Captured evidence · sourceRevision r{selectedConversation.sourceRevision} · {selectedConversation.coverage}{' '}
+          coverage
         </div>
         {cited.length > 0 ? (
           cited.map((m) => (
@@ -745,17 +938,67 @@ export function App() {
               <strong>
                 [m{m.ordinal + 1} · {m.role}]
               </strong>
-              : “{m.content}”
+              : “{m.content.length > 1200 ? `${m.content.slice(0, 1200)}…` : m.content}”
             </div>
           ))
         ) : (
           <div>
-            Message m{(messageIndexes[0] ?? 0) + 1} captured in thread revision r
-            {selectedConversation.sourceRevision}.
+            Message m{(messageIndexes[0] ?? 0) + 1} captured in thread revision r{selectedConversation.sourceRevision}.
           </div>
         )}
       </div>
     );
+  };
+
+  const renderClaims = (
+    items: StructuredSummaryRecord['decisions'],
+    prefix: string,
+    emptyText: string,
+    fallback?: { text: string | null; ordinal: number | null; speaker: 'user_committed' | 'assistant_suggested' | null; id: string }
+  ) => {
+    if (items.length > 0) {
+      return items.map((d, idx) => {
+        const evId = `${prefix}-${idx}`;
+        return (
+          <div key={evId}>
+            <div className="tk-claim-row">
+              <span className="tk-claim-text">{d.text}</span>
+              <button
+                type="button"
+                className="tk-evidence-marker"
+                title={d.speaker === 'user_committed' ? 'You committed to this' : 'Assistant suggested this'}
+                aria-expanded={activeEvidenceId === evId}
+                onClick={() => setActiveEvidenceId((prev) => (prev === evId ? null : evId))}
+              >
+                <span className="tk-evidence-pip" data-speaker={d.speaker} aria-hidden="true" />
+                <span>{d.messageIndexes.map((i) => `m${i + 1}`).join(',')}</span>
+              </button>
+            </div>
+            {renderEvidencePassage(evId, d.messageIndexes)}
+          </div>
+        );
+      });
+    }
+    if (fallback?.text) {
+      return (
+        <div>
+          <div className="tk-claim-row">
+            <span className="tk-claim-text">{fallback.text}</span>
+            <button
+              type="button"
+              className="tk-evidence-marker"
+              aria-expanded={activeEvidenceId === fallback.id}
+              onClick={() => setActiveEvidenceId((prev) => (prev === fallback.id ? null : fallback.id))}
+            >
+              <span className="tk-evidence-pip" data-speaker={fallback.speaker ?? 'user_committed'} aria-hidden="true" />
+              <span>m{(fallback.ordinal ?? 0) + 1}</span>
+            </button>
+          </div>
+          {renderEvidencePassage(fallback.id, [fallback.ordinal ?? 0])}
+        </div>
+      );
+    }
+    return <div className="tk-empty-line">{emptyText}</div>;
   };
 
   const latestUndoableLog = changeLogs.find((c) => !c.undone);
@@ -763,30 +1006,164 @@ export function App() {
   if (surface === 'overlay' && overlayHandshakeState !== 'authorized') {
     if (overlayHandshakeState === 'rejected') {
       return (
-        <div
-          className="tk-workbench"
-          data-surface="overlay"
-          data-testid="overlay-handshake-rejected"
-          role="alert"
-          style={{ padding: 24 }}
-        >
+        <div className="tk-workbench" data-surface="overlay" data-testid="overlay-handshake-rejected" role="alert" style={{ padding: 24 }}>
           <strong>Unauthorized overlay frame rejected</strong>
           <p style={{ marginTop: 8 }}>{overlayHandshakeError}</p>
         </div>
       );
     }
     return (
-      <div
-        className="tk-workbench"
-        data-surface="overlay"
-        data-testid="overlay-handshake-pending"
-        aria-busy="true"
-        style={{ padding: 24 }}
-      >
+      <div className="tk-workbench" data-surface="overlay" data-testid="overlay-handshake-pending" aria-busy="true" style={{ padding: 24 }}>
         Verifying overlay handshake…
       </div>
     );
   }
+
+  const isCompact = surface === 'sidepanel';
+  const activeTabConversation = activeTabThreadKey
+    ? conversations.find((c) => c.threadKey === activeTabThreadKey) ?? null
+    : null;
+
+  const analysisChip = (() => {
+    if (busy) return <span className="tk-status-chip" data-tone="busy">{busy}</span>;
+    if (analysis.running) {
+      return (
+        <span className="tk-status-chip" data-tone="busy">
+          Claude analyzing… {analysis.analyzed} done{pendingAnalysis ? ` · ${pendingAnalysis} queued` : ''}
+          <button type="button" className="tk-linklike" onClick={() => analysisAbortRef.current?.abort()}>
+            Stop
+          </button>
+        </span>
+      );
+    }
+    if (settings?.lastAiError && pendingAnalysis > 0) {
+      return (
+        <button type="button" className="tk-status-chip" data-tone="warn" onClick={() => openModal(settingsDialogRef)} title={settings.lastAiError}>
+          AI paused: {settings.lastAiError.slice(0, 60)}
+        </button>
+      );
+    }
+    if (pendingAnalysis > 0 && (aiReady || settings?.embeddingProvider !== 'local')) {
+      return (
+        <button type="button" className="tk-status-chip" onClick={() => void startAnalysis()}>
+          {pendingAnalysis} queued for analysis · Run now
+        </button>
+      );
+    }
+    if (settings && !aiReady) {
+      return (
+        <button type="button" className="tk-status-chip" data-tone="quiet" onClick={() => openModal(settingsDialogRef)}>
+          On-device analysis · Add Claude for deeper summaries
+        </button>
+      );
+    }
+    return null;
+  })();
+
+  const secondaryActions = (
+    <>
+      <button type="button" className="tk-btn" onClick={openOrganizeModal}>
+        Organize…
+      </button>
+      <button type="button" className="tk-btn" onClick={() => openModal(importDialogRef)}>
+        Import / Export
+      </button>
+      <button type="button" className="tk-btn" onClick={() => openModal(settingsDialogRef)}>
+        Settings
+      </button>
+      <button
+        type="button"
+        className="tk-btn"
+        aria-label="Toggle density"
+        onClick={() => void persistSettingPatch({ density: settings?.density === 'compact' ? 'comfortable' : 'compact' })}
+      >
+        {settings?.density === 'compact' ? 'Compact' : 'Comfortable'}
+      </button>
+      <button
+        type="button"
+        className="tk-btn"
+        aria-label="Toggle color theme"
+        onClick={() => void persistSettingPatch({ theme: effectiveTheme === 'dark' ? 'light' : 'dark' })}
+      >
+        {effectiveTheme === 'dark' ? 'Dark' : 'Light'}
+      </button>
+    </>
+  );
+
+  const renderRow = (hit: SearchHit) => {
+    const c = hit.conversation;
+    const isSelected = selectedConversation?.threadKey === c.threadKey;
+    const queueInfo = queueItemsMap?.get(c.threadKey);
+    const insight = insightsByThread.get(c.threadKey) ?? null;
+    const secondLine = queueInfo
+      ? queueInfo.resurfaceReason
+      : searchQuery.trim()
+        ? hit.supportingExcerpt
+        : summariesByThread.get(c.threadKey)?.whereYouLeftOff ?? hit.supportingExcerpt;
+    return (
+      <li key={c.threadKey} className="tk-row-item">
+        <button
+          ref={(el) => {
+            if (el) rowRefs.current.set(c.threadKey, el);
+          }}
+          type="button"
+          className="tk-row-btn"
+          aria-selected={isSelected}
+          onClick={() => handleSelectThread(c.threadKey)}
+        >
+          <div className="tk-row-main">
+            <div className="tk-row-title">{getSmartTitle(c, insight)}</div>
+            {insight?.gist && insight.gist !== getSmartTitle(c, insight) && <div className="tk-row-gist">{insight.gist}</div>}
+            {secondLine && secondLine !== insight?.gist && <div className="tk-row-excerpt">{secondLine}</div>}
+            <div className="tk-row-meta">
+              {insight && <KindLabel kind={insight.kind} />}
+              {insight?.topics.slice(0, 3).map((t) => (
+                <span key={t} className="tk-chip tk-chip-small">
+                  {t}
+                </span>
+              ))}
+              <span>
+                {c.project}
+                {c.categoryLocked ? ' (locked)' : ''}
+              </span>
+              <span>·</span>
+              <span>{providerLabel(c.provider)}</span>
+              {c.messageCount > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="tk-tabular">{c.messageCount} msgs</span>
+                </>
+              )}
+              {c.branchId !== 'main' && (
+                <>
+                  <span>·</span>
+                  <span>branch: {c.branchId}</span>
+                </>
+              )}
+              {searchQuery.trim() && hit.matchReasons[0] && (
+                <>
+                  <span>·</span>
+                  <span>{hit.matchReasons[0]}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="tk-row-right">
+            <span className="tk-tabular" title={c.updatedAt ?? undefined}>
+              {relativeTime(c.updatedAt ?? c.lastCapturedAt)}
+            </span>
+            <CoverageTick coverage={c.coverage} />
+            <StatusPill state={c.workflowState} />
+            {insight?.source === 'ai' && (
+              <span className="tk-ai-mark" title={`Analyzed by ${insight.model}`}>
+                AI
+              </span>
+            )}
+          </div>
+        </button>
+      </li>
+    );
+  };
 
   return (
     <div className="tk-workbench" data-surface={surface}>
@@ -796,21 +1173,10 @@ export function App() {
         </a>
       )}
 
-      <div
-        role="status"
-        aria-live="polite"
-        style={{
-          position: 'absolute',
-          width: 1,
-          height: 1,
-          overflow: 'hidden',
-          clip: 'rect(0 0 0 0)',
-        }}
-      >
+      <div role="status" aria-live="polite" className="tk-visually-hidden">
         {statusAnnouncement}
       </div>
 
-      {/* Header */}
       <header className="tk-header">
         <div className="tk-header-left">
           <button
@@ -818,31 +1184,23 @@ export function App() {
             className="tk-btn"
             aria-label="Toggle navigation rail"
             onClick={() => {
-              if (window.innerWidth <= 760) {
-                setMobileDrawerOpen((v) => !v);
-              } else {
-                void persistSettingPatch({
-                  sidebarCollapsed: !settings?.sidebarCollapsed,
-                });
-              }
+              if (window.innerWidth <= 760) setMobileDrawerOpen((v) => !v);
+              else void persistSettingPatch({ sidebarCollapsed: !settings?.sidebarCollapsed });
             }}
           >
             ☰
           </button>
           <h1 className="tk-h1">Threadkeeper</h1>
-
           {counts && (
             <details className="tk-counts-details">
               <summary className="tk-counts-summary">
-                {counts.totalThreads} threads · {counts.filedCount} filed ·{' '}
-                {counts.unfiledCount} unfiled
+                {counts.totalThreads} threads · {counts.filedCount} filed · {counts.unfiledCount} unfiled
               </summary>
               <div className="tk-counts-popover">
                 <strong>How these are counted</strong>
                 <p style={{ margin: '6px 0 0' }}>
-                  Total ({counts.totalThreads}) equals filed ({counts.filedCount}) +
-                  unfiled ({counts.unfiledCount}). {counts.partialOrTitleOnlyCount}{' '}
-                  threads have partial or title-only DOM coverage;{' '}
+                  Total ({counts.totalThreads}) equals filed ({counts.filedCount}) + unfiled ({counts.unfiledCount}).{' '}
+                  {counts.partialOrTitleOnlyCount} threads have partial or title-only DOM coverage;{' '}
                   {counts.coverageCounts.full} have full export coverage.
                   {counts.syntheticBenchmarkCount > 0
                     ? ` (${counts.syntheticBenchmarkCount} synthetic benchmark records isolated from user totals.)`
@@ -851,182 +1209,126 @@ export function App() {
               </div>
             </details>
           )}
+          {!isCompact && analysisChip}
         </div>
 
         <div className="tk-header-actions">
           {latestUndoableLog && (
-            <button
-              type="button"
-              className="tk-btn"
-              onClick={() => void handleUndoLastOrganize()}
-            >
+            <button type="button" className="tk-btn" onClick={() => void handleUndoLastOrganize()}>
               Undo organize ({latestUndoableLog.snapshots.length})
             </button>
           )}
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={openOrganizeModal}
-          >
-            Organize…
+          <button type="button" className="tk-btn tk-btn-primary" onClick={() => void handleAutoOrganize()}>
+            Auto-organize
           </button>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() => {
-              if (importDialogRef.current) {
-                if (typeof importDialogRef.current.showModal === 'function') {
-                  importDialogRef.current.showModal();
-                } else {
-                  importDialogRef.current.setAttribute('open', 'true');
-                }
-              }
-            }}
-          >
-            Import / Export
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() => {
-              if (settingsDialogRef.current) {
-                if (typeof settingsDialogRef.current.showModal === 'function') {
-                  settingsDialogRef.current.showModal();
-                } else {
-                  settingsDialogRef.current.setAttribute('open', 'true');
-                }
-              }
-            }}
-          >
-            Settings
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            aria-label="Toggle density"
-            onClick={() =>
-              void persistSettingPatch({
-                density:
-                  settings?.density === 'compact' ? 'comfortable' : 'compact',
-              })
-            }
-          >
-            {settings?.density === 'compact' ? 'Compact' : 'Comfortable'}
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            aria-label="Toggle color theme"
-            onClick={() =>
-              void persistSettingPatch({
-                theme: settings?.theme === 'dark' ? 'light' : 'dark',
-              })
-            }
-          >
-            {settings?.theme === 'dark' ? 'Dark' : 'Light'}
-          </button>
+          {isCompact ? (
+            <details className="tk-more-menu">
+              <summary className="tk-btn" aria-label="More actions">
+                ⋯
+              </summary>
+              <div className="tk-more-popover">
+                {secondaryActions}
+                <button type="button" className="tk-btn" onClick={handleOpenFullPage}>
+                  Open full page ↗
+                </button>
+              </div>
+            </details>
+          ) : (
+            secondaryActions
+          )}
           {surface === 'overlay' && (
             <>
-              <button
-                type="button"
-                className="tk-btn"
-                onClick={handleOpenFullPage}
-              >
+              <button type="button" className="tk-btn" onClick={handleOpenFullPage}>
                 Open full page ↗
               </button>
-              <button
-                type="button"
-                className="tk-btn tk-btn-primary"
-                aria-label="Close Threadkeeper overlay"
-                onClick={handleCloseOverlay}
-              >
+              <button type="button" className="tk-btn tk-btn-primary" aria-label="Close Threadkeeper overlay" onClick={handleCloseOverlay}>
                 Close
               </button>
             </>
           )}
         </div>
+        {isCompact && analysisChip && <div className="tk-header-status">{analysisChip}</div>}
       </header>
 
-      {/* Main 3-column layout */}
-      <div
-        className="tk-columns"
-        data-nav-collapsed={Boolean(settings?.sidebarCollapsed)}
-      >
-        {/* Left Navigation Rail */}
-        <nav
-          className="tk-nav"
-          aria-label="Projects and resurfacing queues"
-          data-drawer-open={mobileDrawerOpen}
-        >
+      <div className="tk-columns" data-nav-collapsed={Boolean(settings?.sidebarCollapsed)}>
+        <nav className="tk-nav" aria-label="Projects and resurfacing queues" data-drawer-open={mobileDrawerOpen}>
           {!settings?.sidebarCollapsed ? (
             <>
               <div>
-                <div className="tk-eyebrow">Workstreams</div>
+                <div className="tk-eyebrow">Projects</div>
                 <div className="tk-nav-list">
                   <button
                     type="button"
                     className="tk-nav-item"
-                    aria-current={
-                      activeQueue === 'all' && activeArea === 'All threads'
-                    }
+                    aria-current={activeQueue === 'all' && activeArea === 'All threads'}
                     onClick={() => handleAreaSelect('All threads')}
                   >
                     <span>All threads</span>
-                    <span className="tk-nav-count">
-                      {counts?.totalThreads ?? 0}
-                    </span>
+                    <span className="tk-nav-count">{counts?.totalThreads ?? 0}</span>
                   </button>
-                  {STARTER_AREAS.map((area) => (
-                    <button
-                      key={area}
-                      type="button"
-                      className="tk-nav-item"
-                      aria-current={
-                        activeQueue === 'all' && activeArea === area
-                      }
-                      onClick={() => handleAreaSelect(area)}
-                    >
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
+                  {projectNames.map((area) => {
+                    const col = collectionByName.get(area);
+                    return (
+                      <button
+                        key={area}
+                        type="button"
+                        className="tk-nav-item"
+                        aria-current={activeQueue === 'all' && activeArea === area}
+                        onClick={() => handleAreaSelect(area)}
+                        title={col?.description || area}
                       >
-                        {area}
-                      </span>
-                      <span className="tk-nav-count">
-                        {counts?.projectCounts[area] ?? 0}
-                      </span>
+                        <span className="tk-ellipsis">
+                          {area}
+                          {col && (col.origin === 'auto' || col.origin === 'provider') ? <span className="tk-auto-mark"> auto</span> : null}
+                        </span>
+                        <span className="tk-nav-count">{counts?.projectCounts[area] ?? 0}</span>
+                      </button>
+                    );
+                  })}
+                  {newProjectDraft === null ? (
+                    <button type="button" className="tk-nav-item tk-nav-add" onClick={() => setNewProjectDraft('')}>
+                      + New project
                     </button>
-                  ))}
+                  ) : (
+                    <form
+                      className="tk-nav-new"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void handleCreateProject(newProjectDraft);
+                      }}
+                    >
+                      <input
+                        autoFocus
+                        className="tk-input"
+                        aria-label="New project name"
+                        placeholder="Project name"
+                        value={newProjectDraft}
+                        onChange={(e) => setNewProjectDraft(e.target.value)}
+                        onBlur={() => !newProjectDraft.trim() && setNewProjectDraft(null)}
+                      />
+                    </form>
+                  )}
                 </div>
               </div>
 
               <div>
                 <div className="tk-eyebrow">Resurfacing</div>
                 <div className="tk-nav-list">
-                  {(Object.keys(RESURFACE_QUEUE_LABELS) as ResurfaceQueue[]).map(
-                    (q) => {
-                      const qCount = computeResurfacingQueueItems(
-                        conversations,
-                        summariesByThread,
-                        q
-                      ).length;
-                      return (
-                        <button
-                          key={q}
-                          type="button"
-                          className="tk-nav-item"
-                          aria-current={activeQueue === q}
-                          onClick={() => handleQueueSelect(q)}
-                        >
-                          <span>{RESURFACE_QUEUE_LABELS[q]}</span>
-                          <span className="tk-nav-count">{qCount}</span>
-                        </button>
-                      );
-                    }
-                  )}
+                  {(Object.keys(RESURFACE_QUEUE_LABELS) as ResurfaceQueue[]).map((q) => {
+                    const qCount = computeResurfacingQueueItems(conversations, summariesByThread, q).length;
+                    return (
+                      <button
+                        key={q}
+                        type="button"
+                        className="tk-nav-item"
+                        aria-current={activeQueue === q}
+                        onClick={() => handleQueueSelect(q)}
+                      >
+                        <span>{RESURFACE_QUEUE_LABELS[q]}</span>
+                        <span className="tk-nav-count">{qCount}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </>
@@ -1045,269 +1347,262 @@ export function App() {
           )}
         </nav>
 
-        {/* Middle List Pane */}
-        <main
-          id="tk-main-list"
-          className="tk-list-pane"
-          aria-label="Conversation index"
-        >
+        <main id="tk-main-list" className="tk-list-pane" aria-label="Conversation index">
           <div className="tk-search-bar">
             <div className="tk-search-row">
-              <input
-                ref={searchInputRef}
-                type="search"
-                className="tk-input tk-search-input"
-                aria-label="Search conversations, decisions, and messages"
-                placeholder="Search phrases, fuzzy titles, decisions, or messages…"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-              />
-            </div>
-
-            <div className="tk-filter-row">
-              <select
-                className="tk-select"
-                aria-label="Filter by provider"
-                value={providerFilter}
-                onChange={(e) =>
-                  setProviderFilter(e.target.value as ProviderId | 'all')
-                }
-              >
-                <option value="all">All providers</option>
-                <option value="chatgpt">ChatGPT</option>
-                <option value="claude">Claude</option>
-                <option value="imported">Imported</option>
-              </select>
-
-              <select
-                className="tk-select"
-                aria-label="Filter by workflow state"
-                value={stateFilter}
-                onChange={(e) =>
-                  setStateFilter(e.target.value as WorkflowState | 'all')
-                }
-              >
-                <option value="all">All states</option>
-                <option value="active">Active</option>
-                <option value="needs_review">Needs review</option>
-                <option value="waiting">Waiting</option>
-                <option value="paused">Paused</option>
-                <option value="done">Done</option>
-                <option value="archived">Archived</option>
-              </select>
-
-              <select
-                className="tk-select"
-                aria-label="Filter by capture coverage"
-                value={coverageFilter}
-                onChange={(e) =>
-                  setCoverageFilter(e.target.value as CoverageState | 'all')
-                }
-              >
-                <option value="all">All coverage</option>
-                <option value="full">Full export</option>
-                <option value="partial">Partial DOM</option>
-                <option value="title_only">Title only</option>
-              </select>
-
-              <select
-                className="tk-select"
-                aria-label="View mode"
-                value={settings?.viewMode ?? 'list'}
-                onChange={(e) =>
-                  void persistSettingPatch({
-                    viewMode: e.target.value as 'list' | 'kanban' | 'cards',
-                  })
-                }
-              >
-                <option value="list">List index</option>
-                <option value="kanban">Kanban by status</option>
-                <option value="cards">Project cards</option>
-              </select>
-            </div>
-          </div>
-
-          {settings?.viewMode === 'kanban' ? (
-            <div className="tk-kanban-grid">
-              {(['active', 'needs_review', 'waiting', 'paused', 'done'] as WorkflowState[]).map(
-                (st) => {
-                  const colHits = displayedHits.filter(
-                    (h) => h.conversation.workflowState === st
-                  );
-                  return (
-                    <div key={st} className="tk-kanban-col">
-                      <div className="tk-eyebrow">
-                        {st.replace('_', ' ')} ({colHits.length})
-                      </div>
-                      {colHits.map((hit) => (
-                        <button
-                          key={hit.conversation.threadKey}
-                          type="button"
-                          className="tk-row-btn"
-                          style={{ borderRadius: 6, border: '1px solid var(--rule)' }}
-                          aria-selected={
-                            selectedConversation?.threadKey ===
-                            hit.conversation.threadKey
-                          }
-                          onClick={() =>
-                            handleSelectThread(hit.conversation.threadKey)
-                          }
-                        >
-                          <div className="tk-row-main">
-                            <div className="tk-row-title">
-                              {getDisplayTitle(hit.conversation)}
-                            </div>
-                            <div className="tk-row-meta">
-                              <span>{hit.conversation.project}</span>
-                              <span>·</span>
-                              <span>{hit.conversation.provider}</span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  );
-                }
+              <div className="tk-segmented" role="tablist" aria-label="Search or ask">
+                <button type="button" role="tab" aria-selected={listMode === 'search'} onClick={() => setListMode('search')}>
+                  Search
+                </button>
+                <button type="button" role="tab" aria-selected={listMode === 'ask'} onClick={() => setListMode('ask')}>
+                  Ask
+                </button>
+              </div>
+              {listMode === 'search' && (
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  className="tk-input tk-search-input"
+                  aria-label="Search conversations, decisions, and messages"
+                  placeholder="Search titles, summaries, topics, decisions, messages…"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                />
               )}
             </div>
-          ) : settings?.viewMode === 'cards' ? (
-            <div className="tk-cards-grid">
-              {Array.from(
-                displayedHits.reduce<Map<string, SearchHit[]>>((map, hit) => {
-                  const proj = hit.conversation.project || 'Unassigned';
-                  const list = map.get(proj) ?? [];
-                  list.push(hit);
-                  map.set(proj, list);
-                  return map;
-                }, new Map())
-              ).map(([proj, projHits]) => {
-                const activeCount = projHits.filter(
-                  (h) => h.conversation.workflowState === 'active'
-                ).length;
-                const reviewCount = projHits.filter(
-                  (h) => h.conversation.workflowState === 'needs_review'
-                ).length;
-                return (
-                  <div key={proj} className="tk-project-card">
-                    <div className="tk-project-card-header">
-                      <span className="tk-row-title">{proj}</span>
-                      <span className="tk-eyebrow tk-tabular">
-                        {projHits.length} threads
-                      </span>
-                    </div>
-                    <div className="tk-row-meta">
-                      <span>{activeCount} active</span>
-                      <span>·</span>
-                      <span>{reviewCount} needs review</span>
-                    </div>
-                    <div className="tk-project-card-items">
-                      {projHits.slice(0, 6).map((hit) => (
-                        <button
-                          key={hit.conversation.threadKey}
-                          type="button"
-                          className="tk-row-btn"
-                          style={{
-                            borderRadius: 6,
-                            border: '1px solid var(--rule)',
-                            padding: '6px 8px',
-                          }}
-                          aria-selected={
-                            selectedConversation?.threadKey ===
-                            hit.conversation.threadKey
-                          }
-                          onClick={() =>
-                            handleSelectThread(hit.conversation.threadKey)
-                          }
-                        >
-                          <div className="tk-row-main">
-                            <div className="tk-row-title">
-                              {getDisplayTitle(hit.conversation)}
-                            </div>
-                            <div className="tk-row-meta">
-                              <span>{hit.conversation.provider}</span>
-                              <span>·</span>
-                              <span>{hit.conversation.coverage}</span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : displayedHits.length === 0 ? (
-            <div style={{ padding: 24, color: 'var(--ink-2)' }}>
-              No conversations match the current filter — clear the search query or
-              import a ChatGPT/Claude export bundle to populate this view.
-            </div>
+
+            {listMode === 'search' && (
+              <div className="tk-filter-row">
+                <select
+                  className="tk-select"
+                  aria-label="Filter by provider"
+                  value={providerFilter}
+                  onChange={(e) => setProviderFilter(e.target.value as ProviderId | 'all')}
+                >
+                  <option value="all">All providers</option>
+                  {providerOptions.map((id) => (
+                    <option key={id} value={id}>
+                      {providerLabel(id)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="tk-select"
+                  aria-label="Filter by kind of work"
+                  value={kindFilter}
+                  onChange={(e) => setKindFilter(e.target.value as ThreadKind | 'all')}
+                >
+                  <option value="all">All kinds</option>
+                  {THREAD_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {THREAD_KIND_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="tk-select"
+                  aria-label="Filter by workflow state"
+                  value={stateFilter}
+                  onChange={(e) => setStateFilter(e.target.value as WorkflowState | 'all')}
+                >
+                  <option value="all">All states</option>
+                  <option value="active">Active</option>
+                  <option value="needs_review">Needs review</option>
+                  <option value="waiting">Waiting</option>
+                  <option value="paused">Paused</option>
+                  <option value="done">Done</option>
+                  <option value="archived">Archived</option>
+                </select>
+                {!isCompact && (
+                  <select
+                    className="tk-select"
+                    aria-label="Filter by capture coverage"
+                    value={coverageFilter}
+                    onChange={(e) => setCoverageFilter(e.target.value as CoverageState | 'all')}
+                  >
+                    <option value="all">All coverage</option>
+                    <option value="full">Full export</option>
+                    <option value="partial">Partial DOM</option>
+                    <option value="title_only">Title only</option>
+                  </select>
+                )}
+                <select
+                  className="tk-select"
+                  aria-label="View mode"
+                  value={settings?.viewMode ?? 'list'}
+                  onChange={(e) => void persistSettingPatch({ viewMode: e.target.value as 'list' | 'kanban' | 'cards' })}
+                >
+                  <option value="list">List index</option>
+                  <option value="kanban">Kanban by status</option>
+                  <option value="cards">Project cards</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {listMode === 'ask' ? (
+            <AskPanel
+              settings={settings}
+              conversations={conversations}
+              insights={insightsByThread}
+              messagesByThread={messagesByThread}
+              vectors={vectorsByThread}
+              searchIndex={searchIndex}
+              onSelectThread={handleSelectThread}
+              onOpenSettings={() => openModal(settingsDialogRef)}
+            />
           ) : (
-            <ul className="tk-row-list">
-              {displayedHits.map((hit) => {
-                const c = hit.conversation;
-                const isSelected =
-                  selectedConversation?.threadKey === c.threadKey;
-                const queueInfo = queueItemsMap?.get(c.threadKey);
-                const dateLabel = c.updatedAt
-                  ? c.updatedAt.slice(0, 10)
-                  : 'Unknown date';
-
-                return (
-                  <li key={c.threadKey} className="tk-row-item">
-                    <button
-                      ref={(el) => {
-                        if (el) rowRefs.current.set(c.threadKey, el);
-                      }}
-                      type="button"
-                      className="tk-row-btn"
-                      aria-selected={isSelected}
-                      onClick={() => handleSelectThread(c.threadKey)}
-                    >
-                      <div className="tk-row-main">
-                        <div className="tk-row-title">{getDisplayTitle(c)}</div>
-                        <div className="tk-row-excerpt">
-                          {queueInfo
-                            ? queueInfo.resurfaceReason
-                            : hit.supportingExcerpt}
+            <>
+              {activeTabConversation && !searchQuery.trim() && (
+                <div className="tk-this-tab">
+                  <div className="tk-eyebrow" style={{ padding: 0 }}>
+                    Open in this tab
+                  </div>
+                  <ul className="tk-row-list" style={{ flex: 'none' }}>
+                    {renderRow({
+                      conversation: activeTabConversation,
+                      score: 1,
+                      lexicalScore: 0,
+                      vectorScore: 0,
+                      rerankScore: null,
+                      matchReasons: [],
+                      supportingExcerpt: '',
+                      matchedMessageOrdinal: null,
+                    })}
+                  </ul>
+                </div>
+              )}
+              {settings?.viewMode === 'kanban' ? (
+                <div className="tk-kanban-grid">
+                  {(['active', 'needs_review', 'waiting', 'paused', 'done'] as WorkflowState[]).map((st) => {
+                    const colHits = displayedHits.filter((h) => h.conversation.workflowState === st);
+                    return (
+                      <div key={st} className="tk-kanban-col">
+                        <div className="tk-eyebrow">
+                          {st.replace('_', ' ')} ({colHits.length})
                         </div>
+                        {colHits.map((hit) => {
+                          const insight = insightsByThread.get(hit.conversation.threadKey) ?? null;
+                          return (
+                            <button
+                              key={hit.conversation.threadKey}
+                              type="button"
+                              className="tk-row-btn tk-card-btn"
+                              aria-selected={selectedConversation?.threadKey === hit.conversation.threadKey}
+                              onClick={() => handleSelectThread(hit.conversation.threadKey)}
+                            >
+                              <div className="tk-row-main">
+                                <div className="tk-row-title">{getSmartTitle(hit.conversation, insight)}</div>
+                                {insight?.gist && <div className="tk-row-gist">{insight.gist}</div>}
+                                <div className="tk-row-meta">
+                                  <span>{hit.conversation.project}</span>
+                                  <span>·</span>
+                                  <span>{providerLabel(hit.conversation.provider)}</span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : settings?.viewMode === 'cards' ? (
+                <div className="tk-cards-grid">
+                  {Array.from(
+                    displayedHits.reduce<Map<string, SearchHit[]>>((map, hit) => {
+                      const proj = hit.conversation.project || 'Unassigned';
+                      const list = map.get(proj) ?? [];
+                      list.push(hit);
+                      map.set(proj, list);
+                      return map;
+                    }, new Map())
+                  ).map(([proj, projHits]) => {
+                    const activeCount = projHits.filter((h) => h.conversation.workflowState === 'active').length;
+                    const reviewCount = projHits.filter((h) => h.conversation.workflowState === 'needs_review').length;
+                    const topicCounts = new Map<string, number>();
+                    for (const h of projHits) {
+                      for (const t of insightsByThread.get(h.conversation.threadKey)?.topics.slice(0, 4) ?? []) {
+                        topicCounts.set(t, (topicCounts.get(t) ?? 0) + 1);
+                      }
+                    }
+                    const topTopics = Array.from(topicCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
+                    return (
+                      <div key={proj} className="tk-project-card">
+                        <div className="tk-project-card-header">
+                          <span className="tk-row-title">{proj}</span>
+                          <span className="tk-eyebrow tk-tabular">{projHits.length} threads</span>
+                        </div>
+                        {collectionByName.get(proj)?.description && (
+                          <div className="tk-row-gist">{collectionByName.get(proj)!.description}</div>
+                        )}
                         <div className="tk-row-meta">
-                          <span>
-                            {c.project}
-                            {c.categoryLocked ? ' (locked)' : ''}
-                          </span>
+                          <span>{activeCount} active</span>
                           <span>·</span>
-                          <span>
-                            {c.provider} / {c.accountId}
-                          </span>
-                          {c.branchId !== 'main' && (
-                            <>
-                              <span>·</span>
-                              <span>branch: {c.branchId}</span>
-                            </>
-                          )}
-                          {searchQuery.trim() && (
-                            <>
-                              <span>·</span>
-                              <span>{hit.matchReasons[0]}</span>
-                            </>
-                          )}
+                          <span>{reviewCount} needs review</span>
+                        </div>
+                        {topTopics.length > 0 && (
+                          <div className="tk-chip-row">
+                            {topTopics.map((t) => (
+                              <span key={t} className="tk-chip tk-chip-small">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="tk-project-card-items">
+                          {projHits.slice(0, 6).map((hit) => (
+                            <button
+                              key={hit.conversation.threadKey}
+                              type="button"
+                              className="tk-row-btn tk-card-btn"
+                              aria-selected={selectedConversation?.threadKey === hit.conversation.threadKey}
+                              onClick={() => handleSelectThread(hit.conversation.threadKey)}
+                            >
+                              <div className="tk-row-main">
+                                <div className="tk-row-title">
+                                  {getSmartTitle(hit.conversation, insightsByThread.get(hit.conversation.threadKey) ?? null)}
+                                </div>
+                                <div className="tk-row-meta">
+                                  <span>{providerLabel(hit.conversation.provider)}</span>
+                                  <span>·</span>
+                                  <span>{relativeTime(hit.conversation.updatedAt)}</span>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
                         </div>
                       </div>
-
-                      <div className="tk-row-right">
-                        <span className="tk-tabular">{dateLabel}</span>
-                        <CoverageTick coverage={c.coverage} />
-                        <StatusPill state={c.workflowState} />
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                    );
+                  })}
+                </div>
+              ) : displayedHits.length === 0 ? (
+                <div className="tk-empty-state">
+                  {conversations.length === 0 ? (
+                    <>
+                      <p>
+                        <strong>No threads yet.</strong> Open any conversation on ChatGPT, Claude, Grok, Gemini, Perplexity,
+                        DeepSeek, Le Chat or Copilot and it appears here automatically, already summarized and filed.
+                      </p>
+                      <p>
+                        Or bring your history in at once:{' '}
+                        <button type="button" className="tk-linklike" onClick={() => openModal(importDialogRef)}>
+                          import a ChatGPT / Claude export or your Claude Code and Codex sessions
+                        </button>
+                        .
+                      </p>
+                    </>
+                  ) : (
+                    <p>No conversations match the current filter — clear the search or pick another project.</p>
+                  )}
+                </div>
+              ) : (
+                <ul className="tk-row-list">{displayedHits.map(renderRow)}</ul>
+              )}
+            </>
           )}
         </main>
 
-        {/* Right Detail Reader Pane */}
         <section
           className="tk-detail-pane"
           aria-label="Conversation context and evidence"
@@ -1322,40 +1617,38 @@ export function App() {
                     className="tk-btn"
                     onClick={() => {
                       setMobileDetailVisible(false);
-                      const btn = rowRefs.current.get(
-                        selectedConversation.threadKey
-                      );
-                      btn?.focus();
+                      rowRefs.current.get(selectedConversation.threadKey)?.focus();
                     }}
                   >
                     ← Back to list
                   </button>
                 </div>
 
-                <h2 className="tk-detail-title">
-                  {getDisplayTitle(selectedConversation)}
-                </h2>
+                <h2 className="tk-detail-title">{getSmartTitle(selectedConversation, selectedInsight)}</h2>
+                {selectedInsight && getSmartTitle(selectedConversation, selectedInsight) !== getDisplayTitle(selectedConversation) && (
+                  <div className="tk-muted" style={{ fontSize: 12 }}>
+                    Original title: {getDisplayTitle(selectedConversation)}
+                  </div>
+                )}
 
                 <div className="tk-detail-meta-strip">
                   <StatusPill state={selectedConversation.workflowState} />
                   <span>·</span>
                   <CoverageTick coverage={selectedConversation.coverage} />
                   <span className="tk-tabular">
-                    rev r{selectedConversation.sourceRevision} (
-                    {selectedConversation.messageCount} msgs)
+                    rev r{selectedConversation.sourceRevision} ({selectedConversation.messageCount} msgs)
                   </span>
                   <span>·</span>
                   <span>
-                    {selectedConversation.provider} ({selectedConversation.accountId}{' '}
-                    / {selectedConversation.workspaceId})
+                    {providerLabel(selectedConversation.provider)}
+                    {selectedConversation.providerProjectName ? ` / ${selectedConversation.providerProjectName}` : ''}
                   </span>
                   <span>·</span>
-                  <span>
-                    Cloud task status: {selectedConversation.cloudTaskStatus} (N)
+                  <span title={`${selectedConversation.accountId} / ${selectedConversation.workspaceId}`}>
+                    updated {relativeTime(selectedConversation.updatedAt ?? selectedConversation.lastCapturedAt)}
                   </span>
                 </div>
 
-                {/* Sibling branch switcher if present */}
                 {selectedConversation.siblingBranchIds.length > 0 && (
                   <div className="tk-filter-row" style={{ marginTop: 4 }}>
                     <span className="tk-eyebrow" style={{ padding: 0 }}>
@@ -1364,19 +1657,13 @@ export function App() {
                     {selectedConversation.siblingBranchIds.map((sibId) => {
                       const sibConv = conversations.find(
                         (c) =>
-                          c.sourceConversationId ===
-                            selectedConversation.sourceConversationId &&
+                          c.sourceConversationId === selectedConversation.sourceConversationId &&
                           c.accountId === selectedConversation.accountId &&
                           c.branchId === sibId
                       );
                       if (!sibConv) return null;
                       return (
-                        <button
-                          key={sibId}
-                          type="button"
-                          className="tk-btn"
-                          onClick={() => handleSelectThread(sibConv.threadKey)}
-                        >
+                        <button key={sibId} type="button" className="tk-btn" onClick={() => handleSelectThread(sibConv.threadKey)}>
                           Switch to {sibId}
                         </button>
                       );
@@ -1384,7 +1671,6 @@ export function App() {
                   </div>
                 )}
 
-                {/* Action strip */}
                 <div className="tk-filter-row" style={{ marginTop: 6 }}>
                   <select
                     className="tk-select"
@@ -1392,22 +1678,13 @@ export function App() {
                     value={selectedConversation.project}
                     onChange={(e) => void handleProjectChange(e.target.value)}
                   >
-                    {STARTER_AREAS.map((area) => (
+                    {projectNames.map((area) => (
                       <option key={area} value={area}>
                         {area}
                       </option>
                     ))}
                   </select>
-
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 12,
-                      color: 'var(--ink-2)',
-                    }}
-                  >
+                  <label className="tk-inline-check">
                     <input
                       type="checkbox"
                       checked={selectedConversation.categoryLocked}
@@ -1415,16 +1692,11 @@ export function App() {
                     />
                     Lock category
                   </label>
-
                   <select
                     className="tk-select"
                     aria-label="Change workflow state"
                     value={selectedConversation.workflowState}
-                    onChange={(e) =>
-                      void handleWorkflowStateChange(
-                        e.target.value as WorkflowState
-                      )
-                    }
+                    onChange={(e) => void handleWorkflowStateChange(e.target.value as WorkflowState)}
                   >
                     <option value="active">Active</option>
                     <option value="needs_review">Needs review</option>
@@ -1433,62 +1705,62 @@ export function App() {
                     <option value="done">Done</option>
                     <option value="archived">Archived</option>
                   </select>
-
+                  {/^https:\/\//.test(selectedConversation.canonicalUrl) ? (
+                    <button
+                      type="button"
+                      className="tk-btn"
+                      onClick={() => {
+                        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+                          chrome.runtime.sendMessage({
+                            type: 'OPEN_ORIGINAL_THREAD',
+                            canonicalUrl: selectedConversation.canonicalUrl,
+                            provider: selectedConversation.provider,
+                            expectedAccountId: selectedConversation.accountId,
+                            expectedWorkspaceId: selectedConversation.workspaceId,
+                            handshakeToken,
+                          });
+                        } else {
+                          window.open(selectedConversation.canonicalUrl, '_blank');
+                        }
+                      }}
+                    >
+                      Open original ↗
+                    </button>
+                  ) : selectedConversation.resumeCommand ? (
+                    <button
+                      type="button"
+                      className="tk-btn"
+                      onClick={() => copyText(selectedConversation.resumeCommand!, 'Resume command')}
+                    >
+                      Copy resume command
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="tk-btn"
-                    onClick={() => {
-                      if (
-                        typeof chrome !== 'undefined' &&
-                        chrome.runtime?.sendMessage
-                      ) {
-                        chrome.runtime.sendMessage({
-                          type: 'OPEN_ORIGINAL_THREAD',
-                          canonicalUrl: selectedConversation.canonicalUrl,
-                          provider: selectedConversation.provider,
-                          expectedAccountId: selectedConversation.accountId,
-                          expectedWorkspaceId: selectedConversation.workspaceId,
-                          handshakeToken,
-                        });
-                      } else {
-                        window.open(selectedConversation.canonicalUrl, '_blank');
-                      }
-                    }}
-                  >
-                    Open original ↗
-                  </button>
-
-                  <button
-                    type="button"
-                    className="tk-btn"
-                    onClick={() => {
-                      const md = exportThreadToMarkdown(
-                        selectedConversation,
-                        selectedMessages,
-                        selectedSummary
-                      );
-                      void navigator.clipboard?.writeText(md);
-                      setStatusAnnouncement('Copied Markdown handoff to clipboard.');
-                    }}
+                    onClick={() =>
+                      copyText(exportThreadToMarkdown(selectedConversation, selectedMessages, selectedSummary), 'Markdown handoff')
+                    }
                   >
                     Copy handoff
                   </button>
-
-                  <button
-                    type="button"
-                    className="tk-btn tk-btn-danger"
-                    onClick={() => void handleDeleteSelected()}
-                  >
+                  <button type="button" className="tk-btn tk-btn-danger" onClick={() => void handleDeleteSelected()}>
                     Delete
                   </button>
                 </div>
               </div>
 
-              {/* FOCAL ELEMENT: Where you left off strip (Evidence Location #1) */}
-              <div
-                className="tk-focal-left-off"
-                data-evidence-location="where-you-left-off"
-              >
+              <ThreadOverview
+                conv={selectedConversation}
+                insight={selectedInsight}
+                canAnalyze={aiReady}
+                analyzing={analyzingThread === selectedConversation.threadKey}
+                onAnalyze={() => void handleAnalyzeSelected()}
+                onCopy={copyText}
+              />
+
+              {/* FOCAL ELEMENT: Where you left off (Evidence Location #1) */}
+              <div className="tk-focal-left-off" data-evidence-location="where-you-left-off">
                 <div className="tk-eyebrow" style={{ padding: 0 }}>
                   Where you left off
                 </div>
@@ -1497,7 +1769,7 @@ export function App() {
                     {selectedSummary?.whereYouLeftOff ??
                       selectedConversation.nextStepText ??
                       selectedConversation.latestDecisionText ??
-                      selectedMessages[selectedMessages.length - 1]?.content ??
+                      selectedMessages[selectedMessages.length - 1]?.content.slice(0, 400) ??
                       'Title-only capture — open the original conversation or import an export file to read message turns.'}
                   </p>
                   {selectedMessages.length > 0 && (
@@ -1505,23 +1777,11 @@ export function App() {
                       type="button"
                       className="tk-evidence-marker"
                       aria-expanded={activeEvidenceId === 'focal-left-off'}
-                      onClick={() =>
-                        setActiveEvidenceId((prev) =>
-                          prev === 'focal-left-off' ? null : 'focal-left-off'
-                        )
-                      }
+                      onClick={() => setActiveEvidenceId((prev) => (prev === 'focal-left-off' ? null : 'focal-left-off'))}
                     >
-                      <span
-                        className="tk-evidence-pip"
-                        data-speaker="user_committed"
-                        aria-hidden="true"
-                      />
+                      <span className="tk-evidence-pip" data-speaker="user_committed" aria-hidden="true" />
                       <span>
-                        {(
-                          selectedSummary?.whereYouLeftOffMessageIndexes ?? [
-                            Math.max(0, selectedMessages.length - 1),
-                          ]
-                        )
+                        {(selectedSummary?.whereYouLeftOffMessageIndexes ?? [Math.max(0, selectedMessages.length - 1)])
                           .map((i) => `m${i + 1}`)
                           .join(',')}
                       </span>
@@ -1530,384 +1790,146 @@ export function App() {
                 </div>
                 {renderEvidencePassage(
                   'focal-left-off',
-                  selectedSummary?.whereYouLeftOffMessageIndexes ?? [
-                    Math.max(0, selectedMessages.length - 1),
-                  ]
+                  selectedSummary?.whereYouLeftOffMessageIndexes ?? [Math.max(0, selectedMessages.length - 1)]
                 )}
               </div>
 
-              {/* Evidence Location #2: Decisions */}
-              <div
-                className="tk-section"
-                data-evidence-location="decisions"
-              >
+              <div className="tk-section" data-evidence-location="decisions">
                 <h3 className="tk-section-h2">Decisions</h3>
-                {selectedSummary && selectedSummary.decisions.length > 0 ? (
-                  selectedSummary.decisions.map((d, idx) => {
-                    const evId = `decision-${idx}`;
-                    return (
-                      <div key={evId}>
-                        <div className="tk-claim-row">
-                          <span className="tk-claim-text">{d.text}</span>
-                          <button
-                            type="button"
-                            className="tk-evidence-marker"
-                            title={
-                              d.speaker === 'user_committed'
-                                ? 'User committed decision'
-                                : 'Assistant suggested decision'
-                            }
-                            aria-expanded={activeEvidenceId === evId}
-                            onClick={() =>
-                              setActiveEvidenceId((prev) =>
-                                prev === evId ? null : evId
-                              )
-                            }
-                          >
-                            <span
-                              className="tk-evidence-pip"
-                              data-speaker={d.speaker}
-                              aria-hidden="true"
-                            />
-                            <span>
-                              {d.messageIndexes.map((i) => `m${i + 1}`).join(',')}
-                            </span>
-                          </button>
-                        </div>
-                        {renderEvidencePassage(evId, d.messageIndexes)}
-                      </div>
-                    );
-                  })
-                ) : selectedConversation.latestDecisionText ? (
-                  <div>
-                    <div className="tk-claim-row">
-                      <span className="tk-claim-text">
-                        {selectedConversation.latestDecisionText}
-                      </span>
-                      <button
-                        type="button"
-                        className="tk-evidence-marker"
-                        aria-expanded={activeEvidenceId === 'cached-decision'}
-                        onClick={() =>
-                          setActiveEvidenceId((prev) =>
-                            prev === 'cached-decision' ? null : 'cached-decision'
-                          )
-                        }
-                      >
-                        <span
-                          className="tk-evidence-pip"
-                          data-speaker={
-                            selectedConversation.latestDecisionSpeaker ??
-                            'user_committed'
-                          }
-                          aria-hidden="true"
-                        />
-                        <span>
-                          m{(selectedConversation.latestDecisionMsgIndex ?? 0) + 1}
-                        </span>
-                      </button>
-                    </div>
-                    {renderEvidencePassage('cached-decision', [
-                      selectedConversation.latestDecisionMsgIndex ?? 0,
-                    ])}
-                  </div>
-                ) : (
-                  <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                    No explicit decisions extracted yet — run opt-in enrichment or
-                    record a manual decision note below.
-                  </div>
+                {renderClaims(
+                  selectedSummary?.decisions ?? [],
+                  'decision',
+                  'No explicit decisions in this thread yet.',
+                  {
+                    text: selectedConversation.latestDecisionText,
+                    ordinal: selectedConversation.latestDecisionMsgIndex,
+                    speaker: selectedConversation.latestDecisionSpeaker,
+                    id: 'cached-decision',
+                  }
                 )}
               </div>
 
-              {/* Evidence Location #3: Action items & Next step */}
-              <div
-                className="tk-section"
-                data-evidence-location="action-items"
-              >
+              <div className="tk-section" data-evidence-location="action-items">
                 <h3 className="tk-section-h2">Action items & next steps</h3>
-                {selectedSummary && selectedSummary.actionItems.length > 0 ? (
-                  selectedSummary.actionItems.map((a, idx) => {
-                    const evId = `action-${idx}`;
-                    return (
-                      <div key={evId}>
-                        <div className="tk-claim-row">
-                          <span className="tk-claim-text">{a.text}</span>
-                          <button
-                            type="button"
-                            className="tk-evidence-marker"
-                            aria-expanded={activeEvidenceId === evId}
-                            onClick={() =>
-                              setActiveEvidenceId((prev) =>
-                                prev === evId ? null : evId
-                              )
-                            }
-                          >
-                            <span
-                              className="tk-evidence-pip"
-                              data-speaker={a.speaker}
-                              aria-hidden="true"
-                            />
-                            <span>
-                              {a.messageIndexes.map((i) => `m${i + 1}`).join(',')}
-                            </span>
-                          </button>
-                        </div>
-                        {renderEvidencePassage(evId, a.messageIndexes)}
-                      </div>
-                    );
-                  })
-                ) : selectedConversation.nextStepText ? (
-                  <div>
-                    <div className="tk-claim-row">
-                      <span className="tk-claim-text">
-                        {selectedConversation.nextStepText}
-                      </span>
-                      <button
-                        type="button"
-                        className="tk-evidence-marker"
-                        aria-expanded={activeEvidenceId === 'cached-next-step'}
-                        onClick={() =>
-                          setActiveEvidenceId((prev) =>
-                            prev === 'cached-next-step' ? null : 'cached-next-step'
-                          )
-                        }
-                      >
-                        <span
-                          className="tk-evidence-pip"
-                          data-speaker={
-                            selectedConversation.nextStepSpeaker ??
-                            'user_committed'
-                          }
-                          aria-hidden="true"
-                        />
-                        <span>
-                          m{(selectedConversation.nextStepMsgIndex ?? 0) + 1}
-                        </span>
-                      </button>
-                    </div>
-                    {renderEvidencePassage('cached-next-step', [
-                      selectedConversation.nextStepMsgIndex ?? 0,
-                    ])}
-                  </div>
-                ) : (
-                  <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                    No pending action items recorded for this conversation.
-                  </div>
+                {renderClaims(
+                  selectedSummary?.actionItems ?? [],
+                  'action',
+                  'No pending action items recorded for this conversation.',
+                  {
+                    text: selectedConversation.nextStepText,
+                    ordinal: selectedConversation.nextStepMsgIndex,
+                    speaker: selectedConversation.nextStepSpeaker,
+                    id: 'cached-next-step',
+                  }
                 )}
               </div>
 
-              {/* Evidence Location #4: Open questions */}
-              <div
-                className="tk-section"
-                data-evidence-location="open-questions"
-              >
+              <div className="tk-section" data-evidence-location="open-questions">
                 <h3 className="tk-section-h2">Open questions</h3>
-                {selectedSummary && selectedSummary.openQuestions.length > 0 ? (
-                  selectedSummary.openQuestions.map((q, idx) => {
-                    const evId = `question-${idx}`;
-                    return (
-                      <div key={evId}>
-                        <div className="tk-claim-row">
-                          <span className="tk-claim-text">{q.text}</span>
-                          <button
-                            type="button"
-                            className="tk-evidence-marker"
-                            aria-expanded={activeEvidenceId === evId}
-                            onClick={() =>
-                              setActiveEvidenceId((prev) =>
-                                prev === evId ? null : evId
-                              )
-                            }
-                          >
-                            <span
-                              className="tk-evidence-pip"
-                              data-speaker={q.speaker}
-                              aria-hidden="true"
-                            />
-                            <span>
-                              {q.messageIndexes.map((i) => `m${i + 1}`).join(',')}
-                            </span>
-                          </button>
-                        </div>
-                        {renderEvidencePassage(evId, q.messageIndexes)}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                    No unresolved questions flagged in this thread.
-                  </div>
-                )}
+                {renderClaims(selectedSummary?.openQuestions ?? [], 'question', 'No unresolved questions flagged in this thread.')}
               </div>
 
-              {/* Evidence Location #5: Related threads & cross-references */}
-              <div
-                className="tk-section"
-                data-evidence-location="related-threads"
-              >
+              <div className="tk-section" data-evidence-location="related-threads">
                 <h3 className="tk-section-h2">Related threads & branches</h3>
-                {selectedRelationships.length > 0 ? (
-                  selectedRelationships.map((rel) => {
-                    const otherKey =
-                      rel.fromThreadKey === selectedConversation.threadKey
-                        ? rel.toThreadKey
-                        : rel.fromThreadKey;
-                    const otherConv = conversations.find(
-                      (c) => c.threadKey === otherKey
-                    );
-                    const evId = `rel-${rel.relationshipKey}`;
-                    const localOrdinal =
-                      rel.fromThreadKey === selectedConversation.threadKey
-                        ? rel.evidenceFromOrdinal
-                        : rel.evidenceToOrdinal;
-                    return (
-                      <div key={rel.relationshipKey}>
-                        <div className="tk-claim-row">
-                          <div>
-                            <button
-                              type="button"
-                              className="tk-btn"
-                              style={{ marginRight: 8 }}
-                              onClick={() => handleSelectThread(otherKey)}
-                            >
-                              {rel.relationType.replace('_', ' ')}:{' '}
-                              {otherConv
-                                ? getDisplayTitle(otherConv)
-                                : otherKey}
-                            </button>
-                            <span className="tk-claim-text">{rel.reason}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="tk-evidence-marker"
-                            aria-expanded={activeEvidenceId === evId}
-                            onClick={() =>
-                              setActiveEvidenceId((prev) =>
-                                prev === evId ? null : evId
-                              )
-                            }
-                          >
-                            <span
-                              className="tk-evidence-pip"
-                              data-speaker="user_committed"
-                              aria-hidden="true"
-                            />
-                            <span>m{localOrdinal + 1}</span>
+                {selectedRelationships.map((rel) => {
+                  const otherKey = rel.fromThreadKey === selectedConversation.threadKey ? rel.toThreadKey : rel.fromThreadKey;
+                  const otherConv = conversations.find((c) => c.threadKey === otherKey);
+                  const evId = `rel-${rel.relationshipKey}`;
+                  const localOrdinal =
+                    rel.fromThreadKey === selectedConversation.threadKey ? rel.evidenceFromOrdinal : rel.evidenceToOrdinal;
+                  return (
+                    <div key={rel.relationshipKey}>
+                      <div className="tk-claim-row">
+                        <div>
+                          <button type="button" className="tk-btn" style={{ marginRight: 8 }} onClick={() => handleSelectThread(otherKey)}>
+                            {rel.relationType.replace('_', ' ')}: {otherConv ? getDisplayTitle(otherConv) : otherKey}
                           </button>
+                          <span className="tk-claim-text">{rel.reason}</span>
                         </div>
-                        {renderEvidencePassage(evId, [localOrdinal])}
+                        <button
+                          type="button"
+                          className="tk-evidence-marker"
+                          aria-expanded={activeEvidenceId === evId}
+                          onClick={() => setActiveEvidenceId((prev) => (prev === evId ? null : evId))}
+                        >
+                          <span className="tk-evidence-pip" data-speaker="user_committed" aria-hidden="true" />
+                          <span>m{localOrdinal + 1}</span>
+                        </button>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                    No cross-thread continuation or contradiction links recorded yet.
-                  </div>
+                      {renderEvidencePassage(evId, [localOrdinal])}
+                    </div>
+                  );
+                })}
+                <SemanticNeighbors related={semanticNeighbors} insights={insightsByThread} onSelect={handleSelectThread} />
+                {selectedRelationships.length === 0 && semanticNeighbors.length === 0 && (
+                  <div className="tk-empty-line">No related threads found yet.</div>
                 )}
               </div>
 
-              {/* Manual overrides & notes editor */}
               <div className="tk-section">
                 <h3 className="tk-section-h2">Manual index overrides & notes</h3>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                    background: 'var(--paper-2)',
-                    padding: 12,
-                    borderRadius: 6,
-                    border: '1px solid var(--rule)',
-                  }}
-                >
-                  <label style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                <div className="tk-notes-box">
+                  <label className="tk-field">
                     Title override
                     <input
                       type="text"
                       className="tk-input"
-                      style={{ width: '100%', marginTop: 4 }}
                       aria-label="Manual title override"
                       value={titleDraft}
                       onChange={(e) => setTitleDraft(e.target.value)}
                     />
                   </label>
-                  <label style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  <label className="tk-field">
                     Tags (comma-separated; synonyms normalized)
                     <input
                       type="text"
                       className="tk-input"
-                      style={{ width: '100%', marginTop: 4 }}
                       aria-label="Manual tags"
                       value={tagInputDraft}
                       onChange={(e) => setTagInputDraft(e.target.value)}
                     />
                   </label>
-                  <label style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  <label className="tk-field">
                     Workbench notes (preserved across re-imports)
                     <textarea
                       className="tk-input"
-                      style={{ width: '100%', minHeight: 68, marginTop: 4 }}
+                      style={{ minHeight: 68 }}
                       aria-label="Manual workbench notes"
                       value={notesDraft}
                       onChange={(e) => setNotesDraft(e.target.value)}
                     />
                   </label>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 12,
-                        color: 'var(--ink-2)',
-                      }}
-                    >
+                  <div className="tk-notes-actions">
+                    <label className="tk-inline-check">
                       <input
                         type="checkbox"
                         checked={selectedConversation.cloudExcluded}
                         onChange={(e) => {
-                          void updateManualThreadFields(
-                            sharedDb,
-                            selectedConversation.threadKey,
-                            { cloudExcluded: e.target.checked }
-                          ).then(() => reloadAll(selectedConversation.threadKey));
+                          void updateManualThreadFields(sharedDb, selectedConversation.threadKey, {
+                            cloudExcluded: e.target.checked,
+                          }).then(() => reloadAll(selectedConversation.threadKey));
                         }}
                       />
-                      Local-only thread (never send to cloud Worker)
+                      Local-only thread (never sent to Claude, embedding APIs or the Worker)
                     </label>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        type="button"
-                        className="tk-btn"
-                        onClick={() => {
-                          void requestThreadEnrichment(
-                            sharedDb,
-                            selectedConversation.threadKey
-                          ).then((res) => {
-                            setStatusAnnouncement(
-                              res.status === 'rejected'
-                                ? `Cloud enrichment skipped: ${res.reason}`
-                                : `Cloud enrichment ${res.status}.`
-                            );
-                            void reloadAll(selectedConversation.threadKey);
-                          });
-                        }}
-                      >
-                        Enrich via Worker
-                      </button>
-                      <button
-                        type="button"
-                        className="tk-btn tk-btn-primary"
-                        onClick={() => void handleSaveManualEdits()}
-                      >
+                      {settings?.cloudEnabled && (
+                        <button
+                          type="button"
+                          className="tk-btn"
+                          onClick={() => {
+                            void requestThreadEnrichment(sharedDb, selectedConversation.threadKey).then((res) => {
+                              setStatusAnnouncement(
+                                res.status === 'rejected' ? `Cloud enrichment skipped: ${res.reason}` : `Cloud enrichment ${res.status}.`
+                              );
+                              void reloadAll(selectedConversation.threadKey);
+                            });
+                          }}
+                        >
+                          Enrich via Worker
+                        </button>
+                      )}
+                      <button type="button" className="tk-btn tk-btn-primary" onClick={() => void handleSaveManualEdits()}>
                         Save notes & overrides
                       </button>
                     </div>
@@ -1915,45 +1937,27 @@ export function App() {
                 </div>
               </div>
 
-              {/* Captured Message Transcript */}
               <div className="tk-section">
-                <h3 className="tk-section-h2">
-                  Captured transcript ({selectedMessages.length} messages)
-                </h3>
+                <h3 className="tk-section-h2">Captured transcript ({selectedMessages.length} messages)</h3>
                 {selectedMessages.length === 0 ? (
-                  <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                    No message bodies captured ({selectedConversation.coverage}{' '}
-                    state). Open the original conversation or import an export file
-                    to populate message turns.
+                  <div className="tk-empty-line">
+                    No message bodies captured ({selectedConversation.coverage} state). Open the original conversation or
+                    import an export file to populate message turns.
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {selectedMessages.map((m) => (
-                      <article
-                        key={m.messageKey}
-                        style={{
-                          padding: '10px 12px',
-                          background: 'var(--paper-2)',
-                          border: '1px solid var(--rule)',
-                          borderRadius: 6,
-                        }}
-                      >
-                        <div
-                          className="tk-tabular"
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--ink-3)',
-                            marginBottom: 4,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                          }}
-                        >
+                  <div className="tk-transcript">
+                    {!showAllMessages && selectedMessages.length > TRANSCRIPT_PAGE && (
+                      <button type="button" className="tk-btn" onClick={() => setShowAllMessages(true)}>
+                        Show all {selectedMessages.length} messages ({selectedMessages.length - TRANSCRIPT_PAGE} earlier hidden)
+                      </button>
+                    )}
+                    {(showAllMessages ? selectedMessages : selectedMessages.slice(-TRANSCRIPT_PAGE)).map((m) => (
+                      <article key={m.messageKey} className="tk-message" data-role={m.role}>
+                        <div className="tk-message-meta tk-tabular">
                           m{m.ordinal + 1} · {m.role} ·{' '}
                           {m.createdAt ? m.createdAt.slice(0, 19).replace('T', ' ') : 'timestamp unknown'}
                         </div>
-                        <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>
-                          {m.content}
-                        </div>
+                        <div className="tk-message-body">{m.content}</div>
                       </article>
                     ))}
                   </div>
@@ -1961,112 +1965,113 @@ export function App() {
               </div>
             </>
           ) : (
-            <div style={{ color: 'var(--ink-2)' }}>
-              Select a conversation from the index to read its context and evidence
-              margin.
-            </div>
+            <div className="tk-empty-line">Select a conversation to see what it is about and where you left off.</div>
           )}
         </section>
       </div>
 
-      {/* Inner Native Dialog #1: Natural-Language Organize Preview */}
+      {/* Inner dialog #1: organize (natural language, Claude-planned, or automatic) */}
       <dialog
         ref={organizeDialogRef}
         id="tk-organize-dialog"
-        className="tk-modal-dialog"
-        aria-label="Organize conversations with natural language"
+        className="tk-modal-dialog tk-modal-wide"
+        aria-label="Organize conversations"
         onClose={() => {
           lastInnerModalCloseAtRef.current = Date.now();
         }}
       >
         <h2 className="tk-section-h2" style={{ marginBottom: 8 }}>
-          Organize conversations (Preview & Undoable Apply)
+          Organize conversations
         </h2>
-        <p style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 0 }}>
-          Nothing is modified silently. Review every proposed project, tag, and
-          exclusion rule below before applying.
+        <p className="tk-settings-note" style={{ marginTop: 0 }}>
+          Describe what you want, or run Auto-organize. Nothing changes until you apply, and every apply can be undone.
         </p>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <div className="tk-field-row" style={{ marginBottom: 12 }}>
           <input
             type="text"
-            className="tk-input"
-            style={{ flex: 1 }}
+            className="tk-input tk-grow"
             aria-label="Natural language organization instruction"
+            placeholder="e.g. Put my Daydock logo threads in Daydock / Meridian, but keep the homepage research separate"
             value={organizeInstruction}
             onChange={(e) => {
               setOrganizeInstruction(e.target.value);
-              setOrganizeProposals(
-                previewNaturalLanguageOrganize(e.target.value, conversations)
-              );
+              setOrganizeProposals(e.target.value.trim() ? localPreview(e.target.value) : []);
+              setOrganizeNotes([]);
             }}
           />
           <button
             type="button"
             className="tk-btn"
-            onClick={() =>
-              setOrganizeProposals(
-                previewNaturalLanguageOrganize(organizeInstruction, conversations)
-              )
-            }
+            disabled={Boolean(organizeBusy)}
+            onClick={() => {
+              setOrganizeProposals(organizeInstruction.trim() ? localPreview(organizeInstruction) : []);
+              setOrganizeNotes(['Keyword preview.']);
+            }}
           >
             Preview
           </button>
+          {aiReady && (
+            <button type="button" className="tk-btn tk-btn-primary" disabled={Boolean(organizeBusy)} onClick={() => void planOrganize(true)}>
+              Plan with Claude
+            </button>
+          )}
         </div>
+        {(organizeBusy || organizeNotes.length > 0) && (
+          <div className="tk-settings-result" role="status">
+            {organizeBusy ?? organizeNotes.join(' ')}
+          </div>
+        )}
 
-        <div
-          style={{
-            maxHeight: 280,
-            overflowY: 'auto',
-            border: '1px solid var(--rule)',
-            borderRadius: 6,
-            padding: 8,
-            marginBottom: 14,
-          }}
-        >
+        <div className="tk-proposal-list">
           {organizeProposals.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
-              No matching conversations for this instruction.
+            <div className="tk-empty-line">
+              {organizeBusy ? 'Working…' : 'No changes proposed yet.'}
             </div>
           ) : (
             organizeProposals.map((p) => (
-              <div
-                key={p.threadKey}
-                style={{
-                  padding: '8px 6px',
-                  borderBottom: '1px solid var(--rule)',
-                  fontSize: 13,
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>{p.title}</div>
-                <div style={{ color: 'var(--ink-2)', fontSize: 12 }}>
-                  {p.excludedByInstruction ? (
-                    <span>Excluded — {p.reason}</span>
-                  ) : (
-                    <span>
-                      {p.currentProject} →{' '}
-                      <strong>
-                        {p.proposedProject ?? `${p.currentProject} (unchanged)`}
-                      </strong>{' '}
-                      · tags: {p.proposedTags.join(', ')} ({p.reason})
-                    </span>
-                  )}
-                </div>
-              </div>
+              <label key={p.threadKey} className="tk-proposal" data-excluded={p.excludedByInstruction}>
+                {!p.excludedByInstruction && (
+                  <input
+                    type="checkbox"
+                    checked={!organizeDeselected.has(p.threadKey)}
+                    onChange={(e) =>
+                      setOrganizeDeselected((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.delete(p.threadKey);
+                        else next.add(p.threadKey);
+                        return next;
+                      })
+                    }
+                  />
+                )}
+                <span>
+                  <span className="tk-proposal-title">{p.title}</span>
+                  <span className="tk-proposal-detail">
+                    {p.excludedByInstruction ? (
+                      <>Excluded — {p.reason}</>
+                    ) : (
+                      <>
+                        {p.currentProject} → <strong>{p.proposedProject ?? `${p.currentProject} (unchanged)`}</strong>
+                        {p.newProject ? <span className="tk-auto-mark"> new project</span> : null}
+                        {p.proposedState ? ` · status: ${p.proposedState}` : ''}
+                        {p.proposedTags.length ? ` · tags: ${p.proposedTags.join(', ')}` : ''} ({p.reason})
+                      </>
+                    )}
+                  </span>
+                </span>
+              </label>
             ))
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() => organizeDialogRef.current?.close()}
-          >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+          <button type="button" className="tk-btn" onClick={() => organizeDialogRef.current?.close()}>
             Cancel
           </button>
           <button
             type="button"
             className="tk-btn tk-btn-primary"
+            disabled={Boolean(organizeBusy) || organizeProposals.length === 0}
             onClick={() => void handleApplyOrganize()}
           >
             Apply changes
@@ -2074,286 +2079,36 @@ export function App() {
         </div>
       </dialog>
 
-      {/* Inner Native Dialog #2: Import / Export */}
-      <dialog
-        ref={importDialogRef}
-        id="tk-import-export-dialog"
-        className="tk-modal-dialog"
-        aria-label="Import and export conversations"
-        onClose={() => {
+      <ImportDialog
+        dialogRef={importDialogRef}
+        settings={settings}
+        onImported={async (message) => {
+          setStatusAnnouncement(message);
+          notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+          await reloadAll(selectedKeyRef.current);
+        }}
+        onClosed={() => {
           lastInnerModalCloseAtRef.current = Date.now();
         }}
-      >
-        <h2 className="tk-section-h2" style={{ marginBottom: 8 }}>
-          Import & Export Library
-        </h2>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <select
-            className="tk-select"
-            aria-label="Import format"
-            value={importFormat}
-            onChange={(e) =>
-              setImportFormat(
-                e.target.value as 'chatgpt' | 'claude' | 'portable'
-              )
-            }
-          >
-            <option value="chatgpt">ChatGPT conversations.json</option>
-            <option value="claude">Claude conversations.json</option>
-            <option value="portable">Threadkeeper Portable JSON</option>
-          </select>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() => void handleLoad652Fixture()}
-          >
-            Load 652-thread ChatGPT fixture
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() =>
-              void (async () => {
-                await seedSyntheticWorkbenchLibrary(sharedDb, { force: true });
-                await reloadAll(selectedThreadKey);
-              })()
-            }
-          >
-            Load starter demo threads
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() => void handleExportPortable()}
-          >
-            Generate Portable JSON Export
-          </button>
-        </div>
+      />
 
-        <textarea
-          className="tk-input"
-          style={{ width: '100%', minHeight: 140, marginBottom: 12 }}
-          aria-label="Paste JSON payload to import"
-          placeholder="Paste ChatGPT conversations.json, Claude export JSON, or Portable bundle here…"
-          value={importJsonText}
-          onChange={(e) => setImportJsonText(e.target.value)}
-        />
-
-        {exportedPreviewText && (
-          <textarea
-            readOnly
-            className="tk-input"
-            style={{ width: '100%', minHeight: 110, marginBottom: 12 }}
-            aria-label="Exported Portable JSON bundle"
-            value={exportedPreviewText}
-          />
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button
-            type="button"
-            className="tk-btn"
-            onClick={() => importDialogRef.current?.close()}
-          >
-            Close
-          </button>
-          <button
-            type="button"
-            className="tk-btn tk-btn-primary"
-            onClick={() => void handleImportJsonSubmit()}
-          >
-            Import JSON
-          </button>
-        </div>
-      </dialog>
-
-      {/* Inner Native Dialog #3: Settings, Privacy & Capability Matrix */}
-      <dialog
-        ref={settingsDialogRef}
-        id="tk-settings-dialog"
-        className="tk-modal-dialog"
-        aria-label="Settings, privacy, and platform capability matrix"
-        onClose={() => {
-          lastInnerModalCloseAtRef.current = Date.now();
+      <SettingsDialog
+        dialogRef={settingsDialogRef}
+        settings={settings}
+        threadCount={counts?.totalThreads ?? 0}
+        collections={collections}
+        projectCounts={counts?.projectCounts ?? {}}
+        onCollectionsChanged={() => {
+          notifyBackground({ type: 'SETTINGS_CHANGED' });
+          void reloadAll(selectedKeyRef.current);
         }}
-      >
-        <h2 className="tk-section-h2" style={{ marginBottom: 8 }}>
-          Settings, Privacy & Platform Capabilities
-        </h2>
-        {settings && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div
-              style={{
-                padding: 12,
-                background: 'var(--paper-2)',
-                borderRadius: 6,
-                border: '1px solid var(--rule)',
-              }}
-            >
-              <strong>Host Capture Authorization (Opt-in per platform)</strong>
-              <div style={{ marginTop: 8, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={settings.authorizedHosts.chatgpt}
-                    onChange={(e) =>
-                      void persistSettingPatch({
-                        authorizedHosts: {
-                          ...settings.authorizedHosts,
-                          chatgpt: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  Authorize ChatGPT visible-DOM capture
-                </label>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={settings.authorizedHosts.claude}
-                    onChange={(e) =>
-                      void persistSettingPatch({
-                        authorizedHosts: {
-                          ...settings.authorizedHosts,
-                          claude: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  Authorize Claude visible-DOM capture
-                </label>
-              </div>
-            </div>
-
-            <div
-              style={{
-                padding: 12,
-                background: 'var(--paper-2)',
-                borderRadius: 6,
-                border: '1px solid var(--rule)',
-              }}
-            >
-              <strong>Opt-in Cloud Worker & Daily Budget</strong>
-              <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: '4px 0 8px' }}>
-                Local-first by default. When enabled, only non-excluded threads with
-                partial or full coverage send message turns to your authenticated
-                Cloudflare Worker (`@cf/deepseek-ai/deepseek-v4.1-flash-1017` and
-                MongoDB Atlas Voyage models).
-              </p>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={settings.cloudEnabled}
-                  onChange={(e) =>
-                    void persistSettingPatch({ cloudEnabled: e.target.checked })
-                  }
-                />
-                Enable opt-in cloud enrichment & semantic vectors
-              </label>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                <input
-                  type="url"
-                  className="tk-input"
-                  placeholder="https://threadkeeper-worker.example.workers.dev"
-                  aria-label="Worker Endpoint URL"
-                  value={settings.workerEndpointUrl}
-                  onChange={(e) =>
-                    void persistSettingPatch({ workerEndpointUrl: e.target.value })
-                  }
-                />
-                <input
-                  type="password"
-                  className="tk-input"
-                  placeholder="Worker Bearer Token"
-                  aria-label="Worker Bearer Token"
-                  value={settings.workerBearerToken}
-                  onChange={(e) =>
-                    void persistSettingPatch({ workerBearerToken: e.target.value })
-                  }
-                />
-                <input
-                  type="number"
-                  className="tk-input"
-                  aria-label="Daily cloud request budget"
-                  value={settings.dailyCloudRequestBudget}
-                  onChange={(e) =>
-                    void persistSettingPatch({
-                      dailyCloudRequestBudget: Math.max(
-                        0,
-                        Number.parseInt(e.target.value || '0', 10)
-                      ),
-                    })
-                  }
-                />
-              </div>
-            </div>
-
-            <div>
-              <strong>Platform Capability Matrix (Y / P / N)</strong>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: 12,
-                  marginTop: 6,
-                }}
-              >
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--rule-strong)' }}>
-                    <th style={{ textAlign: 'left', padding: 4 }}>Adapter</th>
-                    <th style={{ padding: 4 }}>DOM</th>
-                    <th style={{ padding: 4 }}>Export</th>
-                    <th style={{ padding: 4 }}>Branches</th>
-                    <th style={{ padding: 4 }}>Time</th>
-                    <th style={{ padding: 4 }}>Cloud Task</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {CAPABILITY_MATRIX.map((row) => (
-                    <tr
-                      key={row.adapterId}
-                      style={{ borderBottom: '1px solid var(--rule)' }}
-                    >
-                      <td style={{ padding: 4 }}>{row.label}</td>
-                      <td style={{ textAlign: 'center', padding: 4 }}>
-                        {row.visibleDom}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: 4 }}>
-                        {row.fullExport}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: 4 }}>
-                        {row.branchHistory}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: 4 }}>
-                        {row.timestamps}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: 4 }}>
-                        {row.cloudTaskStatus}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            marginTop: 14,
-          }}
-        >
-          <button
-            type="button"
-            className="tk-btn tk-btn-primary"
-            onClick={() => settingsDialogRef.current?.close()}
-          >
-            Done
-          </button>
-        </div>
-      </dialog>
+        onPatch={persistSettingPatch}
+        onRebuildVectors={handleRebuildVectors}
+        onClosed={() => {
+          lastInnerModalCloseAtRef.current = Date.now();
+          void reloadAll(selectedKeyRef.current);
+        }}
+      />
     </div>
   );
 }

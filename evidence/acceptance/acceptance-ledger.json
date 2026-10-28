@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-10-26T01:41:37.817Z",
-  "extensionBuildDir": "C:\\dev\\AI-matrix\\threadkeeper\\.output\\chrome-mv3",
-  "extensionId": "oleidoidmjmkleoofcghmeabadblajld",
+  "generatedAt": "2026-10-28T07:09:05.301Z",
+  "extensionBuildDir": "/home/user/threadkeeper/.output/chrome-mv3",
+  "extensionId": "kajaibhdjhcpncpcmjkklleeoainakje",
   "environment": {
     "browser": "Playwright Chromium (headless=new, packaged MV3 extension)",
     "viewportDefault": "1440x900",
-    "fixtureServer": "http://127.0.0.1:52334"
+    "fixtureServer": "http://127.0.0.1:38947"
   },
   "verificationSeparation": {
     "realBrowserPackagedExtensionChecks": "PASS",
@@ -21,7 +21,7 @@
       "leakedSecretsInBundle": 0,
       "unexpectedNetworkRequests": 0,
       "closedStateExtensionNetworkRequests": 0,
-      "closedStateMainWorldManagerProbeBlocked": true,
+      "staticIdManagerUrlLoads": true,
       "windowGlobalPollutedKeys": 0,
       "manifestFreeOfLocalhost": true,
       "chatgpt": {
@@ -35,7 +35,7 @@
           "activeElementId": "",
           "composerValue": "",
           "composerRect": {
-            "top": 1207,
+            "top": 1197,
             "left": 357,
             "width": 726,
             "height": 76
@@ -51,15 +51,15 @@
           "activeElementId": "",
           "composerValue": "",
           "composerRect": {
-            "top": 1207,
+            "top": 1197,
             "left": 357,
             "width": 726,
             "height": 76
           }
         },
         "exactPngByteEquality": true,
-        "baselineScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\quiet-01-chatgpt-baseline.png",
-        "closedScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\quiet-01-chatgpt-closed.png"
+        "baselineScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-chatgpt-baseline.png",
+        "closedScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-chatgpt-closed.png"
       },
       "claude": {
         "baselineMetrics": {
@@ -72,7 +72,7 @@
           "activeElementId": "",
           "composerValue": "",
           "composerRect": {
-            "top": 1139,
+            "top": 1133,
             "left": 357,
             "width": 726,
             "height": 76
@@ -88,15 +88,15 @@
           "activeElementId": "",
           "composerValue": "",
           "composerRect": {
-            "top": 1139,
+            "top": 1133,
             "left": 357,
             "width": 726,
             "height": 76
           }
         },
         "exactPngByteEquality": true,
-        "baselineScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\quiet-01-claude-baseline.png",
-        "closedScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\quiet-01-claude-closed.png"
+        "baselineScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-claude-baseline.png",
+        "closedScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-claude-closed.png"
       }
     },
     "OPEN-02": {
@@ -106,11 +106,11 @@
       "evidenceType": "packaged_extension_service_worker_invoke_and_host_restoration",
       "invokeResult": {
         "mode": "overlay",
-        "tabId": 792212718
+        "tabId": 1054920062
       },
       "reInvokeResult": {
         "mode": "overlay",
-        "tabId": 792212718
+        "tabId": 1054920062
       },
       "closeButtonHandshakeVerified": true,
       "missingHandshakeTokenCloseRejected": true,
@@ -125,7 +125,7 @@
         "bodyChildCount": 2,
         "injectedCount": 0,
         "windowGlobalPollutedKeys": 0,
-        "scrollY": 382,
+        "scrollY": 372,
         "activeElementId": "prompt-textarea",
         "composerValue": "Unsent draft: verify optical grid kerning at 16px",
         "composerRect": {
@@ -141,7 +141,7 @@
         "bodyChildCount": 2,
         "injectedCount": 0,
         "windowGlobalPollutedKeys": 0,
-        "scrollY": 382,
+        "scrollY": 372,
         "activeElementId": "prompt-textarea",
         "composerValue": "Unsent draft: verify optical grid kerning at 16px",
         "composerRect": {
@@ -163,7 +163,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1440x900-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-light.png"
         },
         "overlay_1440x900_dark": {
           "surface": "overlay",
@@ -176,7 +176,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1440x900-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-dark.png"
         },
         "overlay_1280x800_light": {
           "surface": "overlay",
@@ -189,7 +189,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1280x800-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-light.png"
         },
         "overlay_1280x800_dark": {
           "surface": "overlay",
@@ -202,7 +202,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1280x800-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-dark.png"
         },
         "overlay_700x800_light": {
           "surface": "overlay",
@@ -215,7 +215,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-700x800-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-light.png"
         },
         "overlay_700x800_dark": {
           "surface": "overlay",
@@ -228,17 +228,17 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-700x800-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-dark.png"
         }
       },
-      "overlayScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\open-02-overlay.png",
-      "restoredScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\open-02-restored.png"
+      "overlayScreenshot": "/home/user/threadkeeper/evidence/acceptance/open-02-overlay.png",
+      "restoredScreenshot": "/home/user/threadkeeper/evidence/acceptance/open-02-restored.png"
     },
     "PARITY-03": {
       "status": "PASS",
       "realBrowserPackagedExtensionCheck": "PASS",
       "evidenceType": "packaged_extension_overlay_and_full_page_workbench",
-      "countLedgerText": "8 threads · 6 filed · 2 unfiled",
+      "countLedgerText": "9 threads · 9 filed · 0 unfiled",
       "countsReconciled": true,
       "evidenceLocationPresence": {
         "where-you-left-off": true,
@@ -249,7 +249,7 @@
       },
       "expandedEvidenceText": "Captured evidence · sourceRevision r1 · full coverage[m1 · user]: “We need to lock the Daydock / Meridian mark geometry before exporting the SVG icon set. Let us use a 24x24 optical grid with 1.75px stroke weight.”",
       "viewModesRendered": {
-        "projectCardsCount": 6,
+        "projectCardsCount": 5,
         "kanbanColsCount": 5
       },
       "keyboardNavigation": {
@@ -266,7 +266,7 @@
           "scrollWidth": 1280,
           "clientWidth": 1280,
           "noHorizontalOverflow": true,
-          "screenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-manager-1280.png"
+          "screenshot": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-1280.png"
         },
         "700x800": {
           "width": 700,
@@ -274,7 +274,7 @@
           "scrollWidth": 700,
           "clientWidth": 700,
           "noHorizontalOverflow": true,
-          "screenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-manager-700-narrow.png"
+          "screenshot": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-700-narrow.png"
         }
       },
       "surfaceMatrix": {
@@ -289,7 +289,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-page-1440x900-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1440x900-light.png"
         },
         "page_1440x900_dark": {
           "surface": "page",
@@ -302,7 +302,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-page-1440x900-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1440x900-dark.png"
         },
         "page_1280x800_light": {
           "surface": "page",
@@ -315,7 +315,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-page-1280x800-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1280x800-light.png"
         },
         "page_1280x800_dark": {
           "surface": "page",
@@ -328,7 +328,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-page-1280x800-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1280x800-dark.png"
         },
         "page_700x800_light": {
           "surface": "page",
@@ -341,7 +341,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-page-700x800-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-700x800-light.png"
         },
         "page_700x800_dark": {
           "surface": "page",
@@ -354,7 +354,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-page-700x800-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-700x800-dark.png"
         },
         "overlay_1440x900_light": {
           "surface": "overlay",
@@ -367,7 +367,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1440x900-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-light.png"
         },
         "overlay_1440x900_dark": {
           "surface": "overlay",
@@ -380,7 +380,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1440x900-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-dark.png"
         },
         "overlay_1280x800_light": {
           "surface": "overlay",
@@ -393,7 +393,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1280x800-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-light.png"
         },
         "overlay_1280x800_dark": {
           "surface": "overlay",
@@ -406,7 +406,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-1280x800-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-dark.png"
         },
         "overlay_700x800_light": {
           "surface": "overlay",
@@ -419,7 +419,7 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#FBFAF7",
           "themeTokenInk": "#1B1A17",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-700x800-light.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-light.png"
         },
         "overlay_700x800_dark": {
           "surface": "overlay",
@@ -432,14 +432,14 @@
           "noHorizontalOverflow": true,
           "themeTokenBg": "#16181A",
           "themeTokenInk": "#EDEAE3",
-          "screenshotPath": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-overlay-700x800-dark.png"
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-dark.png"
         }
       },
       "sharedPersistenceVerifiedTitle": "DayDock mark exploration — [Verified Manual Override]",
       "screenshots": {
-        "light1440": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-manager-1440-light.png",
-        "dark1440": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-manager-1440-dark.png",
-        "modalOrganize": "C:\\dev\\AI-matrix\\evidence\\acceptance\\parity-03-organize-modal.png"
+        "light1440": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-1440-light.png",
+        "dark1440": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-1440-dark.png",
+        "modalOrganize": "/home/user/threadkeeper/evidence/acceptance/parity-03-organize-modal.png"
       }
     },
     "CAPTURE-04": {
@@ -515,7 +515,7 @@
       "evidenceType": "packaged_extension_ui_search_and_hybrid_rrf_rerank_suite",
       "uiQuery": "Daydock",
       "uiSearchHitCount": 5,
-      "firstSearchHitSnippet": "Daydock / Meridian logo geometry & SVG gridWe need to lock the Daydock / Meridian mark geometry before exporting the SVG icon set. Let us us",
+      "firstSearchHitSnippet": "Daydock / Meridian logo geometry & SVG gridWe need to lock the Daydock / Meridian mark geometry before exporting the SVG icon setWe need to ",
       "details": "Verified exact phrase, prefix, trigram fuzzy title, and message/decision/note body search with matchReasons, filters, RRF lexical+vector fusion, dimension/model compatibility checks, rerank index validation + fallback, and default exclusion of isSyntheticBenchmark records."
     },
     "LIFE-09": {
@@ -526,15 +526,26 @@
         "storage",
         "unlimitedStorage",
         "alarms",
-        "scripting"
+        "scripting",
+        "sidePanel"
       ],
       "hostPermissions": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
-        "https://claude.ai/*"
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://api.anthropic.com/*",
+        "https://api.voyageai.com/*",
+        "https://api.openai.com/*"
       ],
       "freshHostInjectedCount": 0,
-      "restartScreenshot": "C:\\dev\\AI-matrix\\evidence\\acceptance\\life-09-restart-closed.png",
+      "restartScreenshot": "/home/user/threadkeeper/evidence/acceptance/life-09-restart-closed.png",
       "details": "Verified atomic rw transaction across conversations, summaries, and tombstones preventing deleted-thread resurrection, cascade delete across all 6 stores, resumable job recovery, and zero auto-open on install/startup/fresh tab."
     },
     "PERF-10": {
@@ -546,8 +557,8 @@
         "threadCount": 10000,
         "messageCount": 200000,
         "messagesPerThread": 20,
-        "generationMs": 89.341,
-        "coldIndexBuildMs": 184.912
+        "generationMs": 287.379,
+        "coldIndexBuildMs": 528.963
       },
       "messageCount": 200000,
       "sampleCount": 50,
@@ -564,36 +575,36 @@
         "perQueryHitCountMax": 2750,
         "totalHitsAcross50Samples": 12456,
         "warmOpenMs": {
-          "p50": 56,
-          "p95": 74.3,
-          "max": 105
+          "p50": 114.5,
+          "p95": 218.9,
+          "max": 237.4
         },
         "localSearchMs": {
-          "p50": 2.4,
-          "p95": 3.6,
-          "max": 4.5
+          "p50": 3.9,
+          "p95": 5.6,
+          "max": 7.6
         }
       },
       "warmOpenMs": {
-        "p50": 56,
-        "p95": 74.3,
-        "max": 105
+        "p50": 114.5,
+        "p95": 218.9,
+        "max": 237.4
       },
       "localSearchMs": {
-        "p50": 2.4,
-        "p95": 3.6,
-        "max": 4.5
+        "p50": 3.9,
+        "p95": 5.6,
+        "max": 7.6
       },
       "nodeEngineBenchmark10k": {
         "warmOpenMs": {
-          "p50": 0.502,
-          "p95": 2.455,
-          "max": 8.33
+          "p50": 1.816,
+          "p95": 12.706,
+          "max": 19.135
         },
         "localSearchMs": {
-          "p50": 15.429,
-          "p95": 20.359,
-          "max": 25.165
+          "p50": 59.054,
+          "p95": 82.682,
+          "max": 140.253
         }
       }
     }

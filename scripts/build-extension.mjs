@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { captureMatchPatterns } from './manifest-hosts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -132,13 +133,13 @@ async function build() {
     path.join(outDir, 'assets/manager.css'),
   );
 
-  // 5. Write manager.html
-  const managerHtml = `<!DOCTYPE html>
-<html lang="en" data-theme="light">
+  // 5. Write manager.html (full page + in-page overlay) and sidepanel.html (browser side panel)
+  const pageHtml = (surface, title) => `<!DOCTYPE html>
+<html lang="en" data-surface="${surface}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Threadkeeper — Conversation Archive & Workbench</title>
+  <title>${title}</title>
   <link rel="stylesheet" href="./assets/manager.css" />
 </head>
 <body>
@@ -147,27 +148,33 @@ async function build() {
 </body>
 </html>
 `;
-  fs.writeFileSync(path.join(outDir, 'manager.html'), managerHtml, 'utf8');
+  fs.writeFileSync(path.join(outDir, 'manager.html'), pageHtml('page', 'Threadkeeper — AI thread library'), 'utf8');
+  fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'Threadkeeper'), 'utf8');
 
   // 6. Write manifest.json
+  const capturePatterns = captureMatchPatterns();
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',
-    version: '0.1.0',
+    version: '0.2.0',
     description:
-      'Quiet, context-rich cross-provider AI conversation library with zero closed-state DOM footprint.',
-    permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting'],
+      'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
+    permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel'],
     host_permissions: [
-      'https://chatgpt.com/*',
-      'https://chat.openai.com/*',
-      'https://claude.ai/*',
+      ...capturePatterns,
+      'https://api.anthropic.com/*',
+      'https://api.voyageai.com/*',
+      'https://api.openai.com/*',
     ],
     background: {
       service_worker: 'background.js',
       type: 'module',
     },
+    side_panel: {
+      default_path: 'sidepanel.html',
+    },
     action: {
-      default_title: 'Open Threadkeeper (Alt+Shift+K)',
+      default_title: 'Threadkeeper',
       default_icon: {
         16: 'icons/icon-16.png',
         32: 'icons/icon-32.png',
@@ -181,7 +188,14 @@ async function build() {
           default: 'Alt+Shift+K',
           mac: 'Alt+Shift+K',
         },
-        description: 'Toggle Threadkeeper overlay on active AI tab',
+        description: 'Toggle Threadkeeper overlay on the active AI tab',
+      },
+      'open-side-panel': {
+        suggested_key: {
+          default: 'Alt+Shift+L',
+          mac: 'Alt+Shift+L',
+        },
+        description: 'Open Threadkeeper in the side panel',
       },
       'open-manager': {
         suggested_key: {
@@ -193,24 +207,19 @@ async function build() {
     },
     content_scripts: [
       {
-        matches: [
-          'https://chatgpt.com/*',
-          'https://chat.openai.com/*',
-          'https://claude.ai/*',
-        ],
+        matches: capturePatterns,
         js: ['content-scripts/content.js'],
         run_at: 'document_idle',
       },
     ],
+    // No use_dynamic_url: Edge (and older Chrome) resolve chrome.runtime.getURL() to the
+    // static extension ID, and a static URL for a dynamic-URL resource is refused with
+    // ERR_BLOCKED_BY_CLIENT ("<id> is blocked"). Framing is protected by the one-time
+    // overlay handshake instead.
     web_accessible_resources: [
       {
         resources: ['manager.html', 'assets/*'],
-        matches: [
-          'https://chatgpt.com/*',
-          'https://chat.openai.com/*',
-          'https://claude.ai/*',
-        ],
-        use_dynamic_url: true,
+        matches: capturePatterns,
       },
     ],
     content_security_policy: {

@@ -1,148 +1,183 @@
-# Threadkeeper — Quiet AI Conversation Archive & Workbench
+# Threadkeeper — automatic organizer for all your AI threads
 
-Threadkeeper is a local-first Chrome and Chromium Manifest V3 browser extension and opt-in authenticated Cloudflare Worker for capturing, organizing, searching, and resuming AI conversations across **ChatGPT** and **Claude** without polluting host chat pages.
+Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok, Gemini, Perplexity, DeepSeek, Le Chat and Microsoft Copilot**, works out what each one is about, and files it automatically — so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
 
----
-
-## Core Design Principles & Capabilities
-
-1. **Zero-Presence Closed State (`QUIET-01`)**
-   - When closed, Threadkeeper injects **0 visible DOM elements**, floating action buttons, sidebars, composer toolbars, badges, title/favicon mutations, or layout shifts onto ChatGPT (`chatgpt.com`, `chat.openai.com`) or Claude (`claude.ai`).
-   - Host screenshots with Threadkeeper installed and closed are byte-identical (`Buffer.compare === 0`) to a clean browser profile across SPA navigation and streaming responses.
-
-2. **Deliberate Invocation, Framing Protection & Clean Restoration (`OPEN-02`, `LIFE-09`)**
-   - Opens only via deliberate user action: toolbar click (`chrome.action.onClicked`), keyboard command (`Ctrl+Shift+K` / `Command+Shift+K`), or controls inside an already-open manager surface.
-   - Never auto-opens on install, browser startup, tab navigation, background capture, or error.
-   - **Per-Tab One-Time Handshake & Framing Guard**: Any framed load of `manager.html` (`window.top !== window.self`) is forced into overlay mode and blocks all IndexedDB reads/writes and privileged background commands until a cryptographically random one-time handshake token (`REDEEM_OVERLAY_HANDSHAKE`, persisted in `chrome.storage.session` across MV3 service-worker evictions) is redeemed from the matching tab.
-   - **Layered `Escape` Dismissal**: Pressing `Escape` inside an open modal (`#tk-organize-dialog`, `#tk-import-export-dialog`, `#tk-settings-dialog`) closes only the inner modal first; pressing `Escape` again dismisses `<dialog id="threadkeeper-overlay-root">` and restores host scroll position, composer focus, and unsent draft text.
-
-3. **5-Location Evidence Margin & Archival Workbench (`PARITY-03`)**
-   - **Archival Index & Margin Notes Aesthetic**: Warm Paper Light (`#F6F4EF` / `#161513` / `#1F6F6B`) and Archival Slate Dark (`#111315` / `#ECE9E1` / `#4DB6AC`) themes using a zero-webfont system editorial stack (`Iowan Old Style`, `Palatino Linotype`, `Book Antiqua`, `Georgia`, `serif`).
-   - **5-Location Evidence Margin**: Every AI-extracted or heuristic claim renders a clickable turn citation badge (`m1`, `m2`) with speaker attribution (`user_committed` solid ink pip vs. `assistant_suggested` hollow ring pip):
-     1. `where-you-left-off` — Focal editorial serif resumption banner with goal vs. latest development
-     2. `decisions` — Committed vs. suggested architectural and product decisions
-     3. `action-items` — Concrete next steps with turn citations
-     4. `open-questions` — Unresolved questions flagged in the thread
-     5. `related-threads` — Cross-thread continuation, supersede, and contradiction links
-   - **Responsive Multi-View Workbench**: Shared state across the in-page overlay and full-page manager (`manager.html?surface=page`) with List, Status Board (Kanban), and Project Cards views, keyboard navigation (`/` search focus, `j`/`k` row traversal), and zero horizontal overflow at `1440×900`, `1280×800`, and `700×800`.
-
-4. **Account-Safe Capture, 5-Part Composite Identity & Lossless Import/Export (`CAPTURE-04`, `IMPORT-05`, `ISOLATE-06`)**
-   - Every conversation is keyed by `provider:accountId:workspaceId:sourceConversationId:branchId`, preventing collisions across personal/team accounts, workspaces, or sibling conversation branches.
-   - **Coverage Monotonicity**: Visited DOM captures are labeled `partial` (never overclaiming `full` history) and never overwrite or downgrade higher-coverage export records (`full`) unless a newer revision has strictly more messages.
-   - **652+ Conversation Import without Truncation**: Imports full ChatGPT (`conversations.json` DAG branch extraction), Claude, and Threadkeeper Portable JSON/Markdown bundles without any 500-thread cap, preserving manual overrides (`manualTitleOverride`, `project`, `categoryLocked`, `manualTags`, `workflowState`, `manualNotes`, `pinned`) across re-imports.
-   - **Atomic Tombstones & Cascade Delete**: Deleting a thread records a tombstone (`db.tombstones`) and cascades across conversations, messages, chunks, vectors, summaries, relationships, and pending jobs in a single Dexie transaction so stale background jobs or re-imports never resurrect deleted threads.
-
-5. **Fast Local Search & Opt-In Authenticated Cloud Enrichment (`AI-07`, `SEARCH-08`, `PERF-10`)**
-   - **Local Hybrid Retrieval**: Sub-15ms local keyword, phrase, and fuzzy search over message bodies and metadata, fused via Reciprocal Rank Fusion (RRF, $k = 60$) with compatible local vector indexes (`model`, `dimensions`, `inputType`, `preprocessingVersion`, `indexKind`).
-   - **Authenticated Cloudflare Worker (`worker/`)**:
-     - Constant-time SHA-256 Bearer token hash authentication (`AUTH_TOKEN_HASHES_JSON`) and fail-closed daily per-user request/token quota enforcement via Cloudflare KV (`QUOTA_KV`).
-     - Structured extraction via Cloudflare Workers AI `@cf/deepseek-ai/deepseek-v4.1-flash-1017` (`/ai/v1/chat/completions`) with strict `messageId`, `wireOrdinal`, and $\ge 12$-character normalized quote grounding verification on both Worker and client.
-     - Optional `@cf/cloudflare/clef` decision/classification evaluation endpoint (`/v1/evaluate-clef`).
-     - Server-held proxy for MongoDB Atlas Embedding & Reranking API (`voyage-4`, `voyage-4-large`, `voyage-context-4`, `rerank-3-lite`, `rerank-3`) with regional host selection (`ai.mongodb.com`, `us.ai.mongodb.com`, `eu.ai.mongodb.com`).
+Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key.
 
 ---
 
-## Repository Structure
+## What it does
 
-```text
-threadkeeper/
-├── src/
-│   ├── adapters/          # ChatGPT & Claude DOM capture and export archive parsers (DAG branch reconstruction)
-│   ├── core/              # Dexie IndexedDB schema, 5-part identity, RRF search, NL organizer + Undo, cloud client
-│   └── entrypoints/       # MV3 background service worker, zero-DOM content script, and React 18 manager/overlay UI
-├── shared/
-│   └── cloud.ts           # Shared Zod wire schemas & quote/ordinal grounding verifier for Worker and extension
-├── worker/
-│   ├── src/               # Cloudflare Worker (index.ts, deepseek.ts, clef.ts, voyage.ts)
-│   ├── tests/             # Vitest contract & security suite for Worker endpoints and quota enforcement
-│   └── wrangler.toml      # Cloudflare Worker configuration (Workers AI + QUOTA_KV bindings)
-├── scripts/
-│   ├── build-extension.mjs # Unpacked MV3 builder (.output/chrome-mv3)
-│   ├── bench-10k.mjs       # 10,000-thread (60,000-message) warm-open & body-only search latency benchmark
-│   ├── run-benchmark.mjs   # Synthetic 10k benchmark runner
-│   └── run-acceptance.mjs  # End-to-end Playwright packaged-extension acceptance suite (QUIET-01..PERF-10)
-├── tests/
-│   └── unit/core.test.ts  # 17-test unit & integration suite for DB, imports, grounding, RRF, and tombstones
-├── docs/                  # Architecture, design direction, acceptance plan, and reference evidence
-└── evidence/              # Acceptance ledger, 10k benchmark results, and real-browser Chromium screenshots
+### 1. Captures automatically
+- Open a conversation on any supported site and it lands in the library — no clicks. Capture is read-only, zero-footprint (no injected buttons, badges or layout changes) and never captures the composer or an in-progress streaming reply.
+- **Provider-native organization is kept:** ChatGPT Projects, Claude Projects, the GitHub repository of a Claude Code / Codex web session, and the model a ChatGPT reply used.
+- **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
+- **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
+
+### 2. Understands every thread (beyond the title)
+Each thread gets a **gist** (one line: what it is about and how it ended), a summary, the user's goal and outcome, the **kind of work** (building, debugging, writing, research, planning, design, data, business, learning, personal…), topic tags, named entities and artifacts (files, links), plus **where you left off**, **decisions** (yours vs. the assistant's suggestions), **next steps** and **open questions** — each linked to the exact message it came from.
+
+- **On-device analysis** runs instantly on every capture, with no network and no key.
+- **Claude analysis** (optional): add an Anthropic API key and Claude (default **Claude Opus 5.5**, selectable Sonnet 5.5 / Haiku 5.5 / Fable 5.1) re-reads each new or changed thread once the chat has gone quiet and writes a descriptive title, gist, summary, decisions, next steps and project. Every extracted item must quote its source message verbatim; anything Claude cannot ground is dropped.
+
+### 3. Organizes automatically
+New threads are filed into projects the moment they are captured, using the strongest signal available:
+
+1. **Your choice** — a project you set or locked is never changed.
+2. **The provider's own project** — ChatGPT/Claude Project or the coding session's repository (creating the project if needed).
+3. **Claude's judgement** — matched to an existing project, or a new project for a clear new workstream.
+4. **Keyword routing** — each project's keywords (seeded for your starter areas, editable).
+5. **Similar threads** — nearest neighbours among confidently filed threads in vector space.
+
+Status is set automatically too (*active*, *needs review* when the assistant is waiting on you, *done* when you wrapped up, *paused* after 30 days of silence) unless you set it yourself. **Auto-organize** reviews the whole library — with Claude when a key is set, otherwise by clustering similar unfiled threads into proposed projects — and shows every change for approval; every apply is undoable.
+
+### 4. Finds and answers
+- **Search** fuses keyword, phrase, fuzzy and semantic (vector) matches across titles, gists, summaries, topics, decisions and full message text.
+- **Ask** your library a question ("What did I decide about the Stripe webhook retries?") and Claude answers from your own threads with clickable `[T1]` citations.
+- **Related threads** for every conversation, by semantic similarity.
+
+### 5. Lives next to your chats
+- **Side panel** (default for the toolbar button): the library beside any page, with the conversation open in the current tab pinned at the top.
+- **Overlay** on AI pages (`Alt+Shift+K`) and a **full-page library** (`Alt+Shift+M`). Side panel shortcut: `Alt+Shift+L`.
+
+---
+
+## Privacy
+
+- Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
+- API keys (Anthropic, Voyage, OpenAI) are stored the same way and only sent to their own API.
+- Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and projects marked local-only (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker.
+- A daily limit (default 150 analyses) caps Claude usage; Settings shows a cost estimate for your library and model.
+
+## Embeddings
+
+On-device vectors (feature-hashed, 384 dims) are always maintained and need no key. For true semantic search and better auto-filing choose a hosted model in **Settings → Embeddings**:
+
+| Provider | Models | Notes |
+|---|---|---|
+| Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | API key from voyageai.com |
+| OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | API key from platform.openai.com |
+| Ollama (local) | any embedding model, e.g. `nomic-embed-text` | start Ollama with `OLLAMA_ORIGINS=chrome-extension://*` |
+
+Vectors are only compared within one model space, so switching provider never mixes incompatible vectors.
+
+---
+
+## Getting started
+
+Prerequisites: Node.js ≥ 20, npm ≥ 10, Chrome or Microsoft Edge.
+
+```bash
+npm install
 ```
 
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** `>= 20` and **npm** `>= 10`
-- **Chromium / Google Chrome** (for loading the unpacked MV3 extension or running Playwright acceptance checks)
-
-### 1. Install Dependencies & Build Unpacked Extension
-
-```powershell
-npm install
+```bash
 npm run build
 ```
 
-The unpacked Manifest V3 extension is emitted to `.output/chrome-mv3`.
+The unpacked extension is written to `.output/chrome-mv3`.
 
-### 2. Load Unpacked in Chrome / Chromium
+1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`.
+2. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
+3. Optional: **Settings → AI analysis with Claude** → paste an Anthropic API key → **Test**. Then press **Auto-organize** to analyze and file your whole library.
+4. Optional: **Import / Export** → import your ChatGPT/Claude export and your Claude Code / Codex session folders.
 
-1. Open `chrome://extensions` in Chrome or Chromium.
-2. Enable **Developer mode** (top-right toggle).
-3. Click **Load unpacked** and select the `.output/chrome-mv3` directory.
-4. Visit `https://chatgpt.com` or `https://claude.ai` and press `Ctrl+Shift+K` (`Command+Shift+K` on macOS) or click the Threadkeeper toolbar icon to open the overlay.
+### Commands
 
-### 3. Verification & Benchmark Commands
-
-```powershell
-# Typecheck, build MV3 bundle (.output/chrome-mv3), and run Vitest unit tests (17/17 passing)
+```bash
+# Typecheck, build and run the unit tests
 npm run check
+```
 
-# Typecheck, run Worker unit tests (7/7 passing), and verify Wrangler dry-run bundle
-npm --prefix worker run check
-
-# Run the 10,000-thread (60,000-message) warm-open and local search latency benchmark
-node scripts/bench-10k.mjs
-
-# Run the full packaged-extension headless Chromium acceptance suite (QUIET-01 .. PERF-10)
+```bash
+# Packaged-extension acceptance suite (QUIET-01 .. PERF-10) in headless Chromium
 npm run test:acceptance
+```
+
+```bash
+# End-to-end organizer check: Edge static-URL overlay, multi-provider capture, auto-filing,
+# Claude analysis / Ask against a mocked Anthropic API, side panel layout
+npm run test:e2e
+```
+
+```bash
+# 10,000-thread warm-open and local search benchmark
+npm run bench
+```
+
+Set `CHROME_EXECUTABLE_PATH` to use a specific Chromium build for the browser suites.
+
+---
+
+## Repository structure
+
+```text
+src/
+  core/
+    providers.ts         Provider registry (hosts, URL ids, labels) — the manifest is derived from it
+    dom-capture.ts       Per-provider DOM adapters + generic fallback, structure-aware text extraction
+    cli-sessions.ts      Claude Code and Codex CLI JSONL parsers
+    importers.ts         Format detection, zip/JSON/JSONL import, folder sync
+    adapters.ts          ChatGPT/Claude export parsers, Portable bundle, Markdown handoff
+    insights.ts          On-device analyzer (gist, kind, topics, decisions, next steps, status)
+    ai/claude.ts         Claude analysis, library planning and Ask via the official Anthropic SDK
+    embeddings.ts        Local hashed vectors + Voyage / OpenAI / Ollama
+    auto-organize.ts     Project filing precedence, k-NN, clustering
+    pipeline.ts          Capture → analyze → embed → file; debounced, leased Claude job queue
+    library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
+    db.ts, schema.ts     Dexie schema (v2), identity, tombstones, settings normalization
+    search.ts            Hybrid lexical + vector retrieval
+  entrypoints/
+    background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
+    content.ts           Zero-footprint capture observer, overlay host with load watchdog
+    manager/             React UI shared by side panel, overlay and full page
+shared/cloud.ts          Wire schemas for the optional Cloudflare Worker
+worker/                  Optional Cloudflare Worker (DeepSeek + MongoDB Voyage)
+scripts/                 Build, acceptance, e2e and benchmark runners
+tests/unit/              Vitest suites (core + organizer)
+evidence/                Acceptance ledger, benchmark report and screenshots
 ```
 
 ---
 
-## Optional Cloudflare Worker Setup (`worker/`)
+## Optional Cloudflare Worker (`worker/`)
 
-Threadkeeper works 100% locally out of the box. To enable opt-in cloud summarization, embeddings, or reranking through your own Cloudflare Worker:
+Not needed when Claude analysis is configured. To use your own Worker for enrichment and embeddings instead:
 
-1. Configure your KV namespace in `worker/wrangler.toml` (`QUOTA_KV`) and set Worker secrets via Wrangler:
-   ```powershell
+1. Configure `QUOTA_KV` in `worker/wrangler.toml` and set secrets:
+   ```bash
    cd worker
    npx wrangler secret put AUTH_TOKEN_HASHES_JSON
    npx wrangler secret put MONGODB_ATLAS_MODEL_API_KEY
    ```
-   - `AUTH_TOKEN_HASHES_JSON`: JSON map of lowercase SHA-256 hex digests of client Bearer tokens to user IDs, e.g. `{"<sha256-hex>":"user_primary"}`.
-   - `MONGODB_ATLAS_MODEL_API_KEY`: MongoDB Atlas Model API key for Voyage embeddings (`voyage-4`, `voyage-4-large`, `voyage-context-4`) and rerankers (`rerank-3-lite`, `rerank-3`).
-2. Deploy the Worker when authorized:
-   ```powershell
-   npx wrangler deploy
-   ```
-3. In Threadkeeper **Settings → Cloud & Privacy**, enable **Opt-In Cloud Enrichment**, enter your Worker URL and Bearer token, and set a non-zero daily request budget.
+   - `AUTH_TOKEN_HASHES_JSON`: JSON map of lowercase SHA-256 hex digests of client Bearer tokens to user IDs.
+   - `MONGODB_ATLAS_MODEL_API_KEY`: MongoDB Atlas Model API key for Voyage embeddings and rerankers.
+2. Deploy with `npx wrangler deploy`.
+3. In **Settings → Cloudflare Worker enrichment (advanced)**, enable it, enter the Worker URL and Bearer token, and set a non-zero daily budget.
 
 ---
 
-## Acceptance Gates & Measured Benchmarks (`QUIET-01` .. `PERF-10`)
+## Acceptance gates
 
-All 10 acceptance gates pass in packaged-extension headless Chromium ([`evidence/acceptance/acceptance-ledger.json`](evidence/acceptance/acceptance-ledger.json) and [`evidence/acceptance/acceptance-report.md`](evidence/acceptance/acceptance-report.md)):
+All gates pass in packaged-extension headless Chromium (see [`evidence/acceptance/acceptance-report.md`](evidence/acceptance/acceptance-report.md) and the [ledger](evidence/acceptance/acceptance-ledger.json)); the organizer e2e writes screenshots to [`evidence/organizer/`](evidence/organizer).
 
-| Gate | Requirement | Status | Measured Result / Evidence |
-| :--- | :--- | :--- | :--- |
-| **`QUIET-01`** | Zero-Presence Closed State | **PASS** | `0` injected nodes on ChatGPT & Claude; exact PNG byte equality (`Buffer.compare === 0`) vs. clean browser across streaming & SPA navigation; `0` leaked secrets in bundle |
-| **`OPEN-02`** | Deliberate Invocation & Clean Restoration | **PASS** | Opens only on user command; layered `Escape` closes inner modal first, then outer `<dialog>`, restoring `scrollY=320`, `#prompt-textarea` focus, and unsent draft text |
-| **`PARITY-03`** | Overlay & Full-Page Parity + Evidence Margin | **PASS** | Reconciled counts, all 5 Evidence Margin locations with clickable `m1`/`m2` turn citations, List/Kanban/Project Cards views, zero horizontal overflow at `1440×900`, `1280×800`, and `700×800` |
-| **`CAPTURE-04`** | Authorized Passive Capture & Monotonicity | **PASS** | Live DOM capture stored in IndexedDB (`coverage=partial`, monotonic `sourceRevision`), higher coverage (`full`) never downgraded by partial DOM visits |
-| **`IMPORT-05`** | Lossless Import/Export & 652-Thread Fixture | **PASS** | `652/652` ChatGPT conversations imported with DAG branch splitting, Claude export import, and Portable JSON/Markdown round-trip preserving manual overrides |
-| **`ISOLATE-06`** | Multi-Account, Workspace & Branch Isolation | **PASS** | 5-part key `provider:accountId:workspaceId:sourceConversationId:branchId` isolates accounts and branches; `OPEN_ORIGINAL_THREAD` enforces `account_mismatch` guard |
-| **`AI-07`** | Grounded Enrichment, Worker Auth & NL Organize | **PASS** | Constant-time SHA-256 Bearer auth, fail-closed `QUOTA_KV` quota reservation, strict `messageId` + `wireOrdinal` + $\ge 12$-char quote grounding, `422` `title_only` guard, NL organize negative-clause exclusion + 1-click Undo |
-| **`SEARCH-08`** | Hybrid Local + Vector Search & Provenance | **PASS** | Real-browser search with match reasons & quotes, RRF lexical+vector fusion, model/dimension compatibility checks, rerank fallback, and default `isSyntheticBenchmark` exclusion |
-| **`LIFE-09`** | Lifecycle Hygiene, Framing Guard & Tombstones | **PASS** | Minimal MV3 permissions (`storage`, `unlimitedStorage`, `alarms`), `hostFramedPageSurfaceBlocked=true`, `serviceWorkerEvictionHandshakeSurvived=true`, atomic tombstone & cascade delete |
-| **`PERF-10`** | 10,000-Thread Warm-Open & Search Latency | **PASS** | **Chromium IndexedDB (10k threads / 60k turns)**: Warm-open `p50=56ms`, `p95=74.3ms` ($\le 500\text{ms}$); Local body search `p50=2.4ms`, `p95=3.6ms` ($\le 150\text{ms}$). **Node (10k threads)**: Warm-open `p95=2.455ms`; Search `p95=20.359ms` |
+| Gate | Requirement | Result |
+| :--- | :--- | :--- |
+| `QUIET-01` | Zero-presence closed state | 0 injected nodes, byte-identical host screenshots, no stray network; the manager loads from the static-ID URL Edge uses |
+| `OPEN-02` | Deliberate invocation & restoration | Layered `Escape`, scroll, focus and unsent draft restored |
+| `PARITY-03` | Overlay / full-page parity | Reconciled counts, 5 evidence locations, list / kanban / project cards, no horizontal overflow at 1440, 1280, 700 px |
+| `CAPTURE-04` | Passive capture & monotonic coverage | Partial DOM capture never downgrades full exports |
+| `IMPORT-05` | Lossless import / export | 652-thread ChatGPT fixture, Claude export, Portable JSON + Markdown round-trip |
+| `ISOLATE-06` | Account / workspace / branch isolation | 5-part identity key, `account_mismatch` guard |
+| `AI-07` | Grounded enrichment & NL organize | Quote-grounded claims, exclusion clauses, one-click undo |
+| `SEARCH-08` | Hybrid search | Match reasons, RRF lexical + vector fusion, compatibility checks |
+| `LIFE-09` | Lifecycle hygiene | Handshake framing guard, tombstones, cascade delete, no localhost origins |
+| `PERF-10` | 10k threads | Chromium IndexedDB warm-open p95 221 ms (≤ 500 ms); local search p95 5.6 ms (≤ 150 ms) |
+
+---
+
+## Troubleshooting
+
+- **"`<extension id>` is blocked — ERR_BLOCKED_BY_CLIENT" when opening the overlay (Edge):** fixed in 0.2.0. Older builds marked the manager as `use_dynamic_url`, but Edge resolves `chrome.runtime.getURL()` to the static extension ID, which the browser then refuses. If an ad blocker or page policy still blocks the frame, Threadkeeper now detects it within five seconds and opens the full-page library instead; the side panel (default) never uses a page frame at all.
+- **A site changed its markup and capture stopped:** the generic role heuristics usually keep working; otherwise use the provider's data export via **Import / Export**.
+- **Claude analysis paused:** the status chip in the header shows the last error (invalid key, rate limit, daily limit). Fix it in Settings; queued threads resume automatically.
