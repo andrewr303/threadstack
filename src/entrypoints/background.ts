@@ -621,7 +621,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   invokeOverlayOnTab;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperGetSecurityRejections =
   () => [...securityRejectionLog];
-(globalThis as unknown as Record<string, unknown>).__threadkeeperRunAnalysis = () => kickAnalysis();
 (globalThis as unknown as Record<string, unknown>).__threadkeeperDb = db;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperClearInMemoryHandshakes =
   () => {

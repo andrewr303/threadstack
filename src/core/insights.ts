@@ -1,7 +1,6 @@
 import { providerLabel } from './providers.js';
 import {
   THREAD_KINDS,
-  computeDeterministicHash,
   getDisplayTitle,
   insightKeyFor,
   type ArtifactKind,
@@ -216,6 +215,15 @@ const ACTION_LINE_RE =
 const USER_INTENT_RE = /\b(i need to|i(?:'ll| will) |remind me to|i have to|i should|we need to|next i(?:'ll| will| need))\b/i;
 const CLOSING_RE =
   /\b(thanks?|thank you|perfect|that worked|works now|it works|working now|solved|awesome|great,? (?:that|it) works|all good|that'?s it|resolved)\b/i;
+/** A thank-you that carries a problem, a new request or a question is not a wrap-up. */
+const NOT_CLOSED_RE =
+  /\?|\b(but|still|however|although|though|doesn'?t|does not|didn'?t|did not|isn'?t|is not|won'?t|can'?t|cannot|not working|error|errors|fails?|failed|failing|broken|issue|problem|wrong|next|now|also|another|can you|could you|please|how (?:do|can|would|should))\b/i;
+
+export function isClosingMessage(text: string): boolean {
+  const clean = stripCode(text).trim();
+  return clean.length < 160 && CLOSING_RE.test(clean) && !NOT_CLOSED_RE.test(clean);
+}
+
 const ASSISTANT_QUESTION_RE =
   /(would you like|do you want|should i|shall i|want me to|let me know if|which (?:one|option) (?:do|would) you|can you (?:share|confirm|provide|clarify))[^?]{0,200}\?/i;
 
@@ -558,10 +566,10 @@ function suggestStatus(
   const updatedMs = Date.parse(conv.updatedAt ?? conv.lastCapturedAt ?? '');
   const ageDays = Number.isFinite(updatedMs) ? (nowMs - updatedMs) / 86_400_000 : 0;
 
-  if (lastUser && lastUser === dialog[dialog.length - 2] && CLOSING_RE.test(lastUser.content) && lastUser.content.length < 160) {
+  if (lastUser && lastUser === dialog[dialog.length - 2] && isClosingMessage(lastUser.content)) {
     return { status: 'done', reason: 'You closed the thread out ("' + firstSentence(lastUser.content, 60) + '")' };
   }
-  if (last.role === 'user' && CLOSING_RE.test(last.content) && last.content.length < 160) {
+  if (last.role === 'user' && isClosingMessage(last.content)) {
     return { status: 'done', reason: 'Last message wraps the thread up' };
   }
   if (ageDays > 30) {
@@ -772,10 +780,4 @@ export function getSmartTitle(conv: ConversationRecord, insight: ThreadInsight |
   if (isGenericTitle(conv.title)) return insight.title;
   if (insight.source === 'ai' && looksLikeRawMessage(conv.title)) return insight.title;
   return conv.title;
-}
-
-export function insightDocHash(insight: ThreadInsight): string {
-  return computeDeterministicHash(
-    `${insight.title}|${insight.gist}|${insight.summary}|${insight.topics.join(',')}|${insight.entities.join(',')}`
-  );
 }

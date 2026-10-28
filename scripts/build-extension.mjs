@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { captureMatchPatterns } from './manifest-hosts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -85,6 +84,27 @@ function createPngBuffer(size) {
   ]);
 }
 
+/**
+ * Load the provider registry itself (compiled on the fly) so manifest host
+ * permissions and content-script matches come from the same code the adapters use.
+ */
+async function loadCaptureMatchPatterns() {
+  const result = await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/core/providers.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'neutral',
+    write: false,
+  });
+  const source = Buffer.from(result.outputFiles[0].text).toString('base64');
+  const registry = await import(`data:text/javascript;base64,${source}`);
+  const patterns = registry.captureMatchPatterns();
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    throw new Error('Provider registry returned no capture match patterns');
+  }
+  return patterns;
+}
+
 async function build() {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(outDir, 'assets'), { recursive: true });
@@ -152,7 +172,7 @@ async function build() {
   fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'Threadkeeper'), 'utf8');
 
   // 6. Write manifest.json
-  const capturePatterns = captureMatchPatterns();
+  const capturePatterns = await loadCaptureMatchPatterns();
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',

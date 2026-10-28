@@ -201,10 +201,22 @@ async function edgeChecks() {
     const page = await context.newPage();
     await page.goto(claudeUrl);
     await page.waitForTimeout(1500);
+    const tabsBefore = await sw.evaluate(async () => (await chrome.tabs.query({})).length);
     await invokeOverlay(sw, 'claude.ai/chat');
     await page.locator('#threadkeeper-overlay-root').waitFor({ state: 'detached', timeout: 9000 });
-    const managerTab = context.pages().some((p) => p.url().includes('manager.html') || p.url().startsWith('chrome-error://'));
-    check(managerTab, 'watchdog removes a blocked overlay and opens the full-page library instead');
+    await page.waitForTimeout(500);
+    // The fallback must be the background's OPEN_MANAGER_FALLBACK handler opening one new tab. That tab
+    // is itself blocked (empty URL) only because this variant re-adds the legacy manifest flag.
+    const fallback = await sw.evaluate(async () => ({
+      log: globalThis.__threadkeeperGetSecurityRejections().map((r) => r.reason),
+      tabs: (await chrome.tabs.query({})).length,
+    }));
+    const fallbackLogged = fallback.log.some((r) => /Overlay frame did not load .* opened full-page manager/.test(r));
+    const oneNewTab = fallback.tabs === tabsBefore + 1;
+    check(
+      fallbackLogged && oneNewTab,
+      `watchdog removes a blocked overlay and opens the full-page library instead (logged=${fallbackLogged}, newTabs=${fallback.tabs - tabsBefore})`
+    );
     await context.close();
   }
 }

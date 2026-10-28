@@ -46,7 +46,8 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 
 - Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
 - API keys (Anthropic, Voyage, OpenAI) are stored the same way and only sent to their own API.
-- Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and projects marked local-only (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker.
+- Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and threads already filed in a local-only project (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker. The check happens when a thread is analyzed, so a brand-new conversation that nothing has filed yet *is* sent before Claude can recognize it as personal — mark such conversations local-only, or switch off automatic Claude analysis.
+- Because the library frame must load from the extension's fixed ID (required for Edge, see Troubleshooting), a website can detect that Threadkeeper is installed by probing that URL. It cannot read anything: unauthenticated frames are rejected and the database is extension-only.
 - A daily limit (default 150 analyses) caps Claude usage; Settings shows a cost estimate for your library and model.
 
 ## Embeddings

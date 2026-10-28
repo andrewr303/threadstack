@@ -161,7 +161,9 @@ export function SettingsDialog({
                 With an Anthropic API key, Claude reads each new or changed thread once it goes quiet and writes a
                 descriptive title, gist, summary, decisions, next steps and project assignment. The key is stored in
                 this browser profile only (extension storage, unreadable by websites). Threads marked local-only, and
-                projects marked local-only (like Personal), are never sent.
+                threads already in a local-only project (like Personal), are never sent. A brand-new conversation is
+                checked when it is analyzed, so it can be sent before Claude files it as personal — mark it local-only
+                first if that matters.
               </>
             }
           >
@@ -230,7 +232,8 @@ export function SettingsDialog({
             </div>
             <p className="tk-settings-note">
               Rough cost to analyze all {threadCount} threads once with {model.label}: about $
-              {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)} (≈9k input / 1.8k output tokens each). Only
+              {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)}, assuming ≈9k input / 1.8k output tokens per
+              thread. This is an estimate, not a measurement: long threads and the model's thinking can cost more. Only
               new or changed threads are re-analyzed.
             </p>
             <Toggle
@@ -424,7 +427,7 @@ export function SettingsDialog({
 
           <Section
             title="Projects"
-            note="Threads that mention a project's keywords are filed there automatically; descriptions also guide Claude. Local-only projects are never sent to any API."
+            note="Threads that mention a project's keywords are filed there automatically; descriptions also guide Claude. Threads in a local-only project are never sent to any API."
           >
             {collections
               .filter((c) => c.name !== UNFILED_PROJECT)

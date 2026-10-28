@@ -361,10 +361,6 @@ export async function applyAutoOrganization(
   return result;
 }
 
-export function lastReasonFor(decision: ProjectDecision | null): string | null {
-  return decision?.reason ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // Library-wide clustering (no AI required)
 // ---------------------------------------------------------------------------

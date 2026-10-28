@@ -1,6 +1,5 @@
 import {
   getDisplayTitle,
-  insightKeyFor,
   type CollectionRecord,
   type ConversationRecord,
   type SettingsRecord,
@@ -269,12 +268,3 @@ export async function planLibraryOrganization(
     ],
   };
 }
-
-export async function getResolvedInsights(
-  db: ThreadkeeperDB,
-  conversations: ConversationRecord[]
-): Promise<Map<string, ThreadInsight>> {
-  return loadInsights(db, conversations);
-}
-
-export { insightKeyFor };

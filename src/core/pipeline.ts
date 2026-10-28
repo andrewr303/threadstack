@@ -366,6 +366,15 @@ async function reserveAiSlot(db: ThreadkeeperDB): Promise<boolean> {
   });
 }
 
+/** Give back a reserved slot when the Claude call did not produce an analysis. */
+async function refundAiSlot(db: ThreadkeeperDB): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    const s = normalizeSettings(await db.settings.get('default'));
+    if (s.aiAnalysesDate !== currentUtcDateKey() || s.aiAnalysesToday <= 0) return;
+    await db.settings.put({ ...s, aiAnalysesToday: s.aiAnalysesToday - 1 });
+  });
+}
+
 export interface AiThreadResult {
   status: 'analyzed' | 'embedded' | 'skipped';
   reason?: string;
@@ -394,7 +403,8 @@ export async function analyzeThreadRemotely(
       : false;
 
   if (wantsAi) {
-    if (!options.ignoreDailyLimit && !(await reserveAiSlot(db))) {
+    const reserved = !options.ignoreDailyLimit;
+    if (reserved && !(await reserveAiSlot(db))) {
       throw new ClaudeCallError('Daily AI analysis limit reached; resumes tomorrow.', true, 'rate_limit');
     }
     const collections = await db.collections.toArray();
@@ -406,22 +416,29 @@ export async function analyzeThreadRemotely(
       .sort((a, b) => b[1] - a[1])
       .slice(0, 100)
       .map(([t]) => t);
-    const { analysis, model } = await analyzeThreadWithClaude(
-      settings,
-      {
-        title: conv.manualTitleOverride || conv.title,
-        providerLabel: providerLabel(conv.provider),
-        providerProjectName: conv.providerProjectName ?? null,
-        workspacePath: conv.workspacePath ?? null,
-        updatedAt: conv.updatedAt,
-        messages: messages.map((m) => ({ ordinal: m.ordinal, role: m.role, content: m.content })),
-        projects: collections
-          .filter((c) => c.name !== UNFILED_PROJECT)
-          .map((c) => ({ name: c.name, description: c.description })),
-        knownTags,
-      },
-      options.fetchImpl
-    );
+    let result: Awaited<ReturnType<typeof analyzeThreadWithClaude>>;
+    try {
+      result = await analyzeThreadWithClaude(
+        settings,
+        {
+          title: conv.manualTitleOverride || conv.title,
+          providerLabel: providerLabel(conv.provider),
+          providerProjectName: conv.providerProjectName ?? null,
+          workspacePath: conv.workspacePath ?? null,
+          updatedAt: conv.updatedAt,
+          messages: messages.map((m) => ({ ordinal: m.ordinal, role: m.role, content: m.content })),
+          projects: collections
+            .filter((c) => c.name !== UNFILED_PROJECT)
+            .map((c) => ({ name: c.name, description: c.description })),
+          knownTags,
+        },
+        options.fetchImpl
+      );
+    } catch (err) {
+      if (reserved) await refundAiSlot(db);
+      throw err;
+    }
+    const { analysis, model } = result;
 
     // Stored against the revision that was analysed; a newer revision re-queues the job.
     aiInsight = analysisToInsight(conv, analysis, messages, model, local);

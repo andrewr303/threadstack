@@ -394,6 +394,19 @@ describe('On-device analysis', () => {
     expect(verified.errors).toEqual([]);
   });
 
+  it('only treats a genuine wrap-up as done', () => {
+    const statusAfter = (last: string) =>
+      analyzeThreadLocally(
+        conv('Login bug'),
+        msgs([['user', 'Login fails with a 500 error'], ['assistant', 'Clear the stale session cookie.'], ['user', last]])
+      ).insight.suggestedStatus;
+    expect(statusAfter('Perfect, that worked!')).toBe('done');
+    expect(statusAfter('thanks')).toBe('done');
+    expect(statusAfter("Thanks, but it still doesn't work.")).not.toBe('done');
+    expect(statusAfter('Thank you! Now how do I add tests?')).not.toBe('done');
+    expect(statusAfter('Thanks. Can you also add logging?')).not.toBe('done');
+  });
+
   it('flags threads waiting on the user and old threads as paused', () => {
     const waiting = analyzeThreadLocally(
       conv('Pricing page'),
@@ -664,6 +677,7 @@ describe('Claude analysis pipeline (mocked Anthropic API)', () => {
     expect(job?.status).toBe('pending');
     expect(job?.attempts).toBe(0);
     expect((await ensureStarterCollectionsAndSettings(db)).lastAiError).toMatch(/API key/);
+    expect((await ensureStarterCollectionsAndSettings(db)).aiAnalysesToday).toBe(0); // failed call refunded its slot
 
     const db2 = freshDb();
     const t2 = await seed(db2);

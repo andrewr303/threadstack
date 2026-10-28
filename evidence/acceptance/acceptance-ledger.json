@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-10-28T07:09:05.301Z",
+  "generatedAt": "2026-10-28T15:33:12.548Z",
   "extensionBuildDir": "/home/user/threadkeeper/.output/chrome-mv3",
   "extensionId": "kajaibhdjhcpncpcmjkklleeoainakje",
   "environment": {
     "browser": "Playwright Chromium (headless=new, packaged MV3 extension)",
     "viewportDefault": "1440x900",
-    "fixtureServer": "http://127.0.0.1:38947"
+    "fixtureServer": "http://127.0.0.1:33515"
   },
   "verificationSeparation": {
     "realBrowserPackagedExtensionChecks": "PASS",
@@ -106,11 +106,11 @@
       "evidenceType": "packaged_extension_service_worker_invoke_and_host_restoration",
       "invokeResult": {
         "mode": "overlay",
-        "tabId": 1054920062
+        "tabId": 1971763182
       },
       "reInvokeResult": {
         "mode": "overlay",
-        "tabId": 1054920062
+        "tabId": 1971763182
       },
       "closeButtonHandshakeVerified": true,
       "missingHandshakeTokenCloseRejected": true,
@@ -575,25 +575,25 @@
         "perQueryHitCountMax": 2750,
         "totalHitsAcross50Samples": 12456,
         "warmOpenMs": {
-          "p50": 114.5,
-          "p95": 218.9,
-          "max": 237.4
+          "p50": 158.7,
+          "p95": 194.3,
+          "max": 195.3
         },
         "localSearchMs": {
-          "p50": 3.9,
-          "p95": 5.6,
-          "max": 7.6
+          "p50": 5.9,
+          "p95": 7.9,
+          "max": 11.4
         }
       },
       "warmOpenMs": {
-        "p50": 114.5,
-        "p95": 218.9,
-        "max": 237.4
+        "p50": 158.7,
+        "p95": 194.3,
+        "max": 195.3
       },
       "localSearchMs": {
-        "p50": 3.9,
-        "p95": 5.6,
-        "max": 7.6
+        "p50": 5.9,
+        "p95": 7.9,
+        "max": 11.4
       },
       "nodeEngineBenchmark10k": {
         "warmOpenMs": {
