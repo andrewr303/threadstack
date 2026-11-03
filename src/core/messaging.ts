@@ -16,6 +16,8 @@ export type PrivilegedCommandType =
   | 'START_HISTORY_SYNC'
   | 'CANCEL_HISTORY_SYNC'
   | 'GET_HISTORY_SYNC_STATE'
+  | 'CAPTURE_TAB_NOW'
+  | 'CAPTURE_SITES_CHANGED'
   | DockCommandType;
 
 /** Sidebar Dock (Still) link: manager pages and the consent page (connect.html) only. */
@@ -54,7 +56,8 @@ export type ContentScriptCommandType =
   | 'GET_CAPTURE_AUTH_STATE'
   | 'OVERLAY_FRAME_STATUS'
   | 'OPEN_MANAGER_FALLBACK'
-  | 'HISTORY_SYNC_EVENT';
+  | 'HISTORY_SYNC_EVENT'
+  | 'GET_CAPTURE_SITE';
 
 export type ExtensionMessage =
   | {
@@ -113,6 +116,8 @@ const PRIVILEGED_TYPES = new Set<string>([
   'START_HISTORY_SYNC',
   'CANCEL_HISTORY_SYNC',
   'GET_HISTORY_SYNC_STATE',
+  'CAPTURE_TAB_NOW',
+  'CAPTURE_SITES_CHANGED',
   ...DOCK_COMMAND_TYPES,
 ]);
 
@@ -123,11 +128,43 @@ const CONTENT_SCRIPT_TYPES = new Set<string>([
   'OVERLAY_FRAME_STATUS',
   'OPEN_MANAGER_FALLBACK',
   'HISTORY_SYNC_EVENT',
+  'GET_CAPTURE_SITE',
 ]);
+
+/** The fields of chrome.runtime.MessageSender the checks below read. */
+export interface RuntimeSender {
+  id?: string;
+  url?: string;
+  origin?: string;
+  frameId?: number;
+  tab?: { id?: number; url?: string };
+}
+
+/**
+ * The page a capture-related content-script message came from: the sending frame's own URL,
+ * which must be the top frame (frameId 0) of an http(s) page. Captures are never accepted from
+ * iframes (an embedded page could otherwise file itself under the site that frames it), from
+ * extension pages, or when the browser did not say which page sent it. Where the browser also
+ * reports `sender.origin`, it must agree with the URL.
+ */
+export function captureSenderUrl(sender: RuntimeSender | null | undefined): string | null {
+  if (!sender || !sender.tab) return null;
+  if (typeof sender.frameId === 'number' && sender.frameId !== 0) return null;
+  const url = sender.url ?? '';
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+  if (typeof sender.origin === 'string' && sender.origin !== 'null' && sender.origin !== parsed.origin) return null;
+  return parsed.href;
+}
 
 export function validateRuntimeMessageSender(
   message: { type?: string; handshakeToken?: unknown } | null | undefined,
-  sender: { id?: string; url?: string; tab?: { id?: number; url?: string } },
+  sender: RuntimeSender,
   expectedExtensionId: string
 ): SenderValidationResult {
   if (!message || typeof message.type !== 'string') {

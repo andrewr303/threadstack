@@ -2,6 +2,7 @@ import {
   extractProviderProjectName,
   extractVisibleDomConversation,
   grokXConversationToExtraction,
+  type CaptureSiteContext,
   type DomExtractionResult,
 } from '../core/dom-capture.js';
 import {
@@ -278,6 +279,15 @@ function armOverlayWatchdog(token: string): void {
 }
 
 let pendingExplicitInvoke = false;
+/**
+ * The background's token for this tab when the capture was asked for (overlay opened, or
+ * "Capture this tab"), and which of the two: only "capture" opens explicit-only providers.
+ */
+let pendingExplicitToken: string | null = null;
+let pendingExplicitKind: 'overlay' | 'capture' = 'overlay';
+
+/** Set when the background confirms this page is a site the user added (never from the page). */
+let captureSite: CaptureSiteContext | null = null;
 
 /** Grok on X: messages X's own page loaded for the open conversation (see grok-x-main.ts). */
 let grokXConversation: { id: string; messages: GrokXMessage[] } | null = null;
@@ -285,22 +295,25 @@ let grokXConversation: { id: string; messages: GrokXMessage[] } | null = null;
 /** ChatGPT / Claude: the conversation data the page itself loaded for the open conversation. */
 let siteConversation: SiteConversation | null = null;
 
-/** The conversation on screen: Grok on X from X's own responses, every other site from the DOM. */
-function extractCurrentConversation(): DomExtractionResult | null {
+/**
+ * The conversation on screen: Grok on X from X's own responses, every other site from the DOM.
+ * `explicit` is true only when the user chose "Capture this tab" for this page.
+ */
+function extractCurrentConversation(explicit = false): DomExtractionResult | null {
   const href = window.location.href;
   if (detectProviderFromUrl(href) === 'grok_x') {
     const urlId = extractConversationIdFromUrl(href);
     if (!grokXConversation || (urlId && urlId !== grokXConversation.id)) return null;
     return grokXConversationToExtraction(grokXConversation.id, grokXConversation.messages);
   }
-  return extractVisibleDomConversation(document, href);
+  return extractVisibleDomConversation(document, href, { site: captureSite, explicit });
 }
 
 /** What the last capture attempt did, for the "Check this tab" report in Settings → Diagnostics. */
 interface CaptureStatus {
   at: string;
   method: 'dom' | 'site_data';
-  outcome: 'stored' | 'unchanged' | 'skipped' | 'error' | 'stale_dom' | 'no_conversation';
+  outcome: 'stored' | 'unchanged' | 'skipped' | 'error' | 'stale_dom' | 'no_conversation' | 'settling';
   detail?: string;
   messages?: number;
 }
@@ -312,14 +325,17 @@ function noteCapture(status: Omit<CaptureStatus, 'at'>): void {
 function sendCapture(
   payload: Record<string, unknown>,
   explicitInvoke: boolean,
-  done: (resp: { ok?: boolean; status?: string; skipped?: string } | undefined) => void
+  done: (resp: { ok?: boolean; status?: string; skipped?: string; error?: string } | undefined) => void,
+  explicitToken: string | null = null
 ): void {
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
   try {
-    chrome.runtime.sendMessage({ type: 'PASSIVE_DOM_CAPTURE', explicitInvoke, payload }, (resp) => {
+    const message: Record<string, unknown> = { type: 'PASSIVE_DOM_CAPTURE', explicitInvoke, payload };
+    if (explicitToken) message.explicitToken = explicitToken;
+    chrome.runtime.sendMessage(message, (resp) => {
       // lastError (service worker restarting, extension reloaded) must be read or Chrome logs it.
       const failed = chrome.runtime.lastError;
-      done(failed ? undefined : (resp as { ok?: boolean; status?: string; skipped?: string } | undefined));
+      done(failed ? undefined : (resp as { ok?: boolean; status?: string; skipped?: string; error?: string } | undefined));
     });
   } catch {
     // extension context invalidated (reloaded); nothing to send to
@@ -430,6 +446,15 @@ let lastExtraction: LastExtraction | null = null;
 let staleRetries = 0;
 const MAX_STALE_RETRIES = 8;
 
+/**
+ * Pages without a dependable "still writing" signal (generic readers, added sites, some
+ * adapters): a capture is sent only when two reads in a row see the same text, so a reply is not
+ * stored half-written. Explicit captures skip the wait.
+ */
+const SETTLE_RECHECK_MS = 1500;
+let lastUnsettledFingerprint = '';
+let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
 function textFingerprintOf(messages: DomExtractionResult['messages']): string {
   return messages.map((m) => `${m.role}:${m.content}`).join('␞');
 }
@@ -445,9 +470,17 @@ function isStaleAfterNavigation(extracted: DomExtractionResult): boolean {
   return last.textFingerprint !== '' && last.textFingerprint === textFingerprintOf(extracted.messages);
 }
 
-function schedulePassiveDomCapture(explicitInvoke = false): void {
+function schedulePassiveDomCapture(
+  explicitInvoke = false,
+  explicitToken: string | null = null,
+  explicitKind: 'overlay' | 'capture' = 'overlay'
+): void {
   if (explicitInvoke) {
     pendingExplicitInvoke = true;
+    if (explicitToken) {
+      pendingExplicitToken = explicitToken;
+      pendingExplicitKind = explicitKind;
+    }
   }
   if (captureDebounceTimer) {
     clearTimeout(captureDebounceTimer);
@@ -459,10 +492,14 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
   const delay = isExplicit ? 50 : Math.max(50, Math.min(CAPTURE_QUIET_MS, pendingSince + CAPTURE_MAX_WAIT_MS - now));
   captureDebounceTimer = setTimeout(() => {
     const useExplicit = pendingExplicitInvoke;
+    const useToken = useExplicit ? pendingExplicitToken : null;
+    const useKind = pendingExplicitKind;
     pendingExplicitInvoke = false;
+    pendingExplicitToken = null;
+    pendingExplicitKind = 'overlay';
     pendingSince = 0;
     captureDebounceTimer = null;
-    const extracted = extractCurrentConversation();
+    const extracted = extractCurrentConversation(Boolean(useToken) && useKind === 'capture');
     if (!extracted) {
       noteCapture({ method: 'dom', outcome: 'no_conversation', detail: 'The page is not an open conversation yet.' });
       return;
@@ -470,7 +507,7 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
     if (isStaleAfterNavigation(extracted) && staleRetries < MAX_STALE_RETRIES) {
       staleRetries += 1;
       noteCapture({ method: 'dom', outcome: 'stale_dom', detail: 'Waiting for the page to replace the previous conversation.' });
-      captureDebounceTimer = setTimeout(() => schedulePassiveDomCapture(useExplicit), 700);
+      captureDebounceTimer = setTimeout(() => schedulePassiveDomCapture(useExplicit, useToken, useKind), 700);
       return;
     }
     staleRetries = 0;
@@ -480,6 +517,20 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
       noteCapture({ method: 'dom', outcome: 'unchanged', messages: extracted.messages.length });
       return;
     }
+    if (!useExplicit && extracted.stabilize) {
+      const textPrint = `${fingerprint}␞${textFingerprintOf(extracted.messages)}`;
+      if (textPrint !== lastUnsettledFingerprint) {
+        lastUnsettledFingerprint = textPrint;
+        noteCapture({ method: 'dom', outcome: 'settling', detail: 'Waiting for the page to stop changing.', messages: extracted.messages.length });
+        if (settleTimer) clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => {
+          settleTimer = null;
+          schedulePassiveDomCapture();
+        }, SETTLE_RECHECK_MS);
+        return;
+      }
+    }
+    lastUnsettledFingerprint = '';
 
     sendCapture(
       {
@@ -507,9 +558,10 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
           };
           noteCapture({ method: 'dom', outcome: 'stored', messages: extracted.messages.length });
         } else {
-          noteCapture({ method: 'dom', outcome: resp?.skipped ? 'skipped' : 'error', detail: resp?.skipped ?? 'No answer from the extension.' });
+          noteCapture({ method: 'dom', outcome: resp?.skipped ? 'skipped' : 'error', detail: resp?.skipped ?? resp?.error ?? 'No answer from the extension.' });
         }
-      }
+      },
+      useToken
     );
   }, delay);
 }
@@ -576,7 +628,9 @@ function probeCapture(): Record<string, unknown> {
   }
   return {
     url: href,
-    provider: detectProviderFromUrl(href),
+    provider: extracted?.provider ?? detectProviderFromUrl(href),
+    site: captureSite?.origin ?? null,
+    method: extracted?.method ?? null,
     conversationId: extractConversationIdFromUrl(href),
     domMessages: extracted?.messages.length ?? 0,
     domRoles: extracted ? extracted.messages.reduce<Record<string, number>>((acc, m) => ((acc[m.role] = (acc[m.role] ?? 0) + 1), acc), {}) : {},
@@ -586,6 +640,21 @@ function probeCapture(): Record<string, unknown> {
     lastCapture: lastCaptureStatus,
     error,
   };
+}
+
+/** Ask the background whether this page belongs to a site the user added under Capture → Any AI site. */
+function requestCaptureSite(): void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_CAPTURE_SITE' }, (resp: { ok?: boolean; site?: { origin?: unknown } } | undefined) => {
+      if (chrome.runtime.lastError || !resp?.ok || typeof resp.site?.origin !== 'string') return;
+      if (resp.site.origin !== window.location.origin) return;
+      captureSite = { origin: resp.site.origin };
+      schedulePassiveDomCapture();
+    });
+  } catch {
+    // extension context invalidated
+  }
 }
 
 const ISOLATED_WORLD_GUARD = Symbol.for('threadkeeper.contentScriptInitialized');
@@ -630,7 +699,8 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
       ) {
         const res = openOrToggleOverlay(message.handshakeToken);
         if (res.state === 'opened') {
-          schedulePassiveDomCapture(true);
+          // Opening Threadkeeper here counts as asking for this page (the background holds the same token).
+          schedulePassiveDomCapture(true, message.handshakeToken, 'overlay');
         }
         sendResponse({ ok: true, state: res.state });
         return true;
@@ -640,7 +710,8 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
         return true;
       }
       if (message && message.type === 'TK_CAPTURE_NOW') {
-        schedulePassiveDomCapture(true);
+        const token = typeof message.explicitToken === 'string' && message.explicitToken.length >= 16 ? message.explicitToken : null;
+        schedulePassiveDomCapture(true, token, token ? 'capture' : 'overlay');
         sendResponse({ ok: true });
         return true;
       }
@@ -696,6 +767,7 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
   // Not on X: Grok there comes from X's own responses, and no other X page is captured.
   if (!onX && typeof MutationObserver !== 'undefined' && document.documentElement) {
     const isOverlayNode = (node: Node): boolean =>
+      typeof Element !== 'undefined' &&
       node instanceof Element &&
       (node.id === OVERLAY_DIALOG_ID ||
         Boolean(node.closest(`#${OVERLAY_DIALOG_ID}`)));
@@ -721,7 +793,12 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
       subtree: true,
       characterData: true,
     });
-    schedulePassiveDomCapture();
+    if (detectProviderFromUrl(window.location.href) === null) {
+      // No provider owns this page: read it only if the user added the site (the background decides).
+      requestCaptureSite();
+    } else {
+      schedulePassiveDomCapture();
+    }
 
     // A single-page app can change the conversation without a page load. The mutation observer
     // usually notices, but a cheap URL check makes sure a switch is never missed.

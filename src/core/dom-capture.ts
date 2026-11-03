@@ -1,4 +1,6 @@
 import {
+  PROVIDERS,
+  conversationQueryParams,
   detectProviderFromUrl,
   extractChatGptProjectSlug,
   extractConversationIdFromUrl,
@@ -6,6 +8,7 @@ import {
   parseChatGptProjectRoute,
   type ProviderId,
 } from './providers.js';
+import { fnv1a32Hex, siteConversationKey } from './custom-sites.js';
 import type { UpsertThreadInput } from './db.js';
 import type { GrokXMessage } from './grok-x.js';
 
@@ -19,6 +22,25 @@ export interface DomExtractionResult {
   messages: UpsertThreadInput['messages'];
   providerProjectName: string | null;
   modelSlug: string | null;
+  /** Where the turns came from: the provider's adapter, or the generic / heuristic fallbacks. */
+  method: 'adapter' | 'generic' | 'heuristic' | 'none';
+  /**
+   * The page gives no reliable "still writing" signal for these turns, so the caller should only
+   * send a capture whose text has stopped changing (content.ts checks two reads in a row).
+   */
+  stabilize: boolean;
+}
+
+/** An added site (Settings → Capture → Any AI site) the background confirmed for this page. */
+export interface CaptureSiteContext {
+  origin: string;
+}
+
+export interface ExtractOptions {
+  /** Set only from the background's answer for this page; never from the page itself. */
+  site?: CaptureSiteContext | null;
+  /** The user asked for this tab (needed by explicit-only providers such as Grok Bot). */
+  explicit?: boolean;
 }
 
 type TurnRole = 'user' | 'assistant' | 'tool';
@@ -40,6 +62,16 @@ interface DomAdapter {
   isStreaming?(el: Element): boolean;
   /** Blocks inside a reply that are not its text (reasoning, thinking); `:scope` is the reply body. */
   strip?: string;
+  /** A conversation id read from the page when the URL has none (ChatGPT dots on /dots/home). */
+  conversationId?(doc: Document, url: string): string | null;
+  /** Present anywhere in the page while a reply is being written: the newest assistant turn is skipped. */
+  docStreaming?: string;
+  /** No dependable streaming signal: send only text that has stopped changing. */
+  stabilize?: boolean;
+  /** No message ids in the page and the list grows at the top: ids from the content instead of positions. */
+  hashIds?: boolean;
+  /** Never fall back to the generic / heuristic readers (their guesses would be wrong here). */
+  noFallback?: boolean;
 }
 
 const SKIP_TAGS = new Set([
@@ -605,6 +637,549 @@ const mistralAdapter: DomAdapter = {
   },
 };
 
+// ---- Adapters for the opt-in providers ------------------------------------------------------
+// Every selector below comes from public exporters or the sites' own bundles (see the provider
+// registry's selectorConfidence and README → Providers). None was checked against a signed-in
+// page; the generic and heuristic readers stay behind them as fallbacks.
+
+interface RoleAdapterSpec {
+  /** Turn elements (outermost matches only). */
+  turns: string;
+  /** Limits `turns` to this container when present. */
+  scope?: string;
+  isUser(el: Element): boolean;
+  userBody?: string;
+  assistantBody?: string;
+  /** Read every outermost match of `assistantBody` (replies split by widgets). */
+  assistantBodies?: boolean;
+  /** Turns to leave out (suggested follow-ups, start-of-chat cards). */
+  exclude?: string;
+  idOf?(el: Element): string | null;
+  title(doc: Document, url: string, conversationId: string): string | null;
+  strip?: string;
+  docStreaming?: string;
+  isStreaming?(el: Element): boolean;
+  stabilize?: boolean;
+  hashIds?: boolean;
+  noFallback?: boolean;
+  conversationId?(doc: Document, url: string): string | null;
+  project?(doc: Document, url: string): string | null;
+}
+
+function roleAdapter(spec: RoleAdapterSpec): DomAdapter {
+  return {
+    turns(doc) {
+      const scope = (spec.scope && doc.querySelector(spec.scope)) || doc;
+      return outermost(Array.from(scope.querySelectorAll(spec.turns)))
+        .filter((el) => !(spec.exclude && (el.matches(spec.exclude) || el.closest(spec.exclude))))
+        .map((el) => {
+          const user = spec.isUser(el);
+          const bodySel = user ? spec.userBody : spec.assistantBody;
+          let body: Element | null = null;
+          let bodies: Element[] | undefined;
+          if (bodySel) {
+            if (!user && spec.assistantBodies) {
+              const all = outermost(Array.from(el.querySelectorAll(bodySel)));
+              if (all.length > 1) bodies = all;
+              body = all[0] ?? null;
+            } else {
+              body = el.matches(bodySel) ? el : el.querySelector(bodySel);
+            }
+          }
+          return { el, role: user ? ('user' as const) : ('assistant' as const), body: body ?? el, bodies, id: spec.idOf?.(el) ?? null };
+        });
+    },
+    title: spec.title,
+    project: spec.project,
+    strip: spec.strip,
+    docStreaming: spec.docStreaming,
+    isStreaming: spec.isStreaming,
+    stabilize: spec.stabilize,
+    hashIds: spec.hashIds,
+    noFallback: spec.noFallback,
+    conversationId: spec.conversationId,
+  };
+}
+
+/** document.title without a product suffix (or prefix), or null when only the product name is left. */
+function titleWithout(doc: Document, product: RegExp, placeholder?: RegExp): string | null {
+  const t = doc.title
+    .replace(new RegExp(`\\s*[-|–—•·:]\\s*(?:${product.source})\\s*$`, 'i'), '')
+    .replace(new RegExp(`^\\s*(?:${product.source})\\s*[-|–—•·:]\\s*`, 'i'), '')
+    .trim();
+  if (!t || new RegExp(`^(?:${product.source})$`, 'i').test(t)) return null;
+  if (placeholder && placeholder.test(t)) return null;
+  return t;
+}
+
+const hasClass = (el: Element, name: string) => el.classList.contains(name);
+const matchesAnyOf = (el: Element, sel: string) => el.matches(sel) || Boolean(el.querySelector(sel));
+
+/** ChatGPT dots (chatgpt.com/dots): a messaging layout, `.self` marks your own messages (ghost-in-the-loop, 2026-11). */
+const DOTS_ROW = '.messaging-root .message-list .message-row[data-message-id], .message-list .message-row[data-message-id]';
+
+function dotIdentity(doc: Document): string | null {
+  // 1. The dot's own link in the page (/dots/<account>~<dot>).
+  for (const a of Array.from(doc.querySelectorAll('a[href*="/dots/"]'))) {
+    const current = a.getAttribute('aria-current');
+    if (current && current !== 'false') {
+      const m = (a.getAttribute('href') ?? '').match(/\/dots\/([A-Za-z0-9][\w-]{0,63})~([A-Za-z0-9][\w-]{0,63})/);
+      if (m) return `dot_${m[1]}_${m[2]}`;
+    }
+  }
+  // 2. Ids the messaging layout carries (room or thread).
+  const holder = doc.querySelector('.messaging-root [data-room-id], .messaging-root [data-thread-id], [data-messaging-room-id]');
+  const raw =
+    holder?.getAttribute('data-room-id') || holder?.getAttribute('data-thread-id') || holder?.getAttribute('data-messaging-room-id');
+  if (raw && /^[\w-]{1,100}$/.test(raw)) return `room_${raw}`;
+  // 3. The dot's name in the conversation header: stable for as long as the dot keeps its name.
+  const name = firstText(doc, [
+    '.messaging-root [data-testid="dot-name"]',
+    '.messaging-root header h1',
+    '.messaging-root header h2',
+    '.messaging-root [class*="header"] [class*="name"]',
+  ]);
+  return name ? `dotname_${fnv1a32Hex(name.toLowerCase())}` : null;
+}
+
+const chatgptDotsAdapter = roleAdapter({
+  turns: DOTS_ROW,
+  isUser: (el) => hasClass(el, 'self'),
+  userBody: '.message-text',
+  assistantBody: '.message-text',
+  idOf: (el) => el.getAttribute('data-message-id'),
+  title(doc) {
+    const name = firstText(doc, ['.messaging-root [data-testid="dot-name"]', '.messaging-root header h1', '.messaging-root header h2']);
+    return name ? `${name} (dot)` : null;
+  },
+  conversationId: dotIdentity,
+  stabilize: true,
+  noFallback: true,
+});
+
+/** Claude Duet (claude.ai/duet): selectors guessed from claude.ai's chat markup. */
+const claudeDuetAdapter: DomAdapter = {
+  ...claudeAdapter,
+  title(doc) {
+    const t = firstText(doc, ['[data-testid="duet-channel-name"]', '[data-testid="chat-title-button"]']) ?? cleanDocTitle(doc, /\s*[-|]\s*Claude.*$/i);
+    return t && !/^(Claude|Duet|Claude Duet)$/i.test(t) ? t : null;
+  },
+  stabilize: true,
+};
+
+/**
+ * Grok Bot through X Chat (x.com/i/chat). The chat renders inside an open shadow root, and the
+ * page also holds human DMs, so this adapter is used only when the user asks for this tab.
+ * Selectors from x-dm-export / x-chat-exporter (2026); roles are not marked, so own messages are
+ * recognised by their alignment classes (low confidence).
+ */
+function xChatRoot(doc: Document): ParentNode | null {
+  if (doc.querySelector('[data-testid="dm-message-scroller"]')) return doc;
+  for (const el of Array.from(doc.querySelectorAll('main *'))) {
+    const root = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+    if (root && root.querySelector('[data-testid="dm-conversation-more-button"], [data-testid="dm-message-scroller"]')) return root;
+  }
+  return null;
+}
+
+const X_CHAT_OWN = /(^|\s)(justify-end|items-end|self-end|flex-row-reverse|ml-auto)(\s|$)/;
+
+const grokBotAdapter: DomAdapter = {
+  turns(doc) {
+    const root = xChatRoot(doc);
+    if (!root) return [];
+    const rows = Array.from(root.querySelectorAll('[data-testid^="message-"]')).filter(
+      (el) => !/^message-text-/.test(el.getAttribute('data-testid') ?? '')
+    );
+    return outermost(rows).map((el) => {
+      const testId = el.getAttribute('data-testid') ?? '';
+      const own =
+        el.getAttribute('data-own') === 'true' ||
+        X_CHAT_OWN.test(typeof el.className === 'string' ? el.className : '') ||
+        Boolean(el.querySelector(':scope > [class*="justify-end"], :scope > [class*="items-end"]'));
+      return {
+        el,
+        role: own ? ('user' as const) : ('assistant' as const),
+        body: el.querySelector('[data-testid^="message-text-"]') ?? el,
+        id: testId.replace(/^message-/, '') || null,
+      };
+    });
+  },
+  title(doc) {
+    const root = xChatRoot(doc);
+    const header = root?.querySelector('[data-testid="dm-conversation-header"]');
+    const name = header ? extractReadableText(header).split('\n')[0]?.trim() : '';
+    return name ? `${name} on X Chat` : null;
+  },
+  stabilize: true,
+  noFallback: true,
+};
+
+/** Meta AI (meta.ai/prompt/…): from the site's own React bundle (2026-11), medium-high. */
+const META_ASSISTANT = '[data-testid="assistant-message"]';
+const metaAiAdapter = roleAdapter({
+  turns: '[data-message-item][data-message-id], [data-message-item]',
+  scope: 'div[role="feed"]',
+  isUser: (el) => el.hasAttribute('data-user-message') || Boolean(el.querySelector('[data-message-type="user"]')),
+  userBody: '[data-message-type="user"]',
+  assistantBody: META_ASSISTANT,
+  idOf: (el) => el.getAttribute('data-message-id'),
+  strip: '[data-testid^="subagent-cot"], [data-testid="sources-pill"], [data-testid="source-search-pill"], [data-testid="skip-reasoning-button"]',
+  isStreaming: (el) =>
+    Boolean(el.querySelector(`${META_ASSISTANT}[data-streaming-state="STREAMING"], ${META_ASSISTANT}[data-streaming-state="INIT"]`)),
+  title(doc, _url, id) {
+    const sidebar = id
+      ? firstTitle(doc, [`[data-testid="conversation-item"] a[href$="/prompt/${CSS_ESCAPE(id)}"]`, `[data-testid="conversation-item"][href$="/prompt/${CSS_ESCAPE(id)}"]`], /^(Meta AI|New chat)$/i)
+      : null;
+    if (sidebar) return sidebar;
+    const clean = doc.title.replace(/^\(\d+\+?\)\s*/, '');
+    const t = clean.replace(/\s*[-|–—]\s*Meta AI.*$/i, '').trim();
+    return t && !/^(Meta AI|New chat)$/i.test(t) ? t : null;
+  },
+});
+
+/** Muse (muse.ai): no public selectors; message markers commonly used by React chat apps (low). */
+const museAdapter = roleAdapter({
+  turns: '[data-message-id][data-role], [data-message-role], [data-testid="user-message"], [data-testid="assistant-message"], [data-testid="agent-message"]',
+  isUser: (el) =>
+    /^(user|human)$/i.test(el.getAttribute('data-role') ?? el.getAttribute('data-message-role') ?? '') ||
+    el.getAttribute('data-testid') === 'user-message',
+  idOf: (el) => el.getAttribute('data-message-id'),
+  title: (doc) => titleWithout(doc, /Muse(?:\s+[-—]\s+Your Personal AI Agent from Meta)?/, /^(New thread|Home)$/i),
+  stabilize: true,
+});
+
+/** Poe: CSS-module class prefixes (hash suffixes rotate). Exporters 2024-2026, low-medium. */
+const poeAdapter = roleAdapter({
+  turns: '[class*="ChatMessage_messageRow"], [class*="ChatMessage_chatMessage"]',
+  isUser: (el) => matchesAnyOf(el, '[class*="rightSideMessage"], [class*="humanMessageBubble"]'),
+  userBody: '[class*="Markdown_markdownContainer"], [class*="Prose_prose"], [class*="Message_messageTextContainer"]',
+  assistantBody: '[class*="Markdown_markdownContainer"], [class*="Prose_prose"], [class*="Message_messageTextContainer"]',
+  idOf: (el) => el.getAttribute('data-message-id') ?? el.querySelector('[data-message-id]')?.getAttribute('data-message-id') ?? null,
+  docStreaming: 'button[class*="ChatStopMessageButton"]',
+  title: (doc) => titleWithout(doc, /Poe/),
+  stabilize: true,
+});
+
+/** HuggingChat: chat-ui's own ChatMessage.svelte (HEAD 2026-11-03), high. */
+const huggingChatAdapter = roleAdapter({
+  turns: '[data-message-role="assistant"][data-message-id], [data-message-type="user"][data-message-id]',
+  isUser: (el) => el.getAttribute('data-message-type') === 'user',
+  userBody: 'p.disabled, .disabled',
+  assistantBody: '.prose',
+  assistantBodies: true,
+  idOf: (el) => el.getAttribute('data-message-id'),
+  docStreaming: 'button.stop-generating-btn, button[aria-label="Stop generating"]',
+  title: (doc) => titleWithout(doc, /HuggingChat/, /^New Chat$/i),
+});
+
+/** Qwen Chat (ophel qwen-studio-config, 2026-11), high; data-role markup kept for the older layout. */
+const QWEN_USER = '.qwen-chat-message-user, .chat-user-message-wrapper, [data-role="user"]';
+const qwenAdapter = roleAdapter({
+  turns: `${QWEN_USER}, .qwen-chat-message-assistant, [data-role="assistant"]`,
+  isUser: (el) => el.matches(QWEN_USER),
+  userBody: '.user-message-content',
+  assistantBody: '.response-message-content',
+  idOf: (el) =>
+    el.id.match(/^(?:chat-response-message|qwen-chat-message-assistant|qwen-chat-message-user)-(.+)$/)?.[1] ??
+    el.getAttribute('data-message-id'),
+  strip: '.qwen-chat-thinking-status-card, .qwen-chat-thinking-tool-status-card-wraper, .response-message-footer',
+  docStreaming: 'button.stop-button, [class*="stop-button"]',
+  title: (doc) => titleWithout(doc, /Qwen(?:\s*Chat)?/, /^New Chat$/i),
+});
+
+/** Doubao (ophel doubao-config 2026-11, high; chat-memo-pro test ids for the older markup). */
+const doubaoAdapter = roleAdapter({
+  turns: '[data-target-id="message-box-target-id"] [data-message-id], [data-testid="send_message"], [data-testid="receive_message"]',
+  isUser: (el) => hasClass(el, 'justify-end') || el.getAttribute('data-testid') === 'send_message',
+  userBody: '.whitespace-pre-wrap, [data-testid="message_text_content"]',
+  assistantBody: '.flow-markdown-body, .md-box-root, [data-testid="message_text_content"]',
+  idOf: (el) => el.getAttribute('data-message-id'),
+  strip: '[data-testid="think_block_collapse"]',
+  docStreaming: '[data-testid="chat_input_local_break_button"], [class*="break-btn-"]',
+  title(doc) {
+    return (
+      firstTitle(doc, ['#flow_chat_sidebar a[aria-current="page"] [data-testid="chat_list_item_title"]'], /^(新对话|New chat)$/) ??
+      titleWithout(doc, /豆包|Doubao/)
+    );
+  },
+});
+
+/**
+ * Open WebUI markup, used by Z.ai and recognised on self-hosted Open WebUI sites (ophel zai-config
+ * and open-webui registry, 2026-11), high.
+ */
+const OWUI_TURN = '#messages-container [id^="message-"]';
+function openWebUiAdapter(product: RegExp): DomAdapter {
+  return roleAdapter({
+    turns: OWUI_TURN,
+    isUser: (el) => hasClass(el, 'user-message') || Boolean(el.querySelector(':scope > .user-message, .chat-user')),
+    userBody: '.chat-user .markdown-prose, .chat-user .whitespace-pre-wrap, .chat-user',
+    assistantBody: '#response-content-container, .markdown-prose:not(.chat-user)',
+    idOf: (el) => el.id.replace(/^message-/, '') || null,
+    strip: '.thinking-chain-container, .thinking-block, details[type="reasoning"], details[type="tool_calls"]',
+    docStreaming: 'div[aria-label="停止"] button, button[aria-label="Stop"], #stop-response-button',
+    title: (doc) => titleWithout(doc, product, /^(New Chat|新聊天)$/i),
+  });
+}
+const zaiAdapter = openWebUiAdapter(/Z\.ai(?:\s*Chat)?|GLM/);
+const openWebUiSiteAdapter = openWebUiAdapter(/Open WebUI/);
+
+/** Manus (ophel manus registry 2026-11), high for turns; no streaming signal is known. */
+const manusAdapter = roleAdapter({
+  turns: '[data-chat-question-bubble="true"], .manus-markdown',
+  scope: 'div[class*="--chat-message-list"]',
+  isUser: (el) => el.getAttribute('data-chat-question-bubble') === 'true',
+  exclude: '[data-chat-suggested-follow-ups]',
+  title: (doc) => titleWithout(doc, /Manus/),
+  stabilize: true,
+});
+
+/** Genspark (ophel + chat-memo-pro, 2026), high. */
+const gensparkAdapter = roleAdapter({
+  turns: '.conversation-statement',
+  isUser: (el) => hasClass(el, 'user'),
+  userBody: '.content',
+  assistantBody: '.markdown-viewer',
+  docStreaming: 'svg.stop-icon',
+  title(doc) {
+    const input = doc.querySelector('input.agent-name-input') as HTMLInputElement | null;
+    const value = input?.value?.trim() || input?.getAttribute('value')?.trim();
+    return value || firstText(doc, ['main h1']) || titleWithout(doc, /Genspark/);
+  },
+});
+
+/**
+ * Character.AI (Duetta exporter with 2026-10 fixtures), medium. The list is newest first, has no
+ * message ids, and grows at the top, so turns are reversed and get content ids.
+ */
+const characterAdapter: DomAdapter = {
+  turns(doc) {
+    const list = doc.querySelector('#chat-messages');
+    if (!list) return [];
+    const turns: RawTurn[] = [];
+    for (const child of Array.from(list.children)) {
+      if (child.querySelector('.ticontainer')) continue; // typing indicator: still being written
+      const active = child.querySelector('.swiper-slide-active') ?? child;
+      const prose = active.querySelector('[data-testid="completed-message"] .prose') ?? active.querySelector('.prose');
+      if (!prose) continue; // start-of-chat card, images
+      const user = Boolean(child.querySelector('.flex-row-reverse'));
+      const bot = Boolean(child.querySelector('.cai-badge'));
+      if (user === bot) continue; // exactly one role marker, else unknown
+      turns.push({ el: child, role: user ? 'user' : 'assistant', body: prose });
+    }
+    return turns.reverse();
+  },
+  title(doc) {
+    const name = firstText(doc, ['#chat-header a[href^="/character/"] p']);
+    return name ? `Chat with ${name}` : titleWithout(doc, /Character\.AI|character\.ai/);
+  },
+  isStreaming: (el) => Boolean(el.querySelector('.ticontainer')),
+  hashIds: true,
+  stabilize: true,
+  noFallback: true,
+};
+
+/** Duck.ai (ophel duck-ai registry + the duck.ai bundle, 2026-11), high. */
+const duckAdapter = roleAdapter({
+  turns: '[data-testid="user-message"], [data-activeresponse="true"] > :nth-child(2)',
+  isUser: (el) => el.getAttribute('data-testid') === 'user-message',
+  strip: '[data-message-actions], button[data-streamdown="code-block-copy-button"]',
+  title: (doc) => titleWithout(doc, /Duck\.ai|DuckDuckGo AI Chat/),
+  stabilize: true,
+});
+
+/** Proton Lumo (ophel proton-lumo registry, 2026-11), medium. */
+const lumoAdapter = roleAdapter({
+  turns: '.lumo-chat-item[data-message-role]',
+  isUser: (el) => el.getAttribute('data-message-role') === 'user',
+  userBody: '.user-msg-container .lumo-markdown, .lumo-markdown',
+  assistantBody: '.progressive-markdown-content, .lumo-markdown',
+  strip: '.thinking-path, .action-toolbar, .user-toolbar',
+  docStreaming: '.lumo-input-container button[aria-label*="Stop"], .thinking-path-header[aria-busy="true"]',
+  title: (doc) => titleWithout(doc, /Lumo(?:\s+by\s+Proton)?|Proton Lumo/, /^New chat$/i),
+});
+
+/** Arena (exporter userscripts 2026), low: user bubbles align right, replies sit on the primary surface. */
+const arenaAdapter = roleAdapter({
+  turns: 'div.group.self-end, div[class*="bg-surface-primary"][class*="flex-col"][class*="min-w-0"]',
+  isUser: (el) => hasClass(el, 'self-end'),
+  assistantBody: '.prose, .markdown, [class*="prose"]',
+  strip: '.thought-content, [class*="thought"]',
+  title: (doc) => titleWithout(doc, /(?:LM)?Arena(?:\.ai)?/),
+  stabilize: true,
+});
+
+/** T3 Chat: no public selectors; the role attributes most chat apps carry (low). */
+const t3Adapter = roleAdapter({
+  turns: '[data-message-role], [data-role="user"], [data-role="assistant"], [aria-label="Your message"], [aria-label="Assistant message"]',
+  isUser: (el) =>
+    /^user$/i.test(el.getAttribute('data-message-role') ?? el.getAttribute('data-role') ?? '') || el.getAttribute('aria-label') === 'Your message',
+  title: (doc) => titleWithout(doc, /T3\s*Chat/, /^New Thread$/i),
+  stabilize: true,
+});
+
+/** Gemini Notebook / NotebookLM (decant, 2026-10), medium. */
+const notebookAdapter = roleAdapter({
+  turns: '.from-user-container, .to-user-container',
+  isUser: (el) => hasClass(el, 'from-user-container'),
+  strip: 'button.citation-marker, mat-icon',
+  title(doc) {
+    return (
+      firstText(doc, ['.notebook-title', 'input.title-input', '[data-test-id="notebook-title"]']) ??
+      titleWithout(doc, /NotebookLM|Gemini Notebook|Google NotebookLM/, /^Untitled notebook$/i)
+    );
+  },
+  stabilize: true,
+});
+
+/** GitHub Copilot on github.com: guessed from GitHub's CSS-module naming (low). */
+const githubCopilotAdapter = roleAdapter({
+  turns: '[class*="UserMessage-module__container"], [class*="CopilotMessage-module__container"], [class*="AssistantMessage-module__container"], [data-testid="user-message"], [data-testid="copilot-message"]',
+  isUser: (el) => /UserMessage-module/.test(typeof el.className === 'string' ? el.className : '') || el.getAttribute('data-testid') === 'user-message',
+  assistantBody: '.markdown-body',
+  title: (doc) => titleWithout(doc, /GitHub Copilot|Copilot|GitHub/),
+  stabilize: true,
+  project(_doc, url) {
+    const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+\/agent-sessions\//);
+    return m ? m[2] : null;
+  },
+});
+
+/** Lovable (lovable-chat-exporter, 2026-10), medium: user message ids start with umsg_. */
+const lovableAdapter = roleAdapter({
+  turns: '[data-message-id]',
+  isUser: (el) => (el.getAttribute('data-message-id') ?? '').startsWith('umsg_'),
+  userBody: '[class*="PromptBox_customProse"], .prose',
+  assistantBody: '.prose',
+  assistantBodies: true,
+  idOf: (el) => el.getAttribute('data-message-id'),
+  title(doc) {
+    return firstText(doc, ['nav button span.truncate', 'header button span.truncate']) ?? titleWithout(doc, /Lovable/);
+  },
+  stabilize: true,
+});
+
+/** Bolt (bolt-automations exporter, 2025), low. */
+const boltAdapter = roleAdapter({
+  turns: 'section[aria-label="Chat"] div[data-message-id], div[data-message-id]',
+  isUser: (el) => hasClass(el, 'self-end'),
+  userBody: 'div[class*="_MarkdownContent_"]',
+  assistantBody: 'div[class*="_MarkdownContent_"]',
+  assistantBodies: true,
+  idOf: (el) => el.getAttribute('data-message-id'),
+  title: (doc) => titleWithout(doc, /Bolt(?:\.new)?|bolt\.new/),
+  stabilize: true,
+});
+
+/** Coding agents and builders without public selectors: generic readers plus a product title (low). */
+function titleOnlyAdapter(product: RegExp, placeholder?: RegExp): DomAdapter {
+  return { turns: () => [], title: (doc) => titleWithout(doc, product, placeholder), stabilize: true };
+}
+
+/** LibreChat (its own client source and ophel registry, 2026-10), medium. */
+const libreChatAdapter = roleAdapter({
+  turns: '.message-render',
+  isUser: (el) => Boolean(el.querySelector(':scope > .user-turn')) || hasClass(el, 'user-turn'),
+  userBody: '.message-content',
+  assistantBody: '.message-content',
+  isStreaming: (el) => Boolean(el.querySelector('.message-content.submitting')),
+  docStreaming: '[data-testid="stop-generation-button"]',
+  title: (doc) => titleWithout(doc, /LibreChat/, /^New Chat$/i),
+});
+
+/** LobeChat (ophel lobechat registry, 2026), low. */
+const lobeChatAdapter = roleAdapter({
+  turns: '.message-wrapper[data-message-id], #chatlist-list [data-index]',
+  isUser(el) {
+    const style = el.getAttribute('style') ?? '';
+    if (/--lobe-flex-align:\s*flex-end/.test(style)) return true;
+    if (/--lobe-flex-align:\s*flex-start/.test(style)) return false;
+    return el.hasAttribute('data-index') && !el.querySelector('[data-layout="vertical"]');
+  },
+  userBody: 'article[data-code-type="markdown"]',
+  assistantBody: 'article[data-code-type="markdown"]',
+  idOf: (el) => el.getAttribute('data-message-id'),
+  title: (doc) => titleWithout(doc, /LobeChat|LobeHub/),
+  stabilize: true,
+});
+
+/** AnythingLLM (HistoricalMessage component source, 2026-11), low: rows align by role. */
+const anythingLlmAdapter = roleAdapter({
+  turns: '#chat-history .flex.justify-end.w-full.group, #chat-history .flex.justify-start.w-full.group',
+  isUser: (el) => hasClass(el, 'justify-end'),
+  title: (doc) => titleWithout(doc, /AnythingLLM(?:\s*\|\s*Your personal LLM trained on anything)?/),
+  stabilize: true,
+});
+
+/** Self-hosted chat apps recognised on an added site, by markup the app always renders. */
+export type SelfHostedApp = 'open_webui' | 'librechat' | 'lobechat' | 'anythingllm';
+
+export function detectSelfHostedApp(doc: Document): SelfHostedApp | null {
+  if (doc.querySelector('#messages-container') && doc.querySelector('#chat-input, #response-content-container, .user-message .chat-user')) {
+    return 'open_webui';
+  }
+  if (doc.querySelector('.message-render') && doc.querySelector('[data-testid="text-input"], main[role="main"]')) return 'librechat';
+  if (doc.querySelector('.message-wrapper[data-message-id], #chatlist-list')) return 'lobechat';
+  if (doc.querySelector('#chat-history') && (/AnythingLLM/i.test(doc.title) || doc.querySelector('.justify-end.w-full.group, .justify-start.w-full.group'))) {
+    return 'anythingllm';
+  }
+  return null;
+}
+
+const SITE_ID_PATHS: RegExp[] = [
+  /\/workspace\/([\w.-]+)\/t\/([\w.-]+)/, // AnythingLLM thread
+  /\/(?:c|chat|chats|conversation|conversations|thread|threads|t|session|sessions)\/([\w.-]{4,})(?:\/|$)/,
+];
+const SITE_ID_PARAMS = ['conversationId', 'conversation', 'chatId', 'chatID', 'chat', 'threadId', 'thread', 'topic', 'sessionId', 'session', 'id', 'c'];
+const SITE_NOT_AN_ID = /^(new|settings|login|signin|admin|home|share|search|workspace|models|api)$/i;
+
+/**
+ * The conversation id on an added site: an id-looking path segment, an id query parameter, or a
+ * hash route; null when the page has none (the caller then uses the opening message).
+ */
+export function siteConversationIdFromUrl(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  const clean = (v: string | null | undefined) => {
+    const t = (v ?? '').replace(/[^\w.-]/g, '_').slice(0, 100);
+    return t && !SITE_NOT_AN_ID.test(t) ? t : null;
+  };
+  const anything = url.pathname.match(SITE_ID_PATHS[0]);
+  if (anything) return clean(`${anything[1]}_${anything[2]}`);
+  const fromPath = clean(url.pathname.match(SITE_ID_PATHS[1])?.[1]);
+  if (fromPath) return fromPath;
+  for (const key of SITE_ID_PARAMS) {
+    const v = clean(url.searchParams.get(key));
+    if (v) return v;
+  }
+  const hash = url.hash.replace(/^#/, '');
+  const fromHash = clean(hash.match(SITE_ID_PATHS[1])?.[1]);
+  if (fromHash) return fromHash;
+  const anythingWorkspace = url.pathname.match(/^\/workspace\/([\w.-]+)\/?$/);
+  return anythingWorkspace ? clean(`${anythingWorkspace[1]}_default`) : null;
+}
+
+const SITE_ADAPTERS: Record<SelfHostedApp | 'custom_web', DomAdapter> = {
+  open_webui: openWebUiSiteAdapter,
+  librechat: libreChatAdapter,
+  lobechat: lobeChatAdapter,
+  anythingllm: anythingLlmAdapter,
+  custom_web: { turns: () => [], title: () => null, stabilize: true },
+};
+
+/** A generic page title: document.title without a trailing " - Site name". */
+function genericSiteTitle(doc: Document): string | null {
+  const t = doc.title.replace(/\s*[-|–—•·]\s*[^-|–—•·]{1,40}$/, '').trim();
+  return t && t.length > 1 && !/^(new chat|chat|home|untitled)$/i.test(t) ? t : null;
+}
+
+const noDom: DomAdapter = { turns: () => [], title: () => null, noFallback: true };
+
 const ADAPTERS: Record<ProviderId, DomAdapter> = {
   chatgpt: chatgptAdapter,
   codex: chatgptAdapter,
@@ -612,7 +1187,7 @@ const ADAPTERS: Record<ProviderId, DomAdapter> = {
   claude_code: claudeAdapter,
   grok: grokAdapter,
   // No DOM selectors are known; captured from X's own responses instead (grok-x.ts).
-  grok_x: { turns: () => [], title: () => null },
+  grok_x: noDom,
   gemini: geminiAdapter,
   ai_studio: aiStudioAdapter,
   perplexity: perplexityAdapter,
@@ -620,7 +1195,39 @@ const ADAPTERS: Record<ProviderId, DomAdapter> = {
   mistral: mistralAdapter,
   copilot: copilotAdapter,
   kimi: kimiAdapter,
-  imported: { turns: () => [], title: () => null },
+  imported: noDom,
+  chatgpt_dots: chatgptDotsAdapter,
+  claude_duet: claudeDuetAdapter,
+  grok_bot: grokBotAdapter,
+  muse: museAdapter,
+  meta_ai: metaAiAdapter,
+  poe: poeAdapter,
+  huggingchat: huggingChatAdapter,
+  qwen: qwenAdapter,
+  doubao: doubaoAdapter,
+  zai: zaiAdapter,
+  manus: manusAdapter,
+  genspark: gensparkAdapter,
+  minimax_agent: titleOnlyAdapter(/MiniMax(?:\s*Agent)?/),
+  character_ai: characterAdapter,
+  duck_ai: duckAdapter,
+  lumo: lumoAdapter,
+  arena: arenaAdapter,
+  t3_chat: t3Adapter,
+  gemini_notebook: notebookAdapter,
+  github_copilot: githubCopilotAdapter,
+  cursor_agents: titleOnlyAdapter(/Cursor(?:\s*Agents?)?/),
+  devin: titleOnlyAdapter(/Devin/),
+  jules: titleOnlyAdapter(/Jules/),
+  lovable: lovableAdapter,
+  bolt: boltAdapter,
+  v0: titleOnlyAdapter(/v0(?:\s+by\s+Vercel)?/),
+  replit: titleOnlyAdapter(/Replit/),
+  lobechat: lobeChatAdapter,
+  custom_web: SITE_ADAPTERS.custom_web,
+  open_webui: openWebUiSiteAdapter,
+  librechat: libreChatAdapter,
+  anythingllm: anythingLlmAdapter,
 };
 
 function CSS_ESCAPE(value: string): string {
@@ -633,45 +1240,92 @@ function unixToIsoOrNull(ts: string | null): string | null {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
+/** The provider a page is read as, and how: a registered provider page, or an added site. */
+function resolvePageProvider(
+  doc: Document,
+  locationHref: string,
+  options: ExtractOptions
+): { provider: ProviderId; adapter: DomAdapter; site: CaptureSiteContext | null } | null {
+  if (options.site) {
+    // An added site: the page never names its own provider; the markup decides between the
+    // recognised self-hosted apps and the catch-all.
+    const app = detectSelfHostedApp(doc);
+    return { provider: app ?? 'custom_web', adapter: SITE_ADAPTERS[app ?? 'custom_web'], site: options.site };
+  }
+  const providerAttr = doc.documentElement.getAttribute('data-tk-provider');
+  const provider: ProviderId | null = isProviderId(providerAttr) ? providerAttr : detectProviderFromUrl(locationHref);
+  if (!provider || provider === 'imported' || provider === 'grok_x') return null;
+  // Custom-site providers are read only on sites the user added (the background says which).
+  if (PROVIDERS[provider].hostAccess === 'custom') return null;
+  if (PROVIDERS[provider].captureMode === 'explicit' && !options.explicit) return null;
+  return { provider, adapter: ADAPTERS[provider], site: null };
+}
+
+interface DraftMessage {
+  turn: RawTurn;
+  index: number;
+  text: string;
+  createdAt: string | null;
+}
+
 export function extractVisibleDomConversation(
   doc: Document,
-  locationHref: string
+  locationHref: string,
+  options: ExtractOptions = {}
 ): DomExtractionResult | null {
-  const providerAttr = doc.documentElement.getAttribute('data-tk-provider');
-  const provider: ProviderId | null = isProviderId(providerAttr)
-    ? providerAttr
-    : detectProviderFromUrl(locationHref);
-  // Grok on X is read from X's own responses (grok-x.ts); its DOM is never scraped.
-  if (!provider || provider === 'imported' || provider === 'grok_x') return null;
+  const page = resolvePageProvider(doc, locationHref, options);
+  if (!page) return null;
+  const { provider, adapter, site } = page;
 
-  const convIdAttr =
-    doc.documentElement.getAttribute('data-tk-conversation-id') ||
-    doc.querySelector('[data-conversation-id]')?.getAttribute('data-conversation-id');
-  const sourceConversationId = convIdAttr || extractConversationIdFromUrl(locationHref);
-  if (!sourceConversationId) return null;
+  let urlConversationId: string | null;
+  if (site) {
+    urlConversationId = siteConversationIdFromUrl(locationHref);
+  } else {
+    const convIdAttr =
+      doc.documentElement.getAttribute('data-tk-conversation-id') ||
+      doc.querySelector('[data-conversation-id]')?.getAttribute('data-conversation-id');
+    urlConversationId = convIdAttr || extractConversationIdFromUrl(locationHref) || adapter.conversationId?.(doc, locationHref) || null;
+    if (!urlConversationId) return null;
+  }
 
-  const branchAttr =
-    doc.querySelector('[data-branch-id]')?.getAttribute('data-branch-id') ||
-    doc.documentElement.getAttribute('data-tk-branch-id') ||
-    'main';
+  const branchAttr = site
+    ? 'main'
+    : doc.querySelector('[data-branch-id]')?.getAttribute('data-branch-id') ||
+      doc.documentElement.getAttribute('data-tk-branch-id') ||
+      'main';
   const branchId = branchAttr.trim() || 'main';
 
-  const adapter = ADAPTERS[provider];
+  let method: DomExtractionResult['method'] = 'adapter';
   let turns = adapter.turns(doc);
-  if (turns.length === 0 && provider !== 'claude' && provider !== 'chatgpt') {
+  const fallback = !adapter.noFallback && provider !== 'claude' && provider !== 'chatgpt';
+  if (turns.length === 0 && fallback) {
     turns = genericTurns(doc);
+    method = 'generic';
   }
-  if (turns.length === 0 && provider !== 'claude' && provider !== 'chatgpt') {
+  if (turns.length === 0 && fallback) {
     turns = heuristicTurns(doc);
+    method = 'heuristic';
+  }
+  if (turns.length === 0) method = 'none';
+
+  // A page-wide "still writing" signal (a stop button) means the newest reply is unfinished.
+  let unfinishedIndex = -1;
+  if (adapter.docStreaming && doc.querySelector(adapter.docStreaming)) {
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].role !== 'user') {
+        unfinishedIndex = i;
+        break;
+      }
+    }
   }
 
-  const messages: UpsertThreadInput['messages'] = [];
-  const usedIds = new Set<string>();
+  const drafts: DraftMessage[] = [];
   let modelSlug: string | null = null;
 
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     const el = turn.el;
+    if (i === unfinishedIndex) continue;
 
     // Never capture the composer or an unsent draft
     if (
@@ -687,6 +1341,7 @@ export function extractVisibleDomConversation(
       el.getAttribute('data-streaming') === 'true' ||
       el.classList.contains('result-streaming') ||
       el.querySelector('[data-streaming="true"], .result-streaming') ||
+      el.getAttribute('aria-busy') === 'true' ||
       adapter.isStreaming?.(el)
     ) {
       continue;
@@ -706,23 +1361,42 @@ export function extractVisibleDomConversation(
     const timeEl = el.querySelector('time[datetime]');
     const explicitTs =
       el.getAttribute('data-message-timestamp') || timeEl?.getAttribute('datetime') || null;
+    drafts.push({ turn, index: i, text, createdAt: unixToIsoOrNull(explicitTs) });
+  }
 
+  // An added site without an id in its address: the conversation is named by its opening message.
+  let conversationId = urlConversationId;
+  if (site && !conversationId) {
+    const opening = drafts.find((d) => d.turn.role === 'user')?.text;
+    if (!opening) return null;
+    conversationId = `m_${fnv1a32Hex(opening.replace(/\s+/g, ' ').trim())}`;
+  }
+  if (!conversationId) return null;
+  const sourceConversationId = site ? `${siteConversationKey(site.origin)}~${conversationId}` : conversationId;
+
+  const messages: UpsertThreadInput['messages'] = [];
+  const usedIds = new Set<string>();
+  for (const draft of drafts) {
     // Turns that share a keyed ancestor stay distinct, in a stable order.
-    const baseId = stableMessageKey(turn) ?? `${sourceConversationId}_${branchId}_m_${i}`;
+    const baseId =
+      stableMessageKey(draft.turn) ??
+      (adapter.hashIds
+        ? `h_${fnv1a32Hex(`${draft.turn.role}\n${draft.text}`)}`
+        : `${sourceConversationId}_${branchId}_m_${draft.index}`);
     let sourceMessageId = baseId;
     for (let n = 2; usedIds.has(sourceMessageId); n++) sourceMessageId = `${baseId}#${n}`;
     usedIds.add(sourceMessageId);
 
     messages.push({
       sourceMessageId,
-      role: turn.role,
-      content: text,
-      createdAt: unixToIsoOrNull(explicitTs),
+      role: draft.turn.role,
+      content: draft.text,
+      createdAt: draft.createdAt,
       branchPath: branchId,
     });
   }
 
-  const adapterTitle = adapter.title(doc, locationHref, sourceConversationId);
+  const adapterTitle = adapter.title(doc, locationHref, conversationId) ?? (site ? genericSiteTitle(doc) : null);
   const firstUser = messages.find((m) => m.role === 'user')?.content ?? '';
   const derivedTitle = firstUser
     ? firstUser.replace(/\s+/g, ' ').slice(0, 80).trim()
@@ -733,12 +1407,14 @@ export function extractVisibleDomConversation(
     provider,
     sourceConversationId,
     branchId,
-    canonicalUrl: canonicalizeConversationUrl(locationHref),
+    canonicalUrl: canonicalizeConversationUrl(locationHref, site ? provider : undefined),
     title,
     coverage: messages.length > 0 ? 'partial' : 'title_only',
     messages,
     providerProjectName: adapter.project?.(doc, locationHref) ?? null,
     modelSlug,
+    method,
+    stabilize: Boolean(site) || method !== 'adapter' || Boolean(adapter.stabilize),
   };
 }
 
@@ -746,7 +1422,7 @@ export function extractVisibleDomConversation(
 export function extractProviderProjectName(doc: Document, locationHref: string): string | null {
   const providerAttr = doc.documentElement.getAttribute('data-tk-provider');
   const provider: ProviderId | null = isProviderId(providerAttr) ? providerAttr : detectProviderFromUrl(locationHref);
-  if (!provider) return null;
+  if (!provider || PROVIDERS[provider].hostAccess === 'custom') return null;
   return ADAPTERS[provider].project?.(doc, locationHref) ?? null;
 }
 
@@ -781,22 +1457,33 @@ export function grokXConversationToExtraction(
     })),
     providerProjectName: null,
     modelSlug: null,
+    method: 'adapter',
+    stabilize: false,
   };
 }
 
-/** Strip query strings and fragments that do not identify the conversation. */
-export function canonicalizeConversationUrl(href: string): string {
-  if (detectProviderFromUrl(href) === 'grok_x') {
+/**
+ * Strip query strings and fragments that do not identify the conversation. Parameters that do
+ * (?conversation, Genspark's ?id, Character.AI's ?hist, Duck.ai's ?chatID, …) are kept. Pass the
+ * provider for an added site, where the id may sit in any common parameter or a hash route.
+ */
+export function canonicalizeConversationUrl(href: string, provider?: ProviderId): string {
+  const owner = provider ?? detectProviderFromUrl(href);
+  if (owner === 'grok_x') {
     const conv = extractConversationIdFromUrl(href);
     return conv ? grokXCanonicalUrl(conv) : 'https://x.com/i/grok';
   }
   try {
     const u = new URL(href);
     const keep = new URLSearchParams();
-    const conv = u.searchParams.get('conversation');
-    if (conv) keep.set('conversation', conv);
+    const custom = owner !== null && PROVIDERS[owner].hostAccess === 'custom';
+    for (const key of custom ? ['conversation', ...SITE_ID_PARAMS] : conversationQueryParams(owner)) {
+      const value = u.searchParams.get(key);
+      if (value) keep.set(key, value);
+    }
     const qs = keep.toString();
-    return `${u.origin}${u.pathname}${qs ? `?${qs}` : ''}`;
+    const hashRoute = custom && /^#\/[\w./-]+$/.test(u.hash) ? u.hash : '';
+    return `${u.origin}${u.pathname}${qs ? `?${qs}` : ''}${hashRoute}`;
   } catch {
     return href;
   }

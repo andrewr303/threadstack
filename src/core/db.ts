@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import { PROVIDER_IDS, CAPTURE_PROVIDER_IDS } from './providers.js';
+import { PROVIDER_IDS, CAPTURE_PROVIDER_IDS, PROVIDERS } from './providers.js';
 import {
   STARTER_AREAS,
   normalizeSettings,
@@ -86,7 +86,8 @@ export class ThreadkeeperDB extends Dexie {
           .modify((raw: Partial<SettingsRecord>) => {
             const next = normalizeSettings(raw);
             for (const id of CAPTURE_PROVIDER_IDS) {
-              next.authorizedHosts[id] = true;
+              // Only the providers that were capturable in v1; later ones keep their own default.
+              if (PROVIDERS[id].defaultEnabled) next.authorizedHosts[id] = true;
             }
             next.settingsVersion = 2;
             Object.assign(raw, next);

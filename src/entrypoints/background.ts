@@ -10,10 +10,25 @@ import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv } from '../core/sync-env.js
 import { EMPTY_SYNC_STATE, clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
 import { siteConversationTitle, type SiteConversation } from '../core/site-api.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
-import { DOCK_COMMAND_TYPES, validateDockPageSender, validateRuntimeMessageSender } from '../core/messaging.js';
+import { DOCK_COMMAND_TYPES, captureSenderUrl, validateDockPageSender, validateRuntimeMessageSender } from '../core/messaging.js';
 import { DockService } from '../core/dock/external.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
-import { isCapturePageUrl, isProviderId, type CaptureProviderId } from '../core/providers.js';
+import {
+  PROVIDERS,
+  detectProviderFromUrl,
+  isCapturePageUrl,
+  isProviderAllowedOnUrl,
+  isProviderId,
+  type CaptureProviderId,
+} from '../core/providers.js';
+import { EXPLICIT_GRANT_MS, decideCapture, newGrantToken, type ExplicitGrant } from '../core/capture-gate.js';
+import {
+  CONTENT_SCRIPT_FILE,
+  chromeCaptureScriptEnv,
+  matchCustomSite,
+  readCustomSites,
+  reconcileCaptureScripts,
+} from '../core/custom-sites.js';
 import {
   nextDueAnalysisAt,
   processThreadLocally,
@@ -259,6 +274,128 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessageExternal) {
     return true;
   });
 }
+
+// ---- Capture on runtime-granted sites (optional providers, sites added in Settings) ----------
+
+/** Per-tab proof that the user asked for that tab (overlay opened, or "Capture this tab"). */
+const explicitGrants = new Map<number, ExplicitGrant>();
+/** "Capture this tab" waits for the capture its token produces. */
+const explicitWaiters = new Map<number, { token: string; resolve: (result: CaptureTabResult) => void }>();
+
+interface CaptureTabResult {
+  ok: boolean;
+  status?: string;
+  error?: string;
+  title?: string;
+  messages?: number;
+  provider?: string;
+}
+
+function grantExplicitCapture(tabId: number, kind: ExplicitGrant['kind'], token = newGrantToken()): string {
+  explicitGrants.set(tabId, { token, kind, expiresAt: Date.now() + EXPLICIT_GRANT_MS });
+  return token;
+}
+
+let captureSitesQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Register / unregister the runtime content scripts so they match settings, added sites and
+ * granted access. Runs one at a time: a settings change, a permission event and the page's own
+ * notice often arrive together, and overlapping runs would register the same id twice.
+ */
+function reconcileCaptureSites(settings?: SettingsRecord): Promise<void> {
+  captureSitesQueue = captureSitesQueue.then(() => reconcileCaptureSitesNow(settings)).catch(() => undefined);
+  return captureSitesQueue;
+}
+
+async function reconcileCaptureSitesNow(settings?: SettingsRecord): Promise<void> {
+  const env = chromeCaptureScriptEnv();
+  if (!env) return;
+  const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
+  const sites = await readCustomSites(chrome.storage?.local);
+  const result = await reconcileCaptureScripts(env, { authorizedHosts: s.authorizedHosts, sites: sites.sites });
+  if (result.error) {
+    securityRejectionLog.push({ timestamp: new Date().toISOString(), reason: `Could not update capture scripts: ${result.error}` });
+  }
+}
+
+/** Load the reader into tabs already open on newly granted pages (registration only affects new loads). */
+async function injectIntoOpenTabs(patterns: string[]): Promise<void> {
+  if (patterns.length === 0 || !chrome.tabs?.query || !chrome.scripting?.executeScript) return;
+  try {
+    const tabs = await chrome.tabs.query({ url: patterns });
+    for (const tab of tabs) {
+      if (typeof tab.id !== 'number') continue;
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] }).catch(() => undefined);
+    }
+  } catch {
+    // no access to those tabs yet
+  }
+}
+
+/** Whether Threadkeeper may read this page at all: a provider page it has access to, or an added site. */
+async function capturablePage(url: string): Promise<{ ok: true; label: string } | { ok: false; error: string }> {
+  const provider = detectProviderFromUrl(url);
+  if (provider && PROVIDERS[provider].hostAccess !== 'custom' && isProviderAllowedOnUrl(provider, url)) {
+    return { ok: true, label: PROVIDERS[provider].label };
+  }
+  const site = matchCustomSite(await readCustomSites(chrome.storage?.local), url);
+  if (site) return { ok: true, label: site.label };
+  return { ok: false, error: 'This tab is not an AI page Threadkeeper reads. Add the site under "Any AI site" first.' };
+}
+
+/** Settings → Capture → "Capture this tab": save the conversation open in the given (or active) tab. */
+async function captureTabNow(requestedTabId?: number): Promise<CaptureTabResult> {
+  let tab: chrome.tabs.Tab | undefined;
+  try {
+    tab =
+      typeof requestedTabId === 'number'
+        ? await chrome.tabs.get(requestedTabId)
+        : (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+  } catch {
+    tab = undefined;
+  }
+  if (!tab || typeof tab.id !== 'number') return { ok: false, error: 'There is no tab to capture.' };
+  const url = tab.url ?? '';
+  if (url.startsWith('chrome-extension://') || url.startsWith('edge://') || url.startsWith('chrome://')) {
+    return { ok: false, error: 'Switch to the tab with the chat, then use Capture this tab from the side panel.' };
+  }
+  if (!url) return { ok: false, error: 'Threadkeeper has no access to this tab. Turn its site on (or add it) under Capture first.' };
+  const page = await capturablePage(url);
+  if (!page.ok) return { ok: false, error: page.error };
+  const tabId = tab.id;
+  const token = grantExplicitCapture(tabId, 'capture');
+  const result = new Promise<CaptureTabResult>((resolve) => {
+    explicitWaiters.get(tabId)?.resolve({ ok: false, error: 'Replaced by a newer request.' });
+    explicitWaiters.set(tabId, { token, resolve });
+    setTimeout(() => {
+      if (explicitWaiters.get(tabId)?.token !== token) return;
+      explicitWaiters.delete(tabId);
+      resolve({ ok: false, error: 'No conversation was found on this tab. Open the chat itself, wait for the reply to finish, then try again.' });
+    }, 10_000);
+  });
+  const ask = () => chrome.tabs.sendMessage(tabId, { type: 'TK_CAPTURE_NOW', explicitToken: token });
+  try {
+    await ask();
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: [CONTENT_SCRIPT_FILE] });
+      await ask();
+    } catch {
+      explicitWaiters.delete(tabId);
+      return { ok: false, error: `Threadkeeper could not read this ${page.label} tab. Reload the tab and try again.` };
+    }
+  }
+  return result;
+}
+
+function settleExplicitWaiter(tabId: number | undefined, token: unknown, result: CaptureTabResult): void {
+  if (typeof tabId !== 'number' || typeof token !== 'string') return;
+  const waiter = explicitWaiters.get(tabId);
+  if (!waiter || waiter.token !== token) return;
+  explicitWaiters.delete(tabId);
+  waiter.resolve(result);
+}
 type HandshakeEntry = { token: string; redeemed: boolean };
 const tabHandshakeTokens = new Map<number, HandshakeEntry>();
 const SESSION_HANDSHAKE_KEY = 'tk_tab_handshakes';
@@ -330,6 +467,7 @@ async function deleteTabHandshake(tabId: number): Promise<void> {
 if (typeof chrome !== 'undefined' && chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener((tabId) => {
     void deleteTabHandshake(tabId);
+    explicitGrants.delete(tabId);
   });
 }
 
@@ -358,6 +496,8 @@ export async function invokeOverlayOnTab(
   if (canInjectOverlay && tabId !== undefined) {
     const handshakeToken = generateHandshakeToken();
     await setTabHandshake(tabId, { token: handshakeToken, redeemed: false });
+    // Opening Threadkeeper on a page counts as asking for it (except where capture is explicit-only).
+    grantExplicitCapture(tabId, 'overlay', handshakeToken);
     try {
       const resp = (await chrome.tabs.sendMessage(tabId, {
         type: 'TOGGLE_THREADKEEPER_OVERLAY',
@@ -455,7 +595,15 @@ async function initializeBackground(): Promise<void> {
   // Still link: catch up with anything changed while the browser was closed (no-op when unpaired;
   // skipped when the last full pass is under 10 minutes old), then push what is due.
   await dock.reconcile(false).catch((err) => console.warn('[threadkeeper] Still reconcile failed', err));
+  await reconcileCaptureSites(settings);
   dock.kickDrain();
+}
+
+// Host access granted or withdrawn (in Settings, or on the browser's extension page): keep the
+// runtime content scripts in line.
+if (typeof chrome !== 'undefined' && chrome.permissions?.onAdded) {
+  chrome.permissions.onAdded.addListener(() => void reconcileCaptureSites());
+  chrome.permissions.onRemoved.addListener(() => void reconcileCaptureSites());
 }
 
 // A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
@@ -546,27 +694,49 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
 
+      if (message.type === 'GET_CAPTURE_SITE') {
+        // The content script on a page no provider owns asks whether the user added this site.
+        const pageUrl = captureSenderUrl(sender);
+        const site = pageUrl ? matchCustomSite(await readCustomSites(chrome.storage?.local), pageUrl) : null;
+        sendResponse(site ? { ok: true, site: { origin: site.origin } } : { ok: false });
+        return;
+      }
+
       if (message.type === 'PASSIVE_DOM_CAPTURE') {
         const settings = await ensureStarterCollectionsAndSettings(db);
-        const rawProvider = message.payload?.provider;
-        if (!isProviderId(rawProvider) || rawProvider === 'imported') {
-          sendResponse({ ok: false, error: 'Unknown capture provider' });
-          return;
-        }
-        const provider: CaptureProviderId = rawProvider;
-        if (!settings.authorizedHosts[provider] && !message.explicitInvoke) {
-          sendResponse({
+        const tabId = sender.tab?.id;
+        const decision = decideCapture({
+          payload: message.payload,
+          explicitToken: message.explicitToken,
+          sender,
+          authorizedHosts: settings.authorizedHosts,
+          sites: await readCustomSites(chrome.storage?.local),
+          grant: typeof tabId === 'number' ? explicitGrants.get(tabId) : null,
+          now: Date.now(),
+        });
+        if (!decision.ok) {
+          if (decision.error) {
+            securityRejectionLog.push({ timestamp: new Date().toISOString(), reason: `Rejected capture: ${decision.error}` });
+          }
+          const label = isProviderId(message.payload?.provider) ? PROVIDERS[message.payload.provider as CaptureProviderId].label : 'this site';
+          settleExplicitWaiter(tabId, message.explicitToken, {
             ok: false,
-            skipped: 'provider_not_authorized',
+            error:
+              decision.error ??
+              (decision.skipped === 'provider_not_authorized'
+                ? `Capture is off for ${label}. Turn it on under AI products, then try again.`
+                : 'Threadkeeper did not save this tab.'),
           });
+          sendResponse(decision.error ? { ok: false, error: decision.error } : { ok: false, skipped: decision.skipped });
           return;
         }
+        const provider = decision.provider;
         const bound = settings.boundAccounts[provider];
         const threadKey = buildThreadKey({
           provider,
           accountId: bound.accountId,
           workspaceId: bound.workspaceId,
-          sourceConversationId: message.payload.sourceConversationId,
+          sourceConversationId: decision.sourceConversationId,
           branchId: message.payload.branchId,
         });
         // A content script may only claim the two passive sources; "full" is the site's own
@@ -574,6 +744,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         const passiveSource = message.payload.captureSource === 'network_observer' ? 'network_observer' : 'dom_observer';
         const result = await upsertThread(db, {
           ...message.payload,
+          sourceConversationId: decision.sourceConversationId,
+          canonicalUrl: decision.canonicalUrl,
           captureSource: passiveSource,
           coverage:
             passiveSource === 'network_observer' && message.payload.coverage === 'full'
@@ -592,6 +764,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           threadKey,
           coverage: result.record?.coverage,
         });
+        settleExplicitWaiter(tabId, message.explicitToken, {
+          ok: true,
+          status: result.status,
+          provider,
+          title: typeof message.payload.title === 'string' ? message.payload.title : undefined,
+          messages: Array.isArray(message.payload.messages) ? message.payload.messages.length : 0,
+        });
         if (result.status === 'stored') {
           // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
           await organizeStoredThread(threadKey, settings);
@@ -599,6 +778,19 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             syncOrchestrator.noteCapture(sender.tab.id, message.payload.sourceConversationId, message.payload.messages.length);
           }
         }
+        return;
+      }
+
+      if (message.type === 'CAPTURE_TAB_NOW') {
+        sendResponse(await captureTabNow(typeof message.tabId === 'number' ? message.tabId : undefined));
+        return;
+      }
+
+      if (message.type === 'CAPTURE_SITES_CHANGED') {
+        await reconcileCaptureSites();
+        const patterns = Array.isArray(message.patterns) ? message.patterns.filter((p: unknown): p is string => typeof p === 'string') : [];
+        await injectIntoOpenTabs(patterns);
+        sendResponse({ ok: true });
         return;
       }
 
@@ -630,6 +822,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         organizeCtxCache = null;
         await applyLaunchBehavior();
         await scheduleAnalysisAlarm();
+        await reconcileCaptureSites();
         // Excluded providers may have changed: take back what Still may no longer hold.
         await dock.syncNow({ privacy: true }).catch(() => undefined);
         sendResponse({ ok: true });

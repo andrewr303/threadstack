@@ -2,6 +2,7 @@ import { containsPromptInjectionAttempt } from '../../shared/cloud.js';
 import {
   CAPTURE_PROVIDER_IDS,
   PROVIDER_IDS,
+  PROVIDERS,
   isProviderId,
   type CaptureProviderId,
   type ProviderId,
@@ -786,6 +787,38 @@ const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
   copilot: 'acct_copilot_primary',
   kimi: 'acct_kimi_primary',
   imported: 'acct_imported_primary',
+  chatgpt_dots: 'acct_chatgpt_dots_primary',
+  claude_duet: 'acct_claude_duet_primary',
+  grok_bot: 'acct_grok_bot_primary',
+  muse: 'acct_muse_primary',
+  meta_ai: 'acct_meta_ai_primary',
+  poe: 'acct_poe_primary',
+  huggingchat: 'acct_huggingchat_primary',
+  qwen: 'acct_qwen_primary',
+  doubao: 'acct_doubao_primary',
+  zai: 'acct_zai_primary',
+  manus: 'acct_manus_primary',
+  genspark: 'acct_genspark_primary',
+  minimax_agent: 'acct_minimax_agent_primary',
+  character_ai: 'acct_character_ai_primary',
+  duck_ai: 'acct_duck_ai_primary',
+  lumo: 'acct_lumo_primary',
+  arena: 'acct_arena_primary',
+  t3_chat: 'acct_t3_chat_primary',
+  gemini_notebook: 'acct_gemini_notebook_primary',
+  github_copilot: 'acct_github_copilot_primary',
+  cursor_agents: 'acct_cursor_agents_primary',
+  devin: 'acct_devin_primary',
+  jules: 'acct_jules_primary',
+  lovable: 'acct_lovable_primary',
+  bolt: 'acct_bolt_primary',
+  v0: 'acct_v0_primary',
+  replit: 'acct_replit_primary',
+  lobechat: 'acct_lobechat_primary',
+  custom_web: 'acct_custom_web_primary',
+  open_webui: 'acct_open_webui_primary',
+  librechat: 'acct_librechat_primary',
+  anythingllm: 'acct_anythingllm_primary',
 };
 
 export const DEFAULT_AUTO_ORGANIZE: AutoOrganizeSettings = {
@@ -802,8 +835,10 @@ export const DEFAULT_AUTO_ORGANIZE: AutoOrganizeSettings = {
 export const DEFAULT_SETTINGS: SettingsRecord = {
   id: 'default',
   settingsVersion: 2,
+  // Providers on hosts Threadkeeper holds from install start on; the rest wait for the user to
+  // turn them on (and grant host access) in Settings → Capture. Grok Bot is explicit-only.
   authorizedHosts: Object.fromEntries(
-    CAPTURE_PROVIDER_IDS.map((id) => [id, true])
+    CAPTURE_PROVIDER_IDS.map((id) => [id, PROVIDERS[id].defaultEnabled])
   ) as Record<CaptureProviderId, boolean>,
   boundAccounts: Object.fromEntries(
     PROVIDER_IDS.map((id) => [
