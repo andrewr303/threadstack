@@ -134,8 +134,17 @@ async function loadManifestMatchPatterns() {
   if (siteData.length === 0) {
     throw new Error('Provider registry returned no ChatGPT / Claude match patterns');
   }
+  // Providers on hosts Threadkeeper does not hold from install (asked for at runtime, then their
+  // content script is registered with chrome.scripting.registerContentScripts).
+  const optionalCapture = registry.optionalCaptureMatchPatterns();
+  if (!Array.isArray(optionalCapture) || optionalCapture.some((p) => capture.includes(p))) {
+    throw new Error('A provider pattern is both required and optional');
+  }
   return {
     capture,
+    optionalCapture,
+    // Host permissions take origins (any path is ignored), so huggingface.co/chat* asks for huggingface.co.
+    optionalCaptureOrigins: registry.toOriginMatchPatterns(optionalCapture),
     siteData,
     grokX,
     domCapture: capture.filter((pattern) => !grokX.includes(pattern)),
@@ -249,7 +258,9 @@ async function build() {
     version_name: buildInfo.versionName,
     description:
       'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
-    permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel'],
+    // activeTab: lets Settings → Capture read the address of the tab the user invoked Threadkeeper
+    // on ("Add this site"); it adds no install warning.
+    permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel', 'activeTab'],
     host_permissions: [
       ...capturePatterns,
       'https://api.anthropic.com/*',
@@ -257,7 +268,9 @@ async function build() {
       'https://api.openai.com/*',
     ],
     // AWS hosts (per region), MongoDB Atlas model hosts (per geography) and Cohere are granted at
-    // runtime from Settings → Search & embeddings, never at install.
+    // runtime from Settings → Search & embeddings, never at install. Settings → Capture asks for
+    // one origin at a time: a provider the user turns on (patterns.optionalCaptureOrigins) or an AI site
+    // the user adds, which can be any https origin or a local / private-network http one.
     optional_host_permissions: [
       'https://*.api.aws/*',
       'https://*.amazonaws.com/*',
@@ -265,6 +278,9 @@ async function build() {
       'https://us.ai.mongodb.com/*',
       'https://eu.ai.mongodb.com/*',
       'https://api.cohere.com/*',
+      ...patterns.optionalCaptureOrigins,
+      'https://*/*',
+      'http://*/*',
     ],
     background: {
       service_worker: 'background.js',

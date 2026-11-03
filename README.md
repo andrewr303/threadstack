@@ -1,6 +1,6 @@
 # Threadkeeper — automatic organizer for all your AI threads
 
-Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok (on grok.com and inside X), Gemini, Google AI Studio, Perplexity, DeepSeek, Kimi, Le Chat and Microsoft Copilot**, works out what each one is about, and files it automatically, so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
+Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok (on grok.com and inside X), Gemini, Google AI Studio, Perplexity, DeepSeek, Kimi, Le Chat and Microsoft Copilot**, plus agents, coding agents, app builders and other chat sites you turn on (ChatGPT dots, Meta's Muse, Meta AI, Grok Bot, Poe, HuggingChat, Manus, GitHub Copilot, Cursor, Devin, Jules, Lovable, Bolt, v0, Replit and more — see [Supported AI products](#supported-ai-products)) and any self-hosted chat you add, works out what each one is about, and files it automatically, so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
 
 Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key or AWS account (Amazon Bedrock or Claude Platform on AWS).
 
@@ -12,6 +12,9 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
 - Open a conversation on any supported site and it lands in the library — no clicks. Capture is read-only, zero-footprint (no injected buttons, badges or layout changes) and never captures the composer or an in-progress streaming reply.
 - **Provider-native organization is kept:** ChatGPT Projects, Claude Projects, the GitHub repository of a Claude Code / Codex web session, and the model a ChatGPT reply used.
 - **Grok on X** (`x.com/i/grok`): X loads each Grok conversation as data, and Threadkeeper reads that response as the page receives it instead of scraping the page. A small script in X's page observes those requests without changing them. This needs host access to x.com and twitter.com; nothing outside Grok conversations is captured.
+- **Any AI product, opt-in:** besides the sites above (on from install), **Settings → Capture** lists agents, coding agents, app builders, companions and other chat sites by category. Turning one on asks the browser for access to that site only; nothing is read there before you do. **Any AI site** adds a site Threadkeeper does not list — your own Open WebUI, LibreChat, LobeChat or AnythingLLM (recognised by their pages), or anything else, where messages are found by their roles on the page. Removing a site removes its access too. Plain http is accepted only for this computer and private networks.
+- **Grok Bot through X Chat** (`x.com/i/chat`): X Chat also carries your private messages, so it is never read on its own. Open the chat with your Grok Bot and choose **Settings → Capture → Capture this tab** (Grok Bot must be turned on).
+- On pages without a reliable "still writing" signal (generic readers, added sites, some agents), a capture is sent only after two reads in a row see the same text.
 - Messages keep the site's own ids where it exposes them, so long conversations that the site renders in pieces are not stored twice, and replies still streaming or showing "thinking" are skipped.
 - **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`, or pick `~/.codex` to include `archived_sessions` too). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
   - Codex rollouts older than a week (`.jsonl.zst`) are decompressed on your device.
@@ -158,13 +161,70 @@ Set `CHROME_EXECUTABLE_PATH` to use a specific Chromium build for the browser su
 
 ---
 
+## Supported AI products
+
+Generated from `src/core/providers.ts`. **Host access**: *install* = access held since install, capture on by default (Grok Bot excepted); *on request* = asked for when you turn the product on in Settings → Capture; *your sites* = sites you add under Any AI site. **Selectors**: how sure we are the page reader matches the live site. Every adapter added with the opt-in products is tested only against synthetic fixtures modelled on public exporters and the sites' own code; none was checked against a signed-in page.
+
+| Product | Category | Pages | Host access | Selectors |
+|---|---|---|---|---|
+| ChatGPT (`chatgpt`) | Chat | chatgpt.com, chat.openai.com | install | high |
+| Claude (`claude`) | Chat | claude.ai | install | high |
+| Claude Code (`claude_code`) | Coding agent | claude.ai | install | high |
+| Codex (`codex`) | Coding agent | chatgpt.com | install | high |
+| Grok (`grok`) | Chat | grok.com | install | medium |
+| Grok on X (`grok_x`) | Chat | x.com, twitter.com | install | high |
+| Gemini (`gemini`) | Chat | gemini.google.com | install | medium |
+| Google AI Studio (`ai_studio`) | Chat | aistudio.google.com | install | medium |
+| Perplexity (`perplexity`) | Search | www.perplexity.ai, perplexity.ai | install | medium |
+| DeepSeek (`deepseek`) | Chat | chat.deepseek.com | install | medium |
+| Le Chat (`mistral`) | Chat | chat.mistral.ai | install | low |
+| Copilot (`copilot`) | Chat | copilot.microsoft.com, copilot.com, www.copilot.com | install | medium |
+| Kimi (`kimi`) | Chat | www.kimi.com, kimi.com, kimi.ai, www.kimi.ai | install (+ on request for www.kimi.ai) | medium |
+| ChatGPT dots (`chatgpt_dots`) | Agent | chatgpt.com | install | medium |
+| Claude Duet (`claude_duet`) | Agent | claude.ai | install | low |
+| Grok Bot (`grok_bot`) | Agent | x.com, twitter.com | install, only via Capture this tab | low |
+| Muse (`muse`) | Agent | muse.ai, www.muse.ai | on request | low |
+| Meta AI (`meta_ai`) | Chat | www.meta.ai, meta.ai | on request | medium |
+| Poe (`poe`) | Chat | poe.com | on request | low |
+| HuggingChat (`huggingchat`) | Chat | huggingface.co/chat | on request | high |
+| Qwen Chat (`qwen`) | Chat | chat.qwen.ai | on request | high |
+| Doubao (`doubao`) | Chat | www.doubao.com | on request | high |
+| Z.ai (`zai`) | Chat | chat.z.ai, zchat.z.ai | on request | high |
+| Manus (`manus`) | Agent | manus.im, www.manus.im | on request | medium |
+| Genspark (`genspark`) | Agent | www.genspark.ai, genspark.ai | on request | high |
+| MiniMax Agent (`minimax_agent`) | Agent | agent.minimax.io, agent.minimaxi.com | on request | low |
+| Character.AI (`character_ai`) | Companion | character.ai | on request | medium |
+| Duck.ai (`duck_ai`) | Chat | duck.ai | on request | high |
+| Lumo (`lumo`) | Chat | lumo.proton.me | on request | medium |
+| Arena (`arena`) | Chat | arena.ai, lmarena.ai | on request | low |
+| T3 Chat (`t3_chat`) | Chat | t3.chat | on request | low |
+| Gemini Notebook (`gemini_notebook`) | Chat | notebook.google.com, notebooklm.google.com | on request | medium |
+| GitHub Copilot (`github_copilot`) | Coding agent | github.com | on request | low |
+| Cursor agents (`cursor_agents`) | Coding agent | cursor.com, www.cursor.com | on request | low |
+| Devin (`devin`) | Coding agent | app.devin.ai | on request | low |
+| Jules (`jules`) | Coding agent | jules.google.com | on request | low |
+| Lovable (`lovable`) | App builder | lovable.dev | on request | medium |
+| Bolt (`bolt`) | App builder | bolt.new | on request | low |
+| v0 (`v0`) | App builder | v0.app, v0.dev | on request | low |
+| Replit Agent (`replit`) | App builder | replit.com | on request | low |
+| LobeChat (`lobechat`) | Chat | app.lobehub.com | on request | low |
+| Other AI sites (`custom_web`) | Chat | sites you add | your sites | low |
+| Open WebUI (`open_webui`) | Chat | sites you add | your sites | medium |
+| LibreChat (`librechat`) | Chat | sites you add | your sites | medium |
+| AnythingLLM (`anythingllm`) | Chat | sites you add | your sites | low |
+
+
+Reading is DOM-first everywhere except ChatGPT, Claude and Grok on X (which also read the conversation data the page loads). Catch up, network readers and history import for the newer products are not built yet; their threads arrive as you open them.
+
 ## Repository structure
 
 ```text
 src/
   core/
-    providers.ts         Provider registry (hosts, URL ids, labels) — the manifest is derived from it
-    dom-capture.ts       Per-provider DOM adapters + generic fallback, structure-aware text extraction
+    providers.ts         Provider registry (category, hosts, host access, URL ids, labels) — the manifest is derived from it
+    dom-capture.ts       Per-provider DOM adapters, self-hosted app detection, generic fallback, structure-aware text extraction
+    custom-sites.ts      Sites added under Any AI site + runtime content-script registration for opt-in providers
+    capture-gate.ts      The service worker's accept/reject decision for every capture (sender page, provider, explicit token)
     cli-sessions.ts      Claude Code and Codex CLI JSONL parsers
     importers.ts         Format detection, zip/JSON/JSONL import, folder sync
     site-api.ts          Parsers for the conversation JSON ChatGPT and Claude load (active branch, hidden turns, citations)

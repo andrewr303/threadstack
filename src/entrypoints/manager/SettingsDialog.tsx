@@ -18,6 +18,7 @@ import { UNFILED_PROJECT } from '../../core/db.js';
 import { sharedDb } from './shared.js';
 import { CAPABILITY_MATRIX } from '../../core/adapters.js';
 import { CAPTURE_PROVIDER_IDS, PROVIDERS } from '../../core/providers.js';
+import { CaptureSettings } from './CaptureSettings.js';
 import { MODEL_OPTIONS, estimateAnalysisCostUsd, testClaudeConnection } from '../../core/ai/claude.js';
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
 import {
@@ -265,8 +266,9 @@ function sectionStatus(
 ): { text: string; tone?: 'danger' } | null {
   switch (id) {
     case 'capture': {
-      const on = CAPTURE_PROVIDER_IDS.filter((p) => settings.authorizedHosts[p]).length;
-      return { text: `${on} of ${CAPTURE_PROVIDER_IDS.length}` };
+      const listed = CAPTURE_PROVIDER_IDS.filter((p) => PROVIDERS[p].hostAccess !== 'custom');
+      const on = listed.filter((p) => settings.authorizedHosts[p]).length;
+      return { text: `${on} of ${listed.length}` };
     }
     case 'ai':
       return aiCredentialsReady(settings)
@@ -499,27 +501,7 @@ export function SettingsDialog({
       </>
     ),
 
-    capture: (
-      <Section
-        title="Sites captured automatically"
-        note="Conversations you open on these sites are captured as you read them and stay in this browser. Turning a site off stops new captures; threads already saved stay in the library."
-      >
-        <div className="tk-capture-grid">
-          {CAPTURE_PROVIDER_IDS.map((id) => (
-            <Toggle
-              key={id}
-              checked={settings.authorizedHosts[id]}
-              onChange={(v) => void onPatch({ authorizedHosts: { ...settings.authorizedHosts, [id]: v } })}
-              label={PROVIDERS[id].label}
-              hint={PROVIDERS[id].captureNote}
-            />
-          ))}
-        </div>
-        <p className="tk-settings-note">
-          Claude Code and Codex sessions on your computer, and ChatGPT or Claude data exports, come in through Import / Export.
-        </p>
-      </Section>
-    ),
+    capture: <CaptureSettings settings={settings} onPatch={onPatch} />,
 
     ai: (
       <>
