@@ -66,7 +66,7 @@ function analysisFor(body) {
         : isTrip
           ? 'Day-by-day Lisbon plan: Alfama + fado, Belém pastries, LX Factory.'
           : 'Drafted landing-page hero headlines for HypeStake aimed at sportsbook operators.',
-    summary: 'Produced by the mocked Claude endpoint used in this end-to-end check.',
+    overview: ['Produced by the mocked Claude endpoint used in this end-to-end check.'],
     userGoal: isPayments ? 'Stop double charges from webhook retries' : null,
     outcome: null,
     kind: isPayments || isK8s ? 'debugging' : isTrip ? 'personal' : 'writing',
@@ -81,15 +81,17 @@ function analysisFor(body) {
           : { name: 'HypeStake', isNew: false, confidence: 0.95, reason: 'HypeStake marketing' },
     status: isPayments ? 'needs_review' : 'active',
     statusReason: isPayments ? 'Claude offered to draft the migration' : 'In progress',
+    keyPoints: [],
     whereYouLeftOff: {
-      text: isPayments ? 'Decide whether Claude should draft the processed_events migration, then write the replay test.' : 'Continue from the latest answer.',
+      text: isPayments ? 'The processed_events table was chosen; the migration is not drafted yet.' : 'The latest answer was given.',
+      nextStep: isPayments ? 'Decide whether Claude should draft the processed_events migration, then write the replay test.' : null,
       messageNumber: 2,
       quote: isPayments ? 'Store each processed event id' : 'placeholder quote text',
     },
-    decisions: isPayments ? [{ text: 'Use a processed_events table to dedupe events', messageNumber: 3, quote: "Let's go with the processed_events table", by: 'user' }] : [],
-    actionItems: isPayments ? [{ text: 'Write a replay test for duplicate events', messageNumber: 3, quote: "I'll write the replay test tomorrow", by: 'user' }] : [],
-    openQuestions: isPayments ? [{ text: 'Should Claude draft the migration?', messageNumber: 4, quote: 'Would you like me to draft the migration', by: 'assistant' }] : [],
-    artifacts: isPayments ? [{ label: 'webhooks.ts', kind: 'code', messageNumber: 2 }] : [],
+    decisions: isPayments ? [{ text: 'Use a processed_events table to dedupe events', messageNumber: 3, quote: "Let's go with the processed_events table", by: 'user', rationale: null }] : [],
+    actionItems: isPayments ? [{ text: 'Write a replay test for duplicate events', messageNumber: 3, quote: "I'll write the replay test tomorrow", by: 'user', rationale: null }] : [],
+    openQuestions: isPayments ? [{ text: 'Should Claude draft the migration?', messageNumber: 4, quote: 'Would you like me to draft the migration', by: 'assistant', rationale: null }] : [],
+    produced: isPayments ? [{ label: 'webhooks.ts', kind: 'code', description: 'Stripe webhook handler', messageNumber: 2 }] : [],
   };
 }
 

@@ -575,6 +575,18 @@ body,
   margin: 0;
 }
 
+.tk-focal-next-step {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.tk-focal-next-label {
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* Signature: The Evidence Margin */
 .tk-claim-row {
   display: grid;
@@ -593,6 +605,26 @@ body,
   font-size: 14px;
   color: var(--ink);
   line-height: 1.45;
+}
+
+/* Claims render as a list (decisions, key points, action items, open questions). */
+.tk-claim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Each row sits alone in its <li>, so restore the divider that .tk-claim-row:last-child removes. */
+.tk-claim-list > li > .tk-claim-row {
+  border-bottom: 1px solid var(--rule);
+}
+
+.tk-claim-list > li:last-child > .tk-claim-row {
+  border-bottom: 0;
+}
+
+.tk-claim-rationale {
+  color: var(--ink-2);
 }
 
 .tk-evidence-marker {
@@ -905,6 +937,14 @@ body,
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  /* Also used as a <ul> (overview topics): no bullets or indent. */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tk-chip-row > li {
+  display: inline-flex;
 }
 
 .tk-chip {
@@ -1113,8 +1153,63 @@ body,
 .tk-overview-summary {
   margin: 0;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--ink-2);
+  max-width: 72ch;
+}
+
+.tk-overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tk-overview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tk-overview-h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tk-produced-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tk-produced-item {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.tk-produced-item .tk-artifact {
+  margin: 0;
+}
+
+.tk-produced-desc {
+  color: var(--ink-2);
+}
+
+/* A small "m3" message reference after a line of text; copies as "(m3)". */
+.tk-ref {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 
 .tk-overview-dl {
@@ -1382,6 +1477,22 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-folder-list code {
   font-family: var(--font-mono);
   font-size: 11px;
+}
+
+/* Inline confirmation step (e.g. "Upgrade older summaries"). */
+.tk-settings-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper-2);
+}
+
+.tk-settings-confirm .tk-settings-note {
+  margin: 0;
 }
 
 .tk-settings-result {

@@ -16,8 +16,11 @@ type Call = { url: string; headers: Record<string, string>; body: any };
 
 const ANALYSIS = {
   title: 'Idempotent Stripe webhook handler',
-  gist: 'Chose a processed_events table to dedupe retries.',
-  summary: 'Summary.',
+  gist: 'Stripe webhook retries deduped with a processed_events table; replay test pending.',
+  overview: [
+    'Customers were charged twice because Stripe retries the same webhook event.',
+    'The handler now records processed event ids and skips repeats.',
+  ],
   userGoal: null,
   outcome: null,
   kind: 'debugging',
@@ -25,12 +28,13 @@ const ANALYSIS = {
   entities: [],
   project: null,
   status: 'active',
-  statusReason: 'In progress',
-  whereYouLeftOff: { text: 'Write the replay test.', messageNumber: 1, quote: 'charged twice' },
+  statusReason: 'Replay test still unwritten',
+  keyPoints: [],
+  whereYouLeftOff: { text: 'The dedupe table was agreed.', nextStep: 'Write the replay test.', messageNumber: 1, quote: 'charged twice' },
   decisions: [],
   actionItems: [],
   openQuestions: [],
-  artifacts: [],
+  produced: [],
 };
 
 function messagesFetch(calls: Call[], respond?: (call: Call) => Response | null) {

@@ -205,6 +205,8 @@ export interface ExtractedItem {
   evidenceQuote: string;
   provenance?: 'explicit' | 'inferred';
   speaker: 'user_committed' | 'assistant_suggested';
+  /** Why (decisions from analysis v2 only); null or absent otherwise. Not part of the grounding check. */
+  rationale?: string | null;
 }
 
 export interface ExtensionSummaryOutput {
@@ -221,6 +223,13 @@ export interface ExtensionSummaryOutput {
   suggestedProject: string | null;
   suggestedTags: string[];
   confidence: number;
+  /**
+   * Analysis v2: substantive facts or conclusions from the content, each grounded in a quote like
+   * decisions. Absent on older records (read as `?? []`).
+   */
+  keyPoints?: ExtractedItem[];
+  /** Analysis v2: the single next action for the user (imperative), or null. Absent on older records. */
+  nextStep?: string | null;
 }
 
 export interface StructuredSummaryRecord extends ExtensionSummaryOutput {
@@ -262,7 +271,8 @@ export function verifyExtensionSummaryEvidence(
 
   if (
     containsPromptInjectionAttempt(summary.whereYouLeftOff) ||
-    containsPromptInjectionAttempt(summary.currentStatus)
+    containsPromptInjectionAttempt(summary.currentStatus) ||
+    (typeof summary.nextStep === 'string' && containsPromptInjectionAttempt(summary.nextStep))
   ) {
     errors.push('Summary text contains untrusted prompt injection directive.');
   }
@@ -273,7 +283,10 @@ export function verifyExtensionSummaryEvidence(
         errors.push(`${section} item "${item.text}" has no messageIndexes.`);
         continue;
       }
-      if (containsPromptInjectionAttempt(item.text)) {
+      if (
+        containsPromptInjectionAttempt(item.text) ||
+        (typeof item.rationale === 'string' && containsPromptInjectionAttempt(item.rationale))
+      ) {
         errors.push(`${section} item "${item.text}" contains prompt injection directive.`);
       }
       let quoteMatched = false;
@@ -306,6 +319,7 @@ export function verifyExtensionSummaryEvidence(
   checkItems(summary.openQuestions, 'openQuestion');
   checkItems(summary.actionItems, 'actionItem');
   checkItems(summary.constraints, 'constraint');
+  checkItems(summary.keyPoints ?? [], 'keyPoint');
 
   return {
     valid: errors.length === 0,
@@ -369,6 +383,12 @@ export interface JobRecord {
   notBefore?: string;
   /** Lease expiry for a claimed job so the service worker and manager never double-process. */
   leaseUntil?: string | null;
+  /**
+   * analyze_thread only: the user explicitly asked for this analysis ("Upgrade older summaries", Still's
+   * threads.analyze). It runs even when automatic analysis is off, and re-analyzes an AI insight that
+   * matches the current revision when it was written by an older analysis format.
+   */
+  requested?: boolean;
 }
 
 export const THREAD_KINDS = [
@@ -405,6 +425,19 @@ export const THREAD_KIND_LABELS: Record<ThreadKind, string> = {
 
 export type ArtifactKind = 'code' | 'document' | 'design' | 'data' | 'link' | 'other';
 
+/** Current AI analysis format. 1 (or absent) = gist + one-paragraph summary; 2 = overview, key points, produced, next step. */
+export const ANALYSIS_VERSION = 2;
+
+/** Something the thread produced (analysis v2): a file, document, design, dataset or link, with its state. */
+export interface ProducedItem {
+  label: string;
+  kind: ArtifactKind;
+  /** One line: what it is and its state ('' when unknown). */
+  description: string;
+  /** 0-based message ordinal where it appears, or null. */
+  messageIndex: number | null;
+}
+
 /**
  * What a thread is about, beyond its title. `local` insights are computed
  * instantly on-device; `ai` insights come from Claude and win when current.
@@ -438,6 +471,15 @@ export interface ThreadInsight {
   } | null;
   userTurns: number;
   hasCode: boolean;
+  /**
+   * In-depth narrative, one string per paragraph (AI v2: 2-4; on-device: 1). Absent on older
+   * records: fall back to `summary`. `summary` always holds the paragraphs joined for legacy readers.
+   */
+  overview?: string[];
+  /** What the thread produced, with descriptions (AI v2). `artifacts` mirrors it for older readers. */
+  produced?: ProducedItem[];
+  /** AI insights: the analysis format that wrote this record (absent = 1). See ANALYSIS_VERSION. */
+  analysisVersion?: number;
 }
 
 export function insightKeyFor(source: ThreadInsight['source'], threadKey: string): string {
