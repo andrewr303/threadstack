@@ -105,19 +105,45 @@ export async function requestHostAccess(origins: string[]): Promise<boolean> {
   }
 }
 
-function headersWithout(init: RequestInit | undefined, drop: string[]): Headers {
-  const headers = new Headers(init?.headers ?? {});
-  for (const name of drop) headers.delete(name);
-  return headers;
+interface NormalizedRequest {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: string | ArrayBuffer | undefined;
+  signal: AbortSignal | undefined;
 }
 
-async function bodyForSigning(body: RequestInit['body']): Promise<string | ArrayBuffer | undefined> {
+async function bodyBytes(body: RequestInit['body']): Promise<string | ArrayBuffer | undefined> {
   if (body == null) return undefined;
   if (typeof body === 'string' || body instanceof ArrayBuffer) return body;
   if (ArrayBuffer.isView(body)) {
     return body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer;
   }
   return new Response(body as BodyInit).arrayBuffer();
+}
+
+/**
+ * Fetch callers pass either (url, init) or a Request (the Anthropic SDK does
+ * the latter when middleware is attached). Fold both into one shape, with
+ * init taking precedence as fetch() itself does.
+ */
+async function normalizeRequest(input: RequestInfo | URL, init: RequestInit | undefined, drop: string[]): Promise<NormalizedRequest> {
+  const isRequest = typeof Request !== 'undefined' && input instanceof Request;
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+  const headers = new Headers(isRequest ? (input as Request).headers : undefined);
+  new Headers(init?.headers ?? {}).forEach((value, name) => headers.set(name, value));
+  for (const name of drop) headers.delete(name);
+  let body = await bodyBytes(init?.body);
+  if (body === undefined && isRequest && (input as Request).body != null) {
+    body = await (input as Request).clone().arrayBuffer();
+  }
+  return {
+    url,
+    method: init?.method ?? (isRequest ? (input as Request).method : 'GET'),
+    headers,
+    body,
+    signal: init?.signal ?? (isRequest ? (input as Request).signal : undefined) ?? undefined,
+  };
 }
 
 export interface AwsFetchOptions {
@@ -141,11 +167,11 @@ export function createAwsFetch(aws: AwsSettings, options: AwsFetchOptions): type
 
   if (aws.auth === 'api_key') {
     const key = aws.bedrockApiKey.trim();
-    return (input, init) => {
-      const headers = headersWithout(init, strip);
-      if (options.bearerHeader === 'x-api-key') headers.set('x-api-key', key);
-      else headers.set('authorization', `Bearer ${key}`);
-      return baseFetch(input, { ...init, headers });
+    return async (input, init) => {
+      const req = await normalizeRequest(input, init, strip);
+      if (options.bearerHeader === 'x-api-key') req.headers.set('x-api-key', key);
+      else req.headers.set('authorization', `Bearer ${key}`);
+      return baseFetch(req.url, { method: req.method, headers: req.headers, body: req.body, signal: req.signal });
     };
   }
 
@@ -158,21 +184,19 @@ export function createAwsFetch(aws: AwsSettings, options: AwsFetchOptions): type
     retries: 0,
   });
   return async (input, init) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    const headers = headersWithout(init, [...strip, 'authorization', 'x-api-key']);
-    const body = await bodyForSigning(init?.body);
+    const req = await normalizeRequest(input, init, [...strip, 'authorization', 'x-api-key']);
     const datetime = options.now ? options.now().toISOString().replace(/[:-]|\.\d{3}/g, '') : undefined;
-    const signed = await client.sign(url, {
-      method: init?.method ?? 'GET',
-      headers,
-      body,
+    const signed = await client.sign(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
       ...(datetime ? { aws: { datetime } } : {}),
     });
     return baseFetch(signed.url, {
       method: signed.method,
       headers: signed.headers,
-      body,
-      signal: init?.signal ?? undefined,
+      body: req.body,
+      signal: req.signal,
     });
   };
 }

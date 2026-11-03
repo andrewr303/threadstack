@@ -15,7 +15,7 @@ interface OverviewProps {
 }
 
 function modelLabel(model: string): string {
-  return MODEL_OPTIONS.find((m) => model.startsWith(m.id))?.label ?? model;
+  return MODEL_OPTIONS.find((m) => model.replace(/^anthropic\./, '').startsWith(m.id))?.label ?? model;
 }
 
 /** "What is this thread?" — the summary layer above the evidence margin. */

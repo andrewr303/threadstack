@@ -316,7 +316,11 @@ export function App() {
     setSettings(updated);
     const affectsBackground = [
       'launchSurface',
+      'aiBackend',
       'anthropicApiKey',
+      'aws',
+      'awsPlatformWorkspaceId',
+      'awsPlatformApiKey',
       'aiModel',
       'autoOrganize',
       'embeddingProvider',
@@ -324,6 +328,8 @@ export function App() {
       'openaiApiKey',
       'ollamaUrl',
       'ollamaEmbeddingModel',
+      'bedrockEmbeddingModel',
+      'bedrockEmbeddingDimensions',
       'authorizedHosts',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
