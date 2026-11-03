@@ -42,6 +42,14 @@ import { requestThreadEnrichment } from '../../core/cloud-client.js';
 import { PROVIDER_IDS, detectProviderFromUrl, extractConversationIdFromUrl, providerLabel } from '../../core/providers.js';
 import { getSmartTitle, resolveInsight } from '../../core/insights.js';
 import { LOCAL_SPACE, cosine, localHashEmbedding, primarySpace } from '../../core/embeddings.js';
+import {
+  applyRerankOrder,
+  bestMatchingExcerpt,
+  buildRerankDocument,
+  remoteRerankAllowedKeys,
+  rerankReady,
+  rerankThreads,
+} from '../../core/rerank.js';
 import { hasClaudeKey } from '../../core/ai/claude.js';
 import {
   analyzeThreadRemotely,
@@ -422,7 +430,8 @@ export function App() {
     [providerFilter, activeArea, stateFilter, coverageFilter]
   );
 
-  const searchResults = useMemo(() => {
+  // First stage: runs on every keystroke, so it stays local (no network).
+  const firstStageResults = useMemo(() => {
     const lexical = searchIndex.searchLocal(searchQuery, scope, 5000);
     const q = searchQuery.trim();
     if (!q || q.length < 3 || vectorRows.length === 0) return lexical;
@@ -459,6 +468,28 @@ export function App() {
     });
     return { ...lexical, hits: Array.from(fused.values()).sort((a, b) => b.score - a.score) };
   }, [searchIndex, searchQuery, scope, vectorsByThread, vectorRows.length, insightsByThread]);
+
+  // Second stage: the reranked order from the last explicit submit, applied
+  // only while the query and filters are unchanged.
+  const searchKey = useMemo(() => JSON.stringify([searchQuery.trim(), scope]), [searchQuery, scope]);
+  const [rerankRun, setRerankRun] = useState<{
+    key: string;
+    order: string[];
+    scores: Map<string, number>;
+    note: string;
+  } | null>(null);
+  const rerankAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => rerankAbortRef.current?.abort(), [searchKey]);
+
+  const searchResults = useMemo(() => {
+    if (!rerankRun || rerankRun.key !== searchKey || rerankRun.order.length === 0) return firstStageResults;
+    const hits = applyRerankOrder(firstStageResults.hits, (h) => h.conversation.threadKey, rerankRun.order).map((h) => {
+      const s = rerankRun.scores.get(h.conversation.threadKey);
+      return s === undefined ? h : { ...h, rerankScore: s };
+    });
+    return { ...firstStageResults, hits };
+  }, [firstStageResults, rerankRun, searchKey]);
+  const rerankNote = rerankRun && rerankRun.key === searchKey ? rerankRun.note : null;
 
   const queueItemsMap = useMemo(() => {
     if (activeQueue === 'all') return null;
@@ -683,6 +714,51 @@ export function App() {
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
     void persistSettingPatch({ lastSearchQuery: val });
+  };
+
+  /** Explicit submit (Enter): rerank the top first-stage results. Never runs per keystroke. */
+  const handleSearchSubmit = async () => {
+    const q = searchQuery.trim();
+    if (!settings || !settings.rerankInSearch || !rerankReady(settings) || q.length < 2) return;
+    const key = searchKey;
+    const pool = firstStageResults.hits.slice(0, Math.max(2, Math.min(100, settings.rerankCandidates || 40)));
+    if (pool.length < 2) return;
+    rerankAbortRef.current?.abort();
+    const controller = new AbortController();
+    rerankAbortRef.current = controller;
+    try {
+      const keys = pool.map((h) => h.conversation.threadKey);
+      const allowed = await remoteRerankAllowedKeys(sharedDb, settings, keys);
+      const outcome = await rerankThreads(
+        settings,
+        q,
+        pool.map((h) => {
+          const insight = insightsByThread.get(h.conversation.threadKey) ?? null;
+          return {
+            key: h.conversation.threadKey,
+            document: buildRerankDocument({
+              title: getSmartTitle(h.conversation, insight),
+              gist: insight?.gist,
+              excerpt: bestMatchingExcerpt(messagesByThread.get(h.conversation.threadKey) ?? [], q) || h.supportingExcerpt,
+            }),
+          };
+        }),
+        allowed,
+        fetch,
+        { signal: controller.signal }
+      );
+      if (controller.signal.aborted) return;
+      const note =
+        outcome.scores.size === 0
+          ? 'Not reranked: the top results are local-only.'
+          : `Reranked with ${outcome.label}${outcome.withheld ? ` (${outcome.withheld} local-only kept in place)` : ''}`;
+      setRerankRun({ key, order: outcome.order, scores: outcome.scores, note });
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      // Non-blocking: keep the first-stage order and say why.
+      const reason = err instanceof Error ? err.message : String(err);
+      setRerankRun({ key, order: [], scores: new Map(), note: `Showing first-stage order; reranking failed: ${reason}` });
+    }
   };
 
   const handleAreaSelect = (area: string) => {
@@ -1470,9 +1546,17 @@ export function App() {
                   placeholder="Search titles, summaries, topics, decisions, messages…"
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleSearchSubmit();
+                  }}
                 />
               )}
             </div>
+            {listMode === 'search' && rerankNote && (
+              <div className="tk-muted" role="status" style={{ fontSize: 12 }}>
+                {rerankNote}
+              </div>
+            )}
 
             {listMode === 'search' && (
               <div className="tk-filter-row">
