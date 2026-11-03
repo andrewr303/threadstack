@@ -31,3 +31,7 @@ worker/.dev.vars.*
 *.key
 *.p12
 *.pfx
+
+# Claude Code local state (settings.json is shared and committed)
+.claude/worktrees/
+.claude/settings.local.json
