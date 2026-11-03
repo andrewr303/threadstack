@@ -111,6 +111,9 @@ export class ThreadkeeperDB extends Dexie {
 
 export const UNFILED_PROJECT = 'Unfiled / Uncertain';
 
+/** Message ids DOM capture assigns when the page exposes no id of its own. */
+const POSITIONAL_MESSAGE_ID = /_m_\d+$/;
+
 export async function ensureStarterCollectionsAndSettings(
   db: ThreadkeeperDB
 ): Promise<SettingsRecord> {
@@ -324,8 +327,20 @@ export async function upsertThread(
         const bySourceId = new Map(
           input.messages.map((m) => [m.sourceMessageId, m])
         );
+        // Older captures used positional ids (<conv>_<branch>_m_<i>); newer ones key messages by the
+        // site's own id. Treat a positional message as the keyed one with the same role and text, so
+        // the first recapture after the switch does not store the message twice.
+        const keyedByText = new Map<string, string>();
+        for (const m of input.messages) {
+          if (!POSITIONAL_MESSAGE_ID.test(m.sourceMessageId)) {
+            keyedByText.set(`${m.role}\u0000${m.content.trim()}`, m.sourceMessageId);
+          }
+        }
         for (const prev of existingMessages) {
-          const updated = bySourceId.get(prev.sourceMessageId);
+          const keyedTwin = POSITIONAL_MESSAGE_ID.test(prev.sourceMessageId)
+            ? keyedByText.get(`${prev.role}\u0000${prev.content.trim()}`)
+            : undefined;
+          const updated = bySourceId.get(keyedTwin ?? prev.sourceMessageId);
           if (updated) {
             mergedMessagePayloads.push({
               sourceMessageId: updated.sourceMessageId,
@@ -334,7 +349,7 @@ export async function upsertThread(
               createdAt: updated.createdAt ?? prev.createdAt,
               branchPath: updated.branchPath ?? prev.branchPath,
             });
-            bySourceId.delete(prev.sourceMessageId);
+            bySourceId.delete(updated.sourceMessageId);
           } else {
             mergedMessagePayloads.push({
               sourceMessageId: prev.sourceMessageId,
