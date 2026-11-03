@@ -6,8 +6,8 @@
 
 import {
   PROVIDERS,
+  isCaptureProviderId,
   isProviderAllowedOnUrl,
-  isProviderId,
   type CaptureProviderId,
 } from './providers.js';
 import { matchCustomSite, siteConversationKey, type CustomSite, type CustomSitesState } from './custom-sites.js';
@@ -49,7 +49,7 @@ export function decideCapture(input: {
   const pageUrl = captureSenderUrl(input.sender);
   if (!pageUrl) return { ok: false, error: 'Captures are accepted only from the top frame of a web page.' };
   const raw = input.payload?.provider;
-  if (!isProviderId(raw) || raw === 'imported') return { ok: false, error: 'Unknown capture provider' };
+  if (!isCaptureProviderId(raw)) return { ok: false, error: 'Unknown capture provider' };
   const provider: CaptureProviderId = raw;
   const conv = input.payload?.sourceConversationId;
   if (typeof conv !== 'string' || conv.length === 0 || conv.length > CONV_ID_MAX) {

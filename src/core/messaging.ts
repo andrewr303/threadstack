@@ -18,6 +18,7 @@ export type PrivilegedCommandType =
   | 'GET_HISTORY_SYNC_STATE'
   | 'CAPTURE_TAB_NOW'
   | 'CAPTURE_SITES_CHANGED'
+  | 'PAPERCLIP_SYNC_NOW'
   | DockCommandType;
 
 /** Sidebar Dock (Still) link: manager pages and the consent page (connect.html) only. */
@@ -118,6 +119,7 @@ const PRIVILEGED_TYPES = new Set<string>([
   'GET_HISTORY_SYNC_STATE',
   'CAPTURE_TAB_NOW',
   'CAPTURE_SITES_CHANGED',
+  'PAPERCLIP_SYNC_NOW',
   ...DOCK_COMMAND_TYPES,
 ]);
 

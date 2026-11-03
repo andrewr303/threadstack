@@ -53,6 +53,8 @@ import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/di
 import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
 import { SidebarDockPanel } from './SidebarDock.js';
 import { dockStatusSummary, dockSyncNow, type DockStateView } from './dock.js';
+import { PaperclipSettings, paperclipSectionStatus, usePaperclipSyncState } from './PaperclipSettings.js';
+import type { PaperclipSyncState } from '../../core/paperclip/sync.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -170,11 +172,22 @@ function ProjectRow({
   );
 }
 
-export type SectionId = 'general' | 'capture' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'sidebarDock' | 'diagnostics';
+export type SectionId =
+  | 'general'
+  | 'capture'
+  | 'paperclip'
+  | 'ai'
+  | 'aws'
+  | 'search'
+  | 'organize'
+  | 'privacy'
+  | 'sidebarDock'
+  | 'diagnostics';
 
 const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'capture', label: 'Capture' },
+  { id: 'paperclip', label: 'Paperclip' },
   { id: 'ai', label: 'AI models' },
   { id: 'aws', label: 'Amazon Web Services' },
   { id: 'search', label: 'Search & embeddings' },
@@ -283,9 +296,11 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
 function sectionStatus(
   id: SectionId,
   settings: SettingsRecord,
-  extra: { projectCount: number; reloadNeeded: boolean; dock?: DockStateView | null }
+  extra: { projectCount: number; reloadNeeded: boolean; dock?: DockStateView | null; paperclip?: PaperclipSyncState | null }
 ): { text: string; tone?: 'danger' } | null {
   switch (id) {
+    case 'paperclip':
+      return paperclipSectionStatus(settings.paperclip, extra.paperclip ?? null);
     case 'capture': {
       const listed = CAPTURE_PROVIDER_IDS.filter((p) => PROVIDERS[p].hostAccess !== 'custom');
       const on = listed.filter((p) => settings.authorizedHosts[p]).length;
@@ -476,6 +491,7 @@ export function SettingsDialog({
   const [candidatesDraft, setCandidatesDraft] = useState<string | null>(null);
   const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
   const diagnostics = useDiagnostics();
+  const paperclipState = usePaperclipSyncState();
 
   const patchAuto = (patch: Partial<AutoOrganizeSettings>) =>
     settings ? onPatch({ autoOrganize: { ...settings.autoOrganize, ...patch } }) : Promise.resolve();
@@ -621,6 +637,8 @@ export function SettingsDialog({
     ),
 
     capture: <CaptureSettings settings={settings} onPatch={onPatch} />,
+
+    paperclip: <PaperclipSettings settings={settings} onPatch={onPatch} />,
 
     ai: (
       <>
@@ -1474,7 +1492,12 @@ export function SettingsDialog({
         <nav className="tk-settings-nav" aria-label="Settings sections">
           <div className="tk-nav-list">
             {SECTION_LABELS.map((s) => {
-              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded, dock: dock ? dock.state : undefined });
+              const status = sectionStatus(s.id, settings, {
+                projectCount,
+                reloadNeeded,
+                dock: dock ? dock.state : undefined,
+                paperclip: paperclipState,
+              });
               return (
                 <button
                   key={s.id}

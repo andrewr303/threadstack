@@ -1228,6 +1228,8 @@ const ADAPTERS: Record<ProviderId, DomAdapter> = {
   open_webui: openWebUiSiteAdapter,
   librechat: libreChatAdapter,
   anythingllm: anythingLlmAdapter,
+  // Synced from the Paperclip API, never read from a page.
+  paperclip: noDom,
 };
 
 function CSS_ESCAPE(value: string): string {
@@ -1254,7 +1256,9 @@ function resolvePageProvider(
   }
   const providerAttr = doc.documentElement.getAttribute('data-tk-provider');
   const provider: ProviderId | null = isProviderId(providerAttr) ? providerAttr : detectProviderFromUrl(locationHref);
-  if (!provider || provider === 'imported' || provider === 'grok_x') return null;
+  // Imports and Paperclip (synced from its API) are never read from a page; Grok on X is read from
+  // X's own responses (grok-x.ts).
+  if (!provider || PROVIDERS[provider].hostAccess === 'none' || provider === 'grok_x') return null;
   // Custom-site providers are read only on sites the user added (the background says which).
   if (PROVIDERS[provider].hostAccess === 'custom') return null;
   if (PROVIDERS[provider].captureMode === 'explicit' && !options.explicit) return null;

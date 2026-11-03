@@ -22,6 +22,8 @@ export const PROVIDER_IDS = [
   'copilot',
   'kimi',
   'imported',
+  // Synced from the user's own Paperclip server (Settings → Paperclip), never captured from a page.
+  'paperclip',
   // Agents and chats on hosts Threadkeeper already reads (path-routed like claude_code).
   'chatgpt_dots',
   'claude_duet',
@@ -61,7 +63,10 @@ export const PROVIDER_IDS = [
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
-export type CaptureProviderId = Exclude<ProviderId, 'imported'>;
+/** Providers whose threads never come from a captured web page. */
+export const NON_CAPTURE_PROVIDER_IDS = ['imported', 'paperclip'] as const;
+
+export type CaptureProviderId = Exclude<ProviderId, (typeof NON_CAPTURE_PROVIDER_IDS)[number]>;
 
 /** What kind of product a provider is. Shared with Sidebar Dock (protocol `category`). */
 export const PROVIDER_CATEGORIES = ['chat', 'coding_agent', 'agent', 'builder', 'search', 'companion'] as const;
@@ -262,6 +267,20 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     selectorConfidence: 'medium',
     captureNote: 'Chats on kimi.com and kimi.ai.',
   }),
+  paperclip: {
+    id: 'paperclip',
+    label: 'Paperclip',
+    maker: 'Paperclip',
+    category: 'agent',
+    // Read from the user's own Paperclip server through its API (Settings → Paperclip), never captured.
+    matchPatterns: [],
+    hostAccess: 'none',
+    captureMode: 'passive',
+    defaultEnabled: false,
+    selectorConfidence: 'high',
+    reopen: 'web',
+    captureNote: 'Issues, comments and agent runs synced from your Paperclip server (Settings → Paperclip).',
+  },
   imported: {
     id: 'imported',
     label: 'Imported',
@@ -548,7 +567,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
 };
 
 export const CAPTURE_PROVIDER_IDS = PROVIDER_IDS.filter(
-  (id): id is CaptureProviderId => id !== 'imported'
+  (id): id is CaptureProviderId => !(NON_CAPTURE_PROVIDER_IDS as readonly string[]).includes(id)
 );
 
 /** Providers captured only on sites the user adds (the catch-all and recognised self-hosted apps). */
@@ -563,6 +582,11 @@ export function providerCategory(id: ProviderId | string): ProviderCategory {
 
 export function isProviderCategory(value: unknown): value is ProviderCategory {
   return typeof value === 'string' && (PROVIDER_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** True for a provider whose threads may arrive from a page capture. */
+export function isCaptureProviderId(value: unknown): value is CaptureProviderId {
+  return typeof value === 'string' && (CAPTURE_PROVIDER_IDS as readonly string[]).includes(value);
 }
 
 /**
@@ -916,6 +940,7 @@ function providerConversationId(provider: ProviderId, parsed: URL): string | nul
     case 'librechat':
     case 'anythingllm':
     case 'imported':
+    case 'paperclip':
       return null;
     default:
       return undefined;

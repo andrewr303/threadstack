@@ -320,6 +320,9 @@ async function build() {
       ...patterns.optionalCaptureOrigins,
       'https://*/*',
       'http://*/*',
+      // A Paperclip server on this computer (any port), granted from Settings → Paperclip.
+      'http://localhost/*',
+      'http://127.0.0.1/*',
     ],
     background: {
       service_worker: 'background.js',

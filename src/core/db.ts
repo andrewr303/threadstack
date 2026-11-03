@@ -222,6 +222,8 @@ export interface UpsertThreadInput {
   modelSlug?: string | null;
   resumeCommand?: string | null;
   projectSource?: ProjectSource;
+  agentLabel?: string | null;
+  linkedThreadKeys?: string[];
   messages: Array<{
     sourceMessageId: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
@@ -486,6 +488,10 @@ export async function upsertThread(
           existing?.workflowStateSource ??
           (input.workflowState && input.workflowState !== 'active' ? 'manual' : 'auto'),
       };
+      const agentLabel = input.agentLabel ?? existing?.agentLabel;
+      if (agentLabel) record.agentLabel = agentLabel;
+      const linkedThreadKeys = input.linkedThreadKeys ?? existing?.linkedThreadKeys;
+      if (linkedThreadKeys?.length) record.linkedThreadKeys = linkedThreadKeys;
 
       await db.conversations.put(record);
       if (contentChanged && !record.isSyntheticBenchmark) {

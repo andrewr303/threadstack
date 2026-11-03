@@ -162,7 +162,7 @@ export function decideProject(
     const label =
       conv.provider === 'claude_code' || conv.provider === 'codex'
         ? `repository "${conv.providerProjectName}"`
-        : `${conv.provider === 'chatgpt' ? 'ChatGPT' : 'Claude'} project "${conv.providerProjectName}"`;
+        : `${conv.provider === 'chatgpt' ? 'ChatGPT' : conv.provider === 'paperclip' ? 'Paperclip' : 'Claude'} project "${conv.providerProjectName}"`;
     if (match) {
       return { project: match.name, source: 'provider', confidence: 0.95, reason: `Matches ${label}` };
     }

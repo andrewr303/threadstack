@@ -69,6 +69,7 @@ import {
   sharedDb,
 } from './shared.js';
 import { SettingsDialog } from './SettingsDialog.js';
+import { PaperclipLinks } from './PaperclipLinks.js';
 import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.js';
 import { AskPanel } from './AskPanel.js';
 import { SemanticNeighbors, ThreadOverview, type RelatedThread } from './ThreadOverview.js';
@@ -377,6 +378,7 @@ export function App() {
       'authorizedHosts',
       'cloudExcludedProviders',
       'sidebarDock',
+      'paperclip',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
   }, [surface]);
@@ -1977,6 +1979,7 @@ export function App() {
                   <span>
                     {providerLabel(selectedConversation.provider)}
                     {selectedConversation.providerProjectName ? ` / ${selectedConversation.providerProjectName}` : ''}
+                    {selectedConversation.agentLabel ? ` · ${selectedConversation.agentLabel}` : ''}
                   </span>
                   <span>·</span>
                   <span title={`${selectedConversation.accountId} / ${selectedConversation.workspaceId}`}>
@@ -2013,6 +2016,8 @@ export function App() {
                   </div>
                 )}
 
+                <PaperclipLinks conv={selectedConversation} conversations={conversations} onSelect={handleSelectThread} />
+
                 <div className="tk-filter-row" style={{ marginTop: 6 }}>
                   <select
                     className="tk-select"
@@ -2047,7 +2052,8 @@ export function App() {
                     <option value="done">Done</option>
                     <option value="archived">Archived</option>
                   </select>
-                  {/^https:\/\//.test(selectedConversation.canonicalUrl) ? (
+                  {/^https:\/\//.test(selectedConversation.canonicalUrl) ||
+                  (selectedConversation.provider === 'paperclip' && /^http:\/\//.test(selectedConversation.canonicalUrl)) ? (
                     <button
                       type="button"
                       className="tk-btn"
