@@ -12,7 +12,7 @@ import { siteConversationTitle, type SiteConversation } from '../core/site-api.j
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import { validateRuntimeMessageSender } from '../core/messaging.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
-import { isCapturePageUrl, isProviderId, type CaptureProviderId } from '../core/providers.js';
+import { isCapturePageUrl, isCaptureProviderId, isProviderId, type CaptureProviderId } from '../core/providers.js';
 import {
   nextDueAnalysisAt,
   processThreadLocally,
@@ -21,6 +21,15 @@ import {
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
 import { autoHealStaleManifest, readDiskBuildInfo } from '../core/diagnostics.js';
 import { BUILD_INFO } from '../core/build-info.js';
+import {
+  PAPERCLIP_SYNC_ALARM,
+  PAPERCLIP_SYNC_PERIOD_MINUTES,
+  chromeStateStore as paperclipStateStore,
+  runPaperclipSync,
+  type SyncOutcome,
+} from '../core/paperclip/sync.js';
+import { PaperclipLiveHint } from '../core/paperclip/live.js';
+import { normalizeServerUrl } from '../core/paperclip/client.js';
 
 const db = new ThreadkeeperDB();
 
@@ -99,6 +108,90 @@ async function organizeStoredThread(threadKey: string, settings: SettingsRecord)
     console.warn('[threadkeeper] local organize failed', err);
   }
   broadcastLibraryChanged(threadKey);
+}
+
+// ---------------------------------------------------------------------------
+// Paperclip: issues, comments and agent runs from the user's Paperclip server
+// ---------------------------------------------------------------------------
+
+let paperclipRun: Promise<SyncOutcome> | null = null;
+let paperclipHint: PaperclipLiveHint | null = null;
+
+/** One Paperclip sync at a time per service-worker lifetime; later callers share the running one. */
+function kickPaperclipSync(options: { force?: boolean; budgetMs?: number; maxIssues?: number } = {}): Promise<SyncOutcome> {
+  if (paperclipRun) return paperclipRun;
+  paperclipRun = (async () => {
+    try {
+      const settings = await ensureStarterCollectionsAndSettings(db);
+      const outcome = await runPaperclipSync({
+        db,
+        settings,
+        store: paperclipStateStore(),
+        force: options.force,
+        budgetMs: options.budgetMs,
+        maxIssues: options.maxIssues,
+        organize: async (threadKeys, s) => {
+          const ctx = await getOrganizeContext(s);
+          for (const threadKey of threadKeys) {
+            const outcome = await processThreadLocally(db, threadKey, { settings: s, ctx });
+            if (outcome.createdProject) organizeCtxCache = null;
+          }
+        },
+      });
+      if (outcome.threadKeys.length > 0) {
+        organizeCtxCache = null;
+        broadcastLibraryChanged();
+        await scheduleAnalysisAlarm();
+      }
+      await refreshPaperclipHint(settings);
+      // A sync that stopped at its budget continues soon instead of waiting for the next period.
+      if (outcome.status === 'partial' && chrome.alarms) {
+        await chrome.alarms.create(`${PAPERCLIP_SYNC_ALARM}-continue`, { when: Date.now() + 30_000 });
+      }
+      return outcome;
+    } finally {
+      paperclipRun = null;
+    }
+  })();
+  return paperclipRun;
+}
+
+/** Live events from a local (local_trusted) server schedule a sync sooner; polling covers the rest. */
+async function refreshPaperclipHint(settings: SettingsRecord): Promise<void> {
+  const pc = settings.paperclip;
+  const wanted = pc.enabled && pc.liveUpdates && pc.deploymentMode === 'local_trusted';
+  if (!wanted) {
+    paperclipHint?.close();
+    paperclipHint = null;
+    return;
+  }
+  const state = await paperclipStateStore().load();
+  const companyIds = Object.keys(state.companies);
+  if (companyIds.length === 0) return;
+  if (paperclipHint?.isOpen && paperclipHint.matches(pc.serverUrl, companyIds)) return;
+  paperclipHint?.close();
+  paperclipHint = new PaperclipLiveHint({
+    serverUrl: pc.serverUrl,
+    companyIds,
+    onChange: () => void kickPaperclipSync(),
+  });
+  paperclipHint.open();
+}
+
+/** Sync every few minutes while Paperclip is set up; nothing at all otherwise. */
+async function schedulePaperclipAlarm(settings?: SettingsRecord): Promise<void> {
+  if (!chrome.alarms) return;
+  const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
+  if (!s.paperclip.enabled) {
+    await chrome.alarms.clear(PAPERCLIP_SYNC_ALARM);
+    paperclipHint?.close();
+    paperclipHint = null;
+    return;
+  }
+  const existing = await chrome.alarms.get(PAPERCLIP_SYNC_ALARM);
+  if (!existing) {
+    await chrome.alarms.create(PAPERCLIP_SYNC_ALARM, { delayInMinutes: 0.5, periodInMinutes: PAPERCLIP_SYNC_PERIOD_MINUTES });
+  }
 }
 
 /** Store a conversation read by Catch up. Deleted threads stay deleted (tombstones), and a site whose capture is off is skipped. */
@@ -371,6 +464,7 @@ async function initializeBackground(): Promise<void> {
     await chrome.alarms.create(ANALYSIS_SWEEP_ALARM, { periodInMinutes: 3 });
   }
   await scheduleAnalysisAlarm();
+  await schedulePaperclipAlarm(settings);
 }
 
 // A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
@@ -420,6 +514,8 @@ if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
       });
     } else if (alarm.name === ANALYSIS_DUE_ALARM || alarm.name === ANALYSIS_SWEEP_ALARM) {
       void kickAnalysis();
+    } else if (alarm.name === PAPERCLIP_SYNC_ALARM || alarm.name === `${PAPERCLIP_SYNC_ALARM}-continue`) {
+      void kickPaperclipSync();
     }
   });
 }
@@ -456,7 +552,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       if (message.type === 'PASSIVE_DOM_CAPTURE') {
         const settings = await ensureStarterCollectionsAndSettings(db);
         const rawProvider = message.payload?.provider;
-        if (!isProviderId(rawProvider) || rawProvider === 'imported') {
+        if (!isCaptureProviderId(rawProvider)) {
           sendResponse({ ok: false, error: 'Unknown capture provider' });
           return;
         }
@@ -537,7 +633,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         organizeCtxCache = null;
         await applyLaunchBehavior();
         await scheduleAnalysisAlarm();
+        const settings = await ensureStarterCollectionsAndSettings(db);
+        await schedulePaperclipAlarm(settings);
+        await refreshPaperclipHint(settings);
         sendResponse({ ok: true });
+        return;
+      }
+
+      if (message.type === 'PAPERCLIP_SYNC_NOW') {
+        // Sync now: ignores the failure backoff and gets a larger budget than the periodic sync.
+        const outcome = await kickPaperclipSync({ force: true, budgetMs: 240_000, maxIssues: 1000 });
+        sendResponse({ ok: outcome.status !== 'error', outcome });
         return;
       }
 
@@ -692,7 +798,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           });
           return;
         }
-        if (typeof message.canonicalUrl !== 'string' || !/^https:\/\//i.test(message.canonicalUrl)) {
+        // Paperclip usually runs on this computer over plain http; only its own configured origin is allowed.
+        const paperclipOrigin =
+          message.provider === 'paperclip' ? normalizeServerUrl(settings.paperclip.serverUrl) : null;
+        const isPaperclipPage =
+          typeof message.canonicalUrl === 'string' &&
+          paperclipOrigin !== null &&
+          normalizeServerUrl(message.canonicalUrl) === paperclipOrigin &&
+          message.canonicalUrl.startsWith(`${paperclipOrigin}/`);
+        if (typeof message.canonicalUrl !== 'string' || (!/^https:\/\//i.test(message.canonicalUrl) && !isPaperclipPage)) {
           sendResponse({ ok: false, status: 'no_web_url' });
           return;
         }

@@ -43,6 +43,8 @@ import {
 import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
 import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
 import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
+import { PaperclipSettings, paperclipSectionStatus, usePaperclipSyncState } from './PaperclipSettings.js';
+import type { PaperclipSyncState } from '../../core/paperclip/sync.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -152,11 +154,12 @@ function ProjectRow({
   );
 }
 
-type SectionId = 'general' | 'capture' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'diagnostics';
+type SectionId = 'general' | 'capture' | 'paperclip' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'diagnostics';
 
 const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'capture', label: 'Capture' },
+  { id: 'paperclip', label: 'Paperclip' },
   { id: 'ai', label: 'AI models' },
   { id: 'aws', label: 'Amazon Web Services' },
   { id: 'search', label: 'Search & embeddings' },
@@ -261,9 +264,11 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
 function sectionStatus(
   id: SectionId,
   settings: SettingsRecord,
-  extra: { projectCount: number; reloadNeeded: boolean }
+  extra: { projectCount: number; reloadNeeded: boolean; paperclip: PaperclipSyncState | null }
 ): { text: string; tone?: 'danger' } | null {
   switch (id) {
+    case 'paperclip':
+      return paperclipSectionStatus(settings.paperclip, extra.paperclip);
     case 'capture': {
       const on = CAPTURE_PROVIDER_IDS.filter((p) => settings.authorizedHosts[p]).length;
       return { text: `${on} of ${CAPTURE_PROVIDER_IDS.length}` };
@@ -355,6 +360,7 @@ export function SettingsDialog({
   const [candidatesDraft, setCandidatesDraft] = useState<string | null>(null);
   const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
   const diagnostics = useDiagnostics();
+  const paperclipState = usePaperclipSyncState();
 
   const patchAuto = (patch: Partial<AutoOrganizeSettings>) =>
     settings ? onPatch({ autoOrganize: { ...settings.autoOrganize, ...patch } }) : Promise.resolve();
@@ -520,6 +526,8 @@ export function SettingsDialog({
         </p>
       </Section>
     ),
+
+    paperclip: <PaperclipSettings settings={settings} onPatch={onPatch} />,
 
     ai: (
       <>
@@ -1360,7 +1368,7 @@ export function SettingsDialog({
         <nav className="tk-settings-nav" aria-label="Settings sections">
           <div className="tk-nav-list">
             {SECTION_LABELS.map((s) => {
-              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded });
+              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded, paperclip: paperclipState });
               return (
                 <button
                   key={s.id}
