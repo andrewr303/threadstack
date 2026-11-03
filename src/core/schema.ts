@@ -503,8 +503,6 @@ export type BedrockEmbeddingModel = 'amazon.titan-embed-text-v2:0' | 'cohere.emb
 
 export type RerankProviderId = 'none' | 'voyage' | 'bedrock';
 
-export type VoyageRerankModel = 'rerank-2.5' | 'rerank-2.5-lite';
-
 export type BedrockRerankModel = 'cohere.rerank-v3-5:0' | 'amazon.rerank-v1:0';
 
 export interface AutoOrganizeSettings {
@@ -541,6 +539,7 @@ export interface SettingsRecord {
   embeddingIndexType: 'standard' | 'contextual';
   embeddingModel: 'voyage-4' | 'voyage-4-large' | 'voyage-context-4';
   embeddingDimensions: 256 | 512 | 1024 | 2048;
+  /** Voyage reranker, used directly (rerankProvider "voyage") and by the optional Worker. */
   rerankModel: 'rerank-3-lite' | 'rerank-3';
   enableClefRouting: boolean;
   density: 'comfortable' | 'compact';
@@ -576,7 +575,6 @@ export interface SettingsRecord {
   bedrockEmbeddingDimensions: 256 | 512 | 1024;
   /** Second-stage reranker for search results and Ask context. */
   rerankProvider: RerankProviderId;
-  voyageRerankModel: VoyageRerankModel;
   bedrockRerankModel: BedrockRerankModel;
   /** How many first-stage candidates the reranker re-scores. */
   rerankCandidates: number;
@@ -665,7 +663,6 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   bedrockEmbeddingModel: 'amazon.titan-embed-text-v2:0',
   bedrockEmbeddingDimensions: 1024,
   rerankProvider: 'none',
-  voyageRerankModel: 'rerank-2.5-lite',
   bedrockRerankModel: 'cohere.rerank-v3-5:0',
   rerankCandidates: 40,
   rerankInSearch: true,
