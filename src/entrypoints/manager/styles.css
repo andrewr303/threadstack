@@ -1736,3 +1736,173 @@ details.tk-settings-section > summary.tk-settings-h3 {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Bulk selection: row checkboxes, the selection bar, sort            */
+/* ------------------------------------------------------------------ */
+
+/* A row is its checkbox beside its button; the row, not the button, shows hover, checked and open. */
+.tk-row-item {
+  display: flex;
+  align-items: stretch;
+}
+
+.tk-row-item > .tk-row-btn {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+}
+
+.tk-row-item:hover {
+  background: var(--paper-2);
+}
+
+.tk-row-item[data-checked="true"] {
+  background: var(--accent-soft);
+}
+
+.tk-row-item:has(> .tk-row-btn[aria-selected="true"]) {
+  background: var(--paper-3);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tk-row-item > .tk-row-btn[aria-selected="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.tk-row-check {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+  padding: var(--row-pad);
+  padding-right: 0;
+  cursor: pointer;
+}
+
+.tk-row-check input {
+  margin: 4px 0 0;
+  cursor: pointer;
+}
+
+.tk-row-check + .tk-row-btn {
+  padding-left: 8px;
+}
+
+.tk-workbench[data-surface="sidepanel"] .tk-row-check {
+  padding: 10px 0 10px 12px;
+}
+
+.tk-workbench[data-surface="sidepanel"] .tk-row-check + .tk-row-btn {
+  padding-left: 8px;
+}
+
+/* Kanban and project-card items: the card frame moves from the button to the item. */
+.tk-card-item {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+}
+
+.tk-card-item > .tk-card-btn {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+
+.tk-card-item:hover {
+  background: var(--paper-2);
+}
+
+.tk-card-item[data-checked="true"] {
+  background: var(--accent-soft);
+}
+
+.tk-card-item:has(> .tk-card-btn[aria-selected="true"]) {
+  background: var(--paper-3);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tk-card-item > .tk-card-btn[aria-selected="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.tk-card-item > .tk-row-check {
+  padding: 8px 0 8px 12px;
+}
+
+/* Project cards scroll inside the list pane, like the list and the kanban board. */
+.tk-list-pane > .tk-cards-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+}
+
+/* Selection bar: stays above the scrolling list; becomes the bulk action bar once a row is checked. */
+.tk-bulk-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+
+.tk-bulk-bar[data-active="true"] {
+  background: var(--accent-soft);
+}
+
+.tk-bulk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.tk-bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tk-bulk-delete {
+  margin-left: auto;
+}
+
+.tk-bulk-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tk-bulk-form .tk-select,
+.tk-bulk-form .tk-input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tk-bulk-target {
+  flex: 1 1 140px;
+}
+
+.tk-bulk-result {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.tk-bulk-result[data-ok="false"] {
+  color: var(--danger);
+}
+
+.tk-workbench[data-surface="sidepanel"] .tk-bulk-bar {
+  padding: 8px 10px;
+}

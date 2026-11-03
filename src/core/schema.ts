@@ -474,6 +474,10 @@ export interface ChangeLogEntry {
     previousManualTitleOverride: string | null;
     previousProjectSource?: ProjectSource;
     previousWorkflowStateSource?: 'auto' | 'manual';
+    /** Recorded by bulk edits; undo restores them when present. */
+    previousProjectReason?: string | null;
+    previousPinned?: boolean;
+    previousCloudExcluded?: boolean;
   }>;
   /** Projects created by this change; removed on undo when empty. */
   createdCollections?: string[];

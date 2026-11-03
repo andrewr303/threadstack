@@ -27,6 +27,8 @@ import {
   type StoredHandleRecord,
   type ProjectSource,
 } from './schema.js';
+import { normalizeTags } from './organization.js';
+import type { PortableBundle } from './adapters.js';
 
 export class ThreadkeeperDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
@@ -870,6 +872,149 @@ export async function deleteConversationCascade(
       }
     }
   );
+}
+
+/** Manual fields one bulk edit sets on every selected thread; the same fields the single-thread controls set. */
+export interface BulkThreadPatch {
+  /** Moves and locks the category, exactly as choosing a project for one thread does. */
+  project?: string;
+  workflowState?: WorkflowState;
+  pinned?: boolean;
+  cloudExcluded?: boolean;
+  /** Added to each thread's tags and kept as manual tags, as the tag field keeps them. */
+  addTags?: string[];
+}
+
+/**
+ * Apply one manual edit to many threads in a single transaction and record it in the change
+ * log, so Undo (undoChangeLog) restores every previous value. Each thread goes through
+ * updateManualThreadFields, so bulk and single-thread edits mean the same thing.
+ * Deleted (tombstoned) and missing threads are skipped; returns null when nothing changed.
+ * `description` may depend on how many threads were changed.
+ */
+export async function applyBulkThreadEdit(
+  db: ThreadkeeperDB,
+  threadKeys: readonly string[],
+  patch: BulkThreadPatch,
+  description: string | ((changedCount: number) => string)
+): Promise<ChangeLogEntry | null> {
+  const addTags = normalizeTags(patch.addTags ?? []);
+  const hasEdit =
+    patch.project !== undefined ||
+    patch.workflowState !== undefined ||
+    patch.pinned !== undefined ||
+    patch.cloudExcluded !== undefined ||
+    addTags.length > 0;
+  if (!hasEdit) return null;
+
+  return db.transaction('rw', [db.conversations, db.tombstones, db.changeLogs], async () => {
+    const snapshots: ChangeLogEntry['snapshots'] = [];
+    for (const threadKey of new Set(threadKeys)) {
+      const existing = await db.conversations.get(threadKey);
+      if (!existing) continue;
+      const updated = await updateManualThreadFields(db, threadKey, {
+        ...(patch.project !== undefined ? { project: patch.project, categoryLocked: true } : {}),
+        ...(patch.workflowState !== undefined ? { workflowState: patch.workflowState } : {}),
+        ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
+        ...(patch.cloudExcluded !== undefined ? { cloudExcluded: patch.cloudExcluded } : {}),
+        ...(addTags.length > 0
+          ? { manualTags: normalizeTags([...existing.tags, ...existing.manualTags, ...addTags]) }
+          : {}),
+      });
+      if (!updated) continue;
+      snapshots.push({
+        threadKey,
+        previousProject: existing.project,
+        previousCategoryLocked: existing.categoryLocked,
+        previousTags: [...existing.tags],
+        previousManualTags: [...existing.manualTags],
+        previousWorkflowState: existing.workflowState,
+        previousManualTitleOverride: existing.manualTitleOverride,
+        previousProjectSource: existing.projectSource,
+        previousWorkflowStateSource: existing.workflowStateSource,
+        previousProjectReason: existing.projectReason ?? null,
+        previousPinned: existing.pinned,
+        previousCloudExcluded: existing.cloudExcluded,
+      });
+    }
+    if (snapshots.length === 0) return null;
+    const entry: ChangeLogEntry = {
+      changeId: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+      description: typeof description === 'function' ? description(snapshots.length) : description,
+      undone: false,
+      snapshots,
+    };
+    await db.changeLogs.put(entry);
+    return entry;
+  });
+}
+
+/** Delete several threads at once; each leaves a tombstone, as deleting one thread does. */
+export async function deleteConversationsCascade(
+  db: ThreadkeeperDB,
+  threadKeys: readonly string[]
+): Promise<number> {
+  return db.transaction(
+    'rw',
+    [
+      db.conversations,
+      db.messages,
+      db.chunks,
+      db.vectors,
+      db.summaries,
+      db.relationships,
+      db.jobs,
+      db.tombstones,
+      db.insights,
+      db.threadVectors,
+    ],
+    async () => {
+      let deleted = 0;
+      for (const threadKey of new Set(threadKeys)) {
+        if (!(await db.conversations.get(threadKey))) continue;
+        await deleteConversationCascade(db, threadKey);
+        deleted += 1;
+      }
+      return deleted;
+    }
+  );
+}
+
+/**
+ * A Portable bundle of exactly these threads, in the order given, with only the
+ * relationships between them. Same shape as exportPortableBundle, so it re-imports.
+ */
+export async function exportSelectedThreads(
+  db: ThreadkeeperDB,
+  threadKeys: readonly string[]
+): Promise<PortableBundle> {
+  const keys = Array.from(new Set(threadKeys));
+  const found = (await db.conversations.bulkGet(keys)).filter(
+    (c): c is ConversationRecord => c !== undefined
+  );
+  const conversations: PortableBundle['conversations'] = [];
+  for (const conversation of found) {
+    const messages = await db.messages
+      .where('threadKey')
+      .equals(conversation.threadKey)
+      .sortBy('ordinal');
+    const summary = (await db.summaries.get(conversation.threadKey)) ?? null;
+    conversations.push({ conversation, messages, summary });
+  }
+  const included = new Set(found.map((c) => c.threadKey));
+  const relationships =
+    included.size === 0
+      ? []
+      : (await db.relationships.where('fromThreadKey').anyOf(Array.from(included)).toArray()).filter((r) =>
+          included.has(r.toThreadKey)
+        );
+  return {
+    format: 'threadkeeper-portable-v1',
+    exportedAt: new Date().toISOString(),
+    conversations,
+    relationships,
+  };
 }
 
 export interface LibraryReconciledCounts {
