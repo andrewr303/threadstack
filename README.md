@@ -1,8 +1,8 @@
 # Threadkeeper — automatic organizer for all your AI threads
 
-Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok, Gemini, Perplexity, DeepSeek, Le Chat and Microsoft Copilot**, works out what each one is about, and files it automatically — so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
+Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok (on grok.com and inside X), Gemini, Google AI Studio, Perplexity, DeepSeek, Kimi, Le Chat and Microsoft Copilot**, works out what each one is about, and files it automatically, so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
 
-Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key.
+Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key or AWS account (Amazon Bedrock or Claude Platform on AWS).
 
 ---
 
@@ -11,6 +11,8 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
 ### 1. Captures automatically
 - Open a conversation on any supported site and it lands in the library — no clicks. Capture is read-only, zero-footprint (no injected buttons, badges or layout changes) and never captures the composer or an in-progress streaming reply.
 - **Provider-native organization is kept:** ChatGPT Projects, Claude Projects, the GitHub repository of a Claude Code / Codex web session, and the model a ChatGPT reply used.
+- **Grok on X** (`x.com/i/grok`): X loads each Grok conversation as data, and Threadkeeper reads that response as the page receives it instead of scraping the page. A small script in X's page observes those requests without changing them. This needs host access to x.com and twitter.com; nothing outside Grok conversations is captured.
+- Messages keep the site's own ids where it exposes them, so long conversations that the site renders in pieces are not stored twice, and replies still streaming or showing "thinking" are skipped.
 - **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`, or pick `~/.codex` to include `archived_sessions` too). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
   - Codex rollouts older than a week (`.jsonl.zst`) are decompressed on your device.
   - Subagent transcripts and other side files are never imported as threads of their own. A Codex fork is filed as a branch of the thread it came from, without the history it replayed, and a reverted Codex thread keeps its newest rollout.
@@ -42,8 +44,10 @@ New threads are filed into projects the moment they are captured, using the stro
 
 Status is set automatically too (*active*, *needs review* when the assistant is waiting on you, *done* when you wrapped up, *paused* after 30 days of silence) unless you set it yourself. **Auto-organize** reviews the whole library — with Claude when a key is set, otherwise by clustering similar unfiled threads into proposed projects — and shows every change for approval; every apply is undoable.
 
+**Many threads at once:** tick rows (shift-click for a range, or select all in view) to move them to a project, set their status, add a tag, pin or unpin them, make them local-only, export them as a Markdown handoff or a Portable bundle, or delete them. Every bulk edit can be undone. The list sorts by recent activity, oldest first, title or message count.
+
 ### 4. Finds and answers
-- **Search** fuses keyword, phrase, fuzzy and semantic (vector) matches across titles, gists, summaries, topics, decisions and full message text.
+- **Search** fuses keyword, phrase, fuzzy and semantic (vector) matches across titles, gists, summaries, topics, decisions and full message text. With a reranker on, pressing Enter re-reads the top candidates and puts the most relevant first.
 - **Ask** your library a question ("What did I decide about the Stripe webhook retries?") and Claude answers from your own threads with clickable `[T1]` citations.
 - **Related threads** for every conversation, by semantic similarity.
 
@@ -65,15 +69,25 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 
 ## Embeddings
 
-On-device vectors (feature-hashed, 384 dims) are always maintained and need no key. For true semantic search and better auto-filing choose a hosted model in **Settings → Embeddings**:
+On-device vectors (feature-hashed, 384 dims) are always maintained and need no key. For true semantic search and better auto-filing choose a hosted model in **Settings → Search & embeddings**:
 
 | Provider | Models | Notes |
 |---|---|---|
 | Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | API key from voyageai.com |
+| Amazon Bedrock | Amazon Titan Text Embeddings V2, Cohere Embed v4 (256, 512 or 1024 dimensions) | Uses the AWS credentials in Settings |
 | OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | API key from platform.openai.com |
 | Ollama (local) | any embedding model, e.g. `nomic-embed-text` | start Ollama with `OLLAMA_ORIGINS=chrome-extension://*` |
 
 Vectors are only compared within one model space, so switching provider never mixes incompatible vectors.
+
+### Reranking
+
+A reranker re-scores the best first-stage candidates of a search (when you press Enter) or of an Ask question, then blends its score with the first-stage rank so a strong exact match is not buried. It sends only each thread's title, gist and best-matching excerpt, never local-only threads, and caches scores per query.
+
+| Reranker | Models | Notes |
+|---|---|---|
+| Voyage AI | `rerank-3-lite` (default), `rerank-3` | Voyage API key |
+| Amazon Bedrock | Cohere Rerank 3.5, Amazon Rerank 1.0 | With IAM keys it uses the Bedrock Rerank API. Bedrock API keys are not accepted there, so with an API key Cohere Rerank 3.5 is called directly (experimental). Cohere Rerank 3.5 runs in us-east-1, us-west-2, ca-central-1, eu-central-1 and ap-northeast-1 |
 
 ---
 
@@ -140,8 +154,13 @@ src/
     importers.ts         Format detection, zip/JSON/JSONL import, folder sync
     adapters.ts          ChatGPT/Claude export parsers, Portable bundle, Markdown handoff
     insights.ts          On-device analyzer (gist, kind, topics, decisions, next steps, status)
+    grok-x.ts            Parser for the Grok-on-X conversation data the page loads
     ai/claude.ts         Claude analysis, library planning and Ask via the official Anthropic SDK
-    embeddings.ts        Local hashed vectors + Voyage / OpenAI / Ollama
+    ai/backends.ts       One SDK client for the Anthropic API, Amazon Bedrock and Claude Platform on AWS
+    aws.ts               AWS endpoints, Bedrock API keys and SigV4 signing (aws4fetch), host access
+    embeddings.ts        Local hashed vectors + Voyage / Bedrock / OpenAI / Ollama
+    rerank.ts            Voyage and Bedrock reranking, score fusion, local-only filter
+    diagnostics.ts       Running-manifest vs build check, one-time self-reload, report
     auto-organize.ts     Project filing precedence, k-NN, clustering
     pipeline.ts          Capture → analyze → embed → file; debounced, leased Claude job queue
     library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
@@ -150,11 +169,12 @@ src/
   entrypoints/
     background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
     content.ts           Zero-footprint capture observer, overlay host with load watchdog
+    grok-x-main.ts       Page-world observer for Grok on X responses (reads, never changes)
     manager/             React UI shared by side panel, overlay and full page
 shared/cloud.ts          Wire schemas for the optional Cloudflare Worker
 worker/                  Optional Cloudflare Worker (DeepSeek + MongoDB Voyage)
-scripts/                 Build, acceptance, e2e and benchmark runners
-tests/unit/              Vitest suites (core + organizer)
+scripts/                 Build, acceptance, e2e, Edge smoke, bulk screenshots and benchmark runners
+tests/unit/              Vitest suites
 evidence/                Acceptance ledger, benchmark report and screenshots
 ```
 
@@ -199,5 +219,6 @@ All gates pass in packaged-extension headless Chromium (see [`evidence/acceptanc
 ## Troubleshooting
 
 - **"`<extension id>` is blocked · This page has been blocked by Microsoft Edge · ERR_BLOCKED_BY_CLIENT":** Edge is still running an old manifest. Builds before 0.2.0 made the library pages reachable only through a dynamic URL (`use_dynamic_url`), and Edge blocks the static URL it hands out, including the full-page library. Edge reads `manifest.json` only when an unpacked extension is loaded or reloaded, so running `npm run build` without pressing **Reload** keeps the broken manifest live. Fix: open `edge://extensions`, click **Reload** under Threadkeeper, and check that the version shown matches the `Built Threadkeeper … (build …)` line printed by `npm run build`. From 0.3.0 the extension detects this itself: the service worker reloads once per build to pick up the new manifest, and any open library page shows a **Reload extension** banner. **Settings → Diagnostics** compares the running manifest with the files on disk and copies a report. `npm run test:edge` reproduces the block in real Edge and checks every surface.
+- **Settings → Diagnostics** shows the running and on-disk versions, recent capture and overlay events, and copies a report without keys or thread content.
 - **A site changed its markup and capture stopped:** the generic role heuristics usually keep working; otherwise use the provider's data export via **Import / Export**.
 - **Claude analysis paused:** the status chip in the header shows the last error (invalid key, rate limit, daily limit). Fix it in Settings; queued threads resume automatically.

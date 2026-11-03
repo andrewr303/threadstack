@@ -1,6 +1,6 @@
 # Threadkeeper Acceptance & Verification Report
 
-Generated: `2026-10-28T15:33:12.548Z`
+Generated: `2026-11-03T04:27:25.826Z`
 Extension Build: `/home/user/threadkeeper/.output/chrome-mv3`
 
 ## Summary of 10 Acceptance Gates
@@ -16,7 +16,7 @@ Extension Build: `/home/user/threadkeeper/.output/chrome-mv3`
 | `AI-07` | Grounded Enrichment, Worker Auth & NL Organize | **PASS** | `NOT_VERIFIED` (gated per §14) | SHA-256 Bearer token hash auth (`AUTH_TOKEN_HASHES_JSON`) + `UsageQuotaDO` unconditional fail-closed quota enforcement, `/v1/enrich-thread` client-worker parity, `422` `title_only` guard, negative exclusion clause (`negativeClauseExcludedInUi=true`) + 1-click Undo |
 | `SEARCH-08` | Hybrid Local + Vector Search & Provenance | **PASS** | `NOT_VERIFIED` (gated per §14) | Real-browser search (`hits=5`) with match reasons & supporting quotes, RRF lexical+vector fusion, dimension/model validation, rerank index fallback, and default `isSyntheticBenchmark` exclusion |
 | `LIFE-09` | Lifecycle Hygiene, Cascade Delete & Tombstones | **PASS** | N/A (local extension lifecycle) | MV3 permissions (`storage`, `unlimitedStorage`, `alarms`, `scripting`, `sidePanel`; no localhost origins), atomic tombstone transaction in `applySummaryEnrichment`, cascade delete across 6 stores, zero auto-open on fresh tab |
-| `PERF-10` | 10,000-Record Warm-Open & Local Search Latency | **PASS** | N/A (local 10k benchmark) | Packaged-extension Chromium IndexedDB 10k: Warm-open `p50=158.7ms`, `p95=194.3ms` (<= 500ms); Local search `p50=5.9ms`, `p95=7.9ms` (<= 150ms) |
+| `PERF-10` | 10,000-Record Warm-Open & Local Search Latency | **PASS** | N/A (local 10k benchmark) | Packaged-extension Chromium IndexedDB 10k: Warm-open `p50=110.5ms`, `p95=175.5ms` (<= 500ms); Local search `p50=3.6ms`, `p95=4.8ms` (<= 150ms) |
 
 ## Evidence Artifacts
 
