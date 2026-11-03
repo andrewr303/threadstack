@@ -357,3 +357,50 @@ export function parseSiteDataMessage(data: unknown): SiteDataMessage | null {
   if (rec(m.json) === null) return null;
   return { source: SITE_DATA_MESSAGE_SOURCE, provider, conversationId: id.toLowerCase(), json: m.json };
 }
+
+// ---------------------------------------------------------------------------
+// Validation of a conversation that crossed a message boundary
+// ---------------------------------------------------------------------------
+
+const MAX_MESSAGES = 20_000;
+const MAX_MESSAGE_CHARS = 2_000_000;
+
+/**
+ * A SiteConversation received from a content script, rebuilt field by field. The content script
+ * runs inside a web page's process; the service worker trusts none of its shape.
+ */
+export function validateSiteConversation(value: unknown): SiteConversation | null {
+  const v = rec(value);
+  if (!v) return null;
+  const provider = v.provider;
+  const id = v.sourceConversationId;
+  if ((provider !== 'chatgpt' && provider !== 'claude') || typeof id !== 'string' || !SAFE_ID.test(id)) return null;
+  if (!Array.isArray(v.messages) || v.messages.length > MAX_MESSAGES) return null;
+  const messages: UpsertThreadInput['messages'] = [];
+  for (const raw of v.messages) {
+    const m = rec(raw);
+    if (!m) return null;
+    const role = m.role;
+    if (role !== 'user' && role !== 'assistant') return null;
+    if (typeof m.sourceMessageId !== 'string' || m.sourceMessageId.length === 0 || m.sourceMessageId.length > 200) return null;
+    if (typeof m.content !== 'string' || m.content.length === 0 || m.content.length > MAX_MESSAGE_CHARS) return null;
+    messages.push({
+      sourceMessageId: m.sourceMessageId,
+      role,
+      content: m.content,
+      createdAt: toIso(m.createdAt),
+      branchPath: 'main',
+    });
+  }
+  return {
+    provider,
+    sourceConversationId: id.toLowerCase(),
+    canonicalUrl: provider === 'chatgpt' ? chatGptCanonicalUrl(id.toLowerCase()) : claudeCanonicalUrl(id.toLowerCase()),
+    title: typeof v.title === 'string' ? v.title.slice(0, 300) : '',
+    createdAt: toIso(v.createdAt),
+    updatedAt: toIso(v.updatedAt),
+    messages,
+    modelSlug: typeof v.modelSlug === 'string' ? v.modelSlug.slice(0, 100) : null,
+    providerProjectId: typeof v.providerProjectId === 'string' ? v.providerProjectId.slice(0, 100) : null,
+  };
+}

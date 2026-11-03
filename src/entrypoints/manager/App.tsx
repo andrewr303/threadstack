@@ -2319,6 +2319,10 @@ export function App() {
           notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
           await reloadAll(selectedKeyRef.current);
         }}
+        onOpenThread={(threadKey) => {
+          importDialogRef.current?.close();
+          handleSelectThread(threadKey);
+        }}
         onClosed={() => {
           lastInnerModalCloseAtRef.current = Date.now();
         }}

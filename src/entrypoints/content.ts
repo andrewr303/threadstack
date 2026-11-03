@@ -12,6 +12,9 @@ import {
 } from '../core/site-api.js';
 import { mergeGrokXMessages, parseGrokXCaptureMessage, type GrokXMessage } from '../core/grok-x.js';
 import { validateWindowPostMessage } from '../core/messaging.js';
+import { isSyncProviderId, type SyncEvent } from '../core/history-sync.js';
+import { runApiSync } from '../core/site-history.js';
+import { loadSidebarConversations } from '../core/sidebar-history.js';
 import { detectProviderFromUrl, extractConversationIdFromUrl, isXHostname } from '../core/providers.js';
 
 const OVERLAY_DIALOG_ID = 'threadkeeper-overlay-root';
@@ -511,6 +514,56 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
   }, delay);
 }
 
+// ---- Catch up (history sync) ----------------------------------------------
+
+let syncCancelled = false;
+let syncRunning = false;
+
+const sleepMs = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function emitSyncEvent(event: SyncEvent): void {
+  try {
+    chrome.runtime.sendMessage({ type: 'HISTORY_SYNC_EVENT', event }, () => void chrome.runtime.lastError);
+  } catch {
+    // extension reloaded; the service worker's idle watchdog ends the run
+  }
+}
+
+/** Start the signed-in reader for this site. Only the site this page belongs to can be read. */
+function startApiSync(message: Record<string, unknown>): { ok: boolean; error?: string } {
+  const provider = message.provider;
+  const host = window.location.hostname.toLowerCase();
+  const onChatGpt = host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com';
+  const onClaude = host === 'claude.ai' || host.endsWith('.claude.ai');
+  if ((provider !== 'chatgpt' || !onChatGpt) && (provider !== 'claude' || !onClaude)) return { ok: false, error: 'wrong_site' };
+  if (typeof message.runId !== 'string' || typeof message.sinceMs !== 'number' || typeof message.max !== 'number') {
+    return { ok: false, error: 'bad_request' };
+  }
+  if (syncRunning) return { ok: false, error: 'busy' };
+  const known: Record<string, string> = {};
+  if (typeof message.known === 'object' && message.known !== null) {
+    for (const [k, v] of Object.entries(message.known as Record<string, unknown>)) if (typeof v === 'string') known[k.toLowerCase()] = v;
+  }
+  syncCancelled = false;
+  syncRunning = true;
+  void runApiSync({
+    provider,
+    runId: message.runId,
+    sinceMs: message.sinceMs,
+    max: Math.min(500, Math.max(1, Math.round(message.max))),
+    known,
+    origin: window.location.origin,
+    cookies: document.cookie,
+    fetchImpl: window.fetch.bind(window),
+    emit: emitSyncEvent,
+    isCancelled: () => syncCancelled,
+    sleep: sleepMs,
+  }).finally(() => {
+    syncRunning = false;
+  });
+  return { ok: true };
+}
+
 /** What a capture of this tab would see right now, without storing anything. */
 function probeCapture(): Record<string, unknown> {
   const href = window.location.href;
@@ -580,6 +633,38 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
           schedulePassiveDomCapture(true);
         }
         sendResponse({ ok: true, state: res.state });
+        return true;
+      }
+      if (message && message.type === 'TK_PING') {
+        sendResponse({ ok: true });
+        return true;
+      }
+      if (message && message.type === 'TK_CAPTURE_NOW') {
+        schedulePassiveDomCapture(true);
+        sendResponse({ ok: true });
+        return true;
+      }
+      if (message && message.type === 'TK_HISTORY_SYNC_RUN') {
+        sendResponse(startApiSync(message as Record<string, unknown>));
+        return true;
+      }
+      if (message && message.type === 'TK_HISTORY_SYNC_CANCEL') {
+        syncCancelled = true;
+        sendResponse({ ok: true });
+        return true;
+      }
+      if (message && message.type === 'TK_HISTORY_LIST_SIDEBAR') {
+        const provider = message.provider;
+        const limit = typeof message.limit === 'number' ? Math.min(100, Math.max(1, Math.round(message.limit))) : 30;
+        if (!isSyncProviderId(provider)) {
+          sendResponse({ ok: false, items: [] });
+          return true;
+        }
+        syncCancelled = false;
+        void loadSidebarConversations(document, window, provider, { limit, sleep: sleepMs, isCancelled: () => syncCancelled }).then(
+          (items) => sendResponse({ ok: true, items }),
+          () => sendResponse({ ok: false, items: [] })
+        );
         return true;
       }
       if (message && message.type === 'TK_CAPTURE_PROBE') {

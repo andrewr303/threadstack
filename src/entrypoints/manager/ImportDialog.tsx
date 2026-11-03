@@ -6,11 +6,14 @@ import { seedSyntheticWorkbenchLibrary, generate652ChatGPTExportFixture } from '
 import { parseChatGPTExport } from '../../core/adapters.js';
 import { upsertThread } from '../../core/db.js';
 import { sharedDb } from './shared.js';
+import { CatchUpSection } from './CatchUp.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
   settings: SettingsRecord | null;
   onImported: (message: string) => Promise<void> | void;
+  /** Open a thread from the catch-up brief in the library. */
+  onOpenThread: (threadKey: string) => void;
   onClosed: () => void;
 }
 
@@ -57,7 +60,7 @@ export async function syncSavedFolders(
   return importFiles(sharedDb, settings, files, options.onProgress);
 }
 
-export function ImportDialog({ dialogRef, settings, onImported, onClosed }: Props) {
+export function ImportDialog({ dialogRef, settings, onImported, onOpenThread, onClosed }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState('');
@@ -125,6 +128,8 @@ export function ImportDialog({ dialogRef, settings, onImported, onClosed }: Prop
       <h2 className="tk-section-h2" style={{ marginBottom: 8 }}>
         Import & Export Library
       </h2>
+
+      <CatchUpSection settings={settings} onImported={onImported} onOpenThread={onOpenThread} />
 
       <section className="tk-settings-section">
         <h3 className="tk-settings-h3">Import exports and sessions</h3>

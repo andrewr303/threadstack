@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { BUILD_INFO } from '../../core/build-info.js';
+import { captureMatchPatterns } from '../../core/providers.js';
 import {
   AUTO_RELOAD_LOG_KEY,
   assessManifest,
+  describeCaptureProbe,
   detectBrowser,
   extensionsPageUrl,
   formatDiagnosticsReport,
   reloadWouldHelp,
   type AutoReloadLogEntry,
+  type CaptureCheckResult,
+  type CaptureProbeReport,
   type DiagnosticsSnapshot,
 } from '../../core/diagnostics.js';
 
@@ -94,6 +98,79 @@ export function StaleBuildBanner({ snapshot }: { snapshot: DiagnosticsSnapshot |
       <button type="button" className="tk-btn tk-btn-primary" onClick={reloadExtension}>
         Reload extension
       </button>
+    </div>
+  );
+}
+
+/** Ask the reader in the most recently used AI tab what a capture would see, without storing anything. */
+async function probeAiTab(): Promise<CaptureProbeReport | null> {
+  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return null;
+  const tabs = (await chrome.tabs.query({ url: captureMatchPatterns() })).filter((t) => typeof t.id === 'number');
+  tabs.sort((a, b) => Number(b.active) - Number(a.active) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+  const tab = tabs[0];
+  if (!tab || typeof tab.id !== 'number') return null;
+  try {
+    const reply = (await chrome.tabs.sendMessage(tab.id, { type: 'TK_CAPTURE_PROBE' })) as { ok?: boolean; report?: CaptureProbeReport } | undefined;
+    return reply?.ok && reply.report ? reply.report : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "Check capture": what Threadkeeper sees in the AI tab you used last, with a verdict and a copyable report. */
+export function CaptureCheck() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<CaptureCheckResult | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const run = async () => {
+    setBusy(true);
+    setCopied(false);
+    try {
+      setResult(describeCaptureProbe(await probeAiTab()));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(['Threadkeeper capture check', result.verdict, ...result.lines].join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="tk-diag-capture">
+      <p className="tk-settings-note">
+        Open a conversation on an AI site, then check what Threadkeeper can read from the tab you used last. The report has
+        counts only, never titles or message text.
+      </p>
+      <div className="tk-diag-actions">
+        <button type="button" className="tk-btn" disabled={busy} onClick={() => void run()}>
+          {busy ? 'Checking…' : 'Check capture in my AI tab'}
+        </button>
+        {result && (
+          <button type="button" className="tk-btn" onClick={() => void copy()}>
+            {copied ? 'Copied' : 'Copy report'}
+          </button>
+        )}
+      </div>
+      {result && (
+        <>
+          <div className="tk-diag-status" data-ok={result.ok ? 'true' : 'false'} role="status">
+            {result.verdict}
+          </div>
+          <ul className="tk-diag-issues">
+            {result.lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
@@ -194,6 +271,8 @@ export function DiagnosticsPanel({ snapshot, onRefresh }: { snapshot: Diagnostic
       <p className="tk-settings-note">
         The report lists versions, the browser and recent events only. It never includes API keys or thread content.
       </p>
+      <h4 className="tk-brief-ws-h">Capture check</h4>
+      <CaptureCheck />
     </div>
   );
 }
