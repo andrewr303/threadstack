@@ -599,6 +599,102 @@ export interface AutoOrganizeSettings {
   dailyAiAnalysisLimit: number;
 }
 
+/** What Still asked to sync (protocol SyncPrefs), as Threadkeeper last received it. */
+export interface DockSyncPrefs {
+  scope: 'all' | 'projects' | 'manual';
+  projects: string[];
+  providers: string[];
+  transcripts: boolean;
+  autoUpdate: boolean;
+}
+
+/**
+ * The Sidebar Dock (Still) link. Written only through `patchDockSettings` (src/core/dock/state.ts),
+ * which merges inside a transaction so the service worker and the manager never overwrite each other.
+ */
+export interface SidebarDockSettings {
+  /** Extension id of the paired Still ('' = not paired). */
+  pairedId: string;
+  /** The name Still declared when it asked to pair (sanitized, one line). */
+  pairedName: string;
+  pairedAt: string;
+  /** "Let Still search my threads" (capabilities search + context). */
+  allowSearch: boolean;
+  /** "Share full transcripts" (capability transcripts). */
+  shareTranscripts: boolean;
+  /** "Let Still's searches use my embedding and rerank providers" (capability remote_models). */
+  allowRemoteModels: boolean;
+  /** Whether Still has sent sync.configure since pairing; nothing syncs before. */
+  configured: boolean;
+  prefs: DockSyncPrefs;
+  /** Still's epoch the sent ledger belongs to. */
+  peerEpoch: string;
+  /** Extension ids the user denied; refused until unblocked in Settings. */
+  blockedIds: string[];
+  lastPushAt: string;
+  lastError: string;
+  lastErrorAt: string;
+}
+
+export const DEFAULT_DOCK_PREFS: DockSyncPrefs = {
+  scope: 'manual',
+  projects: [],
+  providers: [],
+  transcripts: true,
+  autoUpdate: true,
+};
+
+export const DEFAULT_SIDEBAR_DOCK: SidebarDockSettings = {
+  pairedId: '',
+  pairedName: '',
+  pairedAt: '',
+  allowSearch: true,
+  shareTranscripts: true,
+  allowRemoteModels: false,
+  configured: false,
+  prefs: { ...DEFAULT_DOCK_PREFS },
+  peerEpoch: '',
+  blockedIds: [],
+  lastPushAt: '',
+  lastError: '',
+  lastErrorAt: '',
+};
+
+/** Coerce a stored (possibly older or partial) Sidebar Dock record; unknown values fall back to defaults. */
+export function normalizeSidebarDock(raw: unknown): SidebarDockSettings {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof SidebarDockSettings, unknown>>;
+  const str = (v: unknown, max = 400) => (typeof v === 'string' ? v.slice(0, max) : '');
+  const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+  const strList = (v: unknown, maxItems: number, maxLen: number) =>
+    Array.isArray(v)
+      ? Array.from(new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim().slice(0, maxLen)))).slice(0, maxItems)
+      : [];
+  const p = (r.prefs && typeof r.prefs === 'object' ? r.prefs : {}) as Partial<Record<keyof DockSyncPrefs, unknown>>;
+  const scope = p.scope === 'all' || p.scope === 'projects' || p.scope === 'manual' ? p.scope : DEFAULT_DOCK_PREFS.scope;
+  const pairedId = typeof r.pairedId === 'string' && /^[a-p]{32}$/.test(r.pairedId) ? r.pairedId : '';
+  return {
+    pairedId,
+    pairedName: pairedId ? str(r.pairedName, 40) : '',
+    pairedAt: pairedId ? str(r.pairedAt, 40) : '',
+    allowSearch: bool(r.allowSearch, DEFAULT_SIDEBAR_DOCK.allowSearch),
+    shareTranscripts: bool(r.shareTranscripts, DEFAULT_SIDEBAR_DOCK.shareTranscripts),
+    allowRemoteModels: bool(r.allowRemoteModels, DEFAULT_SIDEBAR_DOCK.allowRemoteModels),
+    configured: pairedId ? bool(r.configured, false) : false,
+    prefs: {
+      scope,
+      projects: strList(p.projects, 200, 200),
+      providers: strList(p.providers, 100, 40),
+      transcripts: bool(p.transcripts, DEFAULT_DOCK_PREFS.transcripts),
+      autoUpdate: bool(p.autoUpdate, DEFAULT_DOCK_PREFS.autoUpdate),
+    },
+    peerEpoch: pairedId ? str(r.peerEpoch, 100) : '',
+    blockedIds: strList(r.blockedIds, 50, 32).filter((id) => /^[a-p]{32}$/.test(id)),
+    lastPushAt: str(r.lastPushAt, 40),
+    lastError: str(r.lastError, 300),
+    lastErrorAt: str(r.lastErrorAt, 40),
+  };
+}
+
 export interface SettingsRecord {
   id: 'default';
   settingsVersion?: number;
@@ -668,6 +764,8 @@ export interface SettingsRecord {
   rerankInSearch: boolean;
   rerankInAsk: boolean;
   autoOrganize: AutoOrganizeSettings;
+  /** Link with the Still (Sidebar Dock) extension. */
+  sidebarDock: SidebarDockSettings;
   /** Last background AI failure, surfaced in the manager so silent failures are visible. */
   lastAiError?: string | null;
   lastAiErrorAt?: string | null;
@@ -767,6 +865,7 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   rerankInSearch: true,
   rerankInAsk: true,
   autoOrganize: { ...DEFAULT_AUTO_ORGANIZE },
+  sidebarDock: { ...DEFAULT_SIDEBAR_DOCK, prefs: { ...DEFAULT_DOCK_PREFS }, blockedIds: [] },
 };
 
 /**
@@ -795,6 +894,7 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
       ...DEFAULT_AWS_SETTINGS,
       ...(base.aws ?? {}),
     },
+    sidebarDock: normalizeSidebarDock(base.sidebarDock),
   };
 }
 

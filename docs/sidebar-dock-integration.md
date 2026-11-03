@@ -101,7 +101,10 @@ Extension ids of unpacked builds depend on the folder path, so neither side can 
      matches; **Deny** always works. Decisions are accepted only from that top-level window (never from a framed
      Threadkeeper page).
 4. **`pair.granted`** (TK → Still) `{ requestId, tk: { version, capabilities } }` after Allow; **`pair.denied`**
-   `{ requestId }` after Deny. Still accepts them only from the id it sent the pending request to, with the matching
+   `{ requestId }` after Deny. `requestId` here is the envelope `requestId` of Still's `pair.request` (the envelope key
+   and the field are the same key): Still sends its pending request id as that envelope's `requestId`, and Threadkeeper
+   reuses it as the `requestId` of `pair.granted` / `pair.denied`. A repeated `pair.request` from the same sender
+   replaces the pending request's `requestId` and code (the expiry stays). Still accepts them only from the id it sent the pending request to, with the matching
    `requestId`, while that request is pending (Still's pending request also expires after 10 minutes). Threadkeeper
    counts itself paired only once Still acknowledges `pair.granted` with `ok: true`, and retries delivery every 30 s
    until the request expires. After `pair.granted` Still is `paired` but **not configured**: nothing syncs until the

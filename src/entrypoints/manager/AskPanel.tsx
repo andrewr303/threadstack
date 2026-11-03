@@ -21,6 +21,7 @@ import { remoteAllowedKeys } from '../../core/privacy.js';
 import { providerLabel } from '../../core/providers.js';
 import { getSmartTitle } from '../../core/insights.js';
 import { relativeTime, renderCitations, sharedDb } from './shared.js';
+import { citedSourceKeys } from './dock.js';
 
 interface Props {
   settings: SettingsRecord | null;
@@ -31,6 +32,8 @@ interface Props {
   searchIndex: MemorySearchIndex;
   onSelectThread: (threadKey: string) => void;
   onOpenSettings: () => void;
+  /** Set when Threadkeeper is connected to Still: "Send these threads to Still…" under the answer. */
+  onSendToStill?: (threadKeys: string[]) => void;
 }
 
 const MAX_SOURCES = 8;
@@ -74,6 +77,7 @@ export function AskPanel({
   searchIndex,
   onSelectThread,
   onOpenSettings,
+  onSendToStill,
 }: Props) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -295,6 +299,14 @@ export function AskPanel({
               );
             })}
           </ol>
+          {onSendToStill && status === 'done' && (() => {
+            const keys = citedSourceKeys(answer, sources.map((c) => c.threadKey));
+            return (
+              <button type="button" className="tk-linklike tk-ask-send" onClick={() => onSendToStill(keys)}>
+                Send {keys.length === 1 ? 'this thread' : `these ${keys.length} threads`} to Still…
+              </button>
+            );
+          })()}
         </div>
       )}
     </div>

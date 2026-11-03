@@ -57,6 +57,18 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 - **Side panel** (default for the toolbar button): the library beside any page, with the conversation open in the current tab pinned at the top.
 - **Overlay** on AI pages (`Alt+Shift+K`) and a **full-page library** (`Alt+Shift+M`). Side panel shortcut: `Alt+Shift+L`.
 
+### 6. Works with Still (Sidebar Dock)
+Threadkeeper can feed **Still**, a separate sidebar extension, so your AI threads show up there as chats (summary and transcript) inside its collections, and Still's assistant can search them. The two extensions stay independent: Still keeps its own copy of every chat, so it keeps working when Threadkeeper is off.
+- **Connect from Still.** In Still: Settings → Integrations → AI chat threads → Find Threadkeeper → Connect. Threadkeeper opens a small window naming the extension that asks; type the 6-digit code Still shows and press **Allow** (or **Deny**, which blocks that extension until you unblock it). Threadkeeper shows its own ID under Settings → Sidebar Dock if Still needs it pasted.
+- **Still chooses what to sync** (every thread, chosen projects, or only threads it asks for) and where the chats go. Nothing syncs until you press Start syncing in Still.
+- **What Still gets:** title, gist and full analysis (overview, key points, decisions, next steps, open questions, what was produced), project, provider and, if transcript sharing is on in both apps, the transcript. Secrets in tool and system messages (API keys, tokens, private keys, `KEY=` lines) are replaced with `[redacted]`. Changes are pushed when a thread has been quiet for a minute (or your AI debounce), one batch at a time.
+- **Never shared:** local-only threads, threads in local-only projects, providers excluded from cloud processing, and synthetic threads. A thread that becomes private after it was shared is removed from Still right away; Threadkeeper also asks Still, after pairing, configuring and daily, which private threads it still holds and removes them.
+- **Searches from Still** use Threadkeeper's own hybrid search and Ask-style passage retrieval. They reach your embedding and rerank providers only if you allow it ("Let Still's searches use my embedding and rerank providers", off by default) and only for explicit searches.
+- **Send to Still from Threadkeeper.** Once connected, **Send to Still…** appears on a thread's detail row, in the bulk bar (select threads → Send to Still…), above search results ("Send these results to Still…", up to 200) and under an Ask answer (the threads it cites). Pick Still's default placement, one of Still's collections, or a new collection by name. Sending works whatever Still syncs on its own and brings back a chat you deleted in Still; local-only threads are skipped and named in the result. The thread detail shows **In Still · <collection>** when Still holds the thread.
+- **Settings → Sidebar Dock** shows the connection (Still's name and ID, since when, last push, counts), a read-only readout of what Still asked to sync, the options *Let Still search my threads*, *Share full transcripts* and *Let Still's searches use my embedding and rerank providers*, **Resync**, **Disconnect** (Still keeps the chats it has), blocked extensions with **Unblock**, and this Threadkeeper's ID with **Copy ID** for pasting into Still. A waiting request shows **Review request…**, which opens the consent window; Allow and Deny exist only there. In the overlay (Threadkeeper framed inside an AI site) these controls are read-only.
+- Edits made in the library (renames, status, project moves, local-only, deletes, organize, undo, analysis, imports) reach Still on their own; changes that can make a thread private are taken back from Still at once.
+- See `docs/sidebar-dock-integration.md` for the protocol.
+
 ---
 
 ## Privacy
@@ -188,7 +200,9 @@ src/
     auto-organize.ts     Project filing precedence, k-NN, clustering
     pipeline.ts          Capture → analyze → embed → file; debounced, leased Claude job queue
     library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
-    db.ts, schema.ts     Dexie schema (v2), identity, tombstones, settings normalization
+    db.ts, schema.ts     Dexie schema (v3), identity, tombstones, settings normalization
+    dock/                Still (Sidebar Dock) link: protocol + validators, pairing state, payloads,
+                         outbox/ledger/reconcile/drain, read queries, external handler
     search.ts            Hybrid lexical + vector retrieval
   entrypoints/
     background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
@@ -196,6 +210,7 @@ src/
     grok-x-main.ts       Page-world observer for Grok on X responses (reads, never changes)
     site-data-main.ts    Page-world observer for ChatGPT and Claude conversation responses (reads, never changes)
     manager/             React UI shared by side panel, overlay and full page
+    connect/             Consent window for a Still pair request (connect.html, top-level popup only)
 shared/cloud.ts          Wire schemas for the optional Cloudflare Worker
 worker/                  Optional Cloudflare Worker (DeepSeek + MongoDB Voyage)
 scripts/                 Build, acceptance, e2e, Edge smoke, bulk screenshots and benchmark runners

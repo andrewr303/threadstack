@@ -73,6 +73,10 @@ import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.j
 import { AskPanel } from './AskPanel.js';
 import { SemanticNeighbors, ThreadOverview, type RelatedThread } from './ThreadOverview.js';
 import { StaleBuildBanner, useDiagnostics } from './Diagnostics.js';
+import { SendToStillDialog, InStillBadge, type SendRequest } from './SidebarDock.js';
+import { configureDockClient, dockSyncNow, useDockState } from './dock.js';
+import { isRemoteAllowed } from '../../core/privacy.js';
+import type { SectionId } from './SettingsDialog.js';
 import {
   BulkActions,
   RowCheck,
@@ -144,6 +148,10 @@ export function App() {
     isUnauthenticatedFrame ? 'Framing manager.html without surface=overlay is forbidden' : null
   );
   const handshakeAuthorizedRef = useRef<boolean>(!isFramed && surface !== 'overlay');
+  // The overlay proves its handshake on DOCK_SEND, like the other privileged overlay messages.
+  useMemo(() => configureDockClient({ handshakeToken: surface === 'overlay' ? handshakeToken : '' }), [surface, handshakeToken]);
+  const dock = useDockState(overlayHandshakeState === 'authorized');
+  const stillPaired = Boolean(dock.state?.paired);
 
   // ---- Library data ----
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
@@ -191,6 +199,9 @@ export function App() {
   const importDialogRef = useRef<HTMLDialogElement | null>(null);
   const settingsDialogRef = useRef<HTMLDialogElement | null>(null);
   const bulkDeleteDialogRef = useRef<HTMLDialogElement | null>(null);
+  const sendStillDialogRef = useRef<HTMLDialogElement | null>(null);
+  const [sendStillRequest, setSendStillRequest] = useState<SendRequest | null>(null);
+  const [settingsSection, setSettingsSection] = useState<SectionId | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const checkAnchorRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -364,6 +375,8 @@ export function App() {
       'cohereEmbeddingModel',
       'cohereEmbeddingDimensions',
       'authorizedHosts',
+      'cloudExcludedProviders',
+      'sidebarDock',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
   }, [surface]);
@@ -643,6 +656,7 @@ export function App() {
           onProgress: (done, total) => setBusy(`Organizing ${done}/${total} threads…`),
         });
         setBusy(null);
+        dockSyncNow(missing);
         setStatusAnnouncement(`Organized ${r.analyzed} threads (${r.filed} filed automatically).`);
         notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
         await reloadAll(selectedKeyRef.current);
@@ -791,6 +805,7 @@ export function App() {
       manualNotes: notesDraft,
       manualTags: parsedTags,
     });
+    dockSyncNow([selectedConversation.threadKey]);
     await reloadAll(selectedConversation.threadKey);
     setStatusAnnouncement('Saved manual title, tags, and notes.');
   };
@@ -798,6 +813,8 @@ export function App() {
   const handleProjectChange = async (nextProject: string) => {
     if (!authorized() || !selectedConversation) return;
     await updateManualThreadFields(sharedDb, selectedConversation.threadKey, { project: nextProject, categoryLocked: true });
+    // The new project may be local-only.
+    dockSyncNow([selectedConversation.threadKey], { privacy: true });
     await reloadAll(selectedConversation.threadKey);
     setStatusAnnouncement(`Filed under ${nextProject} (locked).`);
   };
@@ -811,6 +828,7 @@ export function App() {
   const handleWorkflowStateChange = async (nextState: WorkflowState) => {
     if (!authorized() || !selectedConversation) return;
     await updateManualThreadFields(sharedDb, selectedConversation.threadKey, { workflowState: nextState });
+    dockSyncNow([selectedConversation.threadKey]);
     await reloadAll(selectedConversation.threadKey);
     setStatusAnnouncement(`Updated status to ${nextState}.`);
   };
@@ -819,6 +837,7 @@ export function App() {
     if (!authorized() || !selectedConversation) return;
     const deletedTitle = getDisplayTitle(selectedConversation);
     await deleteConversationCascade(sharedDb, selectedConversation.threadKey);
+    dockSyncNow([selectedConversation.threadKey], { privacy: true });
     await reloadAll(null);
     setStatusAnnouncement(`Deleted "${deletedTitle}" and recorded tombstone.`);
   };
@@ -842,6 +861,28 @@ export function App() {
     setStatusAnnouncement(`Created project ${clean}. Threads that mention it are filed there automatically.`);
   };
 
+  // ---- Still (Sidebar Dock) ----
+  const localOnlyProjects = useMemo(() => new Set(collections.filter((c) => c.cloudExcluded).map((c) => c.name)), [collections]);
+  const mayShare = (conv: ConversationRecord) => (settings ? isRemoteAllowed(conv, settings, localOnlyProjects) : false);
+
+  const openSettingsAt = (section: SectionId) => {
+    setSettingsSection(section);
+    openModal(settingsDialogRef);
+  };
+
+  /** Every "Send to Still…" except the bulk bar: a picker dialog for these threads. */
+  const openSendToStill = (threadKeys: string[], label: string) => {
+    if (!authorized()) return;
+    if (!stillPaired) {
+      openSettingsAt('sidebarDock');
+      return;
+    }
+    const keys = Array.from(new Set(threadKeys)).slice(0, 500);
+    if (keys.length === 0) return;
+    setSendStillRequest({ threadKeys: keys, label });
+    openModal(sendStillDialogRef);
+  };
+
   const copyText = (text: string, label: string) => {
     void navigator.clipboard?.writeText(text);
     setStatusAnnouncement(`${label} copied to clipboard.`);
@@ -861,7 +902,13 @@ export function App() {
 
   useEffect(() => {
     const getOpenInnerModal = () =>
-      [organizeDialogRef.current, importDialogRef.current, settingsDialogRef.current, bulkDeleteDialogRef.current].find(
+      [
+        organizeDialogRef.current,
+        importDialogRef.current,
+        settingsDialogRef.current,
+        bulkDeleteDialogRef.current,
+        sendStillDialogRef.current,
+      ].find(
         (d) => d && (d.open || d.hasAttribute('open'))
       );
 
@@ -965,9 +1012,13 @@ export function App() {
     analysisAbortRef.current = controller;
     setAnalysis({ running: true, processed: 0, analyzed: 0, current: null, note: null });
     let lastReload = Date.now();
+    const analyzedKeys: string[] = [];
     const summary = await runAnalysisJobs(sharedDb, {
       maxJobs: 2000,
       signal: controller.signal,
+      onJobDone: (threadKey, status) => {
+        if (status !== 'skipped') analyzedKeys.push(threadKey);
+      },
       onProgress: (s, current) => {
         setAnalysis({ running: true, processed: s.processed, analyzed: s.analyzed, current, note: null });
         if (Date.now() - lastReload > 4000) {
@@ -977,6 +1028,7 @@ export function App() {
       },
     });
     analysisAbortRef.current = null;
+    dockSyncNow(analyzedKeys);
     setAnalysis({
       running: false,
       processed: summary.processed,
@@ -995,6 +1047,7 @@ export function App() {
     setAnalyzingThread(selectedConversation.threadKey);
     try {
       const res = await analyzeThreadRemotely(sharedDb, selectedConversation.threadKey, { ignoreDailyLimit: true });
+      if (res.status !== 'skipped') dockSyncNow([selectedConversation.threadKey]);
       setStatusAnnouncement(res.status === 'skipped' ? `Skipped: ${res.reason}` : 'Thread analyzed by Claude.');
     } catch (err) {
       setStatusAnnouncement(`Analysis failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -1046,6 +1099,8 @@ export function App() {
       aiDelaySeconds: 0,
       onProgress: (done, total) => setOrganizeBusy(`Analyzing ${done}/${total} threads on-device…`),
     });
+    // Automatic filing can move threads into local-only projects.
+    dockSyncNow(keys, { privacy: true });
     await reloadAll(selectedKeyRef.current);
     setOrganizeBusy(aiReady ? 'Claude is planning projects for your library…' : 'Grouping similar threads…');
     try {
@@ -1072,6 +1127,10 @@ export function App() {
       chosen
     );
     organizeDialogRef.current?.close();
+    dockSyncNow(
+      entry.snapshots.map((snap) => snap.threadKey),
+      { privacy: true }
+    );
     await reloadAll(selectedKeyRef.current);
     setStatusAnnouncement(`Applied organization to ${entry.snapshots.length} conversations.`);
   };
@@ -1081,6 +1140,7 @@ export function App() {
     const latestActive = changeLogs.find((c) => !c.undone);
     if (!latestActive) return;
     const res = await undoChangeLog(sharedDb, latestActive.changeId);
+    if (res.restoredCount > 0) dockSyncNow(latestActive.snapshots.map((snap) => snap.threadKey), { privacy: true });
     await reloadAll(selectedKeyRef.current);
     setStatusAnnouncement(`Undid changes across ${res.restoredCount} threads.`);
   };
@@ -1090,6 +1150,7 @@ export function App() {
       setBusy('Rebuilding vectors…');
       const keys = conversations.filter((c) => !c.isSyntheticBenchmark).map((c) => c.threadKey);
       await processThreadsLocally(sharedDb, keys, { force: true, aiDelaySeconds: 0 });
+      dockSyncNow(keys, { privacy: true });
       const queued = await enqueueLibraryAnalysis(sharedDb, { onlyMissing: false });
       setBusy(null);
       await reloadAll(selectedKeyRef.current);
@@ -1590,6 +1651,20 @@ export function App() {
                 {rerankNote}
               </div>
             )}
+            {listMode === 'search' && stillPaired && searchQuery.trim() && listHits.length > 0 && (
+              <div className="tk-send-results">
+                <button
+                  type="button"
+                  className="tk-linklike"
+                  onClick={() => {
+                    const keys = listHits.slice(0, 200).map((h) => h.conversation.threadKey);
+                    openSendToStill(keys, keys.length === 1 ? 'this search result' : `${keys.length} search results`);
+                  }}
+                >
+                  Send {listHits.length > 200 ? 'the top 200 results' : listHits.length === 1 ? 'this result' : `these ${listHits.length} results`} to Still…
+                </button>
+              </div>
+            )}
 
             {listMode === 'search' && (
               <div className="tk-filter-row">
@@ -1682,6 +1757,11 @@ export function App() {
               searchIndex={searchIndex}
               onSelectThread={handleSelectThread}
               onOpenSettings={() => openModal(settingsDialogRef)}
+              onSendToStill={
+                stillPaired
+                  ? (keys) => openSendToStill(keys, keys.length === 1 ? 'this thread' : `these ${keys.length} threads`)
+                  : undefined
+              }
             />
           ) : (
             <>
@@ -1695,6 +1775,7 @@ export function App() {
                 onSelectionChange={setCheckedKeys}
                 onChanged={handleBulkChanged}
                 onAnnounce={setStatusAnnouncement}
+                stillPaired={stillPaired}
                 onDialogClosed={() => {
                   lastInnerModalCloseAtRef.current = Date.now();
                 }}
@@ -1901,6 +1982,13 @@ export function App() {
                   <span title={`${selectedConversation.accountId} / ${selectedConversation.workspaceId}`}>
                     updated {relativeTime(selectedConversation.updatedAt ?? selectedConversation.lastCapturedAt)}
                   </span>
+                  {stillPaired && mayShare(selectedConversation) && (
+                    <InStillBadge
+                      threadKey={selectedConversation.threadKey}
+                      paired={stillPaired}
+                      revision={`${selectedConversation.sourceRevision}:${dock.state?.lastPushAt ?? ''}`}
+                    />
+                  )}
                 </div>
 
                 {selectedConversation.siblingBranchIds.length > 0 && (
@@ -2001,6 +2089,21 @@ export function App() {
                   >
                     Copy handoff
                   </button>
+                  {stillPaired && (
+                    <button
+                      type="button"
+                      className="tk-btn"
+                      disabled={!mayShare(selectedConversation)}
+                      title={
+                        mayShare(selectedConversation)
+                          ? 'Add this thread to Still as a chat'
+                          : 'Local-only threads, threads in local-only projects and excluded providers are never sent to Still'
+                      }
+                      onClick={() => openSendToStill([selectedConversation.threadKey], 'this thread')}
+                    >
+                      Send to Still…
+                    </button>
+                  )}
                   <button type="button" className="tk-btn tk-btn-danger" onClick={() => void handleDeleteSelected()}>
                     Delete
                   </button>
@@ -2173,9 +2276,14 @@ export function App() {
                         type="checkbox"
                         checked={selectedConversation.cloudExcluded}
                         onChange={(e) => {
-                          void updateManualThreadFields(sharedDb, selectedConversation.threadKey, {
+                          const key = selectedConversation.threadKey;
+                          void updateManualThreadFields(sharedDb, key, {
                             cloudExcluded: e.target.checked,
-                          }).then(() => reloadAll(selectedConversation.threadKey));
+                          }).then(() => {
+                            // Local-only on: Still must drop its copy now; off: it may sync again.
+                            dockSyncNow([key], { privacy: true });
+                            return reloadAll(key);
+                          });
                         }}
                       />
                       Local-only thread (never sent to Claude, embedding APIs or the Worker)
@@ -2353,6 +2461,9 @@ export function App() {
         onImported={async (message) => {
           setStatusAnnouncement(message);
           notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+          const before = new Set(conversations.map((c) => c.threadKey));
+          const after = (await sharedDb.conversations.toCollection().primaryKeys()) as string[];
+          dockSyncNow(after.filter((k) => !before.has(k)));
           await reloadAll(selectedKeyRef.current);
         }}
         onOpenThread={(threadKey) => {
@@ -2376,9 +2487,23 @@ export function App() {
         }}
         onPatch={persistSettingPatch}
         onRebuildVectors={handleRebuildVectors}
+        dock={dock}
+        initialSection={settingsSection}
         onClosed={() => {
           lastInnerModalCloseAtRef.current = Date.now();
+          setSettingsSection(null);
           void reloadAll(selectedKeyRef.current);
+        }}
+      />
+
+      <SendToStillDialog
+        dialogRef={sendStillDialogRef}
+        request={sendStillRequest}
+        onDone={setStatusAnnouncement}
+        onClosed={() => {
+          lastInnerModalCloseAtRef.current = Date.now();
+          setSendStillRequest(null);
+          void dock.refresh();
         }}
       />
     </div>

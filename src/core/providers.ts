@@ -23,6 +23,10 @@ export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export type CaptureProviderId = Exclude<ProviderId, 'imported'>;
 
+/** What kind of AI product a provider is; used for filters and by the Sidebar Dock integration. */
+export const PROVIDER_CATEGORIES = ['chat', 'coding_agent', 'agent', 'builder', 'search', 'companion'] as const;
+export type ProviderCategory = (typeof PROVIDER_CATEGORIES)[number];
+
 export interface ProviderInfo {
   id: ProviderId;
   label: string;
@@ -31,6 +35,8 @@ export interface ProviderInfo {
   matchPatterns: string[];
   /** How a captured conversation can be reopened. */
   reopen: 'web' | 'terminal' | 'none';
+  /** Product category: chat assistants, coding agents, autonomous agents, app builders, AI search, companions. */
+  category: ProviderCategory;
   /** Short description shown in settings. */
   captureNote: string;
 }
@@ -38,6 +44,7 @@ export interface ProviderInfo {
 export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   chatgpt: {
     id: 'chatgpt',
+    category: 'chat',
     label: 'ChatGPT',
     maker: 'OpenAI',
     matchPatterns: ['https://chatgpt.com/*', 'https://chat.openai.com/*'],
@@ -46,6 +53,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   claude: {
     id: 'claude',
+    category: 'chat',
     label: 'Claude',
     maker: 'Anthropic',
     matchPatterns: ['https://claude.ai/*'],
@@ -54,6 +62,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   claude_code: {
     id: 'claude_code',
+    category: 'coding_agent',
     label: 'Claude Code',
     maker: 'Anthropic',
     matchPatterns: ['https://claude.ai/*'],
@@ -63,6 +72,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   codex: {
     id: 'codex',
+    category: 'coding_agent',
     label: 'Codex',
     maker: 'OpenAI',
     matchPatterns: ['https://chatgpt.com/*'],
@@ -72,6 +82,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   grok: {
     id: 'grok',
+    category: 'chat',
     label: 'Grok',
     maker: 'xAI',
     matchPatterns: ['https://grok.com/*'],
@@ -80,6 +91,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   grok_x: {
     id: 'grok_x',
+    category: 'chat',
     label: 'Grok on X',
     maker: 'xAI',
     // X is a single-page app: /i/grok is reached without a page load, so scripts run on every
@@ -91,6 +103,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   gemini: {
     id: 'gemini',
+    category: 'chat',
     label: 'Gemini',
     maker: 'Google',
     matchPatterns: ['https://gemini.google.com/*'],
@@ -99,6 +112,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   ai_studio: {
     id: 'ai_studio',
+    category: 'chat',
     label: 'Google AI Studio',
     maker: 'Google',
     matchPatterns: ['https://aistudio.google.com/*'],
@@ -107,6 +121,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   perplexity: {
     id: 'perplexity',
+    category: 'search',
     label: 'Perplexity',
     maker: 'Perplexity',
     matchPatterns: ['https://www.perplexity.ai/*', 'https://perplexity.ai/*'],
@@ -115,6 +130,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   deepseek: {
     id: 'deepseek',
+    category: 'chat',
     label: 'DeepSeek',
     maker: 'DeepSeek',
     matchPatterns: ['https://chat.deepseek.com/*'],
@@ -123,6 +139,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   mistral: {
     id: 'mistral',
+    category: 'chat',
     label: 'Le Chat',
     maker: 'Mistral',
     matchPatterns: ['https://chat.mistral.ai/*'],
@@ -131,6 +148,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   copilot: {
     id: 'copilot',
+    category: 'chat',
     label: 'Copilot',
     maker: 'Microsoft',
     matchPatterns: [
@@ -143,6 +161,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   kimi: {
     id: 'kimi',
+    category: 'chat',
     label: 'Kimi',
     maker: 'Moonshot AI',
     matchPatterns: ['https://www.kimi.com/*', 'https://kimi.com/*', 'https://kimi.ai/*'],
@@ -151,6 +170,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   },
   imported: {
     id: 'imported',
+    category: 'chat',
     label: 'Imported',
     maker: 'Other',
     matchPatterns: [],
@@ -190,6 +210,11 @@ export function isProviderId(value: unknown): value is ProviderId {
 
 export function providerLabel(id: ProviderId | string): string {
   return isProviderId(id) ? PROVIDERS[id].label : String(id);
+}
+
+/** The provider's category; unknown ids count as chat. */
+export function providerCategory(id: ProviderId | string): ProviderCategory {
+  return isProviderId(id) ? PROVIDERS[id].category : 'chat';
 }
 
 const X_HOST_RE = /^(?:www\.|mobile\.)?(?:x|twitter)\.com$/;

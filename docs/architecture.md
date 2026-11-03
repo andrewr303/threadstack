@@ -2,6 +2,50 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
+## Still (Sidebar Dock) link (2026-11-03)
+
+Threadkeeper talks to the separate Still extension over `chrome.runtime.onMessageExternal` / `sendMessage(id)`
+(protocol `still-threadkeeper/1`, `docs/sidebar-dock-integration.md`). All of it lives in `src/core/dock/`:
+
+- `protocol.ts` — constants, `threadHash` (two FNV-1a 64 over UTF-8; shared test vectors), shapes, hand validators
+  for every message and every response from Still.
+- `state.ts` — pairing in `settings.sidebarDock` (written only through `patchDockSettings`, a transactional nested
+  merge, so the worker and the manager never overwrite each other); the single pending pair request in
+  `chrome.storage.session` (`tk.dock.pending.v1`); counters (`seq`) and cursors in the `dockMeta` table.
+- `payload.ts` — `ThreadSummary` / `ThreadPayload` from the conversation, the resolved insight and the structured
+  summary (analysis v2 fields read when present), transcript budget (4000 messages, 120k chars each, ~3 MB, first 20 +
+  newest), secret redaction for tool/system messages, validated single-quoted resume commands, the fingerprint (only
+  the protocol's inputs, never a clock).
+- `outbox.ts` — Dexie v3 tables `dockOutbox` (one coalescing row per thread, `dirtySeq`, lease, backoff 1/5/30/120 min,
+  `local_only` removals every minute), `dockSent` (ledger per peer and epoch: fingerprint, seq, transcript revision,
+  prefs hash, cheap digest), `dockTracked`. `reconcileDock` compares a cheap row digest with the ledger in pages with a
+  persisted cursor (~2 s per tick, skipped within 10 min unless forced); `drainDock` decides each row at send time
+  (privacy re-checked; a `local_only`/`deleted` removal is never downgraded), pushes ≤ 20 threads / ~3.9 MB with one
+  push in flight and 1 s between pushes, honours `busy`, splits on `too_large`, and drops the pairing only after two
+  `not_paired` answers ≥ 60 s apart. Metadata first: a transcript is sent only for a revision Still has not acknowledged
+  or when it answers `needsTranscript`.
+- `query.ts` — search / list / context / related / facets for Still over shareable threads only (filters apply before
+  ranking): lexical + local hashed vectors, the remote query embedding and reranker only when the user allowed
+  `remote_models` and the deadline allows. Transcript text and vectors are cached per thread and `sourceRevision`.
+- `external.ts` — `DockService`: the external handler (sender id + extension-page origin, never a tab; check order
+  sender/pairing → type → size → fields; reads at most 2 in flight and 30 per minute), pairing with a one-time code,
+  `pair.granted` retried every 30 s until Still acknowledges, and the operations behind the internal `DOCK_*` messages.
+
+Hooks: `organizeStoredThread` and each finished analysis job mark the thread dirty (debounced by
+`max(60 s, aiDebounceSeconds)`); `SETTINGS_CHANGED` and `DOCK_SYNC_NOW` (sent by pages after their own writes) run the
+privacy fast path; alarms `tk-dock-drain` (one-shot), `tk-dock-reconcile` (15 min), `tk-dock-daily` (hello, private
+thread sweep with `chats.status`) and `tk-dock-pair` (30 s, only while a grant waits for Still). The consent page
+`connect.html` is not web-accessible; `DOCK_DECIDE` is accepted only from it as a top-level page, and `DOCK_UNPAIR`,
+`DOCK_SET_OPTIONS`, `DOCK_UNBLOCK` never from a frame inside a website.
+
+Manager UI (`src/entrypoints/manager/dock.ts`, `SidebarDock.tsx`): a page client for the `DOCK_*` messages (never
+throws; the overlay adds its handshake token for `DOCK_SEND`), `useDockState` (refreshed on `DOCK_CHANGED`), the
+Settings → Sidebar Dock panel, the Send to Still target picker (`DOCK_COLLECTIONS`, else Still's default placement, or a
+new collection name) used by the detail row, the bulk bar, search results and Ask, and the "In Still" badge
+(`DOCK_STATUS_FOR`, cached two minutes per thread, invalidated on `DOCK_CHANGED` and after a send). Page writes send
+`DOCK_SYNC_NOW` with the changed thread keys; writes that can make a thread private or delete it (local-only, project
+moves, deletes, organize, undo) set `privacy: true` so the worker takes copies back from Still at once.
+
 ## v0.4 changes (2026-11-03)
 
 1. **Complete capture on ChatGPT and Claude.** A MAIN-world script (`site-data-main.ts`, `document_start`) clones the response to each site's own conversation request (ChatGPT `GET /backend-api/conversation/<id>`, Claude `GET /api/organizations/<org>/chat_conversations/<id>`) and posts it to the isolated content script, like the Grok on X hook. It never alters a request or response and makes no request of its own. The content script validates the sender, parses the JSON (`site-api.ts`: active branch from `current_node` / `current_leaf_message_uuid`, hidden memory turns, reasoning and tool turns, and citation widgets dropped) and sends a `network_observer` capture with coverage `full` for the conversation that is open. The background accepts only `dom_observer` or `network_observer` from a content script and never lets a DOM capture claim `full`.
