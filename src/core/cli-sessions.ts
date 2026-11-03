@@ -4,7 +4,9 @@ import type { UpsertThreadInput } from './db.js';
 /**
  * Parsers for local coding-agent transcripts:
  *   - Claude Code: ~/.claude/projects/<project-slug>/<session-id>.jsonl
- *   - Codex CLI:   ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<id>.jsonl
+ *   - Codex CLI:   ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<id>.jsonl and
+ *                  ~/.codex/archived_sessions/rollout-*.jsonl, either one
+ *                  zstd-compressed to .jsonl.zst once it is a week old
  * Both are JSON Lines files; unknown record types are ignored so newer CLI
  * versions degrade gracefully instead of failing the import.
  */
@@ -54,16 +56,45 @@ function shellQuote(p: string): string {
   return /^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`;
 }
 
+/**
+ * Claude Code keeps side files beside each transcript: subagent and workflow
+ * transcripts, spilled tool results, MCP task logs, auto memory, and set-aside
+ * copies of a session. They carry the parent's sessionId, so importing one as a
+ * thread would overwrite the parent; only <project>/<session>.jsonl is a thread.
+ */
+const CLAUDE_CODE_SIDE_DIRS = new Set(['subagents', 'tool-results', 'mcp-tasks', 'memory', 'workflows']);
+
+/** True for a path (relative to the picked folder) that names a Claude Code side directory or side file. */
+export function isClaudeCodeSideFile(path: string): boolean {
+  const parts = path.split(/[\\/]+/).filter(Boolean);
+  const base = parts.pop() ?? '';
+  if (parts.some((p) => CLAUDE_CODE_SIDE_DIRS.has(p))) return true;
+  return (
+    /^agent-.*\.jsonl$/i.test(base) || // legacy flat subagent transcript
+    /\.orphaned-.*\.jsonl$/i.test(base) ||
+    /\.jsonl\.superseded-/i.test(base)
+  );
+}
+
+/** True for a directory name a folder walk should not descend into. */
+export function isClaudeCodeSideDirectory(name: string): boolean {
+  return CLAUDE_CODE_SIDE_DIRS.has(name);
+}
+
+/** "/name args" for a slash-command envelope; null for housekeeping commands or other text. */
+function slashCommandText(raw: string): string | null {
+  const command = raw.match(/<command-name>([\s\S]*?)<\/command-name>/);
+  if (!command) return null;
+  const args = (raw.match(/<command-args>([\s\S]*?)<\/command-args>/) ?? [])[1] ?? '';
+  const name = command[1].trim();
+  if (!name || /^\/(clear|exit|cost|help|config|status|model|login|logout)\b/.test(name)) return null;
+  return `${name}${args.trim() ? ` ${args.trim()}` : ''}`;
+}
+
 /** Strip harness wrapper tags Claude Code injects into user turns. */
 function cleanClaudeCodeUserText(raw: string): string | null {
   let text = raw;
-  const command = text.match(/<command-name>([\s\S]*?)<\/command-name>/);
-  if (command) {
-    const args = (text.match(/<command-args>([\s\S]*?)<\/command-args>/) ?? [])[1] ?? '';
-    const name = command[1].trim();
-    if (/^\/(clear|exit|cost|help|config|status|model|login|logout)\b/.test(name)) return null;
-    return `${name}${args.trim() ? ` ${args.trim()}` : ''}`;
-  }
+  if (/<command-name>/.test(text)) return slashCommandText(text);
   if (/^\s*<local-command-(stdout|stderr)>/.test(text)) return null;
   text = text
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
@@ -142,6 +173,23 @@ export function looksLikeCodexSession(records: Array<Record<string, unknown>>): 
   return modern || (legacyHeader && legacyItems);
 }
 
+/** Title records, strongest first; a later record of one type replaces an earlier one. */
+const CLAUDE_CODE_TITLE_TYPES = ['custom-title', 'agent-name', 'ai-title'] as const;
+type ClaudeCodeTitleType = (typeof CLAUDE_CODE_TITLE_TYPES)[number];
+
+function isClaudeCodeTitleType(v: unknown): v is ClaudeCodeTitleType {
+  return CLAUDE_CODE_TITLE_TYPES.some((t) => t === v);
+}
+
+/** The field name differs between record types and CLI versions. */
+function titleRecordText(r: Record<string, unknown>): string {
+  for (const key of ['customTitle', 'agentName', 'aiTitle', 'title', 'name']) {
+    const text = str(r[key]).replace(/\s+/g, ' ').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
 export function parseClaudeCodeSession(
   text: string,
   options: CliParseOptions
@@ -157,6 +205,7 @@ export function parseClaudeCodeSession(
   let gitBranch: string | null = null;
   let model: string | null = null;
   let summaryTitle: string | null = null;
+  const recordTitles: Partial<Record<ClaudeCodeTitleType, string>> = {};
   let firstTs: string | null = null;
   let lastTs: string | null = null;
   const messages: Msg[] = [];
@@ -166,6 +215,30 @@ export function parseClaudeCodeSession(
     const ts = str(r.timestamp) || null;
     if (r.type === 'summary' && typeof r.summary === 'string') {
       summaryTitle = r.summary.trim() || summaryTitle;
+      continue;
+    }
+    if (isClaudeCodeTitleType(r.type)) {
+      recordTitles[r.type] = titleRecordText(r) || recordTitles[r.type];
+      continue;
+    }
+    if (r.type === 'system') {
+      // Newer CLIs log slash commands as system records; their output and other subtypes are noise.
+      if (r.subtype !== 'local_command') continue;
+      const message = r.message && typeof r.message === 'object' ? (r.message as Record<string, unknown>) : {};
+      const command = slashCommandText(str(r.content) || str(message.content));
+      if (!command) continue;
+      if (ts) {
+        firstTs = firstTs ?? ts;
+        lastTs = ts;
+      }
+      lastAssistantId = null;
+      pushMessage(messages, {
+        sourceMessageId: str(r.uuid) || `${messages.length}`,
+        role: 'user',
+        content: command,
+        createdAt: ts,
+        branchPath: 'main',
+      });
       continue;
     }
     if (r.type !== 'user' && r.type !== 'assistant') continue;
@@ -248,7 +321,14 @@ export function parseClaudeCodeSession(
     sessionId = (options.fileName ?? '').replace(/\.jsonl$/i, '') || `claude_code_${Date.now()}`;
   }
   const firstUser = messages.find((m) => m.role === 'user')?.content ?? '';
-  const title = (summaryTitle || firstUser.replace(/\s+/g, ' ').slice(0, 90) || 'Claude Code session').trim();
+  const title = (
+    recordTitles['custom-title'] ||
+    recordTitles['agent-name'] ||
+    recordTitles['ai-title'] ||
+    summaryTitle ||
+    firstUser.replace(/\s+/g, ' ').slice(0, 90) ||
+    'Claude Code session'
+  ).trim();
   const project = basenameOfPath(cwd);
 
   return {
@@ -297,14 +377,47 @@ function isCodexHarnessText(text: string): boolean {
     /^\s*# AGENTS\.md instructions/i.test(text);
 }
 
-export function parseCodexSession(
-  text: string,
-  options: CliParseOptions
-): UpsertThreadInput | null {
+function asRecord(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+/**
+ * Spawned sub-agents, reviews, guardian checks and memory consolidation run in
+ * rollouts of their own. They are working state of another thread, often seeded
+ * with its history, so they never become threads themselves.
+ */
+function isAuxiliaryCodexSession(meta: Record<string, unknown>): boolean {
+  if (['agent_role', 'agent_type', 'agent_nickname', 'agent_path'].some((k) => str(meta[k]))) return true;
+  const source = asRecord(meta.source);
+  if ('subagent' in source || 'internal' in source) return true;
+  return ['subagent', 'guardian_review', 'memory_consolidation'].includes(str(meta.thread_source));
+}
+
+function codexTitle(messages: Msg[]): string {
+  const firstUser = messages.find((m) => m.role === 'user')?.content ?? '';
+  return (firstUser.replace(/\s+/g, ' ').slice(0, 90) || 'Codex session').trim();
+}
+
+export interface CodexRollout {
+  /** The thread as this file alone describes it, including any history a fork replayed from its parent. */
+  thread: UpsertThreadInput;
+  /** Codex thread id from the file's first session_meta; a revert keeps it for the new rollout file. */
+  threadId: string;
+  /** Thread this one was forked from (forked_from_id, else parent_thread_id). */
+  forkedFromId: string | null;
+  /** Sub-agent or other internal rollout (see isAuxiliaryCodexSession). */
+  auxiliary: boolean;
+  /** Rollout file name without .zst; orders rollouts of one thread when their timestamps tie. */
+  fileName: string;
+}
+
+/** Parse one Codex rollout file and keep the metadata needed to fold it with its siblings. */
+export function parseCodexRollout(text: string, options: CliParseOptions): CodexRollout | null {
   const records = parseJsonLines(text);
   if (records.length === 0 || !looksLikeCodexSession(records)) return null;
 
   let sessionId = '';
+  let meta: Record<string, unknown> | null = null;
   let cwd: string | null = null;
   let gitBranch: string | null = null;
   let repoUrl: string | null = null;
@@ -326,10 +439,12 @@ export function parseCodexSession(
       continue;
     }
     if (r.type === 'session_meta') {
-      const p = (r.payload ?? {}) as Record<string, unknown>;
-      sessionId = str(p.id) || sessionId;
-      cwd = str(p.cwd) || cwd;
-      const git = (p.git ?? {}) as Record<string, unknown>;
+      // The first session_meta is this rollout's own; a fork copies its parent's after it.
+      if (meta) continue;
+      meta = asRecord(r.payload);
+      sessionId = str(meta.id) || sessionId;
+      cwd = str(meta.cwd) || cwd;
+      const git = asRecord(meta.git);
       gitBranch = str(git.branch) || gitBranch;
       repoUrl = str(git.repository_url) || repoUrl;
       continue;
@@ -392,44 +507,176 @@ export function parseCodexSession(
     }
   }
 
+  const fileName = (options.fileName ?? '').replace(/\.zst$/i, '');
   if (!sessionId) {
-    const m = (options.fileName ?? '').match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-    sessionId = m ? m[1] : (options.fileName ?? '').replace(/\.jsonl$/i, '') || `codex_${Date.now()}`;
+    const m = fileName.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    sessionId = m ? m[1] : fileName.replace(/\.jsonl$/i, '') || `codex_${Date.now()}`;
   }
   if (!messages.some((m) => m.role === 'user' || m.role === 'assistant')) return null;
 
-  const firstUser = messages.find((m) => m.role === 'user')?.content ?? '';
-  const title = (firstUser.replace(/\s+/g, ' ').slice(0, 90) || 'Codex session').trim();
   const project = repoNameFromUrl(repoUrl) ?? basenameOfPath(cwd);
+  const forkedFromId = (meta && (str(meta.forked_from_id) || str(meta.parent_thread_id))) || null;
+  const isFork = forkedFromId !== null && forkedFromId !== sessionId;
+  // A fork is stored as a branch of its root thread, the shape ChatGPT branches
+  // already use (shared sourceConversationId, own branchId, parentBranchId), so
+  // the library links it to its parent with no schema change and its own id
+  // stays the branch id. session_id names the root thread on current CLIs.
+  const rootSession = meta ? str(meta.session_id) : '';
+  const conversationId = isFork ? (rootSession && rootSession !== sessionId ? rootSession : forkedFromId) : sessionId;
+  const branchId = isFork ? sessionId : 'main';
+  const parentBranchId = isFork ? (forkedFromId === conversationId ? 'main' : forkedFromId) : null;
 
   return {
-    threadKey: buildThreadKey({
+    thread: {
+      threadKey: buildThreadKey({
+        provider: 'codex',
+        accountId: options.accountId,
+        workspaceId: options.workspaceId,
+        sourceConversationId: conversationId,
+        branchId,
+      }),
       provider: 'codex',
       accountId: options.accountId,
       workspaceId: options.workspaceId,
-      sourceConversationId: sessionId,
-      branchId: 'main',
-    }),
-    provider: 'codex',
-    accountId: options.accountId,
-    workspaceId: options.workspaceId,
-    sourceConversationId: sessionId,
-    branchId: 'main',
-    parentBranchId: null,
-    siblingBranchIds: [],
-    canonicalUrl: '',
-    title,
-    createdAt: firstTs,
-    updatedAt: lastTs,
-    coverage: 'full',
-    captureSource: 'export_import',
-    messages: dedupeIds(messages),
-    providerProjectName: project,
-    workspacePath: cwd,
-    gitBranch,
-    modelSlug: model,
-    resumeCommand: cwd ? `cd ${shellQuote(cwd)} && codex resume ${sessionId}` : `codex resume ${sessionId}`,
+      sourceConversationId: conversationId,
+      branchId,
+      parentBranchId,
+      // Left unset on a root thread so links to forks from earlier imports are kept.
+      siblingBranchIds: parentBranchId ? Array.from(new Set(['main', parentBranchId])) : undefined,
+      canonicalUrl: '',
+      title: codexTitle(messages),
+      createdAt: firstTs,
+      updatedAt: lastTs,
+      coverage: 'full',
+      captureSource: 'export_import',
+      messages: dedupeIds(isFork ? messages.map((m) => ({ ...m, branchPath: branchId })) : messages),
+      providerProjectName: project,
+      workspacePath: cwd,
+      gitBranch,
+      modelSlug: model,
+      resumeCommand: cwd ? `cd ${shellQuote(cwd)} && codex resume ${sessionId}` : `codex resume ${sessionId}`,
+    },
+    threadId: sessionId,
+    forkedFromId: isFork ? forkedFromId : null,
+    auxiliary: meta ? isAuxiliaryCodexSession(meta) : false,
+    fileName,
   };
+}
+
+/** One Codex rollout file as a thread; null for unrecognized files and sub-agent rollouts. */
+export function parseCodexSession(
+  text: string,
+  options: CliParseOptions
+): UpsertThreadInput | null {
+  const rollout = parseCodexRollout(text, options);
+  return rollout && !rollout.auxiliary ? rollout.thread : null;
+}
+
+function rolloutTime(r: CodexRollout): number {
+  const t = Date.parse(r.thread.updatedAt ?? '');
+  return Number.isNaN(t) ? -Infinity : t;
+}
+
+/** Newest content wins: latest record timestamp, then the later file name, then the longer transcript. */
+function isNewerRollout(a: CodexRollout, b: CodexRollout): boolean {
+  const ta = rolloutTime(a);
+  const tb = rolloutTime(b);
+  if (ta !== tb) return ta > tb;
+  if (a.fileName !== b.fileName) return a.fileName > b.fileName;
+  return a.thread.messages.length > b.thread.messages.length;
+}
+
+export type StoredMessage = Pick<Msg, 'role' | 'content'>;
+
+/**
+ * How many leading fork messages repeat the parent: the longest shared run,
+ * minus a final user turn when the fork goes on differently after it (that
+ * turn is the fork re-asking where it split off, not replayed history).
+ */
+function replayedPrefixLength(parent: StoredMessage[], fork: Msg[]): number {
+  let n = 0;
+  while (
+    n < parent.length &&
+    n < fork.length &&
+    parent[n].role === fork[n].role &&
+    parent[n].content.trim() === fork[n].content.trim()
+  ) {
+    n++;
+  }
+  if (n > 0 && n < fork.length && fork[n - 1].role === 'user') n--;
+  return n;
+}
+
+/**
+ * The fork without the history it replayed, which stays on the parent thread
+ * (so the fork alone is partial coverage); null when it has nothing of its own yet.
+ */
+function dropReplayedHistory(rollout: CodexRollout, parent: StoredMessage[]): UpsertThreadInput | null {
+  const { thread } = rollout;
+  const n = replayedPrefixLength(parent, thread.messages);
+  if (n === 0) return { ...thread };
+  const own = thread.messages.slice(n);
+  if (!own.some((m) => m.role === 'user' || m.role === 'assistant')) return null;
+  const marker: Msg = {
+    sourceMessageId: `${rollout.threadId}_forked`,
+    role: 'system',
+    content: `Forked from Codex thread ${rollout.forkedFromId}; the ${n === 1 ? 'earlier message is' : `${n} earlier messages are`} on that thread.`,
+    createdAt: thread.createdAt,
+    branchPath: thread.branchId,
+  };
+  return { ...thread, title: codexTitle(own), coverage: 'partial', messages: [marker, ...own] };
+}
+
+/**
+ * Fold the Codex rollouts of one import into threads:
+ *   - rollouts sharing a thread id (a revert writes rollout-<ts>-<id>_<rolloutId>.jsonl
+ *     beside the original) are one thread, and the newest content wins;
+ *   - sub-agent and other internal rollouts are dropped;
+ *   - a fork drops the leading messages it replayed from its parent, compared with
+ *     the parent's rollout in this import, else with the parent thread already stored;
+ *   - a parent in this import lists its forks as sibling branches.
+ */
+export async function resolveCodexRollouts(
+  rollouts: CodexRollout[],
+  loadStoredMessages: (threadKey: string) => Promise<StoredMessage[]> = async () => []
+): Promise<UpsertThreadInput[]> {
+  const newest = new Map<string, CodexRollout>();
+  for (const r of rollouts) {
+    const prev = newest.get(r.threadId);
+    if (!prev || isNewerRollout(r, prev)) newest.set(r.threadId, r);
+  }
+
+  const threads: UpsertThreadInput[] = [];
+  for (const r of newest.values()) {
+    if (r.auxiliary) continue;
+    if (!r.forkedFromId) {
+      threads.push({ ...r.thread });
+      continue;
+    }
+    const parentRollout = newest.get(r.forkedFromId);
+    const parentMessages = parentRollout
+      ? parentRollout.thread.messages
+      : await loadStoredMessages(
+          buildThreadKey({
+            provider: 'codex',
+            accountId: r.thread.accountId,
+            workspaceId: r.thread.workspaceId,
+            sourceConversationId: r.thread.sourceConversationId,
+            branchId: r.thread.parentBranchId ?? 'main',
+          })
+        );
+    const fork = dropReplayedHistory(r, parentMessages);
+    if (fork) threads.push(fork);
+  }
+
+  for (const fork of threads) {
+    if (!fork.parentBranchId) continue;
+    const parent = threads.find(
+      (t) => t.sourceConversationId === fork.sourceConversationId && t.branchId === fork.parentBranchId
+    );
+    if (parent) parent.siblingBranchIds = Array.from(new Set([...(parent.siblingBranchIds ?? []), fork.branchId]));
+  }
+  return threads;
 }
 
 /** Merged records can reuse a source id; message keys must stay unique. */

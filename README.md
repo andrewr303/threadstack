@@ -11,7 +11,10 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
 ### 1. Captures automatically
 - Open a conversation on any supported site and it lands in the library — no clicks. Capture is read-only, zero-footprint (no injected buttons, badges or layout changes) and never captures the composer or an in-progress streaming reply.
 - **Provider-native organization is kept:** ChatGPT Projects, Claude Projects, the GitHub repository of a Claude Code / Codex web session, and the model a ChatGPT reply used.
-- **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
+- **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`, or pick `~/.codex` to include `archived_sessions` too). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
+  - Codex rollouts older than a week (`.jsonl.zst`) are decompressed on your device.
+  - Subagent transcripts and other side files are never imported as threads of their own. A Codex fork is filed as a branch of the thread it came from, without the history it replayed, and a reverted Codex thread keeps its newest rollout.
+  - A Claude Code session is titled by your rename if you made one, else by its agent name, its generated title, its summary, or its first prompt, in that order.
 - **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
 
 ### 2. Understands every thread (beyond the title)
