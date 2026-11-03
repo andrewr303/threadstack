@@ -30,6 +30,7 @@ import {
 import { normalizeTags } from './organization.js';
 import { looksDerivedTitle, mergeCapturedMessages } from './merge.js';
 import type { PortableBundle } from './adapters.js';
+import type { DockMetaRecord, DockOutboxRecord, DockSentRecord, DockTrackedRecord } from './dock/records.js';
 
 export class ThreadkeeperDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
@@ -47,6 +48,10 @@ export class ThreadkeeperDB extends Dexie {
   insights!: Table<ThreadInsight, string>;
   threadVectors!: Table<ThreadVectorRecord, string>;
   handles!: Table<StoredHandleRecord, string>;
+  dockOutbox!: Table<DockOutboxRecord, string>;
+  dockSent!: Table<DockSentRecord, string>;
+  dockTracked!: Table<DockTrackedRecord, string>;
+  dockMeta!: Table<DockMetaRecord, string>;
 
   constructor(dbName = 'ThreadkeeperDB') {
     super(dbName);
@@ -109,6 +114,14 @@ export class ThreadkeeperDB extends Dexie {
             if (!col.keywords) col.keywords = [];
           });
       });
+    // v3: the Sidebar Dock (Still) link — outbox, sent ledger, tracked threads, counters.
+    // New tables only; pairing itself lives in settings.sidebarDock (normalizeSettings fills it).
+    this.version(3).stores({
+      dockOutbox: 'threadKey, notBefore',
+      dockSent: 'threadKey',
+      dockTracked: 'threadKey',
+      dockMeta: 'key',
+    });
   }
 }
 
@@ -257,7 +270,7 @@ export function buildChunksFromMessages(
   return chunks;
 }
 
-async function findMatchingTombstone(
+export async function findMatchingTombstone(
   db: ThreadkeeperDB,
   input: {
     threadKey: string;

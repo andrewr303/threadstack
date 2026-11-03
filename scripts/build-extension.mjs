@@ -215,10 +215,31 @@ async function build() {
     },
   });
 
+  // 3b. Bundle the Sidebar Dock (Still) consent page (ESM). connect.html is NOT web-accessible:
+  // it only ever opens as Threadkeeper's own top-level popup.
+  await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/entrypoints/connect/main.tsx')],
+    outfile: path.join(outDir, 'assets/connect.js'),
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: ['chrome120'],
+    sourcemap: false,
+    minify: true,
+    define: {
+      ...define,
+      'process.env.NODE_ENV': '"production"',
+    },
+  });
+
   // 4. Copy styles.css
   fs.copyFileSync(
     path.join(rootDir, 'src/entrypoints/manager/styles.css'),
     path.join(outDir, 'assets/manager.css'),
+  );
+  fs.copyFileSync(
+    path.join(rootDir, 'src/entrypoints/connect/styles.css'),
+    path.join(outDir, 'assets/connect.css'),
   );
 
   // 5. Write manager.html (full page + in-page overlay) and sidepanel.html (browser side panel)
@@ -238,6 +259,24 @@ async function build() {
 `;
   fs.writeFileSync(path.join(outDir, 'manager.html'), pageHtml('page', 'Threadkeeper — AI thread library'), 'utf8');
   fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'Threadkeeper'), 'utf8');
+  fs.writeFileSync(
+    path.join(outDir, 'connect.html'),
+    `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threadkeeper — Connect Still?</title>
+  <link rel="stylesheet" href="./assets/connect.css" />
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="./assets/connect.js"></script>
+</body>
+</html>
+`,
+    'utf8',
+  );
 
   // 6. Write manifest.json
   const patterns = await loadManifestMatchPatterns();

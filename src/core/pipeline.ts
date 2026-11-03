@@ -529,6 +529,8 @@ export async function runAnalysisJobs(
     signal?: AbortSignal;
     fetchImpl?: typeof fetch;
     onProgress?: (summary: RunJobsSummary, current: string | null) => void;
+    /** Called after each job that finished (analyzed, embedded or skipped) — the Still link's dirty hook. */
+    onJobDone?: (threadKey: string, status: AiThreadResult['status']) => void;
   } = {}
 ): Promise<RunJobsSummary> {
   const started = Date.now();
@@ -564,6 +566,11 @@ export async function runAnalysisJobs(
         lastError: res.status === 'skipped' ? res.reason ?? null : null,
         updatedAt: new Date().toISOString(),
       });
+      try {
+        options.onJobDone?.(job.threadKey, res.status);
+      } catch {
+        // a hook must never stop the queue
+      }
       if (settings.lastAiError) {
         settings.lastAiError = null;
         await saveSettingsPatch(db, { lastAiError: null, lastAiErrorAt: null });

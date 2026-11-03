@@ -10,7 +10,8 @@ import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv } from '../core/sync-env.js
 import { EMPTY_SYNC_STATE, clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
 import { siteConversationTitle, type SiteConversation } from '../core/site-api.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
-import { validateRuntimeMessageSender } from '../core/messaging.js';
+import { DOCK_COMMAND_TYPES, validateDockPageSender, validateRuntimeMessageSender } from '../core/messaging.js';
+import { DockService } from '../core/dock/external.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
 import { isCapturePageUrl, isProviderId, type CaptureProviderId } from '../core/providers.js';
 import {
@@ -26,6 +27,11 @@ const db = new ThreadkeeperDB();
 
 const ANALYSIS_DUE_ALARM = 'tk-analysis-due';
 const ANALYSIS_SWEEP_ALARM = 'tk-analysis-sweep';
+// Sidebar Dock (Still) link.
+const DOCK_DRAIN_ALARM = 'tk-dock-drain';
+const DOCK_RECONCILE_ALARM = 'tk-dock-reconcile';
+const DOCK_DAILY_ALARM = 'tk-dock-daily';
+const DOCK_PAIR_ALARM = 'tk-dock-pair';
 
 let organizeCtxCache: { ctx: OrganizeContext; at: number } | null = null;
 let analysisRun: Promise<unknown> | null = null;
@@ -72,7 +78,15 @@ function kickAnalysis(): Promise<unknown> {
   if (analysisRun) return analysisRun;
   analysisRun = (async () => {
     try {
-      const summary = await runAnalysisJobs(db, { maxJobs: 8, timeBudgetMs: 240_000 });
+      const finished: string[] = [];
+      const summary = await runAnalysisJobs(db, {
+        maxJobs: 8,
+        timeBudgetMs: 240_000,
+        onJobDone: (threadKey, status) => {
+          if (status !== 'skipped') finished.push(threadKey);
+        },
+      });
+      if (finished.length) await dock.markDirty(finished).catch(() => undefined);
       if (summary.processed > 0) {
         organizeCtxCache = null;
         broadcastLibraryChanged();
@@ -98,6 +112,7 @@ async function organizeStoredThread(threadKey: string, settings: SettingsRecord)
   } catch (err) {
     console.warn('[threadkeeper] local organize failed', err);
   }
+  await dock.markDirty([threadKey]).catch((err) => console.warn('[threadkeeper] Still sync mark failed', err));
   broadcastLibraryChanged(threadKey);
 }
 
@@ -180,6 +195,70 @@ async function openManagerTab(query?: Record<string, string>): Promise<number | 
   return created.id;
 }
 const securityRejectionLog: Array<{ timestamp: string; reason: string }> = [];
+
+function logSecurity(reason: string): void {
+  securityRejectionLog.push({ timestamp: new Date().toISOString(), reason });
+  if (securityRejectionLog.length > 200) securityRejectionLog.splice(0, securityRejectionLog.length - 200);
+}
+
+/** Consent window for a Still pair request: a top-level popup (connect.html is not web-accessible). */
+async function openDockConsentWindow(): Promise<void> {
+  const url = chrome.runtime.getURL('connect.html');
+  try {
+    if (chrome.windows?.create) {
+      await chrome.windows.create({ url, type: 'popup', width: 480, height: 640, focused: true });
+      return;
+    }
+  } catch {
+    // fall back to a tab
+  }
+  await chrome.tabs.create({ url });
+}
+
+const dock = new DockService({
+  db,
+  ownId: typeof chrome !== 'undefined' && chrome.runtime?.id ? chrome.runtime.id : '',
+  version:
+    typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : BUILD_INFO.version,
+  sendExternal: (extensionId, message) => chrome.runtime.sendMessage(extensionId, message),
+  openConsentWindow: openDockConsentWindow,
+  openThread: async (threadKey) => {
+    await openManagerTab({ threadKey });
+  },
+  kickAnalysis: () => {
+    organizeCtxCache = null;
+    void kickAnalysis();
+  },
+  scheduleDrain: (atMs) => {
+    if (!chrome.alarms) return;
+    if (atMs === null) void chrome.alarms.clear(DOCK_DRAIN_ALARM);
+    else void chrome.alarms.create(DOCK_DRAIN_ALARM, { when: Math.max(atMs, Date.now() + 30_000) });
+  },
+  schedulePairRetry: (on) => {
+    if (!chrome.alarms) return;
+    if (on) void chrome.alarms.create(DOCK_PAIR_ALARM, { periodInMinutes: 0.5 });
+    else void chrome.alarms.clear(DOCK_PAIR_ALARM);
+  },
+  broadcast: () => {
+    try {
+      void chrome.runtime.sendMessage({ type: 'DOCK_CHANGED' }).catch(() => undefined);
+    } catch {
+      // no listeners open
+    }
+  },
+  log: logSecurity,
+});
+
+// Still (Sidebar Dock) talks to Threadkeeper only on the external channel, with its own validator;
+// external messages never reach the internal handler. Registered synchronously at top level.
+if (typeof chrome !== 'undefined' && chrome.runtime?.onMessageExternal) {
+  chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    void dock.handleExternalMessage(message, sender).then(sendResponse, () =>
+      sendResponse({ ok: false, proto: 'still-threadkeeper/1', error: { code: 'internal', message: 'Threadkeeper failed' } })
+    );
+    return true;
+  });
+}
 type HandshakeEntry = { token: string; redeemed: boolean };
 const tabHandshakeTokens = new Map<number, HandshakeEntry>();
 const SESSION_HANDSHAKE_KEY = 'tk_tab_handshakes';
@@ -369,8 +448,14 @@ async function initializeBackground(): Promise<void> {
   if (chrome.alarms) {
     await chrome.alarms.create('threadkeeper-resumable-jobs', { periodInMinutes: 5 });
     await chrome.alarms.create(ANALYSIS_SWEEP_ALARM, { periodInMinutes: 3 });
+    await chrome.alarms.create(DOCK_RECONCILE_ALARM, { periodInMinutes: 15 });
+    await chrome.alarms.create(DOCK_DAILY_ALARM, { periodInMinutes: 24 * 60 });
   }
   await scheduleAnalysisAlarm();
+  // Still link: catch up with anything changed while the browser was closed (no-op when unpaired;
+  // skipped when the last full pass is under 10 minutes old), then push what is due.
+  await dock.reconcile(false).catch((err) => console.warn('[threadkeeper] Still reconcile failed', err));
+  dock.kickDrain();
 }
 
 // A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
@@ -420,6 +505,14 @@ if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
       });
     } else if (alarm.name === ANALYSIS_DUE_ALARM || alarm.name === ANALYSIS_SWEEP_ALARM) {
       void kickAnalysis();
+    } else if (alarm.name === DOCK_DRAIN_ALARM) {
+      void dock.drain();
+    } else if (alarm.name === DOCK_RECONCILE_ALARM) {
+      void dock.reconcile(false);
+    } else if (alarm.name === DOCK_DAILY_ALARM) {
+      void dock.daily();
+    } else if (alarm.name === DOCK_PAIR_ALARM) {
+      void dock.deliverGrant();
     }
   });
 }
@@ -537,6 +630,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         organizeCtxCache = null;
         await applyLaunchBehavior();
         await scheduleAnalysisAlarm();
+        // Excluded providers may have changed: take back what Still may no longer hold.
+        await dock.syncNow({ privacy: true }).catch(() => undefined);
         sendResponse({ ok: true });
         return;
       }
@@ -636,6 +731,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         'EXPORT_BUNDLE',
         'UPDATE_SETTINGS',
         'RUN_RESUMABLE_JOBS',
+        'DOCK_SEND',
       ]);
 
       if (isEmbeddedInHostTab && privilegedOverlayTypes.has(message.type)) {
@@ -655,6 +751,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           });
           return;
         }
+      }
+
+      if (DOCK_COMMAND_TYPES.has(message.type)) {
+        sendResponse(await handleDockCommand(message, sender));
+        return;
       }
 
       if (message.type === 'OPEN_FULL_PAGE_MANAGER') {
@@ -769,12 +870,70 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   });
 }
 
+/** Internal DOCK_* messages from Threadkeeper's own pages (sender already validated as privileged). */
+async function handleDockCommand(
+  message: Record<string, unknown> & { type: string },
+  sender: chrome.runtime.MessageSender
+): Promise<Record<string, unknown>> {
+  const topLevelOnly = new Set(['DOCK_DECIDE', 'DOCK_UNPAIR', 'DOCK_SET_OPTIONS', 'DOCK_UNBLOCK', 'DOCK_OPEN_CONSENT']);
+  if (topLevelOnly.has(message.type)) {
+    const check = validateDockPageSender(message.type, sender, chrome.runtime.id);
+    if (!check.allowed) {
+      logSecurity(check.reason ?? `Rejected ${message.type}`);
+      return { ok: false, error: 'Open Threadkeeper in its own window to do this.' };
+    }
+  }
+  switch (message.type) {
+    case 'DOCK_SYNC_NOW':
+      return dock.syncNow({ threadKeys: message.threadKeys, privacy: message.privacy });
+    case 'DOCK_GET_STATE':
+      return { ok: true, state: await dock.getState() };
+    case 'DOCK_PENDING':
+      return { ok: true, pending: await dock.getPending() };
+    case 'DOCK_DECIDE':
+      return dock.decide({
+        requestId: message.requestId,
+        allow: message.allow,
+        code: message.code,
+        allowRemoteModels: message.allowRemoteModels,
+      });
+    case 'DOCK_UNPAIR':
+      return dock.unpair();
+    case 'DOCK_SEND':
+      return dock.sendThreads(message.threadKeys, message.target);
+    case 'DOCK_COLLECTIONS':
+      return dock.collections();
+    case 'DOCK_STATUS_FOR':
+      return dock.statusFor(message.threadKeys);
+    case 'DOCK_SET_OPTIONS':
+      return {
+        ok: true,
+        state: await dock.setOptions({
+          allowSearch: message.allowSearch,
+          shareTranscripts: message.shareTranscripts,
+          allowRemoteModels: message.allowRemoteModels,
+        }),
+      };
+    case 'DOCK_UNBLOCK':
+      return dock.unblock(message.extensionId);
+    case 'DOCK_RESYNC':
+      return dock.resync();
+    case 'DOCK_OPEN_CONSENT':
+      if (!(await dock.getPending())) return { ok: false, error: 'No request is waiting.' };
+      await openDockConsentWindow();
+      return { ok: true };
+    default:
+      return { ok: false, error: `Unknown ${message.type}` };
+  }
+}
+
 // Expose test-harness entrypoints on ServiceWorker globalThis for packaged-extension acceptance testing
 (globalThis as unknown as Record<string, unknown>).__threadkeeperInvokeAction =
   invokeOverlayOnTab;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperGetSecurityRejections =
   () => [...securityRejectionLog];
 (globalThis as unknown as Record<string, unknown>).__threadkeeperDb = db;
+(globalThis as unknown as Record<string, unknown>).__threadkeeperDock = dock;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperClearInMemoryHandshakes =
   () => {
     tabHandshakeTokens.clear();
