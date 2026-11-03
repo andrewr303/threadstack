@@ -1,6 +1,7 @@
 import {
   getDisplayTitle,
   computeDeterministicHash,
+  normalizeSettings,
   type ConversationRecord,
   type MessageRecord,
   type StructuredSummaryRecord,
@@ -11,6 +12,12 @@ import {
   type WorkflowState,
 } from './schema.js';
 import type { ThreadkeeperDB } from './db.js';
+import {
+  bestMatchingExcerpt,
+  buildRerankDocument,
+  fuseRerankScores,
+  remoteRerankAllowedKeys,
+} from './rerank.js';
 
 export interface SearchScopeFilter {
   accountId?: string;
@@ -46,10 +53,16 @@ export interface HybridSearchOptions {
     dimensions: 256 | 512 | 1024 | 2048;
     embedding: number[];
   };
+  /**
+   * Second-stage reranker (see rerankerHook in rerank.ts). Receives short
+   * documents for the allowed (not local-only) candidates only.
+   */
   reranker?: (
     query: string,
     documents: string[]
   ) => Promise<Array<{ index: number; relevanceScore: number }>>;
+  /** How many fused results the reranker re-scores (default 40). */
+  rerankCandidates?: number;
 }
 
 export interface HybridSearchResponse {
@@ -769,39 +782,69 @@ export async function runHybridSearch(
 
   let rerankFallbackUsed = false;
   if (options.reranker && mergedHits.length > 1 && options.query.trim().length > 0) {
-    const shortlist = mergedHits.slice(0, Math.min(20, mergedHits.length));
-    try {
-      const reranked = await options.reranker(
-        options.query,
-        shortlist.map(
-          (h) => `${getDisplayTitle(h.conversation)}\n${h.supportingExcerpt}`
-        )
-      );
-      if (
-        !Array.isArray(reranked) ||
-        reranked.length === 0 ||
-        reranked.some(
-          (r) =>
-            typeof r.index !== 'number' ||
-            r.index < 0 ||
-            r.index >= shortlist.length ||
-            !Number.isFinite(r.relevanceScore)
-        )
-      ) {
-        rerankFallbackUsed = true;
-      } else {
-        for (const r of reranked) {
-          const item = shortlist[r.index];
-          item.rerankScore = r.relevanceScore;
-          item.score = item.score + r.relevanceScore;
+    const shortlist = mergedHits.slice(0, Math.max(2, options.rerankCandidates ?? 40));
+    // Local-only threads are never sent; they keep their first-stage slot.
+    const settings = normalizeSettings(await db.settings.get('default'));
+    const allowed = await remoteRerankAllowedKeys(
+      db,
+      settings,
+      shortlist.map((h) => h.conversation.threadKey)
+    );
+    const sendable = shortlist
+      .map((hit, slot) => ({ hit, slot }))
+      .filter(({ hit }) => allowed.has(hit.conversation.threadKey));
+    const summaryByThread = new Map(summaries.map((s) => [s.threadKey, s]));
+    const messagesByThread = new Map<string, MessageRecord[]>();
+    for (const m of messages) {
+      if (!allowed.has(m.threadKey)) continue;
+      const list = messagesByThread.get(m.threadKey) ?? [];
+      list.push(m);
+      messagesByThread.set(m.threadKey, list);
+    }
+    if (sendable.length >= 2) {
+      try {
+        const reranked = await options.reranker(
+          options.query,
+          sendable.map(({ hit }) =>
+            buildRerankDocument({
+              title: getDisplayTitle(hit.conversation),
+              gist: summaryByThread.get(hit.conversation.threadKey)?.currentStatus,
+              excerpt:
+                bestMatchingExcerpt(
+                  (messagesByThread.get(hit.conversation.threadKey) ?? []).sort((a, b) => a.ordinal - b.ordinal),
+                  options.query
+                ) || hit.supportingExcerpt,
+            })
+          )
+        );
+        if (
+          !Array.isArray(reranked) ||
+          reranked.length === 0 ||
+          reranked.some(
+            (r) =>
+              typeof r.index !== 'number' ||
+              !Number.isInteger(r.index) ||
+              r.index < 0 ||
+              r.index >= sendable.length ||
+              !Number.isFinite(r.relevanceScore)
+          )
+        ) {
+          rerankFallbackUsed = true;
+        } else {
+          const scores = new Map<number, number>();
+          for (const r of reranked) {
+            const { hit, slot } = sendable[r.index];
+            hit.rerankScore = r.relevanceScore;
+            scores.set(slot, r.relevanceScore);
+          }
+          mergedHits = [
+            ...fuseRerankScores(shortlist.length, scores).map((i) => shortlist[i]),
+            ...mergedHits.slice(shortlist.length),
+          ];
         }
-        mergedHits = [
-          ...shortlist.sort((a, b) => b.score - a.score),
-          ...mergedHits.slice(shortlist.length),
-        ];
+      } catch {
+        rerankFallbackUsed = true;
       }
-    } catch {
-      rerankFallbackUsed = true;
     }
   }
 

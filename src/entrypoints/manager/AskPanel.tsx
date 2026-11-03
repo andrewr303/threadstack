@@ -9,9 +9,17 @@ import {
 import type { MemorySearchIndex } from '../../core/search.js';
 import { askLibraryWithClaude, hasClaudeKey, type AskContextThread } from '../../core/ai/claude.js';
 import { cosine, embedTexts, localHashEmbedding, remoteSpace, LOCAL_SPACE } from '../../core/embeddings.js';
+import {
+  applyRerankOrder,
+  bestMatchingExcerpt,
+  buildRerankDocument,
+  remoteRerankAllowedKeys,
+  rerankReady,
+  rerankThreads,
+} from '../../core/rerank.js';
 import { providerLabel } from '../../core/providers.js';
 import { getSmartTitle } from '../../core/insights.js';
-import { relativeTime, renderCitations } from './shared.js';
+import { relativeTime, renderCitations, sharedDb } from './shared.js';
 
 interface Props {
   settings: SettingsRecord | null;
@@ -25,6 +33,11 @@ interface Props {
 }
 
 const MAX_SOURCES = 8;
+
+/** Ask reranks a smaller pool than search (default 30 when search uses 40). */
+function askRerankPool(settings: SettingsRecord): number {
+  return Math.max(MAX_SOURCES, Math.min(100, Math.round((settings.rerankCandidates || 40) * 0.75)));
+}
 
 function excerptsFor(messages: MessageRecord[], question: string): string[] {
   const terms = question
@@ -66,8 +79,48 @@ export function AskPanel({
   const [sources, setSources] = useState<ConversationRecord[]>([]);
   const [status, setStatus] = useState<'idle' | 'retrieving' | 'answering' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [rerankNote, setRerankNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const canAsk = settings ? hasClaudeKey(settings) : false;
+
+  /**
+   * Second stage: rerank the best fused candidates before choosing sources.
+   * Local-only threads are never sent and keep their place; any failure
+   * keeps the first-stage order with a short note.
+   */
+  const rerankForAsk = async (q: string, ranked: ConversationRecord[]): Promise<ConversationRecord[]> => {
+    setRerankNote(null);
+    if (!settings || !settings.rerankInAsk || !rerankReady(settings) || ranked.length < 2) return ranked;
+    const pool = ranked.slice(0, askRerankPool(settings));
+    try {
+      const allowed = await remoteRerankAllowedKeys(
+        sharedDb,
+        settings,
+        pool.map((c) => c.threadKey)
+      );
+      const outcome = await rerankThreads(
+        settings,
+        q,
+        pool.map((c) => {
+          const insight = insights.get(c.threadKey) ?? null;
+          return {
+            key: c.threadKey,
+            document: buildRerankDocument({
+              title: getSmartTitle(c, insight),
+              gist: insight?.gist,
+              excerpt: bestMatchingExcerpt(messagesByThread.get(c.threadKey) ?? [], q),
+            }),
+          };
+        }),
+        allowed
+      );
+      if (outcome.scores.size > 0) setRerankNote(`Reranked with ${outcome.label}`);
+      return [...applyRerankOrder(pool, (c) => c.threadKey, outcome.order), ...ranked.slice(pool.length)];
+    } catch (err) {
+      setRerankNote(`Not reranked: ${err instanceof Error ? err.message : String(err)}`);
+      return ranked;
+    }
+  };
 
   const retrieve = async (q: string): Promise<ConversationRecord[]> => {
     const byKey = new Map(conversations.map((c) => [c.threadKey, c]));
@@ -96,11 +149,11 @@ export function AskPanel({
         // remote embeddings unavailable; lexical + local vectors still apply
       }
     }
-    return Array.from(fused.entries())
+    const ranked = Array.from(fused.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, MAX_SOURCES)
-      .map(([k]) => byKey.get(k)!)
-      .filter((c) => c && !c.isSyntheticBenchmark);
+      .map(([k]) => byKey.get(k))
+      .filter((c): c is ConversationRecord => Boolean(c && !c.isSyntheticBenchmark));
+    return (await rerankForAsk(q, ranked)).slice(0, MAX_SOURCES);
   };
 
   const ask = async () => {
@@ -197,6 +250,11 @@ export function AskPanel({
           <div className="tk-eyebrow" style={{ padding: 0 }}>
             {canAsk ? 'Sources' : 'Most relevant threads'}
           </div>
+          {rerankNote && (
+            <div className="tk-muted" role="status" style={{ fontSize: 12 }}>
+              {rerankNote}
+            </div>
+          )}
           <ol>
             {sources.map((c, i) => {
               const insight = insights.get(c.threadKey) ?? null;
