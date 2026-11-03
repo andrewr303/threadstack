@@ -62,6 +62,11 @@ export function bedrockFallbackActive(): boolean {
   return !bedrockFallbackRejected;
 }
 
+/** Whether createAiClient attaches the client-side refusal fallback for these settings. */
+export function bedrockFallbackAttached(settings: SettingsRecord): boolean {
+  return settings.aiBackend === 'bedrock' && bedrockFallbackActive() && FALLBACK_ELIGIBLE.has(settings.aiModel);
+}
+
 export function backendLabel(settings: SettingsRecord): string {
   switch (settings.aiBackend) {
     case 'bedrock':
@@ -166,7 +171,7 @@ export function createAiClient(settings: SettingsRecord, options: AiClientOption
   if (settings.aiBackend === 'bedrock') {
     const baseURL = bedrockMantleBaseUrl(settings.aws.region);
     const middleware =
-      options.withBedrockFallback !== false && bedrockFallbackActive() && FALLBACK_ELIGIBLE.has(settings.aiModel)
+      options.withBedrockFallback !== false && bedrockFallbackAttached(settings)
         ? [betaRefusalFallbackMiddleware([{ model: BEDROCK_FALLBACK_MODEL }])]
         : undefined;
     if (settings.aws.auth === 'api_key') {

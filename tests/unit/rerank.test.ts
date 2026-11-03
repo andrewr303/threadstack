@@ -444,4 +444,15 @@ describe('testReranker', () => {
     expect(ok).toEqual({ ok: true, message: 'Connected: rerank-3 ranked the test documents correctly.' });
     expect(await testReranker(DEFAULT_SETTINGS)).toEqual({ ok: false, message: 'No reranker is selected.' });
   });
+
+  it('always reaches the provider, so a revoked key fails even after a passing test', async () => {
+    const good = recordingFetch((c) => ({
+      data: (c.body.documents as string[]).map((_, index) => ({ index, relevance_score: index === 0 ? 0.8 : 0.1 })),
+    }));
+    expect((await testReranker(voyage, good.fetchImpl)).ok).toBe(true);
+    const revoked = recordingFetch(() => ({ detail: 'Unauthorized' }), 401);
+    const second = await testReranker({ ...voyage, voyageApiKey: 'pa-revoked' }, revoked.fetchImpl);
+    expect(revoked.calls).toHaveLength(1);
+    expect(second.ok).toBe(false);
+  });
 });

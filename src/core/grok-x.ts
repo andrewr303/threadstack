@@ -185,8 +185,20 @@ export function mergeGrokXMessages(existing: GrokXMessage[], incoming: GrokXMess
   if (existing.length === 0) return incoming.slice();
   const incomingIds = new Set(incoming.map((m) => m.id));
   const overlaps = existing.map((m, i) => (incomingIds.has(m.id) ? i : -1)).filter((i) => i >= 0);
+  // Content-hash ids can repeat across pages ("hi" twice), so a shared id is an overlap only when the
+  // two pages line up from there on; otherwise the incoming page is a separate, older page.
+  let aligned = overlaps.length > 0;
+  if (aligned) {
+    const j0 = incoming.findIndex((m) => m.id === existing[overlaps[0]].id);
+    for (let k = 0; overlaps[0] + k < existing.length && j0 + k < incoming.length; k++) {
+      if (existing[overlaps[0] + k].id !== incoming[j0 + k].id) {
+        aligned = false;
+        break;
+      }
+    }
+  }
   const merged =
-    overlaps.length === 0
+    !aligned
       ? [...incoming, ...existing]
       : [
           ...existing.slice(0, overlaps[0]),

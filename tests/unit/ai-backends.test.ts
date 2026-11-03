@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   aiCredentialsProblem,
+  bedrockFallbackActive,
   aiCredentialsReady,
   aiHostOrigins,
   markBedrockFallbackUnsupported,
@@ -132,6 +133,20 @@ describe('AI backends', () => {
     expect(calls[0].headers.authorization).toContain('/eu-central-1/bedrock-mantle/aws4_request');
     expect(calls[0].headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
     expect(calls[0].body.model).toBe('anthropic.claude-opus-5-5');
+  });
+
+  it('Bedrock: a 400 on a model without the fallback middleware is not mistaken for a rejected beta header', async () => {
+    const calls: Call[] = [];
+    const s = settings({ aiBackend: 'bedrock', aiModel: 'claude-haiku-5-5', aws: { ...DEFAULT_AWS_SETTINGS, bedrockApiKey: 'k' } });
+    const fetchImpl = messagesFetch(calls, () =>
+      new Response(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'thinking.display "updates" requires a beta' } }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    await expect(analyzeThreadWithClaude(s, INPUT, fetchImpl)).rejects.toThrow(/Request rejected/);
+    expect(calls).toHaveLength(1);
+    expect(bedrockFallbackActive()).toBe(true);
   });
 
   it('Bedrock: retries without the fallback middleware if Bedrock rejects its beta header', async () => {

@@ -272,6 +272,8 @@ export interface RerankOptions {
   signal?: AbortSignal;
   /** Give up after this long; default 8 s. */
   timeoutMs?: number;
+  /** Ask the provider even for cached documents (connection tests must reach it). */
+  bypassCache?: boolean;
 }
 
 /**
@@ -304,7 +306,7 @@ export async function rerankDocuments(
   capped.forEach((text, index) => {
     if (!text) return;
     const key = cacheKey(provider, model, queryHash, text);
-    const cached = cacheGet(key);
+    const cached = options.bypassCache ? undefined : cacheGet(key);
     if (cached !== undefined) scores.set(index, cached);
     else pending.push({ index, text, key });
   });
@@ -375,7 +377,8 @@ export async function testReranker(
       'How do I make a webhook handler idempotent?',
       ['Store each event id and skip events you have already processed.', 'Sourdough needs a long, cool proof.'],
       2,
-      fetchImpl
+      fetchImpl,
+      { bypassCache: true }
     );
     if (results.length !== 2) return { ok: false, message: `${rerankModelLabel(settings)} returned ${results.length} of 2 scores.` };
     const sensible = results[0].index === 0;
