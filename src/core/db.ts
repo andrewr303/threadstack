@@ -271,6 +271,79 @@ async function findMatchingTombstone(
     .first();
 }
 
+type IncomingMessage = UpsertThreadInput['messages'][number];
+
+/** Containment shorter than this is too weak to say two messages are the same. */
+const MIN_CONTAINED_CHARS = 24;
+
+/**
+ * Pair stored messages with an incoming partial capture, by stored index.
+ *
+ * Older captures used positional ids (<conv>_<branch>_m_<i>); newer ones key
+ * messages by the site's own id and also clean the text (thinking blocks
+ * removed, answer instead of reasoning). Without pairing, the first recapture
+ * after that switch stores those messages twice. Passes, most certain first:
+ * the same id; a positional message and a keyed one with the same role and
+ * text; the same role where one text contains the other; and finally, between
+ * two already-paired messages, the next positional message of the same role.
+ * A keyed message with no paired message before it is never guessed, because
+ * a visible window at the end of a long thread would otherwise overwrite an
+ * older message.
+ */
+export function pairStoredWithIncoming(
+  stored: Array<Pick<MessageRecord, 'sourceMessageId' | 'role' | 'content'>>,
+  incoming: IncomingMessage[]
+): Map<number, IncomingMessage> {
+  const pairs = new Map<number, IncomingMessage>();
+  const used = new Set<string>();
+  const byId = new Map(incoming.map((m) => [m.sourceMessageId, m]));
+  const isPositional = (id: string) => POSITIONAL_MESSAGE_ID.test(id);
+  const pair = (i: number, m: IncomingMessage) => {
+    pairs.set(i, m);
+    used.add(m.sourceMessageId);
+  };
+
+  stored.forEach((prev, i) => {
+    const m = byId.get(prev.sourceMessageId);
+    if (m && !used.has(m.sourceMessageId)) pair(i, m);
+  });
+
+  const keyed = incoming.filter((m) => !isPositional(m.sourceMessageId));
+  const textMatch = (a: string, b: string) => a === b;
+  const containMatch = (a: string, b: string) => {
+    const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+    return short.length >= MIN_CONTAINED_CHARS && long.includes(short);
+  };
+  for (const matches of [textMatch, containMatch]) {
+    stored.forEach((prev, i) => {
+      if (pairs.has(i) || !isPositional(prev.sourceMessageId)) return;
+      const text = prev.content.trim();
+      const m = keyed.find((k) => !used.has(k.sourceMessageId) && k.role === prev.role && matches(text, k.content.trim()));
+      if (m) pair(i, m);
+    });
+  }
+
+  const storedIndexOf = new Map(Array.from(pairs, ([i, m]) => [m.sourceMessageId, i]));
+  let anchor: number | null = null;
+  for (const m of incoming) {
+    const at = storedIndexOf.get(m.sourceMessageId);
+    if (at !== undefined) {
+      anchor = at;
+      continue;
+    }
+    if (anchor === null || isPositional(m.sourceMessageId) || used.has(m.sourceMessageId)) continue;
+    for (let i = anchor + 1; i < stored.length && !pairs.has(i); i++) {
+      if (isPositional(stored[i].sourceMessageId) && stored[i].role === m.role) {
+        pair(i, m);
+        storedIndexOf.set(m.sourceMessageId, i);
+        anchor = i;
+        break;
+      }
+    }
+  }
+  return pairs;
+}
+
 export async function upsertThread(
   db: ThreadkeeperDB,
   input: UpsertThreadInput
@@ -326,43 +399,30 @@ export async function upsertThread(
         input.captureSource === 'dom_observer' &&
         existingMessages.length > input.messages.length
       ) {
-        const bySourceId = new Map(
-          input.messages.map((m) => [m.sourceMessageId, m])
-        );
-        // Older captures used positional ids (<conv>_<branch>_m_<i>); newer ones key messages by the
-        // site's own id. Treat a positional message as the keyed one with the same role and text, so
-        // the first recapture after the switch does not store the message twice.
-        const keyedByText = new Map<string, string>();
-        for (const m of input.messages) {
-          if (!POSITIONAL_MESSAGE_ID.test(m.sourceMessageId)) {
-            keyedByText.set(`${m.role}\u0000${m.content.trim()}`, m.sourceMessageId);
-          }
-        }
-        for (const prev of existingMessages) {
-          const keyedTwin = POSITIONAL_MESSAGE_ID.test(prev.sourceMessageId)
-            ? keyedByText.get(`${prev.role}\u0000${prev.content.trim()}`)
-            : undefined;
-          const updated = bySourceId.get(keyedTwin ?? prev.sourceMessageId);
-          if (updated) {
-            mergedMessagePayloads.push({
-              sourceMessageId: updated.sourceMessageId,
-              role: updated.role,
-              content: updated.content,
-              createdAt: updated.createdAt ?? prev.createdAt,
-              branchPath: updated.branchPath ?? prev.branchPath,
-            });
-            bySourceId.delete(updated.sourceMessageId);
-          } else {
-            mergedMessagePayloads.push({
-              sourceMessageId: prev.sourceMessageId,
-              role: prev.role,
-              content: prev.content,
-              createdAt: prev.createdAt,
-              branchPath: prev.branchPath,
-            });
-          }
-        }
-        for (const remaining of bySourceId.values()) {
+        const pairs = pairStoredWithIncoming(existingMessages, input.messages);
+        const paired = new Set(Array.from(pairs.values(), (m) => m.sourceMessageId));
+        existingMessages.forEach((prev, i) => {
+          const updated = pairs.get(i);
+          mergedMessagePayloads.push(
+            updated
+              ? {
+                  sourceMessageId: updated.sourceMessageId,
+                  role: updated.role,
+                  content: updated.content,
+                  createdAt: updated.createdAt ?? prev.createdAt,
+                  branchPath: updated.branchPath ?? prev.branchPath,
+                }
+              : {
+                  sourceMessageId: prev.sourceMessageId,
+                  role: prev.role,
+                  content: prev.content,
+                  createdAt: prev.createdAt,
+                  branchPath: prev.branchPath,
+                }
+          );
+        });
+        for (const remaining of input.messages) {
+          if (paired.has(remaining.sourceMessageId)) continue;
           mergedMessagePayloads.push({
             sourceMessageId: remaining.sourceMessageId,
             role: remaining.role,
@@ -933,8 +993,9 @@ export async function applyBulkThreadEdit(
         previousProjectSource: existing.projectSource,
         previousWorkflowStateSource: existing.workflowStateSource,
         previousProjectReason: existing.projectReason ?? null,
-        previousPinned: existing.pinned,
-        previousCloudExcluded: existing.cloudExcluded,
+        // Only for the fields this edit changes: undoing a move must not switch off a local-only flag set since.
+        ...(patch.pinned !== undefined ? { previousPinned: existing.pinned } : {}),
+        ...(patch.cloudExcluded !== undefined ? { previousCloudExcluded: existing.cloudExcluded } : {}),
       });
     }
     if (snapshots.length === 0) return null;

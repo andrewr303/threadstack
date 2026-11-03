@@ -8,7 +8,7 @@ import {
   aiCredentialsReady,
   backendHost,
   backendLabel,
-  bedrockFallbackActive,
+  bedrockFallbackAttached,
   createAiClient,
   markBedrockFallbackUnsupported,
   resolveModelId,
@@ -60,7 +60,7 @@ async function withClient<T>(
   fetchImpl: typeof fetch | undefined,
   run: (client: Anthropic) => Promise<T>
 ): Promise<T> {
-  const usesMiddleware = settings.aiBackend === 'bedrock' && bedrockFallbackActive();
+  const usesMiddleware = bedrockFallbackAttached(settings);
   try {
     return await run(createAiClient(settings, { fetchImpl }));
   } catch (err) {

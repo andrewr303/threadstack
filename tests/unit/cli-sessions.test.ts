@@ -322,6 +322,26 @@ describe('Codex forks', () => {
     // the parent thread is untouched and keeps its own transcript
     expect(await storedContents(db, first.threadKeys[0])).toHaveLength(4);
   });
+
+  it('de-duplicates a fork of a stored fork when a later sync reads only the nested fork', async () => {
+    const db = freshDb();
+    const settings = await ensureStarterCollectionsAndSettings(db);
+    const forkRecs = forkRecords(F, P, P, parentRecords, forkOwnTurns);
+    await importFiles(db, settings, [
+      { name: `sessions/2026/10/01/${parentFile}`, text: jsonl(parentRecords) },
+      { name: `sessions/2026/10/01/${forkFile}`, text: jsonl(forkRecs) },
+    ]);
+    const nestedOwn = [item('user', 'Expire Redis keys after an hour', at(41)), item('assistant', 'Keys now have a 3600 s TTL.', at(41, 4))];
+    const later = await importFiles(db, settings, [
+      { name: `sessions/2026/10/01/rollout-2026-10-01T10-40-00-${G}.jsonl`, text: jsonl(forkRecords(G, F, P, forkRecs, nestedOwn, 40)) },
+    ]);
+    const nestedKey = later.threadKeys[0];
+    expect(nestedKey.endsWith(`:${P}:${G}`)).toBe(true);
+    expect((await storedContents(db, nestedKey)).slice(1)).toEqual([
+      ['user', 'Expire Redis keys after an hour'],
+      ['assistant', 'Keys now have a 3600 s TTL.'],
+    ]);
+  });
 });
 
 describe('Codex sub-agent rollouts', () => {

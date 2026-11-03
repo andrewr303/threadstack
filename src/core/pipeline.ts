@@ -1,3 +1,4 @@
+import { isRemoteAllowed } from './privacy.js';
 import {
   insightKeyFor,
   type ConversationRecord,
@@ -408,8 +409,11 @@ export async function analyzeThreadRemotely(
       throw new ClaudeCallError('Daily AI analysis limit reached; resumes tomorrow.', true, 'rate_limit');
     }
     const collections = await db.collections.toArray();
+    // Tags come from message text, so only threads that may leave the browser contribute.
+    const localOnly = new Set(collections.filter((c) => c.cloudExcluded).map((c) => c.name));
     const tagCounts = new Map<string, number>();
     for (const c of await db.conversations.limit(5000).toArray()) {
+      if (!isRemoteAllowed(c, settings, localOnly)) continue;
       for (const t of c.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
     }
     const knownTags = Array.from(tagCounts.entries())

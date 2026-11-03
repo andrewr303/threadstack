@@ -627,6 +627,24 @@ describe('Claude analysis pipeline (mocked Anthropic API)', () => {
     return t;
   }
 
+  it('never sends tags that come from local-only threads to Claude', async () => {
+    const db = freshDb();
+    const t = await seed(db);
+    await upsertThread(db, {
+      ...thread('secret-1', 'Board prep', [['user', 'Draft talking points for the acquisition.']]),
+      tags: ['secret-merger-codename'],
+      cloudExcluded: true,
+    });
+    await upsertThread(db, { ...thread('open-1', 'Retry policy', [['user', 'How long should webhook retries back off?']]), tags: ['retry-policy'] });
+    await processThreadLocally(db, t.threadKey);
+
+    const calls: Array<{ url: string; headers: Record<string, string>; body: any }> = [];
+    await runAnalysisJobs(db, { fetchImpl: anthropicFetch(analysis, calls) });
+    const sent = JSON.stringify(calls[0].body);
+    expect(sent).toContain('retry-policy');
+    expect(sent).not.toContain('secret-merger-codename');
+  });
+
   it('queues analysis on capture, calls Claude with structured output + refusal fallback, and files with the stronger signal', async () => {
     const db = freshDb();
     const t = await seed(db);

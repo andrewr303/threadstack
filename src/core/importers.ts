@@ -1,6 +1,6 @@
 import { unzipSync, strFromU8 } from 'fflate';
 import { decompress as zstdDecompress } from 'fzstd';
-import type { SettingsRecord } from './schema.js';
+import { buildThreadKey, type MessageRecord, type SettingsRecord } from './schema.js';
 import { upsertThread, type ThreadkeeperDB, type UpsertThreadInput } from './db.js';
 import {
   importPortableBundle,
@@ -175,9 +175,7 @@ export async function importFiles(
 
   if (codexRollouts.length > 0) {
     try {
-      const threads = await resolveCodexRollouts(codexRollouts, (threadKey) =>
-        db.messages.where('threadKey').equals(threadKey).sortBy('ordinal')
-      );
+      const threads = await resolveCodexRollouts(codexRollouts, (threadKey) => storedCodexHistory(db, threadKey));
       const items: UpsertThreadInput[] = [];
       for (const thread of threads) {
         const item = await mergeStoredCodexThread(db, thread);
@@ -197,6 +195,26 @@ export async function importFiles(
     });
   }
   return report;
+}
+
+/**
+ * A stored Codex thread's full history. A stored fork keeps only its own turns
+ * after a "Forked from…" marker, so its parent's history is prepended (one
+ * level at a time) for a later fork of that fork to recognise what it replays.
+ */
+async function storedCodexHistory(db: ThreadkeeperDB, threadKey: string, depth = 0): Promise<MessageRecord[]> {
+  const messages = await db.messages.where('threadKey').equals(threadKey).sortBy('ordinal');
+  if (depth >= 8 || !messages[0]?.sourceMessageId.endsWith('_forked')) return messages;
+  const conv = await db.conversations.get(threadKey);
+  if (!conv?.parentBranchId) return messages;
+  const parentKey = buildThreadKey({
+    provider: conv.provider,
+    accountId: conv.accountId,
+    workspaceId: conv.workspaceId,
+    sourceConversationId: conv.sourceConversationId,
+    branchId: conv.parentBranchId,
+  });
+  return [...(await storedCodexHistory(db, parentKey, depth + 1)), ...messages.slice(1)];
 }
 
 /** Minimal shape of the File System Access API we rely on (extension pages only). */

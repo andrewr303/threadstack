@@ -8,8 +8,9 @@ import { BUILD_INFO, type BuildInfo } from './build-info.js';
  * full-page library the extension opens itself. Edge reads manifest.json only
  * when an unpacked extension is (re)loaded, so rebuilding without pressing
  * Reload keeps the broken manifest live while the new JS and HTML on disk are
- * served. Pages and the service worker compare the running manifest with the
- * build they were compiled from and repair or explain the mismatch.
+ * served. Pages compare the running manifest with the build they were compiled
+ * from; the service worker, whose script is cached until reload, compares it
+ * with build-info.json read from disk. Either repairs or explains the mismatch.
  */
 
 export type ManifestIssueCode =
@@ -192,6 +193,31 @@ export async function autoHealStaleManifest(
   });
   deps.reload();
   return 'reloading';
+}
+
+/**
+ * The build whose files are on disk now. A service worker that started before
+ * a rebuild keeps running its cached script (with the old BUILD_INFO), but a
+ * no-store fetch of the packaged build-info.json returns the new file, so
+ * comparing that with the running manifest catches a rebuild without Reload.
+ */
+export async function readDiskBuildInfo(
+  url: string,
+  fetchImpl: typeof fetch = (input, init) => fetch(input, init)
+): Promise<BuildInfo | null> {
+  try {
+    const res = await fetchImpl(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    if (!data || typeof data !== 'object') return null;
+    const { version, versionName, buildId, builtAt } = data as Record<string, unknown>;
+    if (typeof version !== 'string' || typeof versionName !== 'string' || typeof buildId !== 'string' || typeof builtAt !== 'string') {
+      return null;
+    }
+    return { version, versionName, buildId, builtAt };
+  } catch {
+    return null;
+  }
 }
 
 export interface DiagnosticsSnapshot {

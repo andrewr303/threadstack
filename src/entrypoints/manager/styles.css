@@ -226,7 +226,7 @@ body,
 .tk-select:focus-visible,
 .tk-row-btn:focus-visible,
 .tk-nav-item:focus-visible,
-.tk-link-btn:focus-visible,
+.tk-linklike:focus-visible,
 .tk-evidence-marker:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1567,7 +1567,9 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-diag-status[data-ok="false"] {
-  background: rgba(140, 58, 46, 0.10);
+  border-left: 2px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
 }
 
 .tk-diag-grid {
@@ -1655,6 +1657,8 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-settings-nav {
   min-width: 0;
   overflow-y: auto;
+  /* Room for the shared focus ring, which sits outside each item. */
+  padding: 4px;
 }
 
 .tk-settings-panel {
@@ -1689,16 +1693,6 @@ details.tk-settings-section > summary.tk-settings-h3 {
   border: 0;
 }
 
-.tk-link-btn {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 .tk-plain-list {
   margin: 0;
   padding-left: 18px;
@@ -1709,6 +1703,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 @media (max-width: 640px) {
   .tk-modal-settings[open] {
     height: 92vh;
+    max-height: 92vh;
   }
 
   .tk-settings-layout {
@@ -1732,7 +1727,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
     box-shadow: inset 0 -2px 0 var(--accent);
   }
 
-  .tk-settings-nav .tk-nav-count {
+  .tk-settings-nav .tk-nav-count:not([data-tone="danger"]) {
     display: none;
   }
 }

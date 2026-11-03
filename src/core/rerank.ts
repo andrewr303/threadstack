@@ -272,6 +272,8 @@ export interface RerankOptions {
   signal?: AbortSignal;
   /** Give up after this long; default 8 s. */
   timeoutMs?: number;
+  /** Ask the provider even for cached documents (connection tests must reach it). */
+  bypassCache?: boolean;
 }
 
 /**
@@ -304,7 +306,7 @@ export async function rerankDocuments(
   capped.forEach((text, index) => {
     if (!text) return;
     const key = cacheKey(provider, model, queryHash, text);
-    const cached = cacheGet(key);
+    const cached = options.bypassCache ? undefined : cacheGet(key);
     if (cached !== undefined) scores.set(index, cached);
     else pending.push({ index, text, key });
   });
@@ -375,7 +377,8 @@ export async function testReranker(
       'How do I make a webhook handler idempotent?',
       ['Store each event id and skip events you have already processed.', 'Sourdough needs a long, cool proof.'],
       2,
-      fetchImpl
+      fetchImpl,
+      { bypassCache: true }
     );
     if (results.length !== 2) return { ok: false, message: `${rerankModelLabel(settings)} returned ${results.length} of 2 scores.` };
     const sensible = results[0].index === 0;
@@ -392,39 +395,8 @@ export async function testReranker(
 // Privacy
 // ---------------------------------------------------------------------------
 
-/**
- * Whether a thread's text may be sent to a remote reranker. Mirrors
- * isRemoteProcessingAllowed in pipeline.ts (local-only thread, local-only
- * project, excluded provider, synthetic benchmark).
- */
-export function remoteRerankAllowed(
-  conv: ConversationRecord,
-  settings: SettingsRecord,
-  localOnlyProjects: ReadonlySet<string>
-): boolean {
-  if (conv.cloudExcluded || conv.isSyntheticBenchmark) return false;
-  if (settings.cloudExcludedProviders.includes(conv.provider)) return false;
-  return !localOnlyProjects.has(conv.project);
-}
-
-/**
- * The subset of `threadKeys` whose text may go to a remote reranker, read
- * fresh from the database so a thread or project marked local-only a moment
- * ago is honoured even if the caller's copy is stale.
- */
-export async function remoteRerankAllowedKeys(
-  db: ThreadkeeperDB,
-  settings: SettingsRecord,
-  threadKeys: string[]
-): Promise<Set<string>> {
-  const [convs, collections] = await Promise.all([db.conversations.bulkGet(threadKeys), db.collections.toArray()]);
-  const localOnly = new Set(collections.filter((c) => c.cloudExcluded).map((c) => c.name));
-  const allowed = new Set<string>();
-  for (const conv of convs) {
-    if (conv && remoteRerankAllowed(conv, settings, localOnly)) allowed.add(conv.threadKey);
-  }
-  return allowed;
-}
+/** The shared local-only rule (src/core/privacy.ts), under the names the search code uses. */
+export { isRemoteAllowed as remoteRerankAllowed, remoteAllowedKeys as remoteRerankAllowedKeys } from './privacy.js';
 
 // ---------------------------------------------------------------------------
 // Documents and fusion

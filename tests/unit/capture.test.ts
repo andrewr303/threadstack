@@ -228,6 +228,14 @@ describe('Grok on X: merging responses into one conversation', () => {
     ]);
   });
 
+  it('keeps both copies when a repeated content-hash id is not a real overlap', () => {
+    // Two id-less pages where "hi" hashes to the same id on both, but the pages do not line up.
+    const newer = [grokMessage('h#hi', 'user', 'hi'), grokMessage('h#hello', 'assistant', 'Hello!'), grokMessage('h#joke', 'user', 'tell me a joke')];
+    const older = [grokMessage('h#hi', 'user', 'hi'), grokMessage('h#again', 'assistant', 'Hello again')];
+    const merged = mergeGrokXMessages(newer, older).map((m) => m.text);
+    expect(merged).toEqual(['hi', 'Hello again', 'hi', 'Hello!', 'tell me a joke']);
+  });
+
   it('orders by timestamp when every message has one', () => {
     const late = grokMessage('x', 'user', 'later', '2026-11-03T12:00:00.000Z');
     const early = grokMessage('y', 'assistant', 'earlier', '2026-11-03T09:00:00.000Z');
