@@ -620,6 +620,8 @@ const ADAPTERS: Record<ProviderId, DomAdapter> = {
   mistral: mistralAdapter,
   copilot: copilotAdapter,
   kimi: kimiAdapter,
+  // Synced from the Paperclip API, never read from a page.
+  paperclip: { turns: () => [], title: () => null },
   imported: { turns: () => [], title: () => null },
 };
 
@@ -642,7 +644,7 @@ export function extractVisibleDomConversation(
     ? providerAttr
     : detectProviderFromUrl(locationHref);
   // Grok on X is read from X's own responses (grok-x.ts); its DOM is never scraped.
-  if (!provider || provider === 'imported' || provider === 'grok_x') return null;
+  if (!provider || provider === 'imported' || provider === 'paperclip' || provider === 'grok_x') return null;
 
   const convIdAttr =
     doc.documentElement.getAttribute('data-tk-conversation-id') ||

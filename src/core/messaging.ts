@@ -15,7 +15,8 @@ export type PrivilegedCommandType =
   | 'GET_DIAGNOSTICS'
   | 'START_HISTORY_SYNC'
   | 'CANCEL_HISTORY_SYNC'
-  | 'GET_HISTORY_SYNC_STATE';
+  | 'GET_HISTORY_SYNC_STATE'
+  | 'PAPERCLIP_SYNC_NOW';
 
 export type ContentScriptCommandType =
   | 'PASSIVE_DOM_CAPTURE'
@@ -82,6 +83,7 @@ const PRIVILEGED_TYPES = new Set<string>([
   'START_HISTORY_SYNC',
   'CANCEL_HISTORY_SYNC',
   'GET_HISTORY_SYNC_STATE',
+  'PAPERCLIP_SYNC_NOW',
 ]);
 
 const CONTENT_SCRIPT_TYPES = new Set<string>([

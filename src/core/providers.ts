@@ -16,12 +16,19 @@ export const PROVIDER_IDS = [
   'mistral',
   'copilot',
   'kimi',
+  'paperclip',
   'imported',
 ] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
-export type CaptureProviderId = Exclude<ProviderId, 'imported'>;
+/** Providers whose threads never come from a captured web page. */
+export const NON_CAPTURE_PROVIDER_IDS = ['imported', 'paperclip'] as const;
+
+export type CaptureProviderId = Exclude<ProviderId, (typeof NON_CAPTURE_PROVIDER_IDS)[number]>;
+
+/** What kind of AI product a provider is (chat app, coding agent, autonomous agent platform, …). */
+export type ProviderCategory = 'chat' | 'coding_agent' | 'agent' | 'builder' | 'search' | 'companion';
 
 export interface ProviderInfo {
   id: ProviderId;
@@ -33,6 +40,8 @@ export interface ProviderInfo {
   reopen: 'web' | 'terminal' | 'none';
   /** Short description shown in settings. */
   captureNote: string;
+  /** Product category; providers without one are treated as chat apps. */
+  category?: ProviderCategory;
 }
 
 export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
@@ -149,6 +158,16 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     reopen: 'web',
     captureNote: 'Chats on kimi.com.',
   },
+  paperclip: {
+    id: 'paperclip',
+    label: 'Paperclip',
+    maker: 'Paperclip',
+    // Read from the user's own Paperclip server through its API (Settings → Paperclip), never captured.
+    matchPatterns: [],
+    reopen: 'web',
+    captureNote: 'Issues, comments and agent runs synced from your Paperclip server (Settings → Paperclip).',
+    category: 'agent',
+  },
   imported: {
     id: 'imported',
     label: 'Imported',
@@ -160,8 +179,13 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
 };
 
 export const CAPTURE_PROVIDER_IDS = PROVIDER_IDS.filter(
-  (id): id is CaptureProviderId => id !== 'imported'
+  (id): id is CaptureProviderId => !(NON_CAPTURE_PROVIDER_IDS as readonly string[]).includes(id)
 );
+
+/** True for a provider whose threads may arrive from a page capture. */
+export function isCaptureProviderId(value: unknown): value is CaptureProviderId {
+  return typeof value === 'string' && (CAPTURE_PROVIDER_IDS as readonly string[]).includes(value);
+}
 
 /** Deduplicated match patterns for manifest content scripts and host permissions. */
 export function captureMatchPatterns(): string[] {

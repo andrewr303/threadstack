@@ -146,6 +146,16 @@ export interface ConversationRecord {
   projectReason?: string | null;
   /** Whether workflowState was set by the user or inferred automatically. */
   workflowStateSource?: 'auto' | 'manual';
+  /**
+   * Who did the work in an agent thread: the agent's name and the runner it uses,
+   * e.g. "CEO · Grok Bot" or "Engineer · Claude Code" (Paperclip issues).
+   */
+  agentLabel?: string | null;
+  /**
+   * Other threads that hold the same work, e.g. the Claude Code or Codex sessions a
+   * Paperclip agent ran for this issue (their keys, whether or not they are imported yet).
+   */
+  linkedThreadKeys?: string[];
 }
 
 export type ProjectSource =
@@ -557,6 +567,64 @@ export interface AutoOrganizeSettings {
   dailyAiAnalysisLimit: number;
 }
 
+export interface PaperclipSettings {
+  /** Sync is on: issues are pulled every few minutes and on "Sync now". */
+  enabled: boolean;
+  /** Server origin, e.g. http://localhost:3100 (the API lives under /api). */
+  serverUrl: string;
+  /** How requests authenticate: none on a local_trusted instance, else a board API key. */
+  auth: 'none' | 'board_key';
+  /** Board API key (pcp_board_…), from the approval flow or pasted. */
+  apiKey: string;
+  /** When the board key stops working ('' = unknown). */
+  apiKeyExpiresAt: string;
+  /** Who the key signs in as, shown in Settings. */
+  accountLabel: string;
+  /** Deployment mode reported by /api/health at the last check. */
+  deploymentMode: '' | 'local_trusted' | 'authenticated';
+  /** Every company the user can see, or only the chosen ones. */
+  companyScope: 'all' | 'selected';
+  companyIds: string[];
+  /** Listen to the server's live events (local_trusted only) to sync sooner. */
+  liveUpdates: boolean;
+}
+
+export const DEFAULT_PAPERCLIP_URL = 'http://localhost:3100';
+
+export const DEFAULT_PAPERCLIP_SETTINGS: PaperclipSettings = {
+  enabled: false,
+  serverUrl: DEFAULT_PAPERCLIP_URL,
+  auth: 'none',
+  apiKey: '',
+  apiKeyExpiresAt: '',
+  accountLabel: '',
+  deploymentMode: '',
+  companyScope: 'all',
+  companyIds: [],
+  liveUpdates: true,
+};
+
+/** Coerce a stored (possibly partial or older) Paperclip settings object. */
+export function normalizePaperclipSettings(raw: Partial<PaperclipSettings> | null | undefined): PaperclipSettings {
+  const base = { ...DEFAULT_PAPERCLIP_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  const text = (v: unknown, fallback = '') => (typeof v === 'string' ? v.trim() : fallback);
+  return {
+    enabled: base.enabled === true,
+    serverUrl: text(base.serverUrl, DEFAULT_PAPERCLIP_URL) || DEFAULT_PAPERCLIP_URL,
+    auth: base.auth === 'board_key' ? 'board_key' : 'none',
+    apiKey: text(base.apiKey),
+    apiKeyExpiresAt: text(base.apiKeyExpiresAt),
+    accountLabel: text(base.accountLabel).slice(0, 200),
+    deploymentMode:
+      base.deploymentMode === 'local_trusted' || base.deploymentMode === 'authenticated' ? base.deploymentMode : '',
+    companyScope: base.companyScope === 'selected' ? 'selected' : 'all',
+    companyIds: Array.isArray(base.companyIds)
+      ? Array.from(new Set(base.companyIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '').map((id) => id.trim()))).slice(0, 200)
+      : [],
+    liveUpdates: base.liveUpdates !== false,
+  };
+}
+
 export interface SettingsRecord {
   id: 'default';
   settingsVersion?: number;
@@ -626,6 +694,8 @@ export interface SettingsRecord {
   rerankInSearch: boolean;
   rerankInAsk: boolean;
   autoOrganize: AutoOrganizeSettings;
+  /** Paperclip server sync (issues, comments and agent runs as threads). */
+  paperclip: PaperclipSettings;
   /** Last background AI failure, surfaced in the manager so silent failures are visible. */
   lastAiError?: string | null;
   lastAiErrorAt?: string | null;
@@ -645,6 +715,7 @@ const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
   mistral: 'acct_mistral_primary',
   copilot: 'acct_copilot_primary',
   kimi: 'acct_kimi_primary',
+  paperclip: 'acct_paperclip_primary',
   imported: 'acct_imported_primary',
 };
 
@@ -725,6 +796,7 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   rerankInSearch: true,
   rerankInAsk: true,
   autoOrganize: { ...DEFAULT_AUTO_ORGANIZE },
+  paperclip: { ...DEFAULT_PAPERCLIP_SETTINGS },
 };
 
 /**
@@ -753,6 +825,7 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
       ...DEFAULT_AWS_SETTINGS,
       ...(base.aws ?? {}),
     },
+    paperclip: normalizePaperclipSettings(base.paperclip),
   };
 }
 
