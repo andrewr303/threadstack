@@ -18,7 +18,15 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
 Each thread gets a **gist** (one line: what it is about and how it ended), a summary, the user's goal and outcome, the **kind of work** (building, debugging, writing, research, planning, design, data, business, learning, personal…), topic tags, named entities and artifacts (files, links), plus **where you left off**, **decisions** (yours vs. the assistant's suggestions), **next steps** and **open questions** — each linked to the exact message it came from.
 
 - **On-device analysis** runs instantly on every capture, with no network and no key.
-- **Claude analysis** (optional): add an Anthropic API key and Claude (default **Claude Opus 5.5**, selectable Sonnet 5.5 / Haiku 5.5 / Fable 5.1) re-reads each new or changed thread once the chat has gone quiet and writes a descriptive title, gist, summary, decisions, next steps and project. Every extracted item must quote its source message verbatim; anything Claude cannot ground is dropped.
+- **Claude analysis** (optional): Claude (default **Claude Opus 5.5**, selectable Sonnet 5.5 / Haiku 5.5 / Fable 5.1) re-reads each new or changed thread once the chat has gone quiet and writes a descriptive title, gist, summary, decisions, next steps and project. Every extracted item must quote its source message verbatim; anything Claude cannot ground is dropped. Claude can run through any of three providers, chosen in **Settings → AI models**:
+
+  | Provider | Credentials | Notes |
+  |---|---|---|
+  | Anthropic API | API key from console.anthropic.com | Server-side refusal fallback on Opus 5.5, Sonnet 5.5 and Fable 5.1 |
+  | Amazon Bedrock | Bedrock API key, or IAM access keys (optional session token) | Claude in Amazon Bedrock at `bedrock-mantle.{region}.api.aws`, model IDs such as `anthropic.claude-opus-5-5`. Enable model access in the Bedrock console first |
+  | Claude Platform on AWS | Workspace ID (`wrkspc_…`) plus a short-term API key, or IAM access keys | Anthropic-operated, billed through AWS Marketplace |
+
+  AWS credentials live under **Settings → Amazon Web Services** and are shared by Bedrock Claude, embeddings and reranking. Prefer short-term Bedrock API keys (12 hours at most) or temporary IAM credentials; AWS recommends long-term keys only for exploration. IAM keys are signed in the browser with SigV4.
 
 ### 3. Organizes automatically
 New threads are filed into projects the moment they are captured, using the strongest signal available:
@@ -45,7 +53,9 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 ## Privacy
 
 - Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
-- API keys (Anthropic, Voyage, OpenAI) are stored the same way and only sent to their own API.
+- API keys and AWS credentials (Anthropic, Voyage, OpenAI, Bedrock, Claude Platform on AWS) are stored the same way and only sent to their own API.
+- The extension holds no AWS host permission at install. **Settings → Amazon Web Services → Allow access** asks the browser for exactly the endpoints of the configured region (for example `bedrock-mantle.us-east-1.api.aws`).
+- **Settings → Privacy & limits** lists every host that captured text can reach with the current settings.
 - Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and threads already filed in a local-only project (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker. The check happens when a thread is analyzed, so a brand-new conversation that nothing has filed yet *is* sent before Claude can recognize it as personal — mark such conversations local-only, or switch off automatic Claude analysis.
 - Because the library frame must load from the extension's fixed ID (required for Edge, see Troubleshooting), a website can detect that Threadkeeper is installed by probing that URL. It cannot read anything: unauthenticated frames are rejected and the database is extension-only.
 - A daily limit (default 150 analyses) caps Claude usage; Settings shows a cost estimate for your library and model.
@@ -80,7 +90,7 @@ The unpacked extension is written to `.output/chrome-mv3`.
 
 1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. After every later `npm run build`, click **Reload** on that page; the browser keeps the previous manifest until you do.
 2. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
-3. Optional: **Settings → AI analysis with Claude** → paste an Anthropic API key → **Test**. Then press **Auto-organize** to analyze and file your whole library.
+3. Optional: **Settings → AI models** → choose the Anthropic API, Amazon Bedrock or Claude Platform on AWS, add the key → **Test connection**. Then press **Auto-organize** to analyze and file your whole library.
 4. Optional: **Import / Export** → import your ChatGPT/Claude export and your Claude Code / Codex session folders.
 
 ### Commands
