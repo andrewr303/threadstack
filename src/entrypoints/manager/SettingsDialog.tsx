@@ -15,10 +15,17 @@ import type {
   RerankProviderId,
 } from '../../core/schema.js';
 import { UNFILED_PROJECT } from '../../core/db.js';
-import { sharedDb } from './shared.js';
+import { notifyBackground, sharedDb } from './shared.js';
+import { listOlderAnalyses, queueOlderAnalysisUpgrades } from '../../core/pipeline.js';
 import { CAPABILITY_MATRIX } from '../../core/adapters.js';
 import { CAPTURE_PROVIDER_IDS, PROVIDERS } from '../../core/providers.js';
-import { MODEL_OPTIONS, estimateAnalysisCostUsd, testClaudeConnection } from '../../core/ai/claude.js';
+import {
+  ANALYSIS_AVG_INPUT_TOKENS,
+  ANALYSIS_AVG_OUTPUT_TOKENS,
+  MODEL_OPTIONS,
+  estimateAnalysisCostUsd,
+  testClaudeConnection,
+} from '../../core/ai/claude.js';
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
@@ -336,6 +343,94 @@ function Result({ state }: { state: { message: string | null; ok?: boolean } }) 
 type TestState = { busy: boolean; message: string | null; ok?: boolean };
 const IDLE: TestState = { busy: false, message: null };
 
+function formatUsd(usd: number): string {
+  return usd < 1 ? usd.toFixed(2) : usd < 100 ? usd.toFixed(1) : usd.toFixed(0);
+}
+
+/**
+ * Settings → AI models → "Older summaries": re-analyze AI summaries written before the current format
+ * (overview, key points, what was produced, next step). Never automatic: count + estimate + confirm.
+ */
+function UpgradeOlderSummaries({ settings, active }: { settings: SettingsRecord; active: boolean }) {
+  const [count, setCount] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [state, setState] = useState<TestState>(IDLE);
+  const refresh = useCallback(() => {
+    void listOlderAnalyses(sharedDb)
+      .then((keys) => setCount(keys.length))
+      .catch(() => setCount(null));
+  }, []);
+  useEffect(() => {
+    if (active) refresh();
+  }, [active, refresh]);
+
+  const ready = aiCredentialsReady(settings);
+  const model = MODEL_OPTIONS.find((m) => m.id === settings.aiModel) ?? MODEL_OPTIONS[0];
+  const estimate = estimateAnalysisCostUsd(settings.aiModel, count ?? 0);
+  const limit = settings.autoOrganize.dailyAiAnalysisLimit;
+
+  const upgrade = async () => {
+    setState({ busy: true, message: 'Queuing…' });
+    try {
+      const r = await queueOlderAnalysisUpgrades(sharedDb);
+      notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+      setConfirming(false);
+      setState({
+        busy: false,
+        ok: true,
+        message:
+          r.queued === 0
+            ? 'Nothing to upgrade.'
+            : `Queued ${r.queued} thread${r.queued === 1 ? '' : 's'}. Threadkeeper rewrites them in the background${
+                limit > 0 && r.queued > limit ? `, up to ${limit} a day (your daily limit)` : ''
+              }.`,
+      });
+      refresh();
+    } catch (err) {
+      setState({ busy: false, ok: false, message: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  if (count === 0 && !state.message) {
+    return <p className="tk-settings-note">Every Claude summary already uses the current format.</p>;
+  }
+  return (
+    <>
+      <p className="tk-settings-note">
+        {count === null
+          ? 'Counting older summaries…'
+          : `${count} thread${count === 1 ? ' has' : 's have'} a Claude summary in the older, shorter format. Upgrading re-analyzes them once with ${model.label} for an in-depth overview, key points, what was produced and a clear next step. Threads that change are re-analyzed anyway.`}
+      </p>
+      {count !== null && count > 0 && !confirming && (
+        <div className="tk-field-row">
+          <button type="button" className="tk-btn" disabled={!ready || state.busy} onClick={() => setConfirming(true)}>
+            Upgrade older summaries…
+          </button>
+          {!ready && <span className="tk-muted">Set up Claude above first.</span>}
+        </div>
+      )}
+      {confirming && count !== null && count > 0 && (
+        <div className="tk-settings-confirm" role="group" aria-label="Confirm summary upgrade">
+          <p className="tk-settings-note">
+            Re-analyze {count} thread{count === 1 ? '' : 's'} with {model.label}? This costs about ${formatUsd(estimate)} at
+            Anthropic's list price{settings.aiBackend === 'anthropic' ? '' : ' (AWS bills at its own rates)'}
+            {limit > 0 ? ` and counts toward your daily limit of ${limit} analyses` : ''}. Local-only threads are never sent.
+          </p>
+          <div className="tk-field-row">
+            <button type="button" className="tk-btn tk-btn-primary" disabled={state.busy} onClick={() => void upgrade()}>
+              Upgrade {count} summar{count === 1 ? 'y' : 'ies'}
+            </button>
+            <button type="button" className="tk-btn" disabled={state.busy} onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      <Result state={state} />
+    </>
+  );
+}
+
 export function SettingsDialog({
   dialogRef,
   settings,
@@ -639,11 +734,16 @@ export function SettingsDialog({
           <p className="tk-settings-note">
             Analyzing all {threadCount} threads once with {model.label} costs about $
             {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)} at Anthropic's list price (${model.inputPerMTok} / $
-            {model.outputPerMTok} per million input / output tokens), assuming about 9k input and 1.8k output tokens per
-            thread. This is an estimate: long threads and the model's thinking cost more
+            {model.outputPerMTok} per million input / output tokens), assuming about{' '}
+            {Math.round(ANALYSIS_AVG_INPUT_TOKENS / 1000)}k input and {(ANALYSIS_AVG_OUTPUT_TOKENS / 1000).toFixed(1)}k output
+            tokens per thread. This is an estimate: long threads and the model's thinking cost more
             {settings.aiBackend === 'anthropic' ? '' : ', and AWS bills at its own rates'}. Only new or changed threads are
-            analyzed again.
+            analyzed again. Thread analysis always runs at Medium effort or higher, whatever the setting.
           </p>
+        </Section>
+
+        <Section title="Older summaries">
+          <UpgradeOlderSummaries settings={settings} active={section === 'ai'} />
         </Section>
 
         <Section title="Automatic analysis">

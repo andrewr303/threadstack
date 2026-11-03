@@ -686,6 +686,9 @@ export async function applySummaryEnrichment(
     suggestedProject: params.summary.suggestedProject,
     suggestedTags: params.summary.suggestedTags,
     confidence: params.summary.confidence,
+    // Analysis v2 fields (absent on on-device and older summaries).
+    ...(params.summary.keyPoints !== undefined ? { keyPoints: params.summary.keyPoints } : {}),
+    ...(params.summary.nextStep !== undefined ? { nextStep: params.summary.nextStep } : {}),
     groundingVerified: true,
   };
 

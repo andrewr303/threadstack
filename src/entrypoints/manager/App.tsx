@@ -1127,6 +1127,15 @@ export function App() {
     );
   };
 
+  /** "m3,m5" in the margin; reads "(source m3,m5)" when copied or announced. */
+  const evidenceLabel = (indexes: number[]) => (
+    <>
+      <span className="tk-visually-hidden"> (source </span>
+      <span>{indexes.map((i) => `m${i + 1}`).join(',')}</span>
+      <span className="tk-visually-hidden">)</span>
+    </>
+  );
+
   const renderClaims = (
     items: StructuredSummaryRecord['decisions'],
     prefix: string,
@@ -1134,27 +1143,40 @@ export function App() {
     fallback?: { text: string | null; ordinal: number | null; speaker: 'user_committed' | 'assistant_suggested' | null; id: string }
   ) => {
     if (items.length > 0) {
-      return items.map((d, idx) => {
-        const evId = `${prefix}-${idx}`;
-        return (
-          <div key={evId}>
-            <div className="tk-claim-row">
-              <span className="tk-claim-text">{d.text}</span>
-              <button
-                type="button"
-                className="tk-evidence-marker"
-                title={d.speaker === 'user_committed' ? 'You committed to this' : 'Assistant suggested this'}
-                aria-expanded={activeEvidenceId === evId}
-                onClick={() => setActiveEvidenceId((prev) => (prev === evId ? null : evId))}
-              >
-                <span className="tk-evidence-pip" data-speaker={d.speaker} aria-hidden="true" />
-                <span>{d.messageIndexes.map((i) => `m${i + 1}`).join(',')}</span>
-              </button>
-            </div>
-            {renderEvidencePassage(evId, d.messageIndexes)}
-          </div>
-        );
-      });
+      return (
+        <ul className="tk-claim-list">
+          {items.map((d, idx) => {
+            const evId = `${prefix}-${idx}`;
+            const rationale = d.rationale?.trim();
+            return (
+              <li key={evId}>
+                <div className="tk-claim-row">
+                  <span className="tk-claim-text">
+                    {d.text}
+                    {rationale ? (
+                      <span className="tk-claim-rationale">
+                        {' — '}
+                        {rationale}
+                      </span>
+                    ) : null}
+                  </span>
+                  <button
+                    type="button"
+                    className="tk-evidence-marker"
+                    title={d.speaker === 'user_committed' ? 'You committed to this' : 'Assistant suggested this'}
+                    aria-expanded={activeEvidenceId === evId}
+                    onClick={() => setActiveEvidenceId((prev) => (prev === evId ? null : evId))}
+                  >
+                    <span className="tk-evidence-pip" data-speaker={d.speaker} aria-hidden="true" />
+                    {evidenceLabel(d.messageIndexes)}
+                  </button>
+                </div>
+                {renderEvidencePassage(evId, d.messageIndexes)}
+              </li>
+            );
+          })}
+        </ul>
+      );
     }
     if (fallback?.text) {
       return (
@@ -1168,7 +1190,7 @@ export function App() {
               onClick={() => setActiveEvidenceId((prev) => (prev === fallback.id ? null : fallback.id))}
             >
               <span className="tk-evidence-pip" data-speaker={fallback.speaker ?? 'user_committed'} aria-hidden="true" />
-              <span>m{(fallback.ordinal ?? 0) + 1}</span>
+              {evidenceLabel([fallback.ordinal ?? 0])}
             </button>
           </div>
           {renderEvidencePassage(fallback.id, [fallback.ordinal ?? 0])}
@@ -1971,7 +1993,10 @@ export function App() {
                     type="button"
                     className="tk-btn"
                     onClick={() =>
-                      copyText(exportThreadToMarkdown(selectedConversation, selectedMessages, selectedSummary), 'Markdown handoff')
+                      copyText(
+                        exportThreadToMarkdown(selectedConversation, selectedMessages, selectedSummary, selectedInsight),
+                        'Markdown handoff'
+                      )
                     }
                   >
                     Copy handoff
@@ -1985,11 +2010,19 @@ export function App() {
               <ThreadOverview
                 conv={selectedConversation}
                 insight={selectedInsight}
+                summary={selectedSummary}
                 canAnalyze={aiReady}
                 analyzing={analyzingThread === selectedConversation.threadKey}
                 onAnalyze={() => void handleAnalyzeSelected()}
                 onCopy={copyText}
               />
+
+              {(selectedSummary?.keyPoints?.length ?? 0) > 0 && (
+                <div className="tk-section" data-evidence-location="key-points">
+                  <h3 className="tk-section-h2">Key points</h3>
+                  {renderClaims(selectedSummary?.keyPoints ?? [], 'keypoint', '')}
+                </div>
+              )}
 
               {/* FOCAL ELEMENT: Where you left off (Evidence Location #1) */}
               <div className="tk-focal-left-off" data-evidence-location="where-you-left-off">
@@ -2012,14 +2045,17 @@ export function App() {
                       onClick={() => setActiveEvidenceId((prev) => (prev === 'focal-left-off' ? null : 'focal-left-off'))}
                     >
                       <span className="tk-evidence-pip" data-speaker="user_committed" aria-hidden="true" />
-                      <span>
-                        {(selectedSummary?.whereYouLeftOffMessageIndexes ?? [Math.max(0, selectedMessages.length - 1)])
-                          .map((i) => `m${i + 1}`)
-                          .join(',')}
-                      </span>
+                      {evidenceLabel(
+                        selectedSummary?.whereYouLeftOffMessageIndexes ?? [Math.max(0, selectedMessages.length - 1)]
+                      )}
                     </button>
                   )}
                 </div>
+                {selectedSummary?.nextStep ? (
+                  <p className="tk-focal-next-step">
+                    <span className="tk-focal-next-label">Next step:</span> {selectedSummary.nextStep}
+                  </p>
+                ) : null}
                 {renderEvidencePassage(
                   'focal-left-off',
                   selectedSummary?.whereYouLeftOffMessageIndexes ?? [Math.max(0, selectedMessages.length - 1)]
