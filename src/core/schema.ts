@@ -21,6 +21,10 @@ export type CoverageState =
 
 export type CaptureSource =
   | 'dom_observer'
+  /** The site's own conversation data, read as the page received it (complete, with ids and times). */
+  | 'network_observer'
+  /** The user's recent history pulled from the site while they are signed in (Catch up). */
+  | 'history_sync'
   | 'export_import'
   | 'portable_import'
   | 'manual'

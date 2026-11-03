@@ -28,6 +28,7 @@ import {
   type ProjectSource,
 } from './schema.js';
 import { normalizeTags } from './organization.js';
+import { looksDerivedTitle, mergeCapturedMessages } from './merge.js';
 import type { PortableBundle } from './adapters.js';
 
 export class ThreadkeeperDB extends Dexie {
@@ -112,9 +113,6 @@ export class ThreadkeeperDB extends Dexie {
 }
 
 export const UNFILED_PROJECT = 'Unfiled / Uncertain';
-
-/** Message ids DOM capture assigns when the page exposes no id of its own. */
-const POSITIONAL_MESSAGE_ID = /_m_\d+$/;
 
 export async function ensureStarterCollectionsAndSettings(
   db: ThreadkeeperDB
@@ -220,6 +218,11 @@ export interface UpsertThreadInput {
   restoreDeleted?: boolean;
 }
 
+/** Capture sources that hold the whole conversation, so their text outranks a DOM re-rendering. */
+export function isAuthoritativeSource(source: CaptureSource | undefined): boolean {
+  return source === 'export_import' || source === 'network_observer' || source === 'history_sync';
+}
+
 export function buildChunksFromMessages(
   threadKey: string,
   messages: MessageRecord[],
@@ -271,78 +274,7 @@ async function findMatchingTombstone(
     .first();
 }
 
-type IncomingMessage = UpsertThreadInput['messages'][number];
-
-/** Containment shorter than this is too weak to say two messages are the same. */
-const MIN_CONTAINED_CHARS = 24;
-
-/**
- * Pair stored messages with an incoming partial capture, by stored index.
- *
- * Older captures used positional ids (<conv>_<branch>_m_<i>); newer ones key
- * messages by the site's own id and also clean the text (thinking blocks
- * removed, answer instead of reasoning). Without pairing, the first recapture
- * after that switch stores those messages twice. Passes, most certain first:
- * the same id; a positional message and a keyed one with the same role and
- * text; the same role where one text contains the other; and finally, between
- * two already-paired messages, the next positional message of the same role.
- * A keyed message with no paired message before it is never guessed, because
- * a visible window at the end of a long thread would otherwise overwrite an
- * older message.
- */
-export function pairStoredWithIncoming(
-  stored: Array<Pick<MessageRecord, 'sourceMessageId' | 'role' | 'content'>>,
-  incoming: IncomingMessage[]
-): Map<number, IncomingMessage> {
-  const pairs = new Map<number, IncomingMessage>();
-  const used = new Set<string>();
-  const byId = new Map(incoming.map((m) => [m.sourceMessageId, m]));
-  const isPositional = (id: string) => POSITIONAL_MESSAGE_ID.test(id);
-  const pair = (i: number, m: IncomingMessage) => {
-    pairs.set(i, m);
-    used.add(m.sourceMessageId);
-  };
-
-  stored.forEach((prev, i) => {
-    const m = byId.get(prev.sourceMessageId);
-    if (m && !used.has(m.sourceMessageId)) pair(i, m);
-  });
-
-  const keyed = incoming.filter((m) => !isPositional(m.sourceMessageId));
-  const textMatch = (a: string, b: string) => a === b;
-  const containMatch = (a: string, b: string) => {
-    const [short, long] = a.length <= b.length ? [a, b] : [b, a];
-    return short.length >= MIN_CONTAINED_CHARS && long.includes(short);
-  };
-  for (const matches of [textMatch, containMatch]) {
-    stored.forEach((prev, i) => {
-      if (pairs.has(i) || !isPositional(prev.sourceMessageId)) return;
-      const text = prev.content.trim();
-      const m = keyed.find((k) => !used.has(k.sourceMessageId) && k.role === prev.role && matches(text, k.content.trim()));
-      if (m) pair(i, m);
-    });
-  }
-
-  const storedIndexOf = new Map(Array.from(pairs, ([i, m]) => [m.sourceMessageId, i]));
-  let anchor: number | null = null;
-  for (const m of incoming) {
-    const at = storedIndexOf.get(m.sourceMessageId);
-    if (at !== undefined) {
-      anchor = at;
-      continue;
-    }
-    if (anchor === null || isPositional(m.sourceMessageId) || used.has(m.sourceMessageId)) continue;
-    for (let i = anchor + 1; i < stored.length && !pairs.has(i); i++) {
-      if (isPositional(stored[i].sourceMessageId) && stored[i].role === m.role) {
-        pair(i, m);
-        storedIndexOf.set(m.sourceMessageId, i);
-        anchor = i;
-        break;
-      }
-    }
-  }
-  return pairs;
-}
+export { pairStoredWithIncoming } from './merge.js';
 
 export async function upsertThread(
   db: ThreadkeeperDB,
@@ -385,52 +317,30 @@ export async function upsertThread(
         ? await db.messages.where('threadKey').equals(input.threadKey).sortBy('ordinal')
         : [];
 
-      // Merge messages so partial DOM revisit after lazy-unmount never loses previously captured messages
-      const mergedMessagePayloads: Array<{
+      // A DOM capture sees a window of the conversation (a virtualized list, or just the turns that
+      // finished since the last capture), so it is merged by message identity. Snapshots of the
+      // whole conversation (exports, history sync, the site's own data) replace what was stored.
+      let mergedMessagePayloads: Array<{
         sourceMessageId: string;
         role: 'user' | 'assistant' | 'system' | 'tool';
         content: string;
         createdAt: string | null;
         branchPath: string;
       }> = [];
+      let anchoredMerge = false;
 
-      if (
-        existing &&
-        input.captureSource === 'dom_observer' &&
-        existingMessages.length > input.messages.length
-      ) {
-        const pairs = pairStoredWithIncoming(existingMessages, input.messages);
-        const paired = new Set(Array.from(pairs.values(), (m) => m.sourceMessageId));
-        existingMessages.forEach((prev, i) => {
-          const updated = pairs.get(i);
-          mergedMessagePayloads.push(
-            updated
-              ? {
-                  sourceMessageId: updated.sourceMessageId,
-                  role: updated.role,
-                  content: updated.content,
-                  createdAt: updated.createdAt ?? prev.createdAt,
-                  branchPath: updated.branchPath ?? prev.branchPath,
-                }
-              : {
-                  sourceMessageId: prev.sourceMessageId,
-                  role: prev.role,
-                  content: prev.content,
-                  createdAt: prev.createdAt,
-                  branchPath: prev.branchPath,
-                }
-          );
+      if (existing && input.captureSource === 'dom_observer' && existingMessages.length > 0) {
+        const result = mergeCapturedMessages(existingMessages, input.messages, {
+          authoritativeStored: isAuthoritativeSource(existing.captureSource),
         });
-        for (const remaining of input.messages) {
-          if (paired.has(remaining.sourceMessageId)) continue;
-          mergedMessagePayloads.push({
-            sourceMessageId: remaining.sourceMessageId,
-            role: remaining.role,
-            content: remaining.content,
-            createdAt: remaining.createdAt,
-            branchPath: remaining.branchPath ?? input.branchId,
-          });
-        }
+        anchoredMerge = result.anchored;
+        mergedMessagePayloads = result.messages.map((m) => ({
+          sourceMessageId: m.sourceMessageId,
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt,
+          branchPath: m.branchPath ?? input.branchId,
+        }));
       } else {
         for (const msg of input.messages) {
           mergedMessagePayloads.push({
@@ -442,6 +352,12 @@ export async function upsertThread(
           });
         }
       }
+
+      // Never replace a title the site gave with one derived from the first message.
+      const effectiveTitle =
+        existing && input.captureSource === 'dom_observer' && looksDerivedTitle(input.title, input.messages) && !looksDerivedTitle(existing.title, existingMessages)
+          ? existing.title
+          : input.title;
 
       const normalizedMessages: MessageRecord[] = mergedMessagePayloads.map((m, idx) => {
         const content = m.content.trim();
@@ -461,7 +377,7 @@ export async function upsertThread(
       });
 
       const combinedHash = computeDeterministicHash(
-        `${input.title}|${normalizedMessages.map((m) => m.contentHash).join(',')}`
+        `${effectiveTitle}|${normalizedMessages.map((m) => m.contentHash).join(',')}`
       );
 
       const contentChanged = !existing || existing.contentHash !== combinedHash;
@@ -471,15 +387,17 @@ export async function upsertThread(
           : existing.sourceRevision
         : 1;
 
-      // Preserve full coverage if previously imported from full export and unchanged
+      // A DOM capture that continues a full snapshot (unchanged, or lined up and extended with
+      // newer turns) does not turn it into a partial one.
       if (
         existing &&
         existing.coverage === 'full' &&
         input.captureSource === 'dom_observer' &&
-        !contentChanged
+        (!contentChanged || anchoredMerge)
       ) {
         effectiveCoverage = 'full';
       }
+
 
       const preservedManualTags = existing?.manualTags ?? [];
       const mergedTags = Array.from(
@@ -506,7 +424,7 @@ export async function upsertThread(
         parentBranchId: input.parentBranchId ?? existing?.parentBranchId ?? null,
         siblingBranchIds: input.siblingBranchIds ?? existing?.siblingBranchIds ?? [],
         canonicalUrl: input.canonicalUrl,
-        title: input.title,
+        title: effectiveTitle,
         manualTitleOverride:
           existing?.manualTitleOverride ?? input.manualTitleOverride ?? null,
         createdAt: input.createdAt ?? existing?.createdAt ?? null,
@@ -516,8 +434,8 @@ export async function upsertThread(
         contentHash: combinedHash,
         coverage: effectiveCoverage,
         captureSource:
-          existing?.captureSource === 'export_import' && input.captureSource === 'dom_observer'
-            ? 'export_import'
+          existing && isAuthoritativeSource(existing.captureSource) && input.captureSource === 'dom_observer'
+            ? existing.captureSource
             : input.captureSource,
         messageCount: normalizedMessages.length,
         project: effectiveProject,

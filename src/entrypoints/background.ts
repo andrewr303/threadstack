@@ -390,8 +390,18 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           sourceConversationId: message.payload.sourceConversationId,
           branchId: message.payload.branchId,
         });
+        // A content script may only claim the two passive sources; "full" is the site's own
+        // conversation data, and a DOM capture is never more than partial.
+        const passiveSource = message.payload.captureSource === 'network_observer' ? 'network_observer' : 'dom_observer';
         const result = await upsertThread(db, {
           ...message.payload,
+          captureSource: passiveSource,
+          coverage:
+            passiveSource === 'network_observer' && message.payload.coverage === 'full'
+              ? 'full'
+              : message.payload.coverage === 'title_only'
+                ? 'title_only'
+                : 'partial',
           provider,
           threadKey,
           accountId: bound.accountId,

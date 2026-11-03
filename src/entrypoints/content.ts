@@ -1,8 +1,15 @@
 import {
+  extractProviderProjectName,
   extractVisibleDomConversation,
   grokXConversationToExtraction,
   type DomExtractionResult,
 } from '../core/dom-capture.js';
+import {
+  parseSiteConversation,
+  parseSiteDataMessage,
+  siteConversationTitle,
+  type SiteConversation,
+} from '../core/site-api.js';
 import { mergeGrokXMessages, parseGrokXCaptureMessage, type GrokXMessage } from '../core/grok-x.js';
 import { validateWindowPostMessage } from '../core/messaging.js';
 import { detectProviderFromUrl, extractConversationIdFromUrl, isXHostname } from '../core/providers.js';
@@ -272,6 +279,9 @@ let pendingExplicitInvoke = false;
 /** Grok on X: messages X's own page loaded for the open conversation (see grok-x-main.ts). */
 let grokXConversation: { id: string; messages: GrokXMessage[] } | null = null;
 
+/** ChatGPT / Claude: the conversation data the page itself loaded for the open conversation. */
+let siteConversation: SiteConversation | null = null;
+
 /** The conversation on screen: Grok on X from X's own responses, every other site from the DOM. */
 function extractCurrentConversation(): DomExtractionResult | null {
   const href = window.location.href;
@@ -281,6 +291,36 @@ function extractCurrentConversation(): DomExtractionResult | null {
     return grokXConversationToExtraction(grokXConversation.id, grokXConversation.messages);
   }
   return extractVisibleDomConversation(document, href);
+}
+
+/** What the last capture attempt did, for the "Check this tab" report in Settings → Diagnostics. */
+interface CaptureStatus {
+  at: string;
+  method: 'dom' | 'site_data';
+  outcome: 'stored' | 'unchanged' | 'skipped' | 'error' | 'stale_dom' | 'no_conversation';
+  detail?: string;
+  messages?: number;
+}
+let lastCaptureStatus: CaptureStatus | null = null;
+function noteCapture(status: Omit<CaptureStatus, 'at'>): void {
+  lastCaptureStatus = { at: new Date().toISOString(), ...status };
+}
+
+function sendCapture(
+  payload: Record<string, unknown>,
+  explicitInvoke: boolean,
+  done: (resp: { ok?: boolean; status?: string; skipped?: string } | undefined) => void
+): void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'PASSIVE_DOM_CAPTURE', explicitInvoke, payload }, (resp) => {
+      // lastError (service worker restarting, extension reloaded) must be read or Chrome logs it.
+      const failed = chrome.runtime.lastError;
+      done(failed ? undefined : (resp as { ok?: boolean; status?: string; skipped?: string } | undefined));
+    });
+  } catch {
+    // extension context invalidated (reloaded); nothing to send to
+  }
 }
 
 /**
@@ -302,6 +342,106 @@ function onGrokXWindowMessage(event: MessageEvent): void {
   schedulePassiveDomCapture();
 }
 
+/**
+ * Messages from the MAIN-world scripts on ChatGPT and Claude (site-data-main.ts). Any page script
+ * can post to the window, so the sender must be this window, the payload is fully re-validated,
+ * and only the conversation that is open is kept.
+ */
+function onSiteDataWindowMessage(event: MessageEvent): void {
+  if (event.source !== window || event.origin !== window.location.origin) return;
+  const data = parseSiteDataMessage(event.data);
+  if (!data) return;
+  const href = window.location.href;
+  const page = detectProviderFromUrl(href);
+  if (page !== data.provider) return; // claude.ai/code and /codex are other providers
+  const urlId = extractConversationIdFromUrl(href)?.toLowerCase();
+  if (!urlId || urlId !== data.conversationId) return;
+  const parsed = parseSiteConversation(data.provider, data.json, data.conversationId);
+  if (!parsed || parsed.sourceConversationId !== urlId) return;
+  siteConversation = parsed;
+  scheduleSiteDataCapture();
+}
+
+let siteDataTimer: ReturnType<typeof setTimeout> | null = null;
+let lastSiteDataFingerprint = '';
+
+function scheduleSiteDataCapture(): void {
+  if (siteDataTimer) clearTimeout(siteDataTimer);
+  siteDataTimer = setTimeout(() => {
+    siteDataTimer = null;
+    const conv = siteConversation;
+    if (!conv) return;
+    // Still the conversation on screen? (The user may have navigated while the response arrived.)
+    const urlId = extractConversationIdFromUrl(window.location.href)?.toLowerCase();
+    if (urlId !== conv.sourceConversationId) return;
+    const fingerprint = `${conv.sourceConversationId}:${conv.title}:${conv.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
+    if (fingerprint === lastSiteDataFingerprint) return;
+    sendCapture(
+      {
+        provider: conv.provider,
+        sourceConversationId: conv.sourceConversationId,
+        branchId: 'main',
+        canonicalUrl: conv.canonicalUrl,
+        title: siteConversationTitle(conv),
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt ?? new Date().toISOString(),
+        coverage: conv.messages.length > 0 ? 'full' : 'title_only',
+        captureSource: 'network_observer',
+        messages: conv.messages,
+        // The data names the project by id only; the page shows its name.
+        providerProjectName: extractProviderProjectName(document, window.location.href),
+        modelSlug: conv.modelSlug,
+      },
+      false,
+      (resp) => {
+        if (resp?.ok) {
+          lastSiteDataFingerprint = fingerprint;
+          noteCapture({ method: 'site_data', outcome: 'stored', messages: conv.messages.length });
+        } else {
+          noteCapture({ method: 'site_data', outcome: resp?.skipped ? 'skipped' : 'error', detail: resp?.skipped });
+        }
+      }
+    );
+  }, 300);
+}
+
+// ---- DOM capture ----------------------------------------------------------
+
+/** The longest a burst of page changes may postpone a capture. A streaming reply or a ticking timer never lets the page go quiet. */
+const CAPTURE_MAX_WAIT_MS = 4000;
+const CAPTURE_QUIET_MS = 900;
+let pendingSince = 0;
+
+/**
+ * Right after the URL changes, a single-page app still shows the previous conversation for a
+ * moment. Messages from it must not be filed under the new conversation's id, so a capture whose
+ * conversation differs from the last one but whose message ids (or text) are the last one's is
+ * stale and is retried shortly.
+ */
+interface LastExtraction {
+  conversationId: string;
+  keyedIds: Set<string>;
+  textFingerprint: string;
+}
+let lastExtraction: LastExtraction | null = null;
+let staleRetries = 0;
+const MAX_STALE_RETRIES = 8;
+
+function textFingerprintOf(messages: DomExtractionResult['messages']): string {
+  return messages.map((m) => `${m.role}:${m.content}`).join('␞');
+}
+
+function keyedIdsOf(messages: DomExtractionResult['messages']): Set<string> {
+  return new Set(messages.map((m) => m.sourceMessageId).filter((id) => !/_m_\d+(#\d+)?$/.test(id)));
+}
+
+function isStaleAfterNavigation(extracted: DomExtractionResult): boolean {
+  const last = lastExtraction;
+  if (!last || last.conversationId === extracted.sourceConversationId || extracted.messages.length === 0) return false;
+  for (const id of keyedIdsOf(extracted.messages)) if (last.keyedIds.has(id)) return true;
+  return last.textFingerprint !== '' && last.textFingerprint === textFingerprintOf(extracted.messages);
+}
+
 function schedulePassiveDomCapture(explicitInvoke = false): void {
   if (explicitInvoke) {
     pendingExplicitInvoke = true;
@@ -309,48 +449,90 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
   if (captureDebounceTimer) {
     clearTimeout(captureDebounceTimer);
   }
+  const now = Date.now();
+  if (pendingSince === 0) pendingSince = now;
   const isExplicit = pendingExplicitInvoke;
+  // Quiet for 900 ms, but never later than 4 s after the first change in this burst.
+  const delay = isExplicit ? 50 : Math.max(50, Math.min(CAPTURE_QUIET_MS, pendingSince + CAPTURE_MAX_WAIT_MS - now));
   captureDebounceTimer = setTimeout(() => {
     const useExplicit = pendingExplicitInvoke;
     pendingExplicitInvoke = false;
+    pendingSince = 0;
+    captureDebounceTimer = null;
     const extracted = extractCurrentConversation();
-    if (!extracted) return;
+    if (!extracted) {
+      noteCapture({ method: 'dom', outcome: 'no_conversation', detail: 'The page is not an open conversation yet.' });
+      return;
+    }
+    if (isStaleAfterNavigation(extracted) && staleRetries < MAX_STALE_RETRIES) {
+      staleRetries += 1;
+      noteCapture({ method: 'dom', outcome: 'stale_dom', detail: 'Waiting for the page to replace the previous conversation.' });
+      captureDebounceTimer = setTimeout(() => schedulePassiveDomCapture(useExplicit), 700);
+      return;
+    }
+    staleRetries = 0;
 
     const fingerprint = `${extracted.provider}:${extracted.sourceConversationId}:${extracted.branchId}:${extracted.title}:${extracted.providerProjectName ?? ''}:${extracted.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
-    if (!useExplicit && fingerprint === lastCapturedFingerprint) return;
-
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      try {
-        chrome.runtime.sendMessage(
-          {
-            type: 'PASSIVE_DOM_CAPTURE',
-            explicitInvoke: useExplicit,
-            payload: {
-              provider: extracted.provider,
-              sourceConversationId: extracted.sourceConversationId,
-              branchId: extracted.branchId,
-              canonicalUrl: extracted.canonicalUrl,
-              title: extracted.title,
-              createdAt: null,
-              updatedAt: new Date().toISOString(),
-              coverage: extracted.coverage,
-              captureSource: 'dom_observer',
-              messages: extracted.messages,
-              providerProjectName: extracted.providerProjectName,
-              modelSlug: extracted.modelSlug,
-            },
-          },
-          (resp: { ok?: boolean } | undefined) => {
-            if (resp?.ok) {
-              lastCapturedFingerprint = fingerprint;
-            }
-          }
-        );
-      } catch {
-        // Ignore if extension context invalidated
-      }
+    if (!useExplicit && fingerprint === lastCapturedFingerprint) {
+      noteCapture({ method: 'dom', outcome: 'unchanged', messages: extracted.messages.length });
+      return;
     }
-  }, isExplicit ? 50 : 900);
+
+    sendCapture(
+      {
+        provider: extracted.provider,
+        sourceConversationId: extracted.sourceConversationId,
+        branchId: extracted.branchId,
+        canonicalUrl: extracted.canonicalUrl,
+        title: extracted.title,
+        createdAt: null,
+        updatedAt: new Date().toISOString(),
+        coverage: extracted.coverage,
+        captureSource: 'dom_observer',
+        messages: extracted.messages,
+        providerProjectName: extracted.providerProjectName,
+        modelSlug: extracted.modelSlug,
+      },
+      useExplicit,
+      (resp) => {
+        if (resp?.ok) {
+          lastCapturedFingerprint = fingerprint;
+          lastExtraction = {
+            conversationId: extracted.sourceConversationId,
+            keyedIds: keyedIdsOf(extracted.messages),
+            textFingerprint: textFingerprintOf(extracted.messages),
+          };
+          noteCapture({ method: 'dom', outcome: 'stored', messages: extracted.messages.length });
+        } else {
+          noteCapture({ method: 'dom', outcome: resp?.skipped ? 'skipped' : 'error', detail: resp?.skipped ?? 'No answer from the extension.' });
+        }
+      }
+    );
+  }, delay);
+}
+
+/** What a capture of this tab would see right now, without storing anything. */
+function probeCapture(): Record<string, unknown> {
+  const href = window.location.href;
+  let extracted: DomExtractionResult | null = null;
+  let error: string | null = null;
+  try {
+    extracted = extractCurrentConversation();
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+  return {
+    url: href,
+    provider: detectProviderFromUrl(href),
+    conversationId: extractConversationIdFromUrl(href),
+    domMessages: extracted?.messages.length ?? 0,
+    domRoles: extracted ? extracted.messages.reduce<Record<string, number>>((acc, m) => ((acc[m.role] = (acc[m.role] ?? 0) + 1), acc), {}) : {},
+    domTitle: extracted?.title ?? null,
+    domProject: extracted?.providerProjectName ?? null,
+    siteDataMessages: siteConversation && siteConversation.sourceConversationId === extractConversationIdFromUrl(href)?.toLowerCase() ? siteConversation.messages.length : null,
+    lastCapture: lastCaptureStatus,
+    error,
+  };
 }
 
 const ISOLATED_WORLD_GUARD = Symbol.for('threadkeeper.contentScriptInitialized');
@@ -380,6 +562,8 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
   const onX = isXHostname(window.location.hostname);
   if (onX) {
     window.addEventListener('message', onGrokXWindowMessage);
+  } else {
+    window.addEventListener('message', onSiteDataWindowMessage);
   }
 
   // Listen for deliberate invocation from background service worker
@@ -396,6 +580,10 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
           schedulePassiveDomCapture(true);
         }
         sendResponse({ ok: true, state: res.state });
+        return true;
+      }
+      if (message && message.type === 'TK_CAPTURE_PROBE') {
+        sendResponse({ ok: true, report: probeCapture() });
         return true;
       }
       if (message && message.type === 'CLOSE_THREADKEEPER_OVERLAY') {
@@ -449,5 +637,15 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
       characterData: true,
     });
     schedulePassiveDomCapture();
+
+    // A single-page app can change the conversation without a page load. The mutation observer
+    // usually notices, but a cheap URL check makes sure a switch is never missed.
+    let lastHref = window.location.href;
+    window.setInterval(() => {
+      if (window.location.href === lastHref) return;
+      lastHref = window.location.href;
+      staleRetries = 0;
+      schedulePassiveDomCapture();
+    }, 1500);
   }
 }
