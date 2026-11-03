@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
 import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, updateManualThreadFields, deleteConversationCascade } from '../../src/core/db.js';
 import { insightKeyFor, type MessageRecord } from '../../src/core/schema.js';
+import { PROVIDERS } from '../../src/core/providers.js';
 import {
   buildThreadPayload,
   buildTranscriptOut,
@@ -232,6 +233,49 @@ describe('buildThreadPayload', () => {
     expect(p.resumeCommand).toBe("cd '/repo' && claude --resume 'cc1'");
     expect(p.url).toBe('');
     expect(p.analysis).toBeNull();
+  });
+});
+
+describe('payload fields from the other v0.5 workstreams', () => {
+  let db: ThreadkeeperDB;
+  beforeEach(async () => {
+    db = freshDb();
+    await ensureStarterCollectionsAndSettings(db);
+  });
+
+  it('takes the category from the provider registry for every new provider, and Paperclip agent labels', async () => {
+    const settings = await ensureStarterCollectionsAndSettings(db);
+    const cases: Array<[Parameters<typeof thread>[3], string]> = [
+      [{ provider: 'paperclip', agentLabel: 'Engineer · Claude Code', canonicalUrl: 'http://localhost:3100/PAP/issues/PAP-12' }, 'agent'],
+      [{ provider: 'custom_web', canonicalUrl: 'https://chat.example.org/c/1' }, 'chat'],
+      [{ provider: 'muse', canonicalUrl: 'https://muse.ai/thread/1' }, 'agent'],
+      [{ provider: 'lovable', canonicalUrl: 'https://lovable.dev/projects/1' }, 'builder'],
+      [{ provider: 'character_ai', canonicalUrl: 'https://character.ai/chat/1' }, PROVIDERS.character_ai.category],
+    ];
+    for (const [i, [extra, category]] of cases.entries()) {
+      const key = await seed(db, thread(`n${i}`, `New ${i}`, [['user', 'hello there']], extra));
+      const p = (await buildThreadPayload(db, settings, key, { transcript: 'none', seq: i + 1 }))!;
+      expect(p.category).toBe(category);
+      expect(p.category).toBe(PROVIDERS[extra!.provider!].category);
+      expect(p.providerLabel).toBe(PROVIDERS[extra!.provider!].label);
+      if (extra!.provider === 'paperclip') {
+        expect(p.agentLabel).toBe('Engineer · Claude Code');
+        // Paperclip's local http address is never passed on as an https url.
+        expect(p.url).toBe('');
+      } else {
+        expect(p.agentLabel).toBe('');
+      }
+    }
+  });
+
+  it('reports analysis v1 for an AI insight without analysisVersion and 0 for on-device only', async () => {
+    const settings = await ensureStarterCollectionsAndSettings(db);
+    const v1 = await seed(db, thread('v1', 'Old', [['user', 'hello there']]));
+    await putInsight(db, v1, {});
+    expect((await buildThreadPayload(db, settings, v1, { transcript: 'none', seq: 1 }))!.analysisVersion).toBe(1);
+    const local = await seed(db, thread('v0', 'Local', [['user', 'hello there']]));
+    await putInsight(db, local, { source: 'local' });
+    expect((await buildThreadPayload(db, settings, local, { transcript: 'none', seq: 2 }))!.analysisVersion).toBe(0);
   });
 });
 

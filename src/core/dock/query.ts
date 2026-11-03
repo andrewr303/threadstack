@@ -15,7 +15,7 @@ import {
   type ThreadInsight,
 } from '../schema.js';
 import { getSmartTitle, resolveInsight } from '../insights.js';
-import { providerCategory, providerLabel, PROVIDERS, isProviderId } from '../providers.js';
+import { providerCategory, providerLabel } from '../providers.js';
 import { isRemoteAllowed, localOnlyProjectNames } from '../privacy.js';
 import { LOCAL_SPACE, cosine, embedTexts, localHashEmbedding, primarySpace, remoteSpace, type EmbeddingSpace } from '../embeddings.js';
 import { buildRerankDocument, rerankReady, rerankThreads } from '../rerank.js';
@@ -32,7 +32,6 @@ import {
   type ThreadSummary,
 } from './protocol.js';
 
-type InsightV2 = ThreadInsight & { overview?: string[] };
 
 export interface QueryEnv {
   db: ThreadkeeperDB;
@@ -203,7 +202,6 @@ export async function loadCorpus(db: ThreadkeeperDB, settings: SettingsRecord): 
     const insight = resolveInsight(conv, local.get(conv.threadKey), ai.get(conv.threadKey));
     const summary = summaryByKey.get(conv.threadKey);
     const title = getSmartTitle(conv, insight);
-    const i2 = insight as InsightV2 | null;
     const meta = [
       conv.project,
       conv.tags.join(' '),
@@ -213,11 +211,11 @@ export async function loadCorpus(db: ThreadkeeperDB, settings: SettingsRecord): 
       providerLabel(conv.provider),
       insight?.gist ?? '',
       insight?.summary ?? '',
-      (i2?.overview ?? []).join(' '),
+      (insight?.overview ?? []).join(' '),
       insight?.topics.join(' ') ?? '',
       insight?.entities.join(' ') ?? '',
       insight ? THREAD_KIND_LABELS[insight.kind] ?? '' : '',
-      (conv as ConversationRecord & { agentLabel?: string | null }).agentLabel ?? '',
+      conv.agentLabel ?? '',
     ].join(' ');
     const summaryText = summary
       ? [
@@ -226,6 +224,8 @@ export async function loadCorpus(db: ThreadkeeperDB, settings: SettingsRecord): 
           ...summary.decisions.map((d) => d.text),
           ...summary.actionItems.map((d) => d.text),
           ...summary.openQuestions.map((d) => d.text),
+          ...(summary.keyPoints ?? []).map((d) => d.text),
+          summary.nextStep ?? '',
         ].join(' ')
       : '';
     entries.push({
@@ -785,7 +785,7 @@ export async function facets(env: QueryEnv): Promise<FacetsResponse> {
     providers: count((e) => e.conv.provider as string).map(([id, n]) => ({
       id,
       label: providerLabel(id),
-      category: isProviderId(id) ? PROVIDERS[id].category : 'chat',
+      category: providerCategory(id),
       count: n,
     })),
     projects: count((e) => e.conv.project || null).slice(0, 500).map(([name, n]) => ({ name, count: n })),

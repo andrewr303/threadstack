@@ -35,17 +35,6 @@ import {
   type TranscriptOut,
 } from './protocol.js';
 
-// Fields other workstreams add to shared records (analysis v2, Paperclip). Read defensively so
-// older records, and builds without those changes, still work.
-type InsightV2 = ThreadInsight & {
-  overview?: string[];
-  produced?: Array<{ label: string; kind: string; description: string; messageIndex: number | null }>;
-  analysisVersion?: number;
-};
-type SummaryV2 = StructuredSummaryRecord & { keyPoints?: ExtractedItem[]; nextStep?: string | null };
-type ItemV2 = ExtractedItem & { rationale?: string | null };
-type ConversationV2 = ConversationRecord & { agentLabel?: string | null };
-
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const strList = (v: unknown, maxItems: number, maxLen: number): string[] =>
   Array.isArray(v)
@@ -55,6 +44,7 @@ const refs = (v: unknown, limit = 20): number[] =>
   Array.isArray(v)
     ? Array.from(new Set(v.filter((n): n is number => Number.isInteger(n) && n >= 0))).slice(0, limit)
     : [];
+const refOf = (n: number | null | undefined): number | null => (typeof n === 'number' && Number.isInteger(n) && n >= 0 ? n : null);
 const iso = (v: string | null | undefined): string | null => (v && Number.isFinite(Date.parse(v)) ? new Date(Date.parse(v)).toISOString() : null);
 
 // ---------------------------------------------------------------------------
@@ -159,9 +149,13 @@ export function siblingThreadKeys(conv: ConversationRecord): string[] {
     );
 }
 
-export function analysisVersionOf(insight: ThreadInsight | null): number {
+/**
+ * The analysis format of a thread's insight as the protocol reports it: 0 for on-device or none,
+ * else the AI insight's `analysisVersion` (absent = 1; see ANALYSIS_VERSION in schema.ts).
+ */
+export function analysisVersionOf(insight: Pick<ThreadInsight, 'source' | 'analysisVersion'> | null | undefined): number {
   if (!insight || insight.source !== 'ai') return 0;
-  const v = (insight as InsightV2).analysisVersion;
+  const v = insight.analysisVersion;
   return typeof v === 'number' && Number.isFinite(v) && v >= 1 ? Math.floor(v) : 1;
 }
 
@@ -175,7 +169,6 @@ export function httpsUrl(url: string | null | undefined): string {
 }
 
 export function buildThreadSummary(conv: ConversationRecord, insight: ThreadInsight | null): ThreadSummary {
-  const c = conv as ConversationV2;
   const kind = insight?.kind ?? '';
   const state = (WORKFLOW_STATES as readonly string[]).includes(conv.workflowState) ? conv.workflowState : 'active';
   return {
@@ -186,7 +179,7 @@ export function buildThreadSummary(conv: ConversationRecord, insight: ThreadInsi
     provider: conv.provider,
     providerLabel: providerLabel(conv.provider),
     category: providerCategory(conv.provider),
-    agentLabel: str(c.agentLabel, 120),
+    agentLabel: str(conv.agentLabel, 120),
     kind,
     kindLabel: kindLabel(kind),
     project: str(conv.project, 200),
@@ -210,8 +203,7 @@ function modelLabel(insight: ThreadInsight): string {
 
 function evidence(items: ExtractedItem[] | undefined): EvidenceOut[] {
   if (!Array.isArray(items)) return [];
-  return items.slice(0, 30).map((raw): EvidenceOut => {
-    const item = raw as ItemV2;
+  return items.slice(0, 30).map((item): EvidenceOut => {
     return {
       text: str(item.text, 600),
       rationale: str(item.rationale, 400),
@@ -224,12 +216,11 @@ function evidence(items: ExtractedItem[] | undefined): EvidenceOut[] {
 
 export function buildAnalysis(conv: ConversationRecord, insight: ThreadInsight | null, summary: StructuredSummaryRecord | null): ThreadAnalysisOut | null {
   if (!insight) return null;
-  const i = insight as InsightV2;
-  const s = summary as SummaryV2 | null;
-  const kind = insight.kind as ThreadKind;
-  const produced = Array.isArray(i.produced) && i.produced.length
-    ? i.produced.map((p) => ({ label: str(p.label, 200), kind: str(p.kind, 20) || 'other', description: str(p.description, 300), ref: Number.isInteger(p.messageIndex) && (p.messageIndex as number) >= 0 ? (p.messageIndex as number) : null }))
-    : (insight.artifacts ?? []).map((a) => ({ label: str(a.label, 200), kind: str(a.kind, 20) || 'other', description: '', ref: Number.isInteger(a.messageIndex) && (a.messageIndex as number) >= 0 ? (a.messageIndex as number) : null }));
+  const s = summary;
+  const kind: ThreadKind = insight.kind;
+  const produced = Array.isArray(insight.produced) && insight.produced.length
+    ? insight.produced.map((p) => ({ label: str(p.label, 200), kind: str(p.kind, 20) || 'other', description: str(p.description, 300), ref: refOf(p.messageIndex) }))
+    : (insight.artifacts ?? []).map((a) => ({ label: str(a.label, 200), kind: str(a.kind, 20) || 'other', description: '', ref: refOf(a.messageIndex) }));
   const whereText = str(s?.whereYouLeftOff, 1200);
   return {
     source: insight.source,
@@ -239,7 +230,7 @@ export function buildAnalysis(conv: ConversationRecord, insight: ThreadInsight |
     stale: insight.sourceRevision !== conv.sourceRevision,
     analysisVersion: analysisVersionOf(insight),
     gist: str(insight.gist, 400),
-    overview: strList(i.overview, 4, 2000),
+    overview: strList(insight.overview, 4, 2000),
     summary: str(insight.summary, 3000),
     userGoal: str(insight.userGoal, 600),
     outcome: str(insight.outcome, 600),
@@ -298,7 +289,7 @@ export function cheapDigestOf(conv: ConversationRecord, aiGeneratedAt: string | 
       conv.siblingBranchIds,
       aiGeneratedAt ?? '',
       localGeneratedAt ?? '',
-      (conv as ConversationV2).agentLabel ?? '',
+      conv.agentLabel ?? '',
     ])
   );
 }

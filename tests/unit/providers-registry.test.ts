@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CAPTURE_PROVIDER_IDS,
   CUSTOM_SITE_PROVIDER_IDS,
+  NON_CAPTURE_PROVIDER_IDS,
   OPTIONAL_PROVIDER_IDS,
   PROVIDER_CATEGORIES,
   PROVIDER_IDS,
@@ -10,6 +11,7 @@ import {
   conversationQueryParams,
   detectProviderFromUrl,
   extractConversationIdFromUrl,
+  isCaptureProviderId,
   isCapturePageUrl,
   isProviderAllowedOnUrl,
   matchPatternCovers,
@@ -106,6 +108,38 @@ describe('provider registry', () => {
     expect(migrated.authorizedHosts.chatgpt).toBe(false);
     expect(migrated.authorizedHosts.meta_ai).toBe(false);
     for (const id of CAPTURE_PROVIDER_IDS) expect(migrated.boundAccounts[id].accountId).toBe(`acct_${id}_primary`);
+  });
+
+  it('gives every provider (incl. Paperclip) a default account and normalizes a v0.4 record', () => {
+    for (const id of PROVIDER_IDS) {
+      expect(DEFAULT_SETTINGS.boundAccounts[id]).toEqual({ accountId: `acct_${id}_primary`, workspaceId: 'ws_personal' });
+    }
+    const v04 = normalizeSettings({
+      authorizedHosts: { chatgpt: true, claude: false },
+      boundAccounts: { chatgpt: { accountId: 'acct_mine', workspaceId: 'ws_work' } },
+    } as never);
+    expect(v04.boundAccounts.chatgpt).toEqual({ accountId: 'acct_mine', workspaceId: 'ws_work' });
+    for (const id of PROVIDER_IDS) {
+      if (id === 'chatgpt') continue;
+      expect(v04.boundAccounts[id].accountId).toBe(`acct_${id}_primary`);
+    }
+    expect(v04.authorizedHosts.claude).toBe(false);
+    for (const id of CAPTURE_PROVIDER_IDS) expect(typeof v04.authorizedHosts[id]).toBe('boolean');
+    // Paperclip and imports are never captured from a page, so they have no capture switch.
+    expect('paperclip' in v04.authorizedHosts).toBe(false);
+    expect('imported' in v04.authorizedHosts).toBe(false);
+    expect(v04.paperclip.enabled).toBe(false);
+    expect(v04.sidebarDock.pairedId).toBe('');
+  });
+
+  it('keeps non-capture providers and host access none in step', () => {
+    const none = PROVIDER_IDS.filter((id) => PROVIDERS[id].hostAccess === 'none');
+    expect([...NON_CAPTURE_PROVIDER_IDS].sort()).toEqual([...none].sort());
+    expect(PROVIDERS.paperclip).toMatchObject({ category: 'agent', reopen: 'web', matchPatterns: [] });
+    expect(isCaptureProviderId('paperclip')).toBe(false);
+    expect(isCaptureProviderId('imported')).toBe(false);
+    expect(isCaptureProviderId('custom_web')).toBe(true);
+    expect(providerCategory('paperclip')).toBe('agent');
   });
 
   it('round-trips thread keys for new providers', () => {

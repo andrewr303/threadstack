@@ -11,9 +11,9 @@
 import { ensureStarterCollectionsAndSettings, type ThreadkeeperDB } from '../db.js';
 import type { SettingsRecord, SidebarDockSettings } from '../schema.js';
 import { localOnlyProjectNames } from '../privacy.js';
-import { enqueueAnalysis } from '../pipeline.js';
+import { enqueueAnalysis, isOlderAnalysis } from '../pipeline.js';
 import { estimateAnalysisCostUsd, hasClaudeKey } from '../ai/claude.js';
-import { analysisVersionOf, buildThreadPayload, cheapDigestOf, isShareable, loadThreadRecords } from './payload.js';
+import { buildThreadPayload, cheapDigestOf, isShareable, loadThreadRecords } from './payload.js';
 import {
   facets,
   listThreads,
@@ -457,7 +457,8 @@ export class DockService {
         continue;
       }
       const ai = records.ai;
-      if (ai && ai.sourceRevision === records.conv.sourceRevision && analysisVersionOf(ai) >= 2) {
+      const current = Boolean(ai && ai.sourceRevision === records.conv.sourceRevision);
+      if (current && !isOlderAnalysis(ai)) {
         skipped.push({ threadKey, reason: 'fresh' });
         continue;
       }
@@ -465,11 +466,9 @@ export class DockService {
         skipped.push({ threadKey, reason: 'limit' });
         continue;
       }
-      const job = await enqueueAnalysis(this.db, records.conv, 0);
-      if (ai && ai.sourceRevision === records.conv.sourceRevision) {
-        // An older analysis of the current revision: ask the pipeline to upgrade it (analysis v2).
-        await this.db.jobs.put({ ...job, upgradeAnalysis: true } as typeof job);
-      }
+      // A requested job runs even when automatic analysis is off and re-analyzes a current AI insight
+      // written by an older analysis format (analysis v2 upgrade path, as "Upgrade older summaries").
+      await enqueueAnalysis(this.db, records.conv, 0, { requested: true });
       budget -= 1;
       queued += 1;
     }

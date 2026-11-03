@@ -179,6 +179,7 @@ describe('capture decisions', () => {
     expect(decideCapture({ ...base, payload: { provider: 'claude', sourceConversationId: 'c1' }, sender: sender('https://chatgpt.com/c/c1') })).toMatchObject({ ok: false, error: expect.stringMatching(/Claude page/) });
     expect(decideCapture({ ...base, payload: { provider: 'chatgpt', sourceConversationId: 'c1' }, sender: sender('https://chatgpt.com/c/c1', 2) })).toMatchObject({ ok: false });
     expect(decideCapture({ ...base, payload: { provider: 'imported', sourceConversationId: 'c1' }, sender: sender('https://chatgpt.com/c/c1') })).toMatchObject({ ok: false });
+    expect(decideCapture({ ...base, payload: { provider: 'paperclip', sourceConversationId: 'c1' }, sender: sender('http://localhost:3100/PAP/issues/PAP-1') })).toMatchObject({ ok: false, error: 'Unknown capture provider' });
     expect(decideCapture({ ...base, payload: { provider: 'chatgpt', sourceConversationId: '' }, sender: sender('https://chatgpt.com/c/c1') })).toMatchObject({ ok: false });
     expect(decideCapture({ ...base, payload: { provider: 'chatgpt', sourceConversationId: 'x'.repeat(301) }, sender: sender('https://chatgpt.com/c/c1') })).toMatchObject({ ok: false });
   });

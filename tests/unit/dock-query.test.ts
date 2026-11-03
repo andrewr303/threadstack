@@ -77,6 +77,24 @@ describe('read requests', () => {
     expect((byHash.results as ThreadSummary[]).map((r) => r.threadKey)).toEqual([refactor]);
   });
 
+  it('filters by the categories of the v0.5 providers (Paperclip agents, builders, added sites)', async () => {
+    const pc = await seed(h.db, thread('pc1', 'PAP-12 Fix the CTA', [['user', 'Fix the CTA button']], { provider: 'paperclip', agentLabel: 'Engineer · Claude Code' }));
+    const lov = await seed(h.db, thread('lv1', 'Landing page', [['user', 'Build a landing page']], { provider: 'lovable' }));
+    const web = await seed(h.db, thread('cw1', 'Self-hosted chat', [['user', 'hello there']], { provider: 'custom_web' }));
+    const agents = await ask(h, 'threads.list', { filters: { categories: ['agent'] } });
+    expect((agents.results as ThreadSummary[]).map((r) => r.threadKey)).toEqual([pc]);
+    expect((agents.results as ThreadSummary[])[0]).toMatchObject({ category: 'agent', agentLabel: 'Engineer · Claude Code', providerLabel: 'Paperclip' });
+    const builders = await ask(h, 'threads.list', { filters: { categories: ['builder'] } });
+    expect((builders.results as ThreadSummary[]).map((r) => r.threadKey)).toEqual([lov]);
+    const chats = await ask(h, 'threads.list', { filters: { categories: ['chat'] }, limit: 50 });
+    expect((chats.results as ThreadSummary[]).map((r) => r.threadKey)).toContain(web);
+    expect((chats.results as ThreadSummary[]).map((r) => r.threadKey)).not.toContain(pc);
+    const facets = await ask(h, 'facets', {});
+    const providers = facets.providers as Array<{ id: string; category: string }>;
+    expect(providers.find((p) => p.id === 'paperclip')).toMatchObject({ category: 'agent' });
+    expect(providers.find((p) => p.id === 'lovable')).toMatchObject({ category: 'builder' });
+  });
+
   it('lists with sort and an opaque cursor', async () => {
     const page1 = await ask(h, 'threads.list', { sort: 'title', limit: 1 });
     expect(page1.total).toBe(2);
@@ -206,5 +224,19 @@ describe('read requests', () => {
     expect(res.skipped).toEqual([{ threadKey: p, reason: 'local_only' }, { threadKey: fresh, reason: 'fresh' }]);
     expect(kicked).toBe(1);
     expect(await h2.db.jobs.count()).toBe(1);
+  });
+
+  it('threads.analyze upgrades a current v1 analysis through a requested job', async () => {
+    const h2 = await harness();
+    await saveSettingsPatch(h2.db, { anthropicApiKey: 'sk-ant-test', autoOrganize: { ...(await ensureStarterCollectionsAndSettings(h2.db)).autoOrganize, aiAnalysis: false } });
+    const older = await seed(h2.db, thread('zv1', 'ZV1', [['user', 'x']]));
+    await putInsight(h2.db, older, {}); // no analysisVersion: an analysis v1 record of the current revision
+    await pairDirect(h2);
+    const res = await ask(h2, 'threads.analyze', { threadKeys: [older] });
+    expect(res).toMatchObject({ ok: true, queued: 1, skipped: [] });
+    const jobs = await h2.db.jobs.toArray();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toMatchObject({ threadKey: older, requested: true, status: 'pending' });
+    expect('upgradeAnalysis' in jobs[0]).toBe(false);
   });
 });
