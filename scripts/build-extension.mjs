@@ -109,7 +109,7 @@ function createPngBuffer(size) {
  * Load the provider registry itself (compiled on the fly) so manifest host
  * permissions and content-script matches come from the same code the adapters use.
  */
-async function loadCaptureMatchPatterns() {
+async function loadManifestMatchPatterns() {
   const result = await esbuild.build({
     entryPoints: [path.join(rootDir, 'src/core/providers.ts')],
     bundle: true,
@@ -119,11 +119,23 @@ async function loadCaptureMatchPatterns() {
   });
   const source = Buffer.from(result.outputFiles[0].text).toString('base64');
   const registry = await import(`data:text/javascript;base64,${source}`);
-  const patterns = registry.captureMatchPatterns();
-  if (!Array.isArray(patterns) || patterns.length === 0) {
+  const capture = registry.captureMatchPatterns();
+  if (!Array.isArray(capture) || capture.length === 0) {
     throw new Error('Provider registry returned no capture match patterns');
   }
-  return patterns;
+  // Grok on X: X is a single-page app, so its scripts load on every X page at document_start
+  // (the MAIN-world hook must be in place before X requests the conversation).
+  const grokX = registry.PROVIDERS.grok_x.matchPatterns;
+  if (!Array.isArray(grokX) || grokX.length === 0) {
+    throw new Error('Provider registry returned no Grok on X match patterns');
+  }
+  return {
+    capture,
+    grokX,
+    domCapture: capture.filter((pattern) => !grokX.includes(pattern)),
+    // web_accessible_resources only accepts origin patterns (scheme://host/*).
+    webAccessible: registry.toOriginMatchPatterns(capture),
+  };
 }
 
 async function build() {
@@ -156,6 +168,18 @@ async function build() {
     target: ['chrome120'],
     sourcemap: false,
     define,
+  });
+
+  // 2b. Bundle the Grok on X MAIN-world script (IIFE, no extension APIs)
+  await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/entrypoints/grok-x-main.ts')],
+    outfile: path.join(outDir, 'content-scripts/grok-x-main.js'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: ['chrome120'],
+    sourcemap: false,
+    minify: true,
   });
 
   // 3. Bundle manager UI (ESM)
@@ -198,7 +222,8 @@ async function build() {
   fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'Threadkeeper'), 'utf8');
 
   // 6. Write manifest.json
-  const capturePatterns = await loadCaptureMatchPatterns();
+  const patterns = await loadManifestMatchPatterns();
+  const capturePatterns = patterns.capture;
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',
@@ -256,9 +281,20 @@ async function build() {
     },
     content_scripts: [
       {
-        matches: capturePatterns,
+        matches: patterns.domCapture,
         js: ['content-scripts/content.js'],
         run_at: 'document_idle',
+      },
+      {
+        matches: patterns.grokX,
+        js: ['content-scripts/content.js'],
+        run_at: 'document_start',
+      },
+      {
+        matches: patterns.grokX,
+        js: ['content-scripts/grok-x-main.js'],
+        run_at: 'document_start',
+        world: 'MAIN',
       },
     ],
     // No use_dynamic_url: Edge (and older Chrome) resolve chrome.runtime.getURL() to the
@@ -268,7 +304,7 @@ async function build() {
     web_accessible_resources: [
       {
         resources: ['manager.html', 'assets/*'],
-        matches: capturePatterns,
+        matches: patterns.webAccessible,
       },
     ],
     content_security_policy: {

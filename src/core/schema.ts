@@ -592,11 +592,14 @@ const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
   claude_code: 'acct_claude_code_primary',
   codex: 'acct_codex_primary',
   grok: 'acct_grok_primary',
+  grok_x: 'acct_grok_x_primary',
   gemini: 'acct_gemini_primary',
+  ai_studio: 'acct_ai_studio_primary',
   perplexity: 'acct_perplexity_primary',
   deepseek: 'acct_deepseek_primary',
   mistral: 'acct_mistral_primary',
   copilot: 'acct_copilot_primary',
+  kimi: 'acct_kimi_primary',
   imported: 'acct_imported_primary',
 };
 

@@ -8,7 +8,7 @@ import { buildThreadKey, type SettingsRecord } from '../core/schema.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import { validateRuntimeMessageSender } from '../core/messaging.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
-import { isProviderId, type CaptureProviderId } from '../core/providers.js';
+import { isCapturePageUrl, isProviderId, type CaptureProviderId } from '../core/providers.js';
 import {
   nextDueAnalysisAt,
   processThreadLocally,
@@ -21,8 +21,6 @@ const db = new ThreadkeeperDB();
 
 const ANALYSIS_DUE_ALARM = 'tk-analysis-due';
 const ANALYSIS_SWEEP_ALARM = 'tk-analysis-sweep';
-const AI_PAGE_RE =
-  /^https:\/\/(chatgpt\.com|chat\.openai\.com|claude\.ai|grok\.com|gemini\.google\.com|(www\.)?perplexity\.ai|chat\.deepseek\.com|chat\.mistral\.ai|copilot\.microsoft\.com)\//i;
 
 let organizeCtxCache: { ctx: OrganizeContext; at: number } | null = null;
 let analysisRun: Promise<unknown> | null = null;
@@ -187,8 +185,9 @@ export async function invokeOverlayOnTab(
     await seedSyntheticWorkbenchLibrary(db);
   }
 
+  // AI pages come from the provider registry (x.com counts only on /i/grok).
   const canInjectOverlay =
-    typeof tabId === 'number' && typeof tabUrl === 'string' && AI_PAGE_RE.test(tabUrl);
+    typeof tabId === 'number' && typeof tabUrl === 'string' && isCapturePageUrl(tabUrl);
 
   if (canInjectOverlay && tabId !== undefined) {
     const handshakeToken = generateHandshakeToken();
