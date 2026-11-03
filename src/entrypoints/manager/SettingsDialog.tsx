@@ -17,13 +17,13 @@ import { MODEL_OPTIONS, estimateAnalysisCostUsd, testClaudeConnection } from '..
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
-  awsHostOrigins,
   hasHostAccess,
   isValidAwsRegion,
   requestHostAccess,
   type AwsSettings,
 } from '../../core/aws.js';
-import { embedTexts, remoteSpace } from '../../core/embeddings.js';
+import { embeddingHostOrigins, testEmbedding } from '../../core/embeddings.js';
+import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
 import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
 import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
 
@@ -177,13 +177,8 @@ const BEDROCK_RERANK_OPTIONS: Array<{ id: BedrockRerankModel; label: string }> =
 
 /** AWS hosts the current settings call, so access can be granted for exactly those. */
 function awsOriginsInUse(settings: SettingsRecord): string[] {
-  const which: Array<'mantle' | 'runtime' | 'agent' | 'platform'> = [];
-  if (settings.aiBackend === 'bedrock') which.push('mantle');
-  if (settings.aiBackend === 'aws_platform') which.push('platform');
-  if (settings.embeddingProvider === 'bedrock') which.push('runtime');
-  // Bedrock API keys do not work with the Rerank API, so key-based reranking uses InvokeModel.
-  if (settings.rerankProvider === 'bedrock') which.push(settings.aws.auth === 'iam' ? 'agent' : 'runtime');
-  return which.length && isValidAwsRegion(settings.aws.region) ? awsHostOrigins(settings.aws.region, which) : [];
+  const rerankOrigins = settings.rerankProvider === 'bedrock' ? rerankHostOrigins(settings) : [];
+  return Array.from(new Set([...aiHostOrigins(settings), ...embeddingHostOrigins(settings), ...rerankOrigins]));
 }
 
 function usesAws(settings: SettingsRecord): boolean {
@@ -309,6 +304,7 @@ export function SettingsDialog({
   const [section, setSection] = useState<SectionId>('general');
   const [aiTest, setAiTest] = useState<TestState>(IDLE);
   const [embedTest, setEmbedTest] = useState<TestState>(IDLE);
+  const [rerankTest, setRerankTest] = useState<TestState>(IDLE);
   const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
   const diagnostics = useDiagnostics();
 
@@ -358,22 +354,30 @@ export function SettingsDialog({
   };
 
   const testEmbeddings = async () => {
-    const space = remoteSpace(settings);
-    if (!space) {
-      setEmbedTest({ busy: false, ok: false, message: 'Add the key, URL or AWS credentials first.' });
-      return;
-    }
     setEmbedTest({ busy: true, message: 'Testing…' });
-    if (settings.embeddingProvider === 'bedrock' && !(await ensureAwsAccess())) {
+    const origins = embeddingHostOrigins(settings);
+    if (origins.length && !(await requestHostAccess(origins))) {
       setEmbedTest({ busy: false, ok: false, message: 'Access to Amazon Bedrock was not granted.' });
       return;
     }
-    try {
-      const [v] = await embedTexts(settings, space, ['Threadkeeper connection test'], 'query');
-      setEmbedTest({ busy: false, ok: true, message: `Connected: ${space.model} returns ${v.length}-dimensional vectors.` });
-    } catch (err) {
-      setEmbedTest({ busy: false, ok: false, message: err instanceof Error ? err.message : String(err) });
+    const r = await testEmbedding(settings);
+    setEmbedTest({ busy: false, ok: r.ok, message: r.message });
+  };
+
+  const testRerank = async () => {
+    const problem = rerankProblem(settings);
+    if (problem) {
+      setRerankTest({ busy: false, ok: false, message: problem });
+      return;
     }
+    setRerankTest({ busy: true, message: 'Testing…' });
+    const origins = rerankHostOrigins(settings);
+    if (origins.length && !(await requestHostAccess(origins))) {
+      setRerankTest({ busy: false, ok: false, message: 'Access to Amazon Bedrock was not granted.' });
+      return;
+    }
+    const r = await testReranker(settings);
+    setRerankTest({ busy: false, ok: r.ok, message: r.message });
   };
 
   const openShortcuts = () => {
@@ -897,7 +901,10 @@ export function SettingsDialog({
             <select
               className="tk-select"
               value={settings.rerankProvider}
-              onChange={(e) => void onPatch({ rerankProvider: e.target.value as RerankProviderId })}
+              onChange={(e) => {
+                setRerankTest(IDLE);
+                void onPatch({ rerankProvider: e.target.value as RerankProviderId });
+              }}
             >
               <option value="none">Off</option>
               <option value="voyage">Voyage AI</option>
@@ -960,8 +967,19 @@ export function SettingsDialog({
                   />
                 </label>
               </div>
-              <Toggle checked={settings.rerankInSearch} onChange={(v) => void onPatch({ rerankInSearch: v })} label="Rerank search results" />
+              <Toggle
+                checked={settings.rerankInSearch}
+                onChange={(v) => void onPatch({ rerankInSearch: v })}
+                label="Rerank search results"
+                hint="Runs when you press Enter in the search box."
+              />
               <Toggle checked={settings.rerankInAsk} onChange={(v) => void onPatch({ rerankInAsk: v })} label="Rerank the threads Ask reads" />
+              <div className="tk-field-row">
+                <button type="button" className="tk-btn" disabled={rerankTest.busy} onClick={() => void testRerank()}>
+                  Test reranker
+                </button>
+              </div>
+              <Result state={rerankTest} />
             </>
           )}
         </Section>

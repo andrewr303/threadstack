@@ -1392,7 +1392,7 @@ export function App() {
         <div className="tk-header-actions">
           {latestUndoableLog && (
             <button type="button" className="tk-btn" onClick={() => void handleUndoLastOrganize()}>
-              Undo organize ({latestUndoableLog.snapshots.length})
+              Undo last change ({latestUndoableLog.snapshots.length})
             </button>
           )}
           <button type="button" className="tk-btn tk-btn-primary" onClick={() => void handleAutoOrganize()}>
@@ -1543,7 +1543,11 @@ export function App() {
                   type="search"
                   className="tk-input tk-search-input"
                   aria-label="Search conversations, decisions, and messages"
-                  placeholder="Search titles, summaries, topics, decisions, messages…"
+                  placeholder={
+                    settings && settings.rerankProvider !== 'none' && settings.rerankInSearch
+                      ? 'Search titles, summaries, messages… (Enter reranks)'
+                      : 'Search titles, summaries, topics, decisions, messages…'
+                  }
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   onKeyDown={(e) => {

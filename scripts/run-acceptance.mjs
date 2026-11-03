@@ -1015,9 +1015,9 @@ async function runAcceptance() {
       .locator('dialog#tk-organize-dialog button', { hasText: 'Apply changes' })
       .click();
     await managerPage
-      .locator('button', { hasText: 'Undo organize' })
+      .locator('button', { hasText: 'Undo last change' })
       .waitFor({ state: 'visible', timeout: 3000 });
-    await managerPage.locator('button', { hasText: 'Undo organize' }).click();
+    await managerPage.locator('button', { hasText: 'Undo last change' }).click();
     await managerPage.waitForTimeout(200);
 
     // Test Project cards & Kanban view modes in Manager UI
