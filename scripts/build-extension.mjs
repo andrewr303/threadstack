@@ -213,6 +213,8 @@ async function build() {
       'https://api.voyageai.com/*',
       'https://api.openai.com/*',
     ],
+    // AWS hosts are granted per region at runtime (Settings → AI / Embeddings), never at install.
+    optional_host_permissions: ['https://*.api.aws/*', 'https://*.amazonaws.com/*'],
     background: {
       service_worker: 'background.js',
       type: 'module',

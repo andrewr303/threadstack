@@ -7,7 +7,10 @@ import {
   type ProviderId,
 } from './providers.js';
 
+import { DEFAULT_AWS_SETTINGS, type AwsSettings } from './aws.js';
+
 export type { ProviderId, CaptureProviderId } from './providers.js';
+export type { AwsSettings } from './aws.js';
 
 export type CoverageState =
   | 'full'
@@ -491,7 +494,18 @@ export type AiModelId =
   | 'claude-haiku-5-5'
   | 'claude-fable-5-1';
 
-export type EmbeddingProviderId = 'local' | 'voyage' | 'openai' | 'ollama';
+export type EmbeddingProviderId = 'local' | 'voyage' | 'openai' | 'ollama' | 'bedrock';
+
+/** Where Claude requests go: Anthropic's API, Claude in Amazon Bedrock, or Claude Platform on AWS. */
+export type AiBackend = 'anthropic' | 'bedrock' | 'aws_platform';
+
+export type BedrockEmbeddingModel = 'amazon.titan-embed-text-v2:0' | 'cohere.embed-v4:0';
+
+export type RerankProviderId = 'none' | 'voyage' | 'bedrock';
+
+export type VoyageRerankModel = 'rerank-2.5' | 'rerank-2.5-lite';
+
+export type BedrockRerankModel = 'cohere.rerank-v3-5:0' | 'amazon.rerank-v1:0';
 
 export interface AutoOrganizeSettings {
   /** Run the on-device analyzer on every capture/import (instant, free). */
@@ -539,7 +553,14 @@ export interface SettingsRecord {
   lastActiveQueue: ResurfaceQueue | 'all';
   /** Toolbar button behaviour: side panel (default), in-page overlay, or a full tab. */
   launchSurface: 'side_panel' | 'overlay' | 'tab';
+  /** Where Claude requests go. */
+  aiBackend: AiBackend;
   anthropicApiKey: string;
+  /** Shared AWS region and credentials (Bedrock Claude, embeddings and reranking). */
+  aws: AwsSettings;
+  /** Claude Platform on AWS workspace (wrkspc_…) and short-term API key. */
+  awsPlatformWorkspaceId: string;
+  awsPlatformApiKey: string;
   aiModel: AiModelId;
   aiEffort: 'low' | 'medium' | 'high';
   aiAnalysesToday: number;
@@ -551,6 +572,16 @@ export interface SettingsRecord {
   openaiEmbeddingModel: 'text-embedding-3-small' | 'text-embedding-3-large';
   ollamaUrl: string;
   ollamaEmbeddingModel: string;
+  bedrockEmbeddingModel: BedrockEmbeddingModel;
+  bedrockEmbeddingDimensions: 256 | 512 | 1024;
+  /** Second-stage reranker for search results and Ask context. */
+  rerankProvider: RerankProviderId;
+  voyageRerankModel: VoyageRerankModel;
+  bedrockRerankModel: BedrockRerankModel;
+  /** How many first-stage candidates the reranker re-scores. */
+  rerankCandidates: number;
+  rerankInSearch: boolean;
+  rerankInAsk: boolean;
   autoOrganize: AutoOrganizeSettings;
   /** Last background AI failure, surfaced in the manager so silent failures are visible. */
   lastAiError?: string | null;
@@ -615,7 +646,11 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   lastActiveArea: 'All threads',
   lastActiveQueue: 'all',
   launchSurface: 'side_panel',
+  aiBackend: 'anthropic',
   anthropicApiKey: '',
+  aws: { ...DEFAULT_AWS_SETTINGS },
+  awsPlatformWorkspaceId: '',
+  awsPlatformApiKey: '',
   aiModel: 'claude-opus-5-5',
   aiEffort: 'low',
   aiAnalysesToday: 0,
@@ -627,6 +662,14 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   openaiEmbeddingModel: 'text-embedding-3-small',
   ollamaUrl: 'http://localhost:11434',
   ollamaEmbeddingModel: 'nomic-embed-text',
+  bedrockEmbeddingModel: 'amazon.titan-embed-text-v2:0',
+  bedrockEmbeddingDimensions: 1024,
+  rerankProvider: 'none',
+  voyageRerankModel: 'rerank-2.5-lite',
+  bedrockRerankModel: 'cohere.rerank-v3-5:0',
+  rerankCandidates: 40,
+  rerankInSearch: true,
+  rerankInAsk: true,
   autoOrganize: { ...DEFAULT_AUTO_ORGANIZE },
 };
 
@@ -651,6 +694,10 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
     autoOrganize: {
       ...DEFAULT_AUTO_ORGANIZE,
       ...(base.autoOrganize ?? {}),
+    },
+    aws: {
+      ...DEFAULT_AWS_SETTINGS,
+      ...(base.aws ?? {}),
     },
   };
 }
