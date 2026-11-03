@@ -19,6 +19,7 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
   - A Claude Code session is titled by your rename if you made one, else by its agent name, its generated title, its summary, or its first prompt, in that order.
 - **Complete capture on ChatGPT and Claude:** both apps load each conversation as one JSON document. Threadkeeper reads that response as the page receives it (it never alters it and sends no request of its own), so a conversation is stored whole, with the site's message ids, timestamps, model and active branch, even when the page only renders part of it. Page reading stays as the live fallback and merges with it by message id, so nothing is dropped or stored twice.
 - **Catch up, no export needed:** **Import / Export → Catch up from your accounts** pulls the last 7, 14 or 30 days from the sites you are signed in to. ChatGPT and Claude are read through your own signed-in session in this browser: it lists recent conversations, skips the ones already stored and unchanged, then reads the rest one at a time with a pause between them. It only sends GET requests, stops if the site asks it to slow down or shows a check, and can be cancelled. Gemini, Grok, Perplexity, DeepSeek, Kimi, Le Chat, Copilot and AI Studio have no history Threadkeeper can read directly, so it opens your most recent chats in a background tab, a few seconds each (no dates, so it takes the newest 30). Everything imported is summarized and filed like any other thread, and a catch-up brief says where things stand across the period.
+- **Paperclip agent companies:** connect your [Paperclip](https://github.com/paperclipai/paperclip) server in **Settings → Paperclip** and every issue becomes a thread: the task, its comment thread, and the transcripts of the agent runs that worked on it, in time order. Details below.
 - **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
 
 ### 2. Understands every thread (beyond the title)
@@ -57,12 +58,25 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 - **Side panel** (default for the toolbar button): the library beside any page, with the conversation open in the current tab pinned at the top.
 - **Overlay** on AI pages (`Alt+Shift+K`) and a **full-page library** (`Alt+Shift+M`). Side panel shortcut: `Alt+Shift+L`.
 
+### Paperclip
+
+[Paperclip](https://github.com/paperclipai/paperclip) runs companies of AI agents (Claude Code, Codex, Gemini, OpenCode, Grok Build, and its own Grok Bot, OpenAI Dot and Muse runners) on a server you host. **Settings → Paperclip** connects to it:
+
+- **Server:** type the address (default `http://localhost:3100`) and press **Connect**. The browser asks for access to that host from the click. A local server that moved to the next free port is found on 3100-3110 automatically.
+- **Sign-in:** a `local_trusted` server (the `npx paperclipai onboard` default) needs none. On an authenticated server, **Sign in with Paperclip** runs the same approval flow as the Paperclip CLI: Paperclip opens in a tab, you approve, and Threadkeeper keeps the board key (valid 30 days) in this browser profile like its other keys. You can paste a `pcp_board_…` key instead.
+- **Companies:** every company you can see, or the ones you choose.
+- **Sync:** every 5 minutes while the browser runs, plus **Sync now**. Each sync reads only issues changed since the last one (`updatedSince`, with a cursor per company) and the newest runs, so a run that finished without touching its issue still shows up. A finished run is read once; later syncs reuse its stored transcript. Rate limits (429) are waited out or retried later, and repeated failures back off up to an hour. On a local server Threadkeeper also listens to Paperclip's live events to sync sooner.
+- **Threads:** one per issue, titled `PAP-12 Fix the CTA`. The issue description is the opening message, comments follow (agents' comments as replies), and each run is a block that opens with a one-line header (agent, outcome, duration, tokens, cost) followed by its transcript, with tool calls condensed the way Claude Code and Codex sessions are. Threads go through the normal on-device analysis and Claude analysis, are filed under the Paperclip project (else the goal, else the company), and take their status from the issue (in review → needs review, done → done, blocked → paused). A status you set yourself is kept.
+- **Agents and sessions:** each thread records who did the work, for example `Engineer · Claude Code` or `CEO · Grok Bot`. A Claude Code or Codex run is linked to its session: the thread shows **Linked session**, and the session shows **Run by Paperclip**. Import `~/.claude/projects` as usual; Paperclip gives Codex agents their own home, so import `~/.paperclip/instances/default/companies/<company id>/codex-home` to link Codex runs.
+- Threadkeeper only reads. Apart from the sign-in request and revoking its own key when you sign out, it sends Paperclip nothing but GET requests. Threads you delete in Threadkeeper stay deleted.
+
 ---
 
 ## Privacy
 
 - Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
 - API keys and AWS credentials (Anthropic, Voyage, OpenAI, Bedrock, Claude Platform on AWS) are stored the same way and only sent to their own API.
+- Paperclip is reached only after you connect it in **Settings → Paperclip**: access to `localhost` / `127.0.0.1` (or your server's host) is an optional permission asked for from that click. The board key, when one is needed, is stored like the other keys and sent only to your Paperclip server.
 - Hosts for MongoDB Atlas and Cohere are optional permissions too: Settings asks for the one host you chose when you press Test.
 - **Catch up** uses your own signed-in session in this browser to read your own conversations from the site you pick, and nothing else. It keeps no credentials, only reads, and nothing it reads leaves the browser except through the analysis, embedding and reranking settings you already control. The ChatGPT and Claude endpoints it uses are the sites' own and are not documented or supported by OpenAI or Anthropic. They can change or be restricted, and the sites' terms may limit automated access, so it runs only when you start it, at a human pace, and stops at the first sign of a block.
 - The extension holds no AWS host permission at install. **Settings → Amazon Web Services → Allow access** asks the browser for exactly the endpoints of the configured region (for example `bedrock-mantle.us-east-1.api.aws`).
@@ -190,6 +204,10 @@ src/
     library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
     db.ts, schema.ts     Dexie schema (v2), identity, tombstones, settings normalization
     search.ts            Hybrid lexical + vector retrieval
+    paperclip/           Paperclip sync: client.ts (read-only API client, discovery, 429 handling),
+                         auth.ts (CLI approval flow, board keys), mapper.ts (issue/comments/runs → thread,
+                         run-log and native-event transcripts), sync.ts (incremental sync, cursors, backoff),
+                         live.ts (optional live-event hint)
   entrypoints/
     background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
     content.ts           Zero-footprint capture observer, overlay host with load watchdog
