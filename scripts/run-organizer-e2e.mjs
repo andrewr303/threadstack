@@ -295,6 +295,26 @@ async function organizerChecks() {
   await page.waitForTimeout(300);
   check(/Stripe/.test(await page.locator('.tk-detail-title').innerText()), 'Ask answers with citations that open the cited thread');
 
+  // A thread marked local-only must not reach Claude through Ask, even when it is the best match.
+  await sw.evaluate(async () => {
+    const db = globalThis.__threadkeeperDb;
+    const all = await db.conversations.toArray();
+    const stripe = all.find((c) => /stripe/i.test(`${c.title} ${c.manualTitleOverride ?? ''}`));
+    await db.conversations.update(stripe.threadKey, { cloudExcluded: true });
+  });
+  await page.reload();
+  await page.locator('#tk-main-list .tk-row-btn').first().waitFor({ timeout: 8000 });
+  await page.locator('.tk-segmented button', { hasText: 'Ask' }).click();
+  const askCallsBefore = anthropicCalls.filter((c) => c.kind === 'ask').length;
+  await page.locator('textarea[aria-label="Ask a question about your past AI conversations"]').fill('What did I decide about Stripe webhook retries?');
+  await page.getByRole('button', { name: 'Ask Claude', exact: true }).click();
+  await page.locator('.tk-ask', { hasText: /local-only threads? matched but (was|were) not sent to Claude/ }).waitFor({ timeout: 10000 });
+  await page.waitForTimeout(500);
+  const laterAsks = anthropicCalls.filter((c) => c.kind === 'ask').slice(askCallsBefore);
+  // The question names Stripe itself, so look for text that only the thread contains.
+  const leaked = laterAsks.some((c) => /processed_events|idempotent|charged twice/i.test(JSON.stringify(c.body.messages)));
+  check(!leaked, `Ask never sends a local-only thread to Claude (${laterAsks.length} later Ask request${laterAsks.length === 1 ? '' : 's'}, none containing it)`);
+
   const side = await context.newPage();
   await side.setViewportSize({ width: 420, height: 860 });
   side.on('pageerror', (e) => errors.push(`sidepanel: ${e.message}`));

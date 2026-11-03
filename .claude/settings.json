@@ -1,10 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install*)",
       "Bash(npm ci*)",
       "Bash(npm run *)",
-      "Bash(npm view *)",
       "Bash(npx tsc*)",
       "Bash(npx vitest*)",
       "Bash(npx esbuild*)",
@@ -22,9 +20,9 @@
       "Bash(git pull*)",
       "Bash(git rev-parse*)",
       "Bash(git ls-remote*)",
+      "Bash(git push -u origin cloud/*)",
+      "Bash(git push origin cloud/*)",
       "Bash(git worktree*)",
-      "Bash(git push -u origin*)",
-      "Bash(git push origin*)",
       "Bash(ls*)",
       "Bash(cat*)",
       "Bash(grep*)",
@@ -33,7 +31,6 @@
       "Bash(tail*)",
       "Bash(wc*)",
       "Bash(mkdir*)",
-      "Bash(python3 -I*)",
       "WebSearch",
       "WebFetch",
       "mcp__github__pull_request_read",

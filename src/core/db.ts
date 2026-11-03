@@ -933,8 +933,9 @@ export async function applyBulkThreadEdit(
         previousProjectSource: existing.projectSource,
         previousWorkflowStateSource: existing.workflowStateSource,
         previousProjectReason: existing.projectReason ?? null,
-        previousPinned: existing.pinned,
-        previousCloudExcluded: existing.cloudExcluded,
+        // Only for the fields this edit changes: undoing a move must not switch off a local-only flag set since.
+        ...(patch.pinned !== undefined ? { previousPinned: existing.pinned } : {}),
+        ...(patch.cloudExcluded !== undefined ? { previousCloudExcluded: existing.cloudExcluded } : {}),
       });
     }
     if (snapshots.length === 0) return null;

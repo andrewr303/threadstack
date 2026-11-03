@@ -392,39 +392,8 @@ export async function testReranker(
 // Privacy
 // ---------------------------------------------------------------------------
 
-/**
- * Whether a thread's text may be sent to a remote reranker. Mirrors
- * isRemoteProcessingAllowed in pipeline.ts (local-only thread, local-only
- * project, excluded provider, synthetic benchmark).
- */
-export function remoteRerankAllowed(
-  conv: ConversationRecord,
-  settings: SettingsRecord,
-  localOnlyProjects: ReadonlySet<string>
-): boolean {
-  if (conv.cloudExcluded || conv.isSyntheticBenchmark) return false;
-  if (settings.cloudExcludedProviders.includes(conv.provider)) return false;
-  return !localOnlyProjects.has(conv.project);
-}
-
-/**
- * The subset of `threadKeys` whose text may go to a remote reranker, read
- * fresh from the database so a thread or project marked local-only a moment
- * ago is honoured even if the caller's copy is stale.
- */
-export async function remoteRerankAllowedKeys(
-  db: ThreadkeeperDB,
-  settings: SettingsRecord,
-  threadKeys: string[]
-): Promise<Set<string>> {
-  const [convs, collections] = await Promise.all([db.conversations.bulkGet(threadKeys), db.collections.toArray()]);
-  const localOnly = new Set(collections.filter((c) => c.cloudExcluded).map((c) => c.name));
-  const allowed = new Set<string>();
-  for (const conv of convs) {
-    if (conv && remoteRerankAllowed(conv, settings, localOnly)) allowed.add(conv.threadKey);
-  }
-  return allowed;
-}
+/** The shared local-only rule (src/core/privacy.ts), under the names the search code uses. */
+export { isRemoteAllowed as remoteRerankAllowed, remoteAllowedKeys as remoteRerankAllowedKeys } from './privacy.js';
 
 // ---------------------------------------------------------------------------
 // Documents and fusion

@@ -383,3 +383,27 @@ describe('selection', () => {
     container.remove();
   });
 });
+
+describe('undoing a bulk edit never switches off local-only protection set since', () => {
+  it('restores the moved project but keeps a local-only flag added after the move', async () => {
+    const db = freshDb();
+    const keys = await seedLibrary(db);
+    const move = await applyBulkThreadEdit(db, [keys.a, keys.c], { project: 'General research' }, 'move');
+    // After the move, the user marks thread a local-only on its own.
+    await updateManualThreadFields(db, keys.a, { cloudExcluded: true });
+
+    await undoChangeLog(db, move!.changeId);
+
+    const a = (await db.conversations.get(keys.a))!;
+    expect(a.project).toBe('Daydock / Meridian');
+    expect(a.cloudExcluded).toBe(true);
+  });
+
+  it('still reverts local-only when the bulk edit itself changed it', async () => {
+    const db = freshDb();
+    const keys = await seedLibrary(db);
+    const local = await applyBulkThreadEdit(db, [keys.c], { cloudExcluded: true }, 'local');
+    await undoChangeLog(db, local!.changeId);
+    expect((await db.conversations.get(keys.c))!.cloudExcluded).toBe(false);
+  });
+});

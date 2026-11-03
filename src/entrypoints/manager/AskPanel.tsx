@@ -17,6 +17,7 @@ import {
   rerankReady,
   rerankThreads,
 } from '../../core/rerank.js';
+import { remoteAllowedKeys } from '../../core/privacy.js';
 import { providerLabel } from '../../core/providers.js';
 import { getSmartTitle } from '../../core/insights.js';
 import { relativeTime, renderCitations, sharedDb } from './shared.js';
@@ -80,6 +81,7 @@ export function AskPanel({
   const [status, setStatus] = useState<'idle' | 'retrieving' | 'answering' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [rerankNote, setRerankNote] = useState<string | null>(null);
+  const [withheld, setWithheld] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const canAsk = settings ? hasClaudeKey(settings) : false;
 
@@ -149,10 +151,19 @@ export function AskPanel({
         // remote embeddings unavailable; lexical + local vectors still apply
       }
     }
-    const ranked = Array.from(fused.entries())
+    const candidates = Array.from(fused.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([k]) => byKey.get(k))
       .filter((c): c is ConversationRecord => Boolean(c && !c.isSyntheticBenchmark));
+    // Sources become Claude's context, so local-only threads are dropped before choosing them.
+    let ranked = candidates;
+    if (settings && canAsk) {
+      const allowed = await remoteAllowedKeys(sharedDb, settings, candidates.map((c) => c.threadKey));
+      ranked = candidates.filter((c) => allowed.has(c.threadKey));
+      setWithheld(candidates.slice(0, MAX_SOURCES).filter((c) => !allowed.has(c.threadKey)).length);
+    } else {
+      setWithheld(0);
+    }
     return (await rerankForAsk(q, ranked)).slice(0, MAX_SOURCES);
   };
 
@@ -235,6 +246,11 @@ export function AskPanel({
       {error && (
         <div className="tk-settings-result" data-ok="false" role="alert">
           {error}
+        </div>
+      )}
+      {withheld > 0 && (
+        <div className="tk-muted" role="status" style={{ fontSize: 12 }}>
+          {withheld} local-only thread{withheld === 1 ? '' : 's'} matched but {withheld === 1 ? 'was' : 'were'} not sent to Claude.
         </div>
       )}
       {answer && (
