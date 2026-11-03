@@ -105,10 +105,11 @@ npm run build
 
 The unpacked extension is written to `.output/chrome-mv3`.
 
-1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. After every later `npm run build`, click **Reload** on that page; the browser keeps the previous manifest until you do.
-2. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
-3. Optional: **Settings → AI models** → choose the Anthropic API, Amazon Bedrock or Claude Platform on AWS, add the key → **Test connection**. Then press **Auto-organize** to analyze and file your whole library.
-4. Optional: **Import / Export** → import your ChatGPT/Claude export and your Claude Code / Codex session folders.
+1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. On macOS the `.output` folder is hidden: press **Cmd+Shift+.** in the folder picker to show it. Remove any older Threadkeeper first; a copy loaded from another folder has a different ID and keeps running.
+2. Check that the version on the extensions page matches the `Built Threadkeeper … (build …)` line that `npm run build` printed. After every later `npm run build`, click **Reload** (or let the extension reload itself within a few minutes).
+3. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
+4. Optional: **Settings → AI models** → choose the Anthropic API, Amazon Bedrock or Claude Platform on AWS, add the key → **Test connection**. Then press **Auto-organize** to analyze and file your whole library.
+5. Optional: **Import / Export** → import your ChatGPT/Claude export and your Claude Code / Codex session folders.
 
 ### Commands
 
@@ -218,7 +219,7 @@ All gates pass in packaged-extension headless Chromium (see [`evidence/acceptanc
 
 ## Troubleshooting
 
-- **"`<extension id>` is blocked · This page has been blocked by Microsoft Edge · ERR_BLOCKED_BY_CLIENT":** Edge is still running an old manifest. Builds before 0.2.0 made the library pages reachable only through a dynamic URL (`use_dynamic_url`), and Edge blocks the static URL it hands out, including the full-page library. Edge reads `manifest.json` only when an unpacked extension is loaded or reloaded, so running `npm run build` without pressing **Reload** keeps the broken manifest live. Fix: open `edge://extensions`, click **Reload** under Threadkeeper, and check that the version shown matches the `Built Threadkeeper … (build …)` line printed by `npm run build`. From 0.3.0 the extension detects this itself: the service worker reloads once per build to pick up the new manifest, and any open library page shows a **Reload extension** banner. **Settings → Diagnostics** compares the running manifest with the files on disk and copies a report. `npm run test:edge` reproduces the block in real Edge and checks every surface.
+- **"`<extension id>` is blocked · This page has been blocked by Microsoft Edge · ERR_BLOCKED_BY_CLIENT":** Edge is still running an old manifest. Builds before 0.2.0 made the library pages reachable only through a dynamic URL (`use_dynamic_url`), and Edge blocks the static URL it hands out, including the full-page library. Edge reads `manifest.json` only when an unpacked extension is loaded or reloaded, so running `npm run build` without pressing **Reload** keeps the broken manifest live. Fix: open `edge://extensions`, click **Reload** under Threadkeeper, and check that the version shown matches the `Built Threadkeeper … (build …)` line printed by `npm run build`. From 0.3.0 the extension detects this itself. After a rebuild, the service worker (which keeps running its previous script) reads the new `build-info.json` from disk the next time it wakes, at most a few minutes later, and reloads the extension once; any library page opened before that shows a **Reload extension** banner. **Settings → Diagnostics** compares the running manifest with the files on disk and copies a report. `npm run test:edge` reproduces the block in real Edge and checks every surface.
 - **Settings → Diagnostics** shows the running and on-disk versions, recent capture and overlay events, and copies a report without keys or thread content.
 - **A site changed its markup and capture stopped:** the generic role heuristics usually keep working; otherwise use the provider's data export via **Import / Export**.
 - **Claude analysis paused:** the status chip in the header shows the last error (invalid key, rate limit, daily limit). Fix it in Settings; queued threads resume automatically.

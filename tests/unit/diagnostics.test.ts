@@ -7,6 +7,7 @@ import {
   detectBrowser,
   extensionsPageUrl,
   formatDiagnosticsReport,
+  readDiskBuildInfo,
   reloadWouldHelp,
   type ManifestLike,
 } from '../../src/core/diagnostics.js';
@@ -136,5 +137,33 @@ describe('browser helpers', () => {
     expect(report).toContain('Running manifest:  0.1.0');
     expect(report).toContain('dynamic_url_war');
     expect(report).toContain('Overlay frame did not load');
+  });
+});
+
+describe('rebuild without Reload: the worker compares the build on disk', () => {
+  const OLD: BuildInfo = { version: '0.3.0', versionName: '0.3.0 (build A)', buildId: 'A', builtAt: '2026-11-03T01:00:00.000Z' };
+  const NEW: BuildInfo = { version: '0.3.0', versionName: '0.3.0 (build B)', buildId: 'B', builtAt: '2026-11-03T02:00:00.000Z' };
+  const fileFetch = (body: unknown, status = 200) =>
+    (async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
+
+  it('reads a valid build-info.json and rejects anything else', async () => {
+    expect(await readDiskBuildInfo('build-info.json', fileFetch(NEW))).toEqual(NEW);
+    expect(await readDiskBuildInfo('build-info.json', fileFetch({ buildId: 'B' }))).toBeNull();
+    expect(await readDiskBuildInfo('build-info.json', fileFetch(NEW, 404))).toBeNull();
+    const failing = (async () => {
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+    expect(await readDiskBuildInfo('build-info.json', failing)).toBeNull();
+  });
+
+  it('reloads when the files on disk are newer than both the running manifest and the cached worker', async () => {
+    // The cached worker still carries build A and so does the manifest; only build-info.json moved to B.
+    const runningManifest: ManifestLike = { ...GOOD, version_name: OLD.versionName };
+    expect(assessManifest(runningManifest, OLD).ok).toBe(true);
+    const disk = await readDiskBuildInfo('build-info.json', fileFetch(NEW));
+    const reload = vi.fn();
+    const outcome = await autoHealStaleManifest({ manifest: runningManifest, storage: memoryStorage(), reload, build: disk ?? OLD });
+    expect(outcome).toBe('reloading');
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

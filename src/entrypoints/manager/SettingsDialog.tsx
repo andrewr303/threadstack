@@ -305,6 +305,8 @@ export function SettingsDialog({
   const [aiTest, setAiTest] = useState<TestState>(IDLE);
   const [embedTest, setEmbedTest] = useState<TestState>(IDLE);
   const [rerankTest, setRerankTest] = useState<TestState>(IDLE);
+  /** Typed value of "Candidates to rerank"; clamped when the field loses focus. */
+  const [candidatesDraft, setCandidatesDraft] = useState<string | null>(null);
   const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
   const diagnostics = useDiagnostics();
 
@@ -393,7 +395,7 @@ export function SettingsDialog({
       {awsCredentialsReady(settings.aws)
         ? `Uses the AWS credentials for ${settings.aws.region} (${settings.aws.auth === 'api_key' ? 'Bedrock API key' : 'IAM access keys'}).`
         : 'Needs AWS credentials.'}{' '}
-      <button type="button" className="tk-link-btn" onClick={() => setSection('aws')}>
+      <button type="button" className="tk-linklike" onClick={() => setSection('aws')}>
         Edit in Amazon Web Services
       </button>
     </p>
@@ -962,8 +964,13 @@ export function SettingsDialog({
                     min={5}
                     max={100}
                     className="tk-input"
-                    value={settings.rerankCandidates}
-                    onChange={(e) => void onPatch({ rerankCandidates: Math.min(100, Math.max(5, Number(e.target.value) || 40)) })}
+                    value={candidatesDraft ?? String(settings.rerankCandidates)}
+                    onChange={(e) => setCandidatesDraft(e.target.value)}
+                    onBlur={() => {
+                      if (candidatesDraft === null) return;
+                      void onPatch({ rerankCandidates: Math.min(100, Math.max(5, Number(candidatesDraft) || 40)) });
+                      setCandidatesDraft(null);
+                    }}
                   />
                 </label>
               </div>

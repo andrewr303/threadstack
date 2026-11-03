@@ -15,7 +15,8 @@ import {
   runAnalysisJobs,
 } from '../core/pipeline.js';
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
-import { autoHealStaleManifest } from '../core/diagnostics.js';
+import { autoHealStaleManifest, readDiskBuildInfo } from '../core/diagnostics.js';
+import { BUILD_INFO } from '../core/build-info.js';
 
 const db = new ThreadkeeperDB();
 
@@ -287,13 +288,19 @@ async function initializeBackground(): Promise<void> {
 }
 
 // A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
-// (e.g. one with use_dynamic_url, which Edge blocks). Reload once per build.
+// (e.g. one with use_dynamic_url, which Edge blocks) and this worker keeps its
+// cached script, so compare the build on disk with the running manifest and
+// reload once per build. The analysis alarms wake the worker every few minutes.
 if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest && chrome.storage?.local) {
-  void autoHealStaleManifest({
-    manifest: chrome.runtime.getManifest(),
-    storage: chrome.storage.local,
-    reload: () => chrome.runtime.reload(),
-  })
+  void readDiskBuildInfo(chrome.runtime.getURL('build-info.json'))
+    .then((disk) =>
+      autoHealStaleManifest({
+        manifest: chrome.runtime.getManifest(),
+        storage: chrome.storage.local,
+        reload: () => chrome.runtime.reload(),
+        build: disk ?? BUILD_INFO,
+      })
+    )
     .then((outcome) => {
       if (outcome !== 'ok') {
         securityRejectionLog.push({

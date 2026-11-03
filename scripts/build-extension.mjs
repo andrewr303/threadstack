@@ -331,7 +331,7 @@ async function build() {
       '  Edge:   edge://extensions   → Threadkeeper → Reload',
       '  Chrome: chrome://extensions → Threadkeeper → Reload',
       `The extensions page should then show version ${buildInfo.versionName}.`,
-      'An open library page also offers a one-click Reload when it detects an outdated manifest.',
+      'If you forget, the extension reloads itself within a few minutes, and an open library page offers a one-click Reload.',
     ].join('\n')
   );
 }

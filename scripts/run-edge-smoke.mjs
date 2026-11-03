@@ -6,6 +6,8 @@
 //      without Reload) is detected: the service worker reloads once, does not
 //      loop, the overlay shows the reload banner, and a reload with the fixed
 //      manifest on disk restores the full-page library.
+//   C. A rebuild while the extension runs: the worker keeps its cached script,
+//      reads the new build-info.json from disk when it next starts, and reloads.
 //
 // Requires `npm run build`. Edge is found via EDGE_EXECUTABLE_PATH or the
 // standard install paths. Screenshots go to evidence/edge/.
@@ -46,6 +48,10 @@ const CLAUDE_PAGE = `<html><head><title>Stripe webhook retries - Claude</title><
   <textarea id="composer">unsent draft</textarea></main></body></html>`;
 
 async function launch(extDir, profileDir, edge) {
+  // Developer mode on, as for any unpacked install; some Chromium builds otherwise disable an
+  // unpacked extension when it reloads itself.
+  fs.mkdirSync(path.join(profileDir, 'Default'), { recursive: true });
+  fs.writeFileSync(path.join(profileDir, 'Default', 'Preferences'), JSON.stringify({ extensions: { ui: { developer_mode: true } } }));
   const ctx = await chromium.launchPersistentContext(profileDir, {
     executablePath: edge,
     headless: false,
@@ -215,6 +221,51 @@ async function scenarioStaleManifest(edge) {
   }
 }
 
+async function scenarioRebuildWithoutReload(edge) {
+  log('— C. rebuild on disk while the extension keeps running (cached worker, old manifest)');
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'tk-edge-c-'));
+  const ext = path.join(work, 'ext');
+  fs.cpSync(dist, ext, { recursive: true });
+  const ctx = await launch(ext, path.join(work, 'profile'), edge);
+  try {
+    const sw = await ourWorker(ctx);
+    const extId = new URL(sw.url()).host;
+    const before = await sw.evaluate(() => chrome.runtime.getManifest().version_name);
+
+    // What `npm run build` does: new build-info.json and manifest on disk, nothing reloaded.
+    const info = JSON.parse(fs.readFileSync(path.join(ext, 'build-info.json'), 'utf8'));
+    const next = { ...info, buildId: `${info.buildId}-next`, versionName: `${info.version} (build ${info.buildId}-next)` };
+    fs.writeFileSync(path.join(ext, 'build-info.json'), JSON.stringify(next, null, 2));
+    const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
+    fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ ...manifest, version_name: next.versionName }, null, 2));
+
+    // Stop the worker as the browser does when it is idle, then wake it with a message.
+    const page = await ctx.newPage();
+    await page.goto(`chrome-extension://${extId}/manager.html?surface=page`);
+    const cdp = await ctx.newCDPSession(page);
+    const versions = [];
+    cdp.on('ServiceWorker.workerVersionUpdated', (e) => versions.push(...e.versions));
+    await cdp.send('ServiceWorker.enable');
+    await page.waitForTimeout(500);
+    const ours = versions.filter((v) => v.scriptURL === `chrome-extension://${extId}/background.js` && v.runningStatus === 'running');
+    check(ours.length > 0, 'found the running extension worker');
+    await cdp.send('ServiceWorker.stopWorker', { versionId: ours[0].versionId });
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => chrome.runtime.sendMessage({ type: 'GET_DIAGNOSTICS' }).catch(() => undefined)).catch(() => undefined);
+
+    // The restarted worker runs its cached script, reads the new build-info.json and reloads once.
+    let after = before;
+    for (let i = 0; i < 40 && after === before; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const w = ctx.serviceWorkers().filter((x) => x.url().endsWith('/background.js')).pop();
+      after = w ? await w.evaluate(() => chrome.runtime.getManifest().version_name).catch(() => before) : before;
+    }
+    check(after === next.versionName, `extension reloaded itself to the rebuilt manifest (${before} → ${after})`);
+  } finally {
+    await ctx.close();
+  }
+}
+
 const edge = findEdge();
 if (!edge) {
   console.error('[edge-smoke] Microsoft Edge not found. Set EDGE_EXECUTABLE_PATH to the msedge binary.');
@@ -229,6 +280,7 @@ log('Edge:', edge);
 try {
   await scenarioCurrentBuild(edge);
   await scenarioStaleManifest(edge);
+  await scenarioRebuildWithoutReload(edge);
   log('PASS');
 } catch (err) {
   console.error(err);
