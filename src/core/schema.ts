@@ -21,6 +21,10 @@ export type CoverageState =
 
 export type CaptureSource =
   | 'dom_observer'
+  /** The site's own conversation data, read as the page received it (complete, with ids and times). */
+  | 'network_observer'
+  /** The user's recent history pulled from the site while they are signed in (Catch up). */
+  | 'history_sync'
   | 'export_import'
   | 'portable_import'
   | 'manual'
@@ -498,14 +502,39 @@ export type AiModelId =
   | 'claude-haiku-5-5'
   | 'claude-fable-5-1';
 
-export type EmbeddingProviderId = 'local' | 'voyage' | 'openai' | 'ollama' | 'bedrock';
+export type EmbeddingProviderId = 'local' | 'voyage' | 'mongodb' | 'cohere' | 'openai' | 'ollama' | 'bedrock';
+
+/** Voyage models served by MongoDB Atlas (ai.mongodb.com). */
+export type MongoDbEmbeddingModel = 'voyage-4-lite' | 'voyage-4' | 'voyage-4-large' | 'voyage-code-4';
+export type MongoDbRerankModel = 'rerank-3-lite' | 'rerank-3' | 'rerank-2.5-lite' | 'rerank-2.5';
+/** Which Atlas model API host a key belongs to; a key only works on the geography it was issued for. */
+export type MongoDbGeography = 'global' | 'us' | 'eu';
+
+/** Cohere models called directly on api.cohere.com. */
+export type CohereEmbeddingModel =
+  | 'embed-v5.0-fast'
+  | 'embed-v5.0-pro'
+  | 'embed-v4.0'
+  | 'embed-multilingual-v3.0'
+  | 'embed-english-v3.0';
+export type CohereEmbeddingDimensions = 256 | 512 | 1024 | 1536 | 2048;
+export type CohereRerankModel =
+  | 'rerank-v5.0-fast'
+  | 'rerank-v5.0-pro'
+  | 'rerank-v4.0-fast'
+  | 'rerank-v4.0-pro'
+  | 'rerank-v3.5';
 
 /** Where Claude requests go: Anthropic's API, Claude in Amazon Bedrock, or Claude Platform on AWS. */
 export type AiBackend = 'anthropic' | 'bedrock' | 'aws_platform';
 
-export type BedrockEmbeddingModel = 'amazon.titan-embed-text-v2:0' | 'cohere.embed-v4:0';
+export type BedrockEmbeddingModel =
+  | 'amazon.titan-embed-text-v2:0'
+  | 'cohere.embed-v4:0'
+  | 'cohere.embed-english-v3'
+  | 'cohere.embed-multilingual-v3';
 
-export type RerankProviderId = 'none' | 'voyage' | 'bedrock';
+export type RerankProviderId = 'none' | 'voyage' | 'mongodb' | 'cohere' | 'bedrock';
 
 export type BedrockRerankModel = 'cohere.rerank-v3-5:0' | 'amazon.rerank-v1:0';
 
@@ -577,6 +606,18 @@ export interface SettingsRecord {
   ollamaEmbeddingModel: string;
   bedrockEmbeddingModel: BedrockEmbeddingModel;
   bedrockEmbeddingDimensions: 256 | 512 | 1024;
+  /** MongoDB Atlas model API (Voyage models). The key is issued in Atlas, not at voyageai.com. */
+  mongodbApiKey: string;
+  mongodbGeography: MongoDbGeography;
+  mongodbEmbeddingModel: MongoDbEmbeddingModel;
+  mongodbEmbeddingDimensions: 256 | 512 | 1024 | 2048;
+  mongodbRerankModel: MongoDbRerankModel;
+  /** Cohere's own API (api.cohere.com). */
+  cohereApiKey: string;
+  cohereEmbeddingModel: CohereEmbeddingModel;
+  /** Used by embed-v4.0 and embed-v5.0-*; the v3 models have a fixed size. */
+  cohereEmbeddingDimensions: CohereEmbeddingDimensions;
+  cohereRerankModel: CohereRerankModel;
   /** Second-stage reranker for search results and Ask context. */
   rerankProvider: RerankProviderId;
   bedrockRerankModel: BedrockRerankModel;
@@ -669,6 +710,15 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   ollamaEmbeddingModel: 'nomic-embed-text',
   bedrockEmbeddingModel: 'amazon.titan-embed-text-v2:0',
   bedrockEmbeddingDimensions: 1024,
+  mongodbApiKey: '',
+  mongodbGeography: 'global',
+  mongodbEmbeddingModel: 'voyage-4-lite',
+  mongodbEmbeddingDimensions: 1024,
+  mongodbRerankModel: 'rerank-3-lite',
+  cohereApiKey: '',
+  cohereEmbeddingModel: 'embed-v5.0-fast',
+  cohereEmbeddingDimensions: 1024,
+  cohereRerankModel: 'rerank-v5.0-fast',
   rerankProvider: 'none',
   bedrockRerankModel: 'cohere.rerank-v3-5:0',
   rerankCandidates: 40,

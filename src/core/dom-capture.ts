@@ -27,6 +27,8 @@ interface RawTurn {
   el: Element;
   role: TurnRole;
   body?: Element | null;
+  /** Several content blocks of one message (a reply with text on both sides of a widget), read in order. */
+  bodies?: Element[];
   id?: string | null;
   model?: string | null;
 }
@@ -214,6 +216,8 @@ function genericRole(el: Element): TurnRole {
     el.getAttribute('data-message-author-role') ||
     el.getAttribute('data-tk-message-role') ||
     el.querySelector('[data-message-author-role]')?.getAttribute('data-message-author-role') ||
+    // ChatGPT's turn wrapper names its speaker even when the message inside has not rendered yet.
+    el.getAttribute('data-turn') ||
     (el.classList.contains('font-user-message') ? 'user' : 'assistant');
   return roleAttr === 'user' || roleAttr === 'human'
     ? 'user'
@@ -222,16 +226,21 @@ function genericRole(el: Element): TurnRole {
       : 'assistant';
 }
 
-/** Explicit role attributes shared by several providers and by Threadkeeper test fixtures. */
-function genericTurns(doc: Document): RawTurn[] {
-  return outermost(Array.from(doc.querySelectorAll(GENERIC_ROLE_SELECTOR))).map((el) => ({
+/** The content blocks of one message: its explicit content node, else every rendered markdown block. */
+function messageBodies(el: Element): { body: Element | null; bodies?: Element[] } {
+  const explicit = el.querySelector('[data-message-content]');
+  if (explicit) return { body: explicit };
+  const markdown = outermost(Array.from(el.querySelectorAll('.markdown')));
+  if (markdown.length > 1) return { body: markdown[0], bodies: markdown };
+  return { body: markdown[0] ?? el.querySelector('.whitespace-pre-wrap') ?? null };
+}
+
+function messageTurn(el: Element, container: Element): RawTurn {
+  const withRole = el.hasAttribute('data-message-author-role') ? el : container;
+  return {
     el,
-    role: genericRole(el),
-    body:
-      el.querySelector('[data-message-content]') ??
-      el.querySelector('.markdown') ??
-      el.querySelector('.whitespace-pre-wrap') ??
-      null,
+    role: genericRole(withRole),
+    ...messageBodies(el),
     id:
       el.getAttribute('data-message-id') ||
       el.querySelector('[data-message-id]')?.getAttribute('data-message-id') ||
@@ -240,7 +249,28 @@ function genericTurns(doc: Document): RawTurn[] {
       el.getAttribute('data-message-model-slug') ||
       el.querySelector('[data-message-model-slug]')?.getAttribute('data-message-model-slug') ||
       null,
-  }));
+  };
+}
+
+/**
+ * Explicit role attributes shared by several providers and by Threadkeeper test fixtures.
+ *
+ * A ChatGPT turn can hold several messages (a preamble, a tool step, the final answer); each
+ * is its own turn so none of them is lost behind the first one.
+ */
+function genericTurns(doc: Document): RawTurn[] {
+  const turns: RawTurn[] = [];
+  for (const container of outermost(Array.from(doc.querySelectorAll(GENERIC_ROLE_SELECTOR)))) {
+    const own = container.hasAttribute('data-message-author-role') ? [container] : [];
+    const inner = outermost(Array.from(container.querySelectorAll('[data-message-author-role]')));
+    const messages = own.length > 0 ? own : inner;
+    if (messages.length > 1) {
+      for (const el of messages) turns.push(messageTurn(el, container));
+    } else {
+      turns.push(messageTurn(container, container));
+    }
+  }
+  return turns;
 }
 
 const HEURISTIC_USER = /(^|[-_\s])(user|human|query|prompt)([-_\s]|$)/i;
@@ -662,8 +692,13 @@ export function extractVisibleDomConversation(
       continue;
     }
 
-    const bodyNode = turn.body ?? el;
-    const text = extractReadableText(bodyNode, turn.role === 'user' ? undefined : adapter.strip);
+    const skip = turn.role === 'user' ? undefined : adapter.strip;
+    const text = turn.bodies
+      ? turn.bodies
+          .map((b) => extractReadableText(b, skip))
+          .filter(Boolean)
+          .join('\n\n')
+      : extractReadableText(turn.body ?? el, skip);
     if (!text) continue;
 
     if (turn.model) modelSlug = turn.model;
@@ -705,6 +740,14 @@ export function extractVisibleDomConversation(
     providerProjectName: adapter.project?.(doc, locationHref) ?? null,
     modelSlug,
   };
+}
+
+/** The provider's own project (ChatGPT/Claude Project, coding-agent repository) shown on this page. */
+export function extractProviderProjectName(doc: Document, locationHref: string): string | null {
+  const providerAttr = doc.documentElement.getAttribute('data-tk-provider');
+  const provider: ProviderId | null = isProviderId(providerAttr) ? providerAttr : detectProviderFromUrl(locationHref);
+  if (!provider) return null;
+  return ADAPTERS[provider].project?.(doc, locationHref) ?? null;
 }
 
 /** The one URL a Grok-on-X conversation is filed under, whichever X host it was opened on. */

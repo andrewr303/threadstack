@@ -5,6 +5,10 @@ import {
   processResumableJobs,
 } from '../core/db.js';
 import { buildThreadKey, type SettingsRecord } from '../core/schema.js';
+import { HistorySyncOrchestrator } from '../core/sync-orchestrator.js';
+import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv } from '../core/sync-env.js';
+import { EMPTY_SYNC_STATE, clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
+import { siteConversationTitle, type SiteConversation } from '../core/site-api.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import { validateRuntimeMessageSender } from '../core/messaging.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
@@ -80,6 +84,88 @@ function kickAnalysis(): Promise<unknown> {
     }
   })();
   return analysisRun;
+}
+
+/** Organize a stored thread on-device right away and queue Claude analysis for when it goes quiet. */
+async function organizeStoredThread(threadKey: string, settings: SettingsRecord): Promise<void> {
+  try {
+    const outcome = await processThreadLocally(db, threadKey, {
+      settings,
+      ctx: await getOrganizeContext(settings),
+    });
+    if (outcome.createdProject) organizeCtxCache = null;
+    if (outcome.enqueued) await scheduleAnalysisAlarm();
+  } catch (err) {
+    console.warn('[threadkeeper] local organize failed', err);
+  }
+  broadcastLibraryChanged(threadKey);
+}
+
+/** Store a conversation read by Catch up. Deleted threads stay deleted (tombstones), and a site whose capture is off is skipped. */
+async function storeSyncedConversation(conv: SiteConversation): Promise<'stored' | 'skipped'> {
+  const settings = await ensureStarterCollectionsAndSettings(db);
+  if (!settings.authorizedHosts[conv.provider]) return 'skipped';
+  const bound = settings.boundAccounts[conv.provider];
+  const threadKey = buildThreadKey({
+    provider: conv.provider,
+    accountId: bound.accountId,
+    workspaceId: bound.workspaceId,
+    sourceConversationId: conv.sourceConversationId,
+    branchId: 'main',
+  });
+  const result = await upsertThread(db, {
+    threadKey,
+    provider: conv.provider,
+    accountId: bound.accountId,
+    workspaceId: bound.workspaceId,
+    sourceConversationId: conv.sourceConversationId,
+    branchId: 'main',
+    canonicalUrl: conv.canonicalUrl,
+    title: siteConversationTitle(conv),
+    createdAt: conv.createdAt,
+    updatedAt: conv.updatedAt ?? new Date().toISOString(),
+    coverage: conv.messages.length > 0 ? 'full' : 'title_only',
+    captureSource: 'history_sync',
+    modelSlug: conv.modelSlug,
+    messages: conv.messages,
+  });
+  if (result.status !== 'stored') return 'skipped';
+  await organizeStoredThread(threadKey, settings);
+  return 'stored';
+}
+
+const syncOrchestrator = new HistorySyncOrchestrator(
+  createChromeSyncEnv(db, {
+    loadSettings: () => ensureStarterCollectionsAndSettings(db),
+    storeConversation: storeSyncedConversation,
+  })
+);
+
+/** The state the library shows: the live run, else what was last saved. A run the worker lost is marked interrupted. */
+async function currentSyncState(): Promise<SyncState> {
+  if (syncOrchestrator.state.runId) return syncOrchestrator.state;
+  try {
+    const stored = (await chrome.storage.local.get(HISTORY_SYNC_STATE_KEY))[HISTORY_SYNC_STATE_KEY] as SyncState | undefined;
+    if (stored && typeof stored === 'object' && Array.isArray(stored.providers)) {
+      if (stored.running) {
+        const fixed: SyncState = {
+          ...stored,
+          running: false,
+          providers: stored.providers.map((p) =>
+            p.status === 'done' || p.status === 'error' || p.status === 'cancelled'
+              ? p
+              : { ...p, status: 'error' as const, message: 'Stopped when the browser restarted the extension. Run Catch up again; what was imported is kept.' }
+          ),
+        };
+        await chrome.storage.local.set({ [HISTORY_SYNC_STATE_KEY]: fixed });
+        return fixed;
+      }
+      return stored;
+    }
+  } catch {
+    // storage unavailable
+  }
+  return EMPTY_SYNC_STATE;
 }
 
 async function openManagerTab(query?: Record<string, string>): Promise<number | undefined> {
@@ -390,8 +476,18 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           sourceConversationId: message.payload.sourceConversationId,
           branchId: message.payload.branchId,
         });
+        // A content script may only claim the two passive sources; "full" is the site's own
+        // conversation data, and a DOM capture is never more than partial.
+        const passiveSource = message.payload.captureSource === 'network_observer' ? 'network_observer' : 'dom_observer';
         const result = await upsertThread(db, {
           ...message.payload,
+          captureSource: passiveSource,
+          coverage:
+            passiveSource === 'network_observer' && message.payload.coverage === 'full'
+              ? 'full'
+              : message.payload.coverage === 'title_only'
+                ? 'title_only'
+                : 'partial',
           provider,
           threadKey,
           accountId: bound.accountId,
@@ -405,17 +501,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         });
         if (result.status === 'stored') {
           // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
-          try {
-            const outcome = await processThreadLocally(db, threadKey, {
-              settings,
-              ctx: await getOrganizeContext(settings),
-            });
-            if (outcome.createdProject) organizeCtxCache = null;
-            if (outcome.enqueued) await scheduleAnalysisAlarm();
-          } catch (err) {
-            console.warn('[threadkeeper] local organize failed', err);
+          await organizeStoredThread(threadKey, settings);
+          if (typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
+            syncOrchestrator.noteCapture(sender.tab.id, message.payload.sourceConversationId, message.payload.messages.length);
           }
-          broadcastLibraryChanged(threadKey);
         }
         return;
       }
@@ -449,6 +538,39 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         await applyLaunchBehavior();
         await scheduleAnalysisAlarm();
         sendResponse({ ok: true });
+        return;
+      }
+
+      if (message.type === 'HISTORY_SYNC_EVENT') {
+        const event = validateSyncEvent(message.event);
+        if (event) await syncOrchestrator.handleEvent(event, sender.tab?.id);
+        sendResponse({ ok: Boolean(event) });
+        return;
+      }
+
+      if (
+        message.type === 'START_HISTORY_SYNC' ||
+        message.type === 'CANCEL_HISTORY_SYNC' ||
+        message.type === 'GET_HISTORY_SYNC_STATE'
+      ) {
+        // Catch up opens tabs and reads signed-in sessions: only the library's own pages may start it,
+        // never an overlay frame inside a website.
+        if (typeof sender.tab?.id === 'number' && !(sender.tab.url ?? '').startsWith('chrome-extension://')) {
+          sendResponse({ ok: false, error: 'Open the side panel or the full library to run Catch up.' });
+          return;
+        }
+        if (message.type === 'GET_HISTORY_SYNC_STATE') {
+          sendResponse({ ok: true, state: await currentSyncState() });
+          return;
+        }
+        if (message.type === 'CANCEL_HISTORY_SYNC') {
+          syncOrchestrator.cancel();
+          sendResponse({ ok: true });
+          return;
+        }
+        const providers = Array.isArray(message.providers) ? message.providers.filter(isSyncProviderId) : [];
+        const started = await syncOrchestrator.start({ providers, days: clampSyncDays(message.days) });
+        sendResponse({ ok: started.started, error: started.reason });
         return;
       }
 

@@ -7,6 +7,11 @@ import type {
   AiBackend,
   BedrockEmbeddingModel,
   BedrockRerankModel,
+  CohereEmbeddingModel,
+  CohereRerankModel,
+  MongoDbEmbeddingModel,
+  MongoDbGeography,
+  MongoDbRerankModel,
   RerankProviderId,
 } from '../../core/schema.js';
 import { UNFILED_PROJECT } from '../../core/db.js';
@@ -22,7 +27,19 @@ import {
   requestHostAccess,
   type AwsSettings,
 } from '../../core/aws.js';
-import { embeddingHostOrigins, testEmbedding } from '../../core/embeddings.js';
+import { embeddingApiOrigins, embeddingHostOrigins, testEmbedding } from '../../core/embeddings.js';
+import {
+  COHERE_EMBEDDING_MODELS,
+  COHERE_RERANK_MODELS,
+  MONGODB_EMBEDDING_DIMENSIONS,
+  MONGODB_EMBEDDING_MODELS,
+  MONGODB_GEOGRAPHY_LABELS,
+  MONGODB_RERANK_MODELS,
+  cohereEffectiveDimensions,
+  cohereEmbeddingInfo,
+  cohereSupportsDimensions,
+  isBedrockCohereV3,
+} from '../../core/model-apis.js';
 import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
 import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
 import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
@@ -168,6 +185,8 @@ const AWS_REGIONS = [
 const BEDROCK_EMBEDDING_OPTIONS: Array<{ id: BedrockEmbeddingModel; label: string }> = [
   { id: 'amazon.titan-embed-text-v2:0', label: 'Amazon Titan Text Embeddings V2' },
   { id: 'cohere.embed-v4:0', label: 'Cohere Embed v4' },
+  { id: 'cohere.embed-english-v3', label: 'Cohere Embed English v3 (1024 fixed)' },
+  { id: 'cohere.embed-multilingual-v3', label: 'Cohere Embed Multilingual v3 (1024 fixed)' },
 ];
 
 const BEDROCK_RERANK_OPTIONS: Array<{ id: BedrockRerankModel; label: string }> = [
@@ -187,6 +206,23 @@ function usesAws(settings: SettingsRecord): boolean {
   );
 }
 
+const MONGODB_GEOGRAPHY_URLS = {
+  global: 'https://ai.mongodb.com',
+  us: 'https://us.ai.mongodb.com',
+  eu: 'https://eu.ai.mongodb.com',
+} as const;
+
+/** Name shown for each hosted embedding provider. */
+const EMBEDDING_PROVIDER_NAMES: Record<EmbeddingProviderId, string> = {
+  local: 'Local',
+  voyage: 'Voyage',
+  mongodb: 'Atlas Voyage',
+  cohere: 'Cohere',
+  bedrock: 'Bedrock',
+  openai: 'OpenAI',
+  ollama: 'Ollama',
+};
+
 /** Where captured text can go with the current settings. Local-only threads never go anywhere. */
 function dataDestinations(settings: SettingsRecord): Array<{ what: string; where: string }> {
   const out: Array<{ what: string; where: string }> = [];
@@ -194,6 +230,10 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
     out.push({ what: 'Claude analysis, Organize and Ask', where: backendHost(settings) });
   }
   if (settings.embeddingProvider === 'voyage' && settings.voyageApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.voyageai.com' });
+  if (settings.embeddingProvider === 'mongodb' && settings.mongodbApiKey.trim()) {
+    out.push({ what: 'Embeddings', where: new URL(MONGODB_GEOGRAPHY_URLS[settings.mongodbGeography]).host });
+  }
+  if (settings.embeddingProvider === 'cohere' && settings.cohereApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.cohere.com' });
   if (settings.embeddingProvider === 'openai' && settings.openaiApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.openai.com' });
   if (settings.embeddingProvider === 'ollama') out.push({ what: 'Embeddings', where: settings.ollamaUrl || 'Ollama' });
   if (settings.embeddingProvider === 'bedrock' && awsCredentialsReady(settings.aws)) {
@@ -201,6 +241,12 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
   }
   if (settings.rerankProvider === 'voyage' && settings.voyageApiKey.trim()) {
     out.push({ what: 'Reranking (short excerpts)', where: 'api.voyageai.com' });
+  }
+  if (settings.rerankProvider === 'mongodb' && settings.mongodbApiKey.trim()) {
+    out.push({ what: 'Reranking (short excerpts)', where: new URL(MONGODB_GEOGRAPHY_URLS[settings.mongodbGeography]).host });
+  }
+  if (settings.rerankProvider === 'cohere' && settings.cohereApiKey.trim()) {
+    out.push({ what: 'Reranking (short excerpts)', where: 'api.cohere.com' });
   }
   if (settings.rerankProvider === 'bedrock' && awsCredentialsReady(settings.aws)) {
     const host = settings.aws.auth === 'iam' ? 'bedrock-agent-runtime' : 'bedrock-runtime';
@@ -230,7 +276,7 @@ function sectionStatus(
       if (!usesAws(settings)) return { text: 'Unused' };
       return awsCredentialsReady(settings.aws) ? { text: settings.aws.region } : { text: 'Needs keys', tone: 'danger' };
     case 'search': {
-      const embed = settings.embeddingProvider === 'local' ? 'Local' : settings.embeddingProvider === 'bedrock' ? 'Bedrock' : settings.embeddingProvider === 'voyage' ? 'Voyage' : settings.embeddingProvider === 'openai' ? 'OpenAI' : 'Ollama';
+      const embed = EMBEDDING_PROVIDER_NAMES[settings.embeddingProvider] ?? 'Local';
       return { text: settings.rerankProvider === 'none' ? embed : `${embed} + rerank` };
     }
     case 'organize':
@@ -357,9 +403,9 @@ export function SettingsDialog({
 
   const testEmbeddings = async () => {
     setEmbedTest({ busy: true, message: 'Testing…' });
-    const origins = embeddingHostOrigins(settings);
+    const origins = embeddingApiOrigins(settings);
     if (origins.length && !(await requestHostAccess(origins))) {
-      setEmbedTest({ busy: false, ok: false, message: 'Access to Amazon Bedrock was not granted.' });
+      setEmbedTest({ busy: false, ok: false, message: `Access to ${origins[0].replace(/^https:\/\//, '').replace(/\/\*$/, '')} was not granted.` });
       return;
     }
     const r = await testEmbedding(settings);
@@ -375,7 +421,7 @@ export function SettingsDialog({
     setRerankTest({ busy: true, message: 'Testing…' });
     const origins = rerankHostOrigins(settings);
     if (origins.length && !(await requestHostAccess(origins))) {
-      setRerankTest({ busy: false, ok: false, message: 'Access to Amazon Bedrock was not granted.' });
+      setRerankTest({ busy: false, ok: false, message: `Access to ${origins[0].replace(/^https:\/\//, '').replace(/\/\*$/, '')} was not granted.` });
       return;
     }
     const r = await testReranker(settings);
@@ -784,6 +830,8 @@ export function SettingsDialog({
             >
               <option value="local">On-device only (free, private)</option>
               <option value="voyage">Voyage AI</option>
+              <option value="mongodb">MongoDB Atlas (Voyage)</option>
+              <option value="cohere">Cohere</option>
               <option value="bedrock">Amazon Bedrock</option>
               <option value="openai">OpenAI</option>
               <option value="ollama">Ollama (local server)</option>
@@ -807,6 +855,109 @@ export function SettingsDialog({
               </label>
             </>
           )}
+          {settings.embeddingProvider === 'mongodb' && (
+            <>
+              <SecretInput
+                label="Atlas model API key"
+                placeholder="Created in MongoDB Atlas"
+                value={settings.mongodbApiKey}
+                onChange={(v) => void onPatch({ mongodbApiKey: v })}
+              />
+              <label className="tk-field">
+                Geography
+                <select
+                  className="tk-select"
+                  value={settings.mongodbGeography}
+                  onChange={(e) => void onPatch({ mongodbGeography: e.target.value as MongoDbGeography })}
+                >
+                  {(Object.keys(MONGODB_GEOGRAPHY_LABELS) as MongoDbGeography[]).map((g) => (
+                    <option key={g} value={g}>
+                      {MONGODB_GEOGRAPHY_LABELS[g]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="tk-field-row">
+                <label className="tk-field">
+                  Model
+                  <select
+                    className="tk-select"
+                    value={settings.mongodbEmbeddingModel}
+                    onChange={(e) => void onPatch({ mongodbEmbeddingModel: e.target.value as MongoDbEmbeddingModel })}
+                  >
+                    {MONGODB_EMBEDDING_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="tk-field">
+                  Dimensions
+                  <select
+                    className="tk-select"
+                    value={settings.mongodbEmbeddingDimensions}
+                    onChange={(e) =>
+                      void onPatch({ mongodbEmbeddingDimensions: Number(e.target.value) as SettingsRecord['mongodbEmbeddingDimensions'] })
+                    }
+                  >
+                    {MONGODB_EMBEDDING_DIMENSIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="tk-settings-note">
+                The same Voyage models as voyageai.com, billed through your Atlas account. A key only works on the
+                geography it was created for. Threadkeeper asks for access to that one host when you press Test.
+              </p>
+            </>
+          )}
+          {settings.embeddingProvider === 'cohere' && (
+            <>
+              <SecretInput label="Cohere API key" placeholder="From dashboard.cohere.com" value={settings.cohereApiKey} onChange={(v) => void onPatch({ cohereApiKey: v })} />
+              <div className="tk-field-row">
+                <label className="tk-field">
+                  Model
+                  <select
+                    className="tk-select"
+                    value={settings.cohereEmbeddingModel}
+                    onChange={(e) => void onPatch({ cohereEmbeddingModel: e.target.value as CohereEmbeddingModel })}
+                  >
+                    {COHERE_EMBEDDING_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {cohereSupportsDimensions(settings.cohereEmbeddingModel) && (
+                  <label className="tk-field">
+                    Dimensions
+                    <select
+                      className="tk-select"
+                      value={cohereEffectiveDimensions(settings.cohereEmbeddingModel, settings.cohereEmbeddingDimensions)}
+                      onChange={(e) =>
+                        void onPatch({ cohereEmbeddingDimensions: Number(e.target.value) as SettingsRecord['cohereEmbeddingDimensions'] })
+                      }
+                    >
+                      {cohereEmbeddingInfo(settings.cohereEmbeddingModel).dimensions.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+              <p className="tk-settings-note">
+                Embed v5.0 Pro and Fast share one vector space, so you can index with Pro and keep Fast for queries without rebuilding.
+                1024 dimensions keeps a large library compact; 2048 is the v5.0 default.
+              </p>
+            </>
+          )}
           {settings.embeddingProvider === 'bedrock' && (
             <>
               {awsSummary}
@@ -825,6 +976,7 @@ export function SettingsDialog({
                     ))}
                   </select>
                 </label>
+                {!isBedrockCohereV3(settings.bedrockEmbeddingModel) && (
                 <label className="tk-field">
                   Dimensions
                   <select
@@ -839,6 +991,7 @@ export function SettingsDialog({
                     <option value={1024}>1024</option>
                   </select>
                 </label>
+                )}
               </div>
             </>
           )}
@@ -910,9 +1063,74 @@ export function SettingsDialog({
             >
               <option value="none">Off</option>
               <option value="voyage">Voyage AI</option>
+              <option value="mongodb">MongoDB Atlas (Voyage)</option>
+              <option value="cohere">Cohere</option>
               <option value="bedrock">Amazon Bedrock</option>
             </select>
           </label>
+          {settings.rerankProvider === 'mongodb' && (
+            <>
+              {settings.embeddingProvider !== 'mongodb' && (
+                <>
+                  <SecretInput
+                    label="Atlas model API key"
+                    placeholder="Created in MongoDB Atlas"
+                    value={settings.mongodbApiKey}
+                    onChange={(v) => void onPatch({ mongodbApiKey: v })}
+                  />
+                  <label className="tk-field">
+                    Geography
+                    <select
+                      className="tk-select"
+                      value={settings.mongodbGeography}
+                      onChange={(e) => void onPatch({ mongodbGeography: e.target.value as MongoDbGeography })}
+                    >
+                      {(Object.keys(MONGODB_GEOGRAPHY_LABELS) as MongoDbGeography[]).map((g) => (
+                        <option key={g} value={g}>
+                          {MONGODB_GEOGRAPHY_LABELS[g]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+              <label className="tk-field">
+                Model
+                <select
+                  className="tk-select"
+                  value={settings.mongodbRerankModel}
+                  onChange={(e) => void onPatch({ mongodbRerankModel: e.target.value as MongoDbRerankModel })}
+                >
+                  {MONGODB_RERANK_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          {settings.rerankProvider === 'cohere' && (
+            <>
+              {settings.embeddingProvider !== 'cohere' && (
+                <SecretInput label="Cohere API key" placeholder="From dashboard.cohere.com" value={settings.cohereApiKey} onChange={(v) => void onPatch({ cohereApiKey: v })} />
+              )}
+              <label className="tk-field">
+                Model
+                <select
+                  className="tk-select"
+                  value={settings.cohereRerankModel}
+                  onChange={(e) => void onPatch({ cohereRerankModel: e.target.value as CohereRerankModel })}
+                >
+                  {COHERE_RERANK_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
           {settings.rerankProvider === 'voyage' && (
             <>
               {settings.embeddingProvider !== 'voyage' && (

@@ -129,8 +129,14 @@ async function loadManifestMatchPatterns() {
   if (!Array.isArray(grokX) || grokX.length === 0) {
     throw new Error('Provider registry returned no Grok on X match patterns');
   }
+  // ChatGPT and Claude load each conversation as one JSON document; a MAIN-world script reads it.
+  const siteData = [...registry.PROVIDERS.chatgpt.matchPatterns, ...registry.PROVIDERS.claude.matchPatterns];
+  if (siteData.length === 0) {
+    throw new Error('Provider registry returned no ChatGPT / Claude match patterns');
+  }
   return {
     capture,
+    siteData,
     grokX,
     domCapture: capture.filter((pattern) => !grokX.includes(pattern)),
     // web_accessible_resources only accepts origin patterns (scheme://host/*).
@@ -174,6 +180,18 @@ async function build() {
   await esbuild.build({
     entryPoints: [path.join(rootDir, 'src/entrypoints/grok-x-main.ts')],
     outfile: path.join(outDir, 'content-scripts/grok-x-main.js'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: ['chrome120'],
+    sourcemap: false,
+    minify: true,
+  });
+
+  // 2c. Bundle the ChatGPT / Claude MAIN-world script (IIFE, no extension APIs)
+  await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/entrypoints/site-data-main.ts')],
+    outfile: path.join(outDir, 'content-scripts/site-data-main.js'),
     bundle: true,
     format: 'iife',
     platform: 'browser',
@@ -238,8 +256,16 @@ async function build() {
       'https://api.voyageai.com/*',
       'https://api.openai.com/*',
     ],
-    // AWS hosts are granted per region at runtime (Settings → AI / Embeddings), never at install.
-    optional_host_permissions: ['https://*.api.aws/*', 'https://*.amazonaws.com/*'],
+    // AWS hosts (per region), MongoDB Atlas model hosts (per geography) and Cohere are granted at
+    // runtime from Settings → Search & embeddings, never at install.
+    optional_host_permissions: [
+      'https://*.api.aws/*',
+      'https://*.amazonaws.com/*',
+      'https://ai.mongodb.com/*',
+      'https://us.ai.mongodb.com/*',
+      'https://eu.ai.mongodb.com/*',
+      'https://api.cohere.com/*',
+    ],
     background: {
       service_worker: 'background.js',
       type: 'module',
@@ -293,6 +319,13 @@ async function build() {
       {
         matches: patterns.grokX,
         js: ['content-scripts/grok-x-main.js'],
+        run_at: 'document_start',
+        world: 'MAIN',
+      },
+      {
+        // Must be in place before the app requests the conversation.
+        matches: patterns.siteData,
+        js: ['content-scripts/site-data-main.js'],
         run_at: 'document_start',
         world: 'MAIN',
       },

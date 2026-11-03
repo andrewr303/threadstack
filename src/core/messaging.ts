@@ -12,14 +12,18 @@ export type PrivilegedCommandType =
   | 'RUN_RESUMABLE_JOBS'
   | 'SETTINGS_CHANGED'
   | 'RUN_ANALYSIS_NOW'
-  | 'GET_DIAGNOSTICS';
+  | 'GET_DIAGNOSTICS'
+  | 'START_HISTORY_SYNC'
+  | 'CANCEL_HISTORY_SYNC'
+  | 'GET_HISTORY_SYNC_STATE';
 
 export type ContentScriptCommandType =
   | 'PASSIVE_DOM_CAPTURE'
   | 'OVERLAY_STATE_CHANGED'
   | 'GET_CAPTURE_AUTH_STATE'
   | 'OVERLAY_FRAME_STATUS'
-  | 'OPEN_MANAGER_FALLBACK';
+  | 'OPEN_MANAGER_FALLBACK'
+  | 'HISTORY_SYNC_EVENT';
 
 export type ExtensionMessage =
   | {
@@ -75,6 +79,9 @@ const PRIVILEGED_TYPES = new Set<string>([
   'SETTINGS_CHANGED',
   'RUN_ANALYSIS_NOW',
   'GET_DIAGNOSTICS',
+  'START_HISTORY_SYNC',
+  'CANCEL_HISTORY_SYNC',
+  'GET_HISTORY_SYNC_STATE',
 ]);
 
 const CONTENT_SCRIPT_TYPES = new Set<string>([
@@ -83,6 +90,7 @@ const CONTENT_SCRIPT_TYPES = new Set<string>([
   'OVERLAY_STATE_CHANGED',
   'OVERLAY_FRAME_STATUS',
   'OPEN_MANAGER_FALLBACK',
+  'HISTORY_SYNC_EVENT',
 ]);
 
 export function validateRuntimeMessageSender(

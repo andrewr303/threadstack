@@ -356,6 +356,13 @@ export function App() {
       'ollamaEmbeddingModel',
       'bedrockEmbeddingModel',
       'bedrockEmbeddingDimensions',
+      'mongodbApiKey',
+      'mongodbGeography',
+      'mongodbEmbeddingModel',
+      'mongodbEmbeddingDimensions',
+      'cohereApiKey',
+      'cohereEmbeddingModel',
+      'cohereEmbeddingDimensions',
       'authorizedHosts',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
@@ -2311,6 +2318,10 @@ export function App() {
           setStatusAnnouncement(message);
           notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
           await reloadAll(selectedKeyRef.current);
+        }}
+        onOpenThread={(threadKey) => {
+          importDialogRef.current?.close();
+          handleSelectThread(threadKey);
         }}
         onClosed={() => {
           lastInnerModalCloseAtRef.current = Date.now();

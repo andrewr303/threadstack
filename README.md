@@ -17,6 +17,8 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
   - Codex rollouts older than a week (`.jsonl.zst`) are decompressed on your device.
   - Subagent transcripts and other side files are never imported as threads of their own. A Codex fork is filed as a branch of the thread it came from, without the history it replayed, and a reverted Codex thread keeps its newest rollout.
   - A Claude Code session is titled by your rename if you made one, else by its agent name, its generated title, its summary, or its first prompt, in that order.
+- **Complete capture on ChatGPT and Claude:** both apps load each conversation as one JSON document. Threadkeeper reads that response as the page receives it (it never alters it and sends no request of its own), so a conversation is stored whole, with the site's message ids, timestamps, model and active branch, even when the page only renders part of it. Page reading stays as the live fallback and merges with it by message id, so nothing is dropped or stored twice.
+- **Catch up, no export needed:** **Import / Export → Catch up from your accounts** pulls the last 7, 14 or 30 days from the sites you are signed in to. ChatGPT and Claude are read through your own signed-in session in this browser: it lists recent conversations, skips the ones already stored and unchanged, then reads the rest one at a time with a pause between them. It only sends GET requests, stops if the site asks it to slow down or shows a check, and can be cancelled. Gemini, Grok, Perplexity, DeepSeek, Kimi, Le Chat, Copilot and AI Studio have no history Threadkeeper can read directly, so it opens your most recent chats in a background tab, a few seconds each (no dates, so it takes the newest 30). Everything imported is summarized and filed like any other thread, and a catch-up brief says where things stand across the period.
 - **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
 
 ### 2. Understands every thread (beyond the title)
@@ -61,6 +63,8 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 
 - Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
 - API keys and AWS credentials (Anthropic, Voyage, OpenAI, Bedrock, Claude Platform on AWS) are stored the same way and only sent to their own API.
+- Hosts for MongoDB Atlas and Cohere are optional permissions too: Settings asks for the one host you chose when you press Test.
+- **Catch up** uses your own signed-in session in this browser to read your own conversations from the site you pick, and nothing else. It keeps no credentials, only reads, and nothing it reads leaves the browser except through the analysis, embedding and reranking settings you already control. The ChatGPT and Claude endpoints it uses are the sites' own and are not documented or supported by OpenAI or Anthropic. They can change or be restricted, and the sites' terms may limit automated access, so it runs only when you start it, at a human pace, and stops at the first sign of a block.
 - The extension holds no AWS host permission at install. **Settings → Amazon Web Services → Allow access** asks the browser for exactly the endpoints of the configured region (for example `bedrock-mantle.us-east-1.api.aws`).
 - **Settings → Privacy & limits** lists every host that captured text can reach with the current settings.
 - Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and threads already filed in a local-only project (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker. The check happens when a thread is analyzed, so a brand-new conversation that nothing has filed yet *is* sent before Claude can recognize it as personal — mark such conversations local-only, or switch off automatic Claude analysis.
@@ -74,11 +78,13 @@ On-device vectors (feature-hashed, 384 dims) are always maintained and need no k
 | Provider | Models | Notes |
 |---|---|---|
 | Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | API key from voyageai.com |
-| Amazon Bedrock | Amazon Titan Text Embeddings V2, Cohere Embed v4 (256, 512 or 1024 dimensions) | Uses the AWS credentials in Settings |
+| MongoDB Atlas (Voyage) | The same four Voyage models, 256 to 2048 dimensions | A model API key created in Atlas, with the geography it was issued for (`ai.mongodb.com`, `us.ai.mongodb.com` or `eu.ai.mongodb.com`). It does not work on voyageai.com, and a voyageai.com key does not work here |
+| Cohere | `embed-v5.0-fast`, `embed-v5.0-pro`, `embed-v4.0`, `embed-multilingual-v3.0`, `embed-english-v3.0` | API key from dashboard.cohere.com, called directly on `api.cohere.com`. v5.0 and v4.0 take 256 to 2048 or 1536 dimensions (default here 1024); v5.0 Pro and Fast share one vector space, so you can index with Pro and query with Fast |
+| Amazon Bedrock | Amazon Titan Text Embeddings V2, Cohere Embed v4 (256, 512 or 1024 dimensions), Cohere Embed English v3 and Multilingual v3 (fixed 1024) | Uses the AWS credentials in Settings |
 | OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | API key from platform.openai.com |
 | Ollama (local) | any embedding model, e.g. `nomic-embed-text` | start Ollama with `OLLAMA_ORIGINS=chrome-extension://*` |
 
-Vectors are only compared within one model space, so switching provider never mixes incompatible vectors.
+Vectors are only compared within one model space, so switching provider never mixes incompatible vectors. Atlas and direct Voyage are separate spaces even for the same model name. Cohere's newest models (Embed v5.0, Rerank v5.0) are only on Cohere's own API; Amazon Bedrock offers Cohere Embed v4 and v3 and Rerank 3.5.
 
 ### Reranking
 
@@ -87,6 +93,8 @@ A reranker re-scores the best first-stage candidates of a search (when you press
 | Reranker | Models | Notes |
 |---|---|---|
 | Voyage AI | `rerank-3-lite` (default), `rerank-3` | Voyage API key |
+| MongoDB Atlas (Voyage) | `rerank-3-lite`, `rerank-3`, `rerank-2.5-lite`, `rerank-2.5` | Atlas model API key and geography, as above |
+| Cohere | `rerank-v5.0-fast`, `rerank-v5.0-pro`, `rerank-v4.0-fast`, `rerank-v4.0-pro`, `rerank-v3.5` | Cohere API key, called directly on `api.cohere.com` |
 | Amazon Bedrock | Cohere Rerank 3.5, Amazon Rerank 1.0 | With IAM keys it uses the Bedrock Rerank API. Bedrock API keys are not accepted there, so with an API key Cohere Rerank 3.5 is called directly (experimental). Cohere Rerank 3.5 runs in us-east-1, us-west-2, ca-central-1, eu-central-1 and ap-northeast-1 |
 
 ---
@@ -136,11 +144,17 @@ npm run test:edge
 ```
 
 ```bash
+# ChatGPT capture and Catch up against a mock ChatGPT / Claude: complete capture from the site's
+# own data, history sync, the brief, Check capture, and the narrow layout
+npm run test:catchup
+```
+
+```bash
 # 10,000-thread warm-open and local search benchmark
 npm run bench
 ```
 
-Set `CHROME_EXECUTABLE_PATH` to use a specific Chromium build for the browser suites.
+Set `CHROME_EXECUTABLE_PATH` to use a specific Chromium build for the browser suites (for example `/opt/pw-browsers/chromium` when the repo's Playwright version does not match the installed browsers).
 
 ---
 
@@ -153,6 +167,15 @@ src/
     dom-capture.ts       Per-provider DOM adapters + generic fallback, structure-aware text extraction
     cli-sessions.ts      Claude Code and Codex CLI JSONL parsers
     importers.ts         Format detection, zip/JSON/JSONL import, folder sync
+    site-api.ts          Parsers for the conversation JSON ChatGPT and Claude load (active branch, hidden turns, citations)
+    merge.ts             Identity-anchored merge of a DOM window into a stored thread
+    history-sync.ts      Catch up: sites, events, state, validation
+    site-history.ts      Page-side reader for ChatGPT and Claude through the signed-in session
+    sidebar-history.ts   Tab-by-tab reader for sites without a readable history
+    sync-orchestrator.ts Service-worker run: tabs, progress, cancel, idle timeout
+    sync-env.ts          The orchestrator's view of chrome.tabs and the database
+    catch-up.ts          Catch-up brief: on-device, or written by Claude from titles and summaries only
+    model-apis.ts        MongoDB Atlas and Cohere endpoints, model catalogs and dimension rules
     adapters.ts          ChatGPT/Claude export parsers, Portable bundle, Markdown handoff
     insights.ts          On-device analyzer (gist, kind, topics, decisions, next steps, status)
     grok-x.ts            Parser for the Grok-on-X conversation data the page loads
@@ -171,6 +194,7 @@ src/
     background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
     content.ts           Zero-footprint capture observer, overlay host with load watchdog
     grok-x-main.ts       Page-world observer for Grok on X responses (reads, never changes)
+    site-data-main.ts    Page-world observer for ChatGPT and Claude conversation responses (reads, never changes)
     manager/             React UI shared by side panel, overlay and full page
 shared/cloud.ts          Wire schemas for the optional Cloudflare Worker
 worker/                  Optional Cloudflare Worker (DeepSeek + MongoDB Voyage)
@@ -220,6 +244,8 @@ All gates pass in packaged-extension headless Chromium (see [`evidence/acceptanc
 ## Troubleshooting
 
 - **"`<extension id>` is blocked · This page has been blocked by Microsoft Edge · ERR_BLOCKED_BY_CLIENT":** Edge is still running an old manifest. Builds before 0.2.0 made the library pages reachable only through a dynamic URL (`use_dynamic_url`), and Edge blocks the static URL it hands out, including the full-page library. Edge reads `manifest.json` only when an unpacked extension is loaded or reloaded, so running `npm run build` without pressing **Reload** keeps the broken manifest live. Fix: open `edge://extensions`, click **Reload** under Threadkeeper, and check that the version shown matches the `Built Threadkeeper … (build …)` line printed by `npm run build`. From 0.3.0 the extension detects this itself. After a rebuild, the service worker (which keeps running its previous script) reads the new `build-info.json` from disk the next time it wakes, at most a few minutes later, and reloads the extension once; any library page opened before that shows a **Reload extension** banner. **Settings → Diagnostics** compares the running manifest with the files on disk and copies a report. `npm run test:edge` reproduces the block in real Edge and checks every surface.
+- **Capture looks incomplete or missing on a site:** open the conversation, then **Settings → Diagnostics → Check capture in my AI tab**. It says whether the page was read, whether the site's own data arrived, and what the last capture did, as counts only (copy it into a bug report). For ChatGPT and Claude, reloading the tab makes the page send the complete conversation again.
+- **Catch up says to sign in, or that a site blocked it:** open the site in a normal tab, sign in or complete any check it shows, and run Catch up again. What was already imported is kept, and unchanged conversations are not read twice.
 - **Settings → Diagnostics** shows the running and on-disk versions, recent capture and overlay events, and copies a report without keys or thread content.
 - **A site changed its markup and capture stopped:** the generic role heuristics usually keep working; otherwise use the provider's data export via **Import / Export**.
 - **Claude analysis paused:** the status chip in the header shows the last error (invalid key, rate limit, daily limit). Fix it in Settings; queued threads resume automatically.
