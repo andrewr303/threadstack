@@ -172,6 +172,21 @@ describe('titles', () => {
   });
 });
 
+describe('large threads', () => {
+  it('aligns a 400-message snapshot with a DOM copy whose ids all differ, quickly and without duplicates', () => {
+    const body = (k: number) => `Message number ${k} with enough words to be a real turn about retries and tables ${'x'.repeat(400)}`;
+    const snapshot = Array.from({ length: 400 }, (_, k) => ({ ...m(`api-${k}`, k % 2 ? 'assistant' : 'user', body(k)), branchPath: 'main' }));
+    const dom = Array.from({ length: 400 }, (_, k) => m(`dom-${k}`, k % 2 ? 'assistant' : 'user', body(k)));
+    const t0 = performance.now();
+    const result = mergeCapturedMessages(snapshot, dom, { authoritativeStored: true });
+    const ms = performance.now() - t0;
+    expect(result.anchored).toBe(true);
+    expect(result.messages).toHaveLength(400);
+    expect(result.messages.every((x, k) => x.sourceMessageId === `api-${k}`)).toBe(true);
+    expect(ms).toBeLessThan(1000);
+  });
+});
+
 describe('merge primitives', () => {
   it('compares text without markup and tolerates a stripped prefix', () => {
     expect(sameMessageText('**Bold** answer', 'Bold answer')).toBe(true);

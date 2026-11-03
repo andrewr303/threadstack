@@ -98,6 +98,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const wasRunning = useRef(false);
 
+  const claude = settings ? hasClaudeKey(settings) : false;
   const available = SYNC_PROVIDERS.filter((p) => settings?.authorizedHosts[p.id] !== false);
   const complete = available.filter((p) => p.strategy === 'api');
   const slower = available.filter((p) => p.strategy === 'sidebar');
@@ -170,7 +171,6 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
     }
   };
 
-  const claude = settings ? hasClaudeKey(settings) : false;
   const title = (key: string) => titles.get(key) ?? 'Conversation';
   const stillSummarizing = Boolean(brief?.looseEnds.some((l) => l.text.includes('no summary yet')));
 
@@ -184,6 +184,13 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
         through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then
         summarized and filed like any other thread.
       </p>
+
+      {settings && claude && settings.autoOrganize.aiAnalysis && (
+        <p className="tk-settings-note" data-testid="catchup-ai-note">
+          Claude analysis is on, so imported conversations are sent to Claude for summaries and filing, up to your daily limit
+          of {settings.autoOrganize.dailyAiAnalysisLimit || 'no'} analyses. Mark a conversation local-only to keep it on this device.
+        </p>
+      )}
 
       <div className="tk-field-row">
         <label className="tk-field">

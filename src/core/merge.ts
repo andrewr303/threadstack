@@ -53,8 +53,10 @@ function normalizeForMatch(text: string): string {
 
 /** Same message, allowing for markup differences and a stripped thinking block. */
 export function sameMessageText(a: string, b: string): boolean {
-  const na = normalizeForMatch(a);
-  const nb = normalizeForMatch(b);
+  return sameNormalized(normalizeForMatch(a), normalizeForMatch(b));
+}
+
+function sameNormalized(na: string, nb: string): boolean {
   if (!na || !nb) return false;
   if (na === nb) return true;
   const [short, long] = na.length <= nb.length ? [na, nb] : [nb, na];
@@ -166,6 +168,9 @@ export function alignMessages(stored: StoredMessage[], incoming: IncomingMessage
 
   const aligned = new Map<number, number>(anchors);
   if (stored.length * incoming.length > MAX_CONTENT_PAIRING_WORK) return aligned;
+  // Each text is normalized once, not once per comparison.
+  const normStored = stored.map((m) => normalizeForMatch(m.content));
+  const normIncoming = incoming.map((m) => normalizeForMatch(m.content));
 
   const bounds: Array<[number, number]> = [[-1, -1], ...anchors, [stored.length, incoming.length]];
   for (let g = 0; g + 1 < bounds.length; g++) {
@@ -174,7 +179,7 @@ export function alignMessages(stored: StoredMessage[], incoming: IncomingMessage
     let jCursor = j0 + 1;
     for (let i = i0 + 1; i < i1; i++) {
       for (let j = jCursor; j < j1; j++) {
-        if (stored[i].role === incoming[j].role && sameMessageText(stored[i].content, incoming[j].content)) {
+        if (stored[i].role === incoming[j].role && sameNormalized(normStored[i], normIncoming[j])) {
           aligned.set(i, j);
           jCursor = j + 1;
           break;
