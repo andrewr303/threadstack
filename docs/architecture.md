@@ -38,6 +38,14 @@ thread sweep with `chats.status`) and `tk-dock-pair` (30 s, only while a grant w
 `connect.html` is not web-accessible; `DOCK_DECIDE` is accepted only from it as a top-level page, and `DOCK_UNPAIR`,
 `DOCK_SET_OPTIONS`, `DOCK_UNBLOCK` never from a frame inside a website.
 
+Manager UI (`src/entrypoints/manager/dock.ts`, `SidebarDock.tsx`): a page client for the `DOCK_*` messages (never
+throws; the overlay adds its handshake token for `DOCK_SEND`), `useDockState` (refreshed on `DOCK_CHANGED`), the
+Settings → Sidebar Dock panel, the Send to Still target picker (`DOCK_COLLECTIONS`, else Still's default placement, or a
+new collection name) used by the detail row, the bulk bar, search results and Ask, and the "In Still" badge
+(`DOCK_STATUS_FOR`, cached two minutes per thread, invalidated on `DOCK_CHANGED` and after a send). Page writes send
+`DOCK_SYNC_NOW` with the changed thread keys; writes that can make a thread private or delete it (local-only, project
+moves, deletes, organize, undo) set `privacy: true` so the worker takes copies back from Still at once.
+
 ## v0.4 changes (2026-11-03)
 
 1. **Complete capture on ChatGPT and Claude.** A MAIN-world script (`site-data-main.ts`, `document_start`) clones the response to each site's own conversation request (ChatGPT `GET /backend-api/conversation/<id>`, Claude `GET /api/organizations/<org>/chat_conversations/<id>`) and posts it to the isolated content script, like the Grok on X hook. It never alters a request or response and makes no request of its own. The content script validates the sender, parses the JSON (`site-api.ts`: active branch from `current_node` / `current_leaf_message_uuid`, hidden memory turns, reasoning and tool turns, and citation widgets dropped) and sends a `network_observer` capture with coverage `full` for the conversation that is open. The background accepts only `dom_observer` or `network_observer` from a content script and never lets a DOM capture claim `full`.

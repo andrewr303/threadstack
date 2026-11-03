@@ -43,6 +43,8 @@ import {
 import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
 import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
 import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
+import { SidebarDockPanel } from './SidebarDock.js';
+import { dockStatusSummary, dockSyncNow, type DockStateView } from './dock.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -54,6 +56,10 @@ interface Props {
   onPatch: (patch: Partial<SettingsRecord>) => Promise<void>;
   onRebuildVectors: () => void;
   onClosed: () => void;
+  /** Still (Sidebar Dock) link state, owned by App (useDockState). */
+  dock?: { state: DockStateView | null; loaded: boolean; refresh: () => Promise<void> };
+  /** Open the dialog on this section (e.g. from "Connect Still first"). */
+  initialSection?: SectionId | null;
 }
 
 function Section({ title, children, note }: { title: string; note?: React.ReactNode; children: React.ReactNode }) {
@@ -105,7 +111,11 @@ function ProjectRow({
     setKeywords((col.keywords ?? []).join(', '));
   }, [col.name, col.description, (col.keywords ?? []).join(',')]);
   const save = (patch: Partial<CollectionRecord>) =>
-    void sharedDb.collections.put({ ...col, ...patch }).then(onChanged);
+    void sharedDb.collections.put({ ...col, ...patch }).then(() => {
+      // A project turning local-only must leave Still at once.
+      if ('cloudExcluded' in patch) dockSyncNow([], { privacy: true });
+      onChanged();
+    });
   return (
     <div className="tk-project-row">
       <div className="tk-project-row-head">
@@ -152,7 +162,7 @@ function ProjectRow({
   );
 }
 
-type SectionId = 'general' | 'capture' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'diagnostics';
+export type SectionId = 'general' | 'capture' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'sidebarDock' | 'diagnostics';
 
 const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
   { id: 'general', label: 'General' },
@@ -162,6 +172,7 @@ const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
   { id: 'search', label: 'Search & embeddings' },
   { id: 'organize', label: 'Organization' },
   { id: 'privacy', label: 'Privacy & limits' },
+  { id: 'sidebarDock', label: 'Sidebar Dock' },
   { id: 'diagnostics', label: 'Diagnostics' },
 ];
 
@@ -255,13 +266,16 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
   if (settings.cloudEnabled && settings.workerEndpointUrl.trim()) {
     out.push({ what: 'Worker enrichment', where: settings.workerEndpointUrl });
   }
+  if (settings.sidebarDock?.pairedId) {
+    out.push({ what: 'Threads Still syncs, is sent or searches', where: `${settings.sidebarDock.pairedName || 'Still'} (another extension in this browser)` });
+  }
   return out;
 }
 
 function sectionStatus(
   id: SectionId,
   settings: SettingsRecord,
-  extra: { projectCount: number; reloadNeeded: boolean }
+  extra: { projectCount: number; reloadNeeded: boolean; dock?: DockStateView | null }
 ): { text: string; tone?: 'danger' } | null {
   switch (id) {
     case 'capture': {
@@ -281,6 +295,11 @@ function sectionStatus(
     }
     case 'organize':
       return { text: String(extra.projectCount) };
+    case 'sidebarDock': {
+      if (extra.dock === undefined) return settings.sidebarDock.pairedId ? { text: 'Connected' } : { text: 'Off' };
+      const s = dockStatusSummary(extra.dock);
+      return { text: s.short, tone: s.tone };
+    }
     case 'diagnostics':
       return extra.reloadNeeded ? { text: 'Reload', tone: 'danger' } : { text: 'OK' };
     default:
@@ -346,8 +365,13 @@ export function SettingsDialog({
   onPatch,
   onRebuildVectors,
   onClosed,
+  dock,
+  initialSection,
 }: Props) {
   const [section, setSection] = useState<SectionId>('general');
+  useEffect(() => {
+    if (initialSection) setSection(initialSection);
+  }, [initialSection]);
   const [aiTest, setAiTest] = useState<TestState>(IDLE);
   const [embedTest, setEmbedTest] = useState<TestState>(IDLE);
   const [rerankTest, setRerankTest] = useState<TestState>(IDLE);
@@ -1306,6 +1330,14 @@ export function SettingsDialog({
       </>
     ),
 
+    sidebarDock: (
+      <SidebarDockPanel
+        state={dock?.state ?? null}
+        loaded={dock ? dock.loaded : true}
+        onRefresh={() => dock?.refresh()}
+      />
+    ),
+
     diagnostics: (
       <>
         <Section
@@ -1360,7 +1392,7 @@ export function SettingsDialog({
         <nav className="tk-settings-nav" aria-label="Settings sections">
           <div className="tk-nav-list">
             {SECTION_LABELS.map((s) => {
-              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded });
+              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded, dock: dock ? dock.state : undefined });
               return (
                 <button
                   key={s.id}
