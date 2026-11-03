@@ -9,6 +9,16 @@ import {
   type ThreadVectorRecord,
 } from './schema.js';
 import type { ThreadkeeperDB } from './db.js';
+import {
+  AwsRequestError,
+  awsCredentialsReady,
+  awsHostOrigins,
+  awsPostJson,
+  bedrockRuntimeUrl,
+  createAwsFetch,
+  hasHostAccess,
+  isValidAwsRegion,
+} from './aws.js';
 
 /**
  * Embedding spaces. Vectors are only ever compared within one space id, so
@@ -26,6 +36,8 @@ export interface EmbeddingSpace {
   model: string;
   /** Cosine similarity above which two threads count as related in this space. */
   relatedThreshold: number;
+  /** Requested output size, for providers where it is part of the space (Bedrock). */
+  dimensions?: number;
 }
 
 export function localSpace(): EmbeddingSpace {
@@ -45,6 +57,17 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
     case 'ollama':
       return settings.ollamaUrl.trim() && settings.ollamaEmbeddingModel.trim()
         ? { id: `ollama:${settings.ollamaEmbeddingModel}`, provider: 'ollama', model: settings.ollamaEmbeddingModel, relatedThreshold: 0.6 }
+        : null;
+    case 'bedrock':
+      // The output size is part of the space: 256- and 1024-dim vectors never mix.
+      return awsCredentialsReady(settings.aws)
+        ? {
+            id: `bedrock:${settings.bedrockEmbeddingModel}:${settings.bedrockEmbeddingDimensions}`,
+            provider: 'bedrock',
+            model: settings.bedrockEmbeddingModel,
+            relatedThreshold: 0.5,
+            dimensions: settings.bedrockEmbeddingDimensions,
+          }
         : null;
     default:
       return null;
@@ -161,7 +184,8 @@ export class EmbeddingError extends Error {
   }
 }
 
-async function postJson(
+/** POST JSON and turn a non-2xx answer into a readable error (reads `error`, `error.message` or Voyage's `detail`). */
+export async function postJson(
   fetchImpl: typeof fetch,
   url: string,
   headers: Record<string, string>,
@@ -186,6 +210,133 @@ async function postJson(
   return res.json();
 }
 
+function isNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.length > 0 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Run `fn` over `items` with at most `limit` calls in flight; results keep
+ * input order. After the first failure no new calls start.
+ */
+async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  let failed = false;
+  const worker = async () => {
+    while (!failed && next < items.length) {
+      const i = next++;
+      try {
+        out[i] = await fn(items[i], i);
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+/** Titan Text Embeddings V2 takes one text per InvokeModel call. */
+const TITAN_CONCURRENCY = 4;
+/** Cohere Embed v4 accepts at most 96 texts per call. */
+const COHERE_EMBED_BATCH = 96;
+
+/** Origins Bedrock embeddings need (runtime host for the configured region). */
+export function embeddingHostOrigins(settings: SettingsRecord): string[] {
+  return settings.embeddingProvider === 'bedrock' && isValidAwsRegion(settings.aws.region)
+    ? awsHostOrigins(settings.aws.region, ['runtime'])
+    : [];
+}
+
+function checkDims(vector: number[], dims: number, model: string): number[] {
+  if (vector.length !== dims) {
+    throw new EmbeddingError(`${model} returned ${vector.length}-dimensional vectors, expected ${dims}`);
+  }
+  return vector;
+}
+
+/** Titan: `embedding`, or `embeddingsByType.float` when only typed output is present. */
+export function parseTitanEmbedding(body: unknown): number[] | null {
+  if (!isRecord(body)) return null;
+  if (isNumberArray(body.embedding)) return body.embedding;
+  const byType = body.embeddingsByType;
+  return isRecord(byType) && isNumberArray(byType.float) ? byType.float : null;
+}
+
+/**
+ * Cohere Embed on Bedrock answers `embeddings: number[][]` ("embeddings_floats")
+ * or `embeddings: { float: number[][] }` ("embeddings_by_type"); AWS examples
+ * show both for a float-only request, so accept either shape.
+ */
+export function parseCohereEmbeddings(body: unknown): number[][] | null {
+  if (!isRecord(body)) return null;
+  const raw = body.embeddings;
+  const rows: unknown = Array.isArray(raw) ? raw : isRecord(raw) ? raw.float : null;
+  if (!Array.isArray(rows) || !rows.every(isNumberArray)) return null;
+  return rows as number[][];
+}
+
+async function embedWithBedrock(
+  settings: SettingsRecord,
+  space: EmbeddingSpace,
+  texts: string[],
+  inputType: 'document' | 'query',
+  fetchImpl: typeof fetch
+): Promise<number[][]> {
+  const region = settings.aws.region.trim();
+  if (!awsCredentialsReady(settings.aws)) throw new EmbeddingError('Add AWS credentials and a region for Bedrock embeddings.');
+  const origins = awsHostOrigins(region, ['runtime']);
+  if (!(await hasHostAccess(origins))) {
+    throw new EmbeddingError(
+      `Threadkeeper has no access to bedrock-runtime.${region}.amazonaws.com yet. Allow it in Settings → Search & embeddings.`
+    );
+  }
+  const dims = space.dimensions ?? settings.bedrockEmbeddingDimensions;
+  const url = bedrockRuntimeUrl(region, `/model/${encodeURIComponent(space.model)}/invoke`);
+  const awsFetch = createAwsFetch(settings.aws, { service: 'bedrock', baseFetch: fetchImpl });
+  const invoke = async (body: unknown): Promise<unknown> => {
+    try {
+      return await awsPostJson(awsFetch, url, body);
+    } catch (err) {
+      if (err instanceof AwsRequestError) throw new EmbeddingError(err.message, err.status);
+      throw err;
+    }
+  };
+
+  if (space.model === 'cohere.embed-v4:0') {
+    const out: number[][] = [];
+    for (let i = 0; i < texts.length; i += COHERE_EMBED_BATCH) {
+      const batch = texts.slice(i, i + COHERE_EMBED_BATCH);
+      const rows = parseCohereEmbeddings(
+        await invoke({
+          texts: batch,
+          input_type: inputType === 'query' ? 'search_query' : 'search_document',
+          output_dimension: dims,
+          embedding_types: ['float'],
+          truncate: 'RIGHT',
+        })
+      );
+      if (!rows || rows.length !== batch.length) throw new EmbeddingError('Cohere Embed returned an unexpected number of vectors');
+      out.push(...rows.map((r) => checkDims(r, dims, space.model)));
+    }
+    return out;
+  }
+
+  // amazon.titan-embed-text-v2:0
+  return mapBounded(texts, TITAN_CONCURRENCY, async (text) => {
+    const vector = parseTitanEmbedding(
+      await invoke({ inputText: text, dimensions: dims, normalize: true, embeddingTypes: ['float'] })
+    );
+    if (!vector) throw new EmbeddingError('Titan Embeddings returned no vector');
+    return checkDims(vector, dims, space.model);
+  });
+}
+
 /** Embed texts in the given space. Remote providers are batched. */
 export async function embedTexts(
   settings: SettingsRecord,
@@ -196,6 +347,7 @@ export async function embedTexts(
 ): Promise<number[][]> {
   if (texts.length === 0) return [];
   if (space.provider === 'local') return texts.map((t) => localHashEmbedding(t));
+  if (space.provider === 'bedrock') return embedWithBedrock(settings, space, texts, inputType, fetchImpl);
 
   const batchSize = 48;
   const out: number[][] = [];
@@ -234,6 +386,24 @@ export async function embedTexts(
     }
   }
   return out;
+}
+
+/**
+ * One short query embedding against the configured remote provider, for the
+ * Settings "Test" button. Never throws; never sends thread text.
+ */
+export async function testEmbedding(
+  settings: SettingsRecord,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ ok: boolean; message: string }> {
+  const space = remoteSpace(settings);
+  if (!space) return { ok: false, message: 'Add the key, URL or AWS credentials first.' };
+  try {
+    const [v] = await embedTexts(settings, space, ['Threadkeeper connection test'], 'query', fetchImpl);
+    return { ok: true, message: `Connected: ${space.model} returns ${v.length}-dimensional vectors.` };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export function vectorKeyFor(space: string, threadKey: string): string {

@@ -1,16 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useId, useState } from 'react';
 import type {
   SettingsRecord,
   AutoOrganizeSettings,
   EmbeddingProviderId,
   CollectionRecord,
+  AiBackend,
+  BedrockEmbeddingModel,
+  BedrockRerankModel,
+  RerankProviderId,
 } from '../../core/schema.js';
 import { UNFILED_PROJECT } from '../../core/db.js';
 import { sharedDb } from './shared.js';
 import { CAPABILITY_MATRIX } from '../../core/adapters.js';
 import { CAPTURE_PROVIDER_IDS, PROVIDERS } from '../../core/providers.js';
 import { MODEL_OPTIONS, estimateAnalysisCostUsd, testClaudeConnection } from '../../core/ai/claude.js';
-import { embedTexts, remoteSpace } from '../../core/embeddings.js';
+import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
+import {
+  awsCredentialsReady,
+  hasHostAccess,
+  isValidAwsRegion,
+  requestHostAccess,
+  type AwsSettings,
+} from '../../core/aws.js';
+import { embeddingHostOrigins, testEmbedding } from '../../core/embeddings.js';
+import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
+import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
+import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -120,6 +135,161 @@ function ProjectRow({
   );
 }
 
+type SectionId = 'general' | 'capture' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'diagnostics';
+
+const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
+  { id: 'general', label: 'General' },
+  { id: 'capture', label: 'Capture' },
+  { id: 'ai', label: 'AI models' },
+  { id: 'aws', label: 'Amazon Web Services' },
+  { id: 'search', label: 'Search & embeddings' },
+  { id: 'organize', label: 'Organization' },
+  { id: 'privacy', label: 'Privacy & limits' },
+  { id: 'diagnostics', label: 'Diagnostics' },
+];
+
+const AWS_REGIONS = [
+  'us-east-1',
+  'us-east-2',
+  'us-west-2',
+  'ca-central-1',
+  'eu-central-1',
+  'eu-west-1',
+  'eu-west-2',
+  'eu-west-3',
+  'eu-north-1',
+  'ap-northeast-1',
+  'ap-southeast-1',
+  'ap-southeast-2',
+  'ap-south-1',
+  'sa-east-1',
+];
+
+const BEDROCK_EMBEDDING_OPTIONS: Array<{ id: BedrockEmbeddingModel; label: string }> = [
+  { id: 'amazon.titan-embed-text-v2:0', label: 'Amazon Titan Text Embeddings V2' },
+  { id: 'cohere.embed-v4:0', label: 'Cohere Embed v4' },
+];
+
+const BEDROCK_RERANK_OPTIONS: Array<{ id: BedrockRerankModel; label: string }> = [
+  { id: 'cohere.rerank-v3-5:0', label: 'Cohere Rerank 3.5' },
+  { id: 'amazon.rerank-v1:0', label: 'Amazon Rerank 1.0' },
+];
+
+/** AWS hosts the current settings call, so access can be granted for exactly those. */
+function awsOriginsInUse(settings: SettingsRecord): string[] {
+  const rerankOrigins = settings.rerankProvider === 'bedrock' ? rerankHostOrigins(settings) : [];
+  return Array.from(new Set([...aiHostOrigins(settings), ...embeddingHostOrigins(settings), ...rerankOrigins]));
+}
+
+function usesAws(settings: SettingsRecord): boolean {
+  return (
+    settings.aiBackend !== 'anthropic' || settings.embeddingProvider === 'bedrock' || settings.rerankProvider === 'bedrock'
+  );
+}
+
+/** Where captured text can go with the current settings. Local-only threads never go anywhere. */
+function dataDestinations(settings: SettingsRecord): Array<{ what: string; where: string }> {
+  const out: Array<{ what: string; where: string }> = [];
+  if (aiCredentialsReady(settings)) {
+    out.push({ what: 'Claude analysis, Organize and Ask', where: backendHost(settings) });
+  }
+  if (settings.embeddingProvider === 'voyage' && settings.voyageApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.voyageai.com' });
+  if (settings.embeddingProvider === 'openai' && settings.openaiApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.openai.com' });
+  if (settings.embeddingProvider === 'ollama') out.push({ what: 'Embeddings', where: settings.ollamaUrl || 'Ollama' });
+  if (settings.embeddingProvider === 'bedrock' && awsCredentialsReady(settings.aws)) {
+    out.push({ what: 'Embeddings', where: `bedrock-runtime.${settings.aws.region}.amazonaws.com` });
+  }
+  if (settings.rerankProvider === 'voyage' && settings.voyageApiKey.trim()) {
+    out.push({ what: 'Reranking (short excerpts)', where: 'api.voyageai.com' });
+  }
+  if (settings.rerankProvider === 'bedrock' && awsCredentialsReady(settings.aws)) {
+    const host = settings.aws.auth === 'iam' ? 'bedrock-agent-runtime' : 'bedrock-runtime';
+    out.push({ what: 'Reranking (short excerpts)', where: `${host}.${settings.aws.region}.amazonaws.com` });
+  }
+  if (settings.cloudEnabled && settings.workerEndpointUrl.trim()) {
+    out.push({ what: 'Worker enrichment', where: settings.workerEndpointUrl });
+  }
+  return out;
+}
+
+function sectionStatus(
+  id: SectionId,
+  settings: SettingsRecord,
+  extra: { projectCount: number; reloadNeeded: boolean }
+): { text: string; tone?: 'danger' } | null {
+  switch (id) {
+    case 'capture': {
+      const on = CAPTURE_PROVIDER_IDS.filter((p) => settings.authorizedHosts[p]).length;
+      return { text: `${on} of ${CAPTURE_PROVIDER_IDS.length}` };
+    }
+    case 'ai':
+      return aiCredentialsReady(settings)
+        ? { text: BACKEND_OPTIONS.find((b) => b.id === settings.aiBackend)?.label.replace(/^Claude Platform on AWS$/, 'AWS') ?? '' }
+        : { text: 'Off' };
+    case 'aws':
+      if (!usesAws(settings)) return { text: 'Unused' };
+      return awsCredentialsReady(settings.aws) ? { text: settings.aws.region } : { text: 'Needs keys', tone: 'danger' };
+    case 'search': {
+      const embed = settings.embeddingProvider === 'local' ? 'Local' : settings.embeddingProvider === 'bedrock' ? 'Bedrock' : settings.embeddingProvider === 'voyage' ? 'Voyage' : settings.embeddingProvider === 'openai' ? 'OpenAI' : 'Ollama';
+      return { text: settings.rerankProvider === 'none' ? embed : `${embed} + rerank` };
+    }
+    case 'organize':
+      return { text: String(extra.projectCount) };
+    case 'diagnostics':
+      return extra.reloadNeeded ? { text: 'Reload', tone: 'danger' } : { text: 'OK' };
+    default:
+      return null;
+  }
+}
+
+function SecretInput({
+  value,
+  onChange,
+  label,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+  placeholder?: string;
+}) {
+  const [show, setShow] = useState(false);
+  const id = useId();
+  return (
+    <div className="tk-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="tk-field-row">
+        <input
+          id={id}
+          type={show ? 'text' : 'password'}
+          className="tk-input tk-grow"
+          placeholder={placeholder}
+          aria-label={label}
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          onChange={(e) => onChange(e.target.value.trim())}
+        />
+        <button type="button" className="tk-btn" aria-label={`${show ? 'Hide' : 'Show'} ${label}`} onClick={() => setShow((v) => !v)}>
+          {show ? 'Hide' : 'Show'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Result({ state }: { state: { message: string | null; ok?: boolean } }) {
+  if (!state.message) return null;
+  return (
+    <div className="tk-settings-result" data-ok={state.ok ?? true} role="status">
+      {state.message}
+    </div>
+  );
+}
+
+type TestState = { busy: boolean; message: string | null; ok?: boolean };
+const IDLE: TestState = { busy: false, message: null };
+
 export function SettingsDialog({
   dialogRef,
   settings,
@@ -131,180 +301,499 @@ export function SettingsDialog({
   onRebuildVectors,
   onClosed,
 }: Props) {
-  const [showKey, setShowKey] = useState(false);
-  const [testState, setTestState] = useState<{ busy: boolean; message: string | null; ok?: boolean }>({ busy: false, message: null });
-  const [embedTest, setEmbedTest] = useState<string | null>(null);
+  const [section, setSection] = useState<SectionId>('general');
+  const [aiTest, setAiTest] = useState<TestState>(IDLE);
+  const [embedTest, setEmbedTest] = useState<TestState>(IDLE);
+  const [rerankTest, setRerankTest] = useState<TestState>(IDLE);
+  const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
+  const diagnostics = useDiagnostics();
 
   const patchAuto = (patch: Partial<AutoOrganizeSettings>) =>
     settings ? onPatch({ autoOrganize: { ...settings.autoOrganize, ...patch } }) : Promise.resolve();
+  const patchAws = (patch: Partial<AwsSettings>) =>
+    settings ? onPatch({ aws: { ...settings.aws, ...patch } }) : Promise.resolve();
 
-  const model = MODEL_OPTIONS.find((m) => m.id === settings?.aiModel) ?? MODEL_OPTIONS[0];
-  const estimate = settings ? estimateAnalysisCostUsd(settings.aiModel, Math.max(threadCount, 1)) : 0;
+  const origins = settings ? awsOriginsInUse(settings) : [];
+  const originsKey = origins.join(' ');
+  useEffect(() => {
+    if (!originsKey) {
+      setAwsAccess(null);
+      return;
+    }
+    void hasHostAccess(originsKey.split(' ')).then(setAwsAccess);
+  }, [originsKey]);
 
-  return (
-    <dialog
-      ref={dialogRef}
-      id="tk-settings-dialog"
-      className="tk-modal-dialog tk-modal-wide"
-      aria-label="Settings, AI, privacy, and platform capabilities"
-      onClose={onClosed}
-    >
-      <h2 className="tk-section-h2" style={{ marginBottom: 8 }}>
-        Settings
-      </h2>
-      {settings && (
-        <div className="tk-settings-stack">
-          <Section
-            title="AI analysis with Claude"
-            note={
-              <>
-                With an Anthropic API key, Claude reads each new or changed thread once it goes quiet and writes a
-                descriptive title, gist, summary, decisions, next steps and project assignment. The key is stored in
-                this browser profile only (extension storage, unreadable by websites). Threads marked local-only, and
-                threads already in a local-only project (like Personal), are never sent. A brand-new conversation is
-                checked when it is analyzed, so it can be sent before Claude files it as personal — mark it local-only
-                first if that matters.
-              </>
-            }
-          >
-            <div className="tk-field-row">
-              <input
-                type={showKey ? 'text' : 'password'}
-                className="tk-input tk-grow"
-                placeholder="sk-ant-…"
-                aria-label="Anthropic API key"
-                autoComplete="off"
-                spellCheck={false}
-                value={settings.anthropicApiKey}
-                onChange={(e) => void onPatch({ anthropicApiKey: e.target.value.trim() })}
-              />
-              <button type="button" className="tk-btn" onClick={() => setShowKey((v) => !v)}>
-                {showKey ? 'Hide' : 'Show'}
-              </button>
-              <button
-                type="button"
-                className="tk-btn"
-                disabled={testState.busy}
-                onClick={() => {
-                  setTestState({ busy: true, message: 'Testing…' });
-                  void testClaudeConnection(settings).then((r) =>
-                    setTestState({ busy: false, message: r.message, ok: r.ok })
-                  );
-                }}
+  /** Ask for the AWS hosts in use; must run from a click. */
+  const ensureAwsAccess = useCallback(async (): Promise<boolean> => {
+    if (!originsKey) return true;
+    const granted = await requestHostAccess(originsKey.split(' '));
+    setAwsAccess(granted);
+    return granted;
+  }, [originsKey]);
+
+  if (!settings) {
+    return (
+      <dialog ref={dialogRef} id="tk-settings-dialog" className="tk-modal-dialog tk-modal-wide" aria-label="Settings" onClose={onClosed} />
+    );
+  }
+
+  const model = MODEL_OPTIONS.find((m) => m.id === settings.aiModel) ?? MODEL_OPTIONS[0];
+  const estimate = estimateAnalysisCostUsd(settings.aiModel, Math.max(threadCount, 1));
+  const projectCount = collections.filter((c) => c.name !== UNFILED_PROJECT).length;
+  const reloadNeeded = diagnostics.snapshot ? reloadWouldHelp(diagnostics.snapshot.health) : false;
+  const browser = detectBrowser(navigator.userAgent);
+
+  const testAi = async () => {
+    setAiTest({ busy: true, message: 'Testing…' });
+    if (aiHostOrigins(settings).length && !(await requestHostAccess(aiHostOrigins(settings)))) {
+      setAiTest({ busy: false, ok: false, message: `Access to ${backendHost(settings)} was not granted, so Threadkeeper cannot reach it.` });
+      return;
+    }
+    const r = await testClaudeConnection(settings);
+    setAiTest({ busy: false, message: r.message, ok: r.ok });
+  };
+
+  const testEmbeddings = async () => {
+    setEmbedTest({ busy: true, message: 'Testing…' });
+    const origins = embeddingHostOrigins(settings);
+    if (origins.length && !(await requestHostAccess(origins))) {
+      setEmbedTest({ busy: false, ok: false, message: 'Access to Amazon Bedrock was not granted.' });
+      return;
+    }
+    const r = await testEmbedding(settings);
+    setEmbedTest({ busy: false, ok: r.ok, message: r.message });
+  };
+
+  const testRerank = async () => {
+    const problem = rerankProblem(settings);
+    if (problem) {
+      setRerankTest({ busy: false, ok: false, message: problem });
+      return;
+    }
+    setRerankTest({ busy: true, message: 'Testing…' });
+    const origins = rerankHostOrigins(settings);
+    if (origins.length && !(await requestHostAccess(origins))) {
+      setRerankTest({ busy: false, ok: false, message: 'Access to Amazon Bedrock was not granted.' });
+      return;
+    }
+    const r = await testReranker(settings);
+    setRerankTest({ busy: false, ok: r.ok, message: r.message });
+  };
+
+  const openShortcuts = () => {
+    try {
+      void chrome.tabs.create({ url: `${extensionsPageUrl(browser)}/shortcuts` });
+    } catch {
+      // tabs API unavailable in this context
+    }
+  };
+
+  const awsSummary = (
+    <p className="tk-settings-note">
+      {awsCredentialsReady(settings.aws)
+        ? `Uses the AWS credentials for ${settings.aws.region} (${settings.aws.auth === 'api_key' ? 'Bedrock API key' : 'IAM access keys'}).`
+        : 'Needs AWS credentials.'}{' '}
+      <button type="button" className="tk-link-btn" onClick={() => setSection('aws')}>
+        Edit in Amazon Web Services
+      </button>
+    </p>
+  );
+
+  const panels: Record<SectionId, React.ReactNode> = {
+    general: (
+      <>
+        <Section title="Appearance & toolbar button">
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Toolbar button opens
+              <select
+                className="tk-select"
+                value={settings.launchSurface}
+                onChange={(e) => void onPatch({ launchSurface: e.target.value as SettingsRecord['launchSurface'] })}
               >
-                Test
-              </button>
+                <option value="side_panel">Side panel (recommended)</option>
+                <option value="overlay">Overlay on AI pages</option>
+                <option value="tab">Full-page library tab</option>
+              </select>
+            </label>
+            <label className="tk-field">
+              Theme
+              <select
+                className="tk-select"
+                value={settings.theme}
+                onChange={(e) => void onPatch({ theme: e.target.value as SettingsRecord['theme'] })}
+              >
+                <option value="system">Match system</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+            <label className="tk-field">
+              Density
+              <select
+                className="tk-select"
+                value={settings.density}
+                onChange={(e) => void onPatch({ density: e.target.value as SettingsRecord['density'] })}
+              >
+                <option value="comfortable">Comfortable</option>
+                <option value="compact">Compact</option>
+              </select>
+            </label>
+          </div>
+        </Section>
+        <Section title="Keyboard shortcuts" note="Alt+Shift+L opens the side panel, Alt+Shift+K the overlay on an AI page, and Alt+Shift+M the full-page library.">
+          <div className="tk-field-row">
+            <button type="button" className="tk-btn" onClick={openShortcuts}>
+              Change shortcuts…
+            </button>
+          </div>
+        </Section>
+      </>
+    ),
+
+    capture: (
+      <Section
+        title="Sites captured automatically"
+        note="Conversations you open on these sites are captured as you read them and stay in this browser. Turning a site off stops new captures; threads already saved stay in the library."
+      >
+        <div className="tk-capture-grid">
+          {CAPTURE_PROVIDER_IDS.map((id) => (
+            <Toggle
+              key={id}
+              checked={settings.authorizedHosts[id]}
+              onChange={(v) => void onPatch({ authorizedHosts: { ...settings.authorizedHosts, [id]: v } })}
+              label={PROVIDERS[id].label}
+              hint={PROVIDERS[id].captureNote}
+            />
+          ))}
+        </div>
+        <p className="tk-settings-note">
+          Claude Code and Codex sessions on your computer, and ChatGPT or Claude data exports, come in through Import / Export.
+        </p>
+      </Section>
+    ),
+
+    ai: (
+      <>
+        <Section
+          title="Where Claude runs"
+          note="Claude reads each new or changed thread once it goes quiet and writes a descriptive title, gist, summary, decisions, next steps and project. Keys stay in this browser profile (extension storage that websites cannot read)."
+        >
+          <fieldset className="tk-fieldset">
+            <legend className="tk-visually-hidden">Claude provider</legend>
+            {BACKEND_OPTIONS.map((b) => (
+              <label key={b.id} className="tk-toggle">
+                <input
+                  type="radio"
+                  name="tk-ai-backend"
+                  checked={settings.aiBackend === b.id}
+                  onChange={() => {
+                    setAiTest(IDLE);
+                    void onPatch({ aiBackend: b.id as AiBackend });
+                  }}
+                />
+                <span>
+                  {b.label}
+                  <span className="tk-toggle-hint">{b.note}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+
+          {settings.aiBackend === 'anthropic' && (
+            <SecretInput
+              label="Anthropic API key"
+              placeholder="sk-ant-…"
+              value={settings.anthropicApiKey}
+              onChange={(v) => void onPatch({ anthropicApiKey: v })}
+            />
+          )}
+          {settings.aiBackend === 'bedrock' && (
+            <>
+              {awsSummary}
+              <p className="tk-settings-note">
+                Requests go to Claude in Amazon Bedrock ({`bedrock-mantle.${settings.aws.region}.api.aws`}) with
+                Bedrock model IDs such as <code>anthropic.{settings.aiModel}</code>. Enable model access for these models in
+                the Bedrock console first.
+              </p>
+            </>
+          )}
+          {settings.aiBackend === 'aws_platform' && (
+            <>
+              <label className="tk-field">
+                Workspace ID
+                <input
+                  type="text"
+                  className="tk-input"
+                  placeholder="wrkspc_…"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={settings.awsPlatformWorkspaceId}
+                  onChange={(e) => void onPatch({ awsPlatformWorkspaceId: e.target.value.trim() })}
+                />
+              </label>
+              {settings.aws.auth === 'api_key' ? (
+                <>
+                  <SecretInput
+                    label="Claude Platform on AWS API key"
+                    placeholder="Short-term API key"
+                    value={settings.awsPlatformApiKey}
+                    onChange={(v) => void onPatch({ awsPlatformApiKey: v })}
+                  />
+                  <p className="tk-settings-note">
+                    Short-term keys last at most 12 hours. Mint one with AWS's token generator for Claude Platform on AWS,
+                    or switch to IAM access keys under Amazon Web Services.
+                  </p>
+                </>
+              ) : (
+                awsSummary
+              )}
+            </>
+          )}
+
+          <div className="tk-field-row">
+            <button type="button" className="tk-btn" disabled={aiTest.busy} onClick={() => void testAi()}>
+              Test connection
+            </button>
+          </div>
+          <Result state={aiTest} />
+        </Section>
+
+        <Section title="Model">
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Model
+              <select
+                className="tk-select"
+                value={settings.aiModel}
+                onChange={(e) => void onPatch({ aiModel: e.target.value as SettingsRecord['aiModel'] })}
+              >
+                {MODEL_OPTIONS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} · {m.note}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="tk-field">
+              Effort
+              <select
+                className="tk-select"
+                value={settings.aiEffort}
+                onChange={(e) => void onPatch({ aiEffort: e.target.value as SettingsRecord['aiEffort'] })}
+              >
+                <option value="low">Low (fast, cheapest)</option>
+                <option value="medium">Medium</option>
+                <option value="high">High (most thorough)</option>
+              </select>
+            </label>
+          </div>
+          <p className="tk-settings-note">
+            Analyzing all {threadCount} threads once with {model.label} costs about $
+            {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)} at Anthropic's list price (${model.inputPerMTok} / $
+            {model.outputPerMTok} per million input / output tokens), assuming about 9k input and 1.8k output tokens per
+            thread. This is an estimate: long threads and the model's thinking cost more
+            {settings.aiBackend === 'anthropic' ? '' : ', and AWS bills at its own rates'}. Only new or changed threads are
+            analyzed again.
+          </p>
+        </Section>
+
+        <Section title="Automatic analysis">
+          <Toggle
+            checked={settings.autoOrganize.aiAnalysis}
+            onChange={(v) => void patchAuto({ aiAnalysis: v })}
+            label="Analyze new and changed threads automatically"
+            hint="Runs in the background after a chat has been quiet for the delay below."
+          />
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Quiet delay (seconds)
+              <input
+                type="number"
+                min={0}
+                className="tk-input"
+                value={settings.autoOrganize.aiDebounceSeconds}
+                onChange={(e) => void patchAuto({ aiDebounceSeconds: Math.max(0, Number(e.target.value) || 0) })}
+              />
+            </label>
+            <label className="tk-field">
+              Daily analysis limit (0 = unlimited)
+              <input
+                type="number"
+                min={0}
+                className="tk-input"
+                value={settings.autoOrganize.dailyAiAnalysisLimit}
+                onChange={(e) => void patchAuto({ dailyAiAnalysisLimit: Math.max(0, Number(e.target.value) || 0) })}
+              />
+            </label>
+          </div>
+          {settings.lastAiError && (
+            <div className="tk-settings-result" data-ok="false" role="alert">
+              Last AI error ({settings.lastAiErrorAt?.slice(0, 16).replace('T', ' ')}): {settings.lastAiError}
             </div>
-            {testState.message && (
-              <div className="tk-settings-result" data-ok={testState.ok ?? true} role="status">
-                {testState.message}
+          )}
+        </Section>
+      </>
+    ),
+
+    aws: (
+      <>
+        <Section
+          title="AWS account"
+          note={`Used by ${[
+            settings.aiBackend === 'bedrock' ? 'Claude in Amazon Bedrock' : '',
+            settings.aiBackend === 'aws_platform' ? 'Claude Platform on AWS' : '',
+            settings.embeddingProvider === 'bedrock' ? 'Bedrock embeddings' : '',
+            settings.rerankProvider === 'bedrock' ? 'Bedrock reranking' : '',
+          ]
+            .filter(Boolean)
+            .join(', ') || 'nothing yet: choose an AWS option under AI models or Search & embeddings'}.`}
+        >
+          <label className="tk-field">
+            Region
+            <input
+              type="text"
+              className="tk-input"
+              list="tk-aws-regions"
+              autoComplete="off"
+              spellCheck={false}
+              value={settings.aws.region}
+              aria-invalid={!isValidAwsRegion(settings.aws.region)}
+              onChange={(e) => void patchAws({ region: e.target.value.trim().toLowerCase() })}
+            />
+            <datalist id="tk-aws-regions">
+              {AWS_REGIONS.map((r) => (
+                <option key={r} value={r} />
+              ))}
+            </datalist>
+          </label>
+          {!isValidAwsRegion(settings.aws.region) && (
+            <div className="tk-settings-result" data-ok="false" role="alert">
+              Enter a region code such as us-east-1.
+            </div>
+          )}
+          <fieldset className="tk-fieldset">
+            <legend className="tk-visually-hidden">AWS credential type</legend>
+            <label className="tk-toggle">
+              <input type="radio" name="tk-aws-auth" checked={settings.aws.auth === 'api_key'} onChange={() => void patchAws({ auth: 'api_key' })} />
+              <span>
+                Bedrock API key
+                <span className="tk-toggle-hint">
+                  Simplest. Prefer a short-term key (lasts at most 12 hours); AWS recommends long-term keys only for
+                  exploration. Not accepted by the Bedrock Rerank API, so Bedrock reranking then uses Cohere Rerank 3.5
+                  directly.
+                </span>
+              </span>
+            </label>
+            <label className="tk-toggle">
+              <input type="radio" name="tk-aws-auth" checked={settings.aws.auth === 'iam'} onChange={() => void patchAws({ auth: 'iam' })} />
+              <span>
+                IAM access keys
+                <span className="tk-toggle-hint">
+                  Requests are signed in this browser (SigV4). Use temporary credentials with a session token where you
+                  can, scoped to the Bedrock actions you need.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+          {settings.aws.auth === 'api_key' ? (
+            <SecretInput
+              label="Bedrock API key"
+              placeholder="bedrock-api-key-…"
+              value={settings.aws.bedrockApiKey}
+              onChange={(v) => void patchAws({ bedrockApiKey: v })}
+            />
+          ) : (
+            <>
+              <div className="tk-field-row">
+                <label className="tk-field">
+                  Access key ID
+                  <input
+                    type="text"
+                    className="tk-input"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={settings.aws.accessKeyId}
+                    onChange={(e) => void patchAws({ accessKeyId: e.target.value.trim() })}
+                  />
+                </label>
               </div>
-            )}
-            <div className="tk-field-row">
+              <SecretInput
+                label="Secret access key"
+                value={settings.aws.secretAccessKey}
+                onChange={(v) => void patchAws({ secretAccessKey: v })}
+              />
+              <SecretInput
+                label="Session token (optional)"
+                placeholder="Session token for temporary credentials"
+                value={settings.aws.sessionToken}
+                onChange={(v) => void patchAws({ sessionToken: v })}
+              />
+            </>
+          )}
+        </Section>
+
+        <Section
+          title="Browser access to AWS"
+          note="Threadkeeper holds no AWS host permission until you allow the endpoints for this region. The browser asks once."
+        >
+          {origins.length === 0 ? (
+            <p className="tk-settings-note">Nothing to allow yet: no AWS feature is turned on.</p>
+          ) : (
+            <>
+              <ul className="tk-plain-list">
+                {origins.map((o) => (
+                  <li key={o}>
+                    <code>{o.replace('https://', '').replace('/*', '')}</code>
+                  </li>
+                ))}
+              </ul>
+              <div className="tk-field-row">
+                <button
+                  type="button"
+                  className={`tk-btn${awsAccess ? '' : ' tk-btn-primary'}`}
+                  disabled={awsAccess === true}
+                  onClick={() => void ensureAwsAccess()}
+                >
+                  {awsAccess ? 'Access allowed' : 'Allow access'}
+                </button>
+              </div>
+            </>
+          )}
+        </Section>
+      </>
+    ),
+
+    search: (
+      <>
+        <Section
+          title="Embeddings"
+          note="On-device vectors are always kept and need no key. A hosted model adds real semantic search, better related threads and better auto-filing."
+        >
+          <label className="tk-field">
+            Provider
+            <select
+              className="tk-select"
+              value={settings.embeddingProvider}
+              onChange={(e) => {
+                setEmbedTest(IDLE);
+                void onPatch({ embeddingProvider: e.target.value as EmbeddingProviderId });
+              }}
+            >
+              <option value="local">On-device only (free, private)</option>
+              <option value="voyage">Voyage AI</option>
+              <option value="bedrock">Amazon Bedrock</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (local server)</option>
+            </select>
+          </label>
+          {settings.embeddingProvider === 'voyage' && (
+            <>
+              <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
               <label className="tk-field">
                 Model
                 <select
                   className="tk-select"
-                  aria-label="Claude model"
-                  value={settings.aiModel}
-                  onChange={(e) => void onPatch({ aiModel: e.target.value as SettingsRecord['aiModel'] })}
-                >
-                  {MODEL_OPTIONS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label} — ${m.inputPerMTok}/${m.outputPerMTok} per MTok · {m.note}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="tk-field">
-                Effort
-                <select
-                  className="tk-select"
-                  aria-label="Analysis effort"
-                  value={settings.aiEffort}
-                  onChange={(e) => void onPatch({ aiEffort: e.target.value as SettingsRecord['aiEffort'] })}
-                >
-                  <option value="low">Low (fast, cheapest)</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High (most thorough)</option>
-                </select>
-              </label>
-            </div>
-            <p className="tk-settings-note">
-              Rough cost to analyze all {threadCount} threads once with {model.label}: about $
-              {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)}, assuming ≈9k input / 1.8k output tokens per
-              thread. This is an estimate, not a measurement: long threads and the model's thinking can cost more. Only
-              new or changed threads are re-analyzed.
-            </p>
-            <Toggle
-              checked={settings.autoOrganize.aiAnalysis}
-              onChange={(v) => void patchAuto({ aiAnalysis: v })}
-              label="Analyze new and changed threads automatically"
-              hint="Runs in the background after a chat has been quiet for the delay below."
-            />
-            <div className="tk-field-row">
-              <label className="tk-field">
-                Quiet delay (seconds)
-                <input
-                  type="number"
-                  min={0}
-                  className="tk-input"
-                  aria-label="AI analysis quiet delay"
-                  value={settings.autoOrganize.aiDebounceSeconds}
-                  onChange={(e) => void patchAuto({ aiDebounceSeconds: Math.max(0, Number(e.target.value) || 0) })}
-                />
-              </label>
-              <label className="tk-field">
-                Daily analysis limit (0 = unlimited)
-                <input
-                  type="number"
-                  min={0}
-                  className="tk-input"
-                  aria-label="Daily AI analysis limit"
-                  value={settings.autoOrganize.dailyAiAnalysisLimit}
-                  onChange={(e) => void patchAuto({ dailyAiAnalysisLimit: Math.max(0, Number(e.target.value) || 0) })}
-                />
-              </label>
-            </div>
-            {settings.lastAiError && (
-              <div className="tk-settings-result" data-ok="false" role="alert">
-                Last AI error ({settings.lastAiErrorAt?.slice(0, 16).replace('T', ' ')}): {settings.lastAiError}
-              </div>
-            )}
-          </Section>
-
-          <Section
-            title="Embeddings (semantic search, related threads, auto-filing)"
-            note="On-device vectors are always maintained and need no key. A hosted model adds true semantic understanding; Anthropic recommends Voyage AI for embeddings."
-          >
-            <label className="tk-field">
-              Provider
-              <select
-                className="tk-select"
-                aria-label="Embedding provider"
-                value={settings.embeddingProvider}
-                onChange={(e) => void onPatch({ embeddingProvider: e.target.value as EmbeddingProviderId })}
-              >
-                <option value="local">On-device only (free, private)</option>
-                <option value="voyage">Voyage AI</option>
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama (local server)</option>
-              </select>
-            </label>
-            {settings.embeddingProvider === 'voyage' && (
-              <div className="tk-field-row">
-                <input
-                  type="password"
-                  className="tk-input tk-grow"
-                  placeholder="Voyage API key (pa-…)"
-                  aria-label="Voyage API key"
-                  autoComplete="off"
-                  value={settings.voyageApiKey}
-                  onChange={(e) => void onPatch({ voyageApiKey: e.target.value.trim() })}
-                />
-                <select
-                  className="tk-select"
-                  aria-label="Voyage model"
                   value={settings.voyageModel}
                   onChange={(e) => void onPatch({ voyageModel: e.target.value as SettingsRecord['voyageModel'] })}
                 >
@@ -313,245 +802,372 @@ export function SettingsDialog({
                   <option value="voyage-4-large">voyage-4-large (best)</option>
                   <option value="voyage-code-4">voyage-code-4 (code-heavy libraries)</option>
                 </select>
-              </div>
-            )}
-            {settings.embeddingProvider === 'openai' && (
+              </label>
+            </>
+          )}
+          {settings.embeddingProvider === 'bedrock' && (
+            <>
+              {awsSummary}
               <div className="tk-field-row">
-                <input
-                  type="password"
-                  className="tk-input tk-grow"
-                  placeholder="OpenAI API key (sk-…)"
-                  aria-label="OpenAI API key"
-                  autoComplete="off"
-                  value={settings.openaiApiKey}
-                  onChange={(e) => void onPatch({ openaiApiKey: e.target.value.trim() })}
-                />
+                <label className="tk-field">
+                  Model
+                  <select
+                    className="tk-select"
+                    value={settings.bedrockEmbeddingModel}
+                    onChange={(e) => void onPatch({ bedrockEmbeddingModel: e.target.value as BedrockEmbeddingModel })}
+                  >
+                    {BEDROCK_EMBEDDING_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="tk-field">
+                  Dimensions
+                  <select
+                    className="tk-select"
+                    value={settings.bedrockEmbeddingDimensions}
+                    onChange={(e) =>
+                      void onPatch({ bedrockEmbeddingDimensions: Number(e.target.value) as SettingsRecord['bedrockEmbeddingDimensions'] })
+                    }
+                  >
+                    <option value={256}>256</option>
+                    <option value={512}>512</option>
+                    <option value={1024}>1024</option>
+                  </select>
+                </label>
+              </div>
+            </>
+          )}
+          {settings.embeddingProvider === 'openai' && (
+            <>
+              <SecretInput label="OpenAI API key" placeholder="sk-…" value={settings.openaiApiKey} onChange={(v) => void onPatch({ openaiApiKey: v })} />
+              <label className="tk-field">
+                Model
                 <select
                   className="tk-select"
-                  aria-label="OpenAI embedding model"
                   value={settings.openaiEmbeddingModel}
-                  onChange={(e) =>
-                    void onPatch({ openaiEmbeddingModel: e.target.value as SettingsRecord['openaiEmbeddingModel'] })
-                  }
+                  onChange={(e) => void onPatch({ openaiEmbeddingModel: e.target.value as SettingsRecord['openaiEmbeddingModel'] })}
                 >
                   <option value="text-embedding-3-small">text-embedding-3-small</option>
                   <option value="text-embedding-3-large">text-embedding-3-large</option>
                 </select>
-              </div>
-            )}
-            {settings.embeddingProvider === 'ollama' && (
-              <>
-                <div className="tk-field-row">
-                  <input
-                    type="url"
-                    className="tk-input tk-grow"
-                    aria-label="Ollama URL"
-                    value={settings.ollamaUrl}
-                    onChange={(e) => void onPatch({ ollamaUrl: e.target.value.trim() })}
-                  />
+              </label>
+            </>
+          )}
+          {settings.embeddingProvider === 'ollama' && (
+            <>
+              <div className="tk-field-row">
+                <label className="tk-field">
+                  Ollama URL
+                  <input type="url" className="tk-input" value={settings.ollamaUrl} onChange={(e) => void onPatch({ ollamaUrl: e.target.value.trim() })} />
+                </label>
+                <label className="tk-field">
+                  Model
                   <input
                     type="text"
                     className="tk-input"
-                    aria-label="Ollama embedding model"
                     value={settings.ollamaEmbeddingModel}
                     onChange={(e) => void onPatch({ ollamaEmbeddingModel: e.target.value.trim() })}
                   />
-                </div>
-                <p className="tk-settings-note">
-                  Start Ollama with <code>OLLAMA_ORIGINS=chrome-extension://*</code> so it accepts requests from the
-                  extension (no extra browser permission is needed), and pull an embedding model (e.g.{' '}
-                  <code>ollama pull nomic-embed-text</code>). Use Test to confirm.
-                </p>
-              </>
-            )}
-            <div className="tk-field-row">
-              {settings.embeddingProvider !== 'local' && (
-                <button
-                  type="button"
-                  className="tk-btn"
-                  onClick={() => {
-                    const space = remoteSpace(settings);
-                    if (!space) {
-                      setEmbedTest('Add the key / URL first.');
-                      return;
-                    }
-                    setEmbedTest('Testing…');
-                    void embedTexts(settings, space, ['Threadkeeper connection test'], 'query')
-                      .then(([v]) => setEmbedTest(`Connected: ${space.model} returns ${v.length}-dimensional vectors.`))
-                      .catch((err) => setEmbedTest(err instanceof Error ? err.message : String(err)));
-                  }}
-                >
-                  Test
-                </button>
-              )}
-              <button type="button" className="tk-btn" onClick={onRebuildVectors}>
-                Rebuild vectors for the library
-              </button>
-            </div>
-            {embedTest && (
-              <div className="tk-settings-result" role="status">
-                {embedTest}
+                </label>
               </div>
+              <p className="tk-settings-note">
+                Start Ollama with <code>OLLAMA_ORIGINS=chrome-extension://*</code> so it accepts requests from the extension,
+                and pull an embedding model (for example <code>ollama pull nomic-embed-text</code>).
+              </p>
+            </>
+          )}
+          <div className="tk-field-row">
+            {settings.embeddingProvider !== 'local' && (
+              <button type="button" className="tk-btn" disabled={embedTest.busy} onClick={() => void testEmbeddings()}>
+                Test
+              </button>
             )}
-          </Section>
+            <button type="button" className="tk-btn" onClick={onRebuildVectors}>
+              Rebuild vectors for the library
+            </button>
+          </div>
+          <Result state={embedTest} />
+        </Section>
 
-          <Section title="Automatic organization" note="Manual choices always win: locked or hand-filed threads and statuses you set are never changed.">
-            <Toggle
-              checked={settings.autoOrganize.localAnalysis}
-              onChange={(v) => void patchAuto({ localAnalysis: v })}
-              label="Analyze threads on-device as they are captured"
-              hint="Instant gist, kind, topics, decisions and next steps — no network."
-            />
-            <Toggle
-              checked={settings.autoOrganize.autoFile}
-              onChange={(v) => void patchAuto({ autoFile: v })}
-              label="File threads into projects automatically"
-              hint="Uses provider projects, repositories, Claude, keyword rules and similar threads."
-            />
-            <Toggle
-              checked={settings.autoOrganize.autoCreateProjects}
-              onChange={(v) => void patchAuto({ autoCreateProjects: v })}
-              label="Create new projects when a clear new workstream appears"
-            />
-            <Toggle
-              checked={settings.autoOrganize.autoStatus}
-              onChange={(v) => void patchAuto({ autoStatus: v })}
-              label="Set status automatically (active, needs review, done, paused)"
-            />
-            <Toggle
-              checked={settings.autoOrganize.autoTags}
-              onChange={(v) => void patchAuto({ autoTags: v })}
-              label="Add topic tags automatically"
-            />
-          </Section>
-
-          <Section
-            title="Projects"
-            note="Threads that mention a project's keywords are filed there automatically; descriptions also guide Claude. Threads in a local-only project are never sent to any API."
-          >
-            {collections
-              .filter((c) => c.name !== UNFILED_PROJECT)
-              .sort((a, b) => (projectCounts[b.name] ?? 0) - (projectCounts[a.name] ?? 0) || a.name.localeCompare(b.name))
-              .map((col) => (
-                <ProjectRow key={col.name} col={col} count={projectCounts[col.name] ?? 0} onChanged={onCollectionsChanged} />
-              ))}
-          </Section>
-
-          <Section title="Capture" note="Conversations you open on these sites are captured automatically and stay in this browser.">
-            <div className="tk-capture-grid">
-              {CAPTURE_PROVIDER_IDS.map((id) => (
-                <Toggle
-                  key={id}
-                  checked={settings.authorizedHosts[id]}
-                  onChange={(v) => void onPatch({ authorizedHosts: { ...settings.authorizedHosts, [id]: v } })}
-                  label={`${PROVIDERS[id].label}`}
-                  hint={PROVIDERS[id].captureNote}
-                />
-              ))}
-            </div>
-          </Section>
-
-          <Section title="Appearance & toolbar button">
-            <div className="tk-field-row">
+        <Section
+          title="Reranking"
+          note="A reranker re-reads the best candidates of a search or an Ask question and puts the most relevant first. It runs when you press Enter or Ask, never while you type, and sends only titles, gists and short excerpts."
+        >
+          <label className="tk-field">
+            Reranker
+            <select
+              className="tk-select"
+              value={settings.rerankProvider}
+              onChange={(e) => {
+                setRerankTest(IDLE);
+                void onPatch({ rerankProvider: e.target.value as RerankProviderId });
+              }}
+            >
+              <option value="none">Off</option>
+              <option value="voyage">Voyage AI</option>
+              <option value="bedrock">Amazon Bedrock</option>
+            </select>
+          </label>
+          {settings.rerankProvider === 'voyage' && (
+            <>
+              {settings.embeddingProvider !== 'voyage' && (
+                <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+              )}
               <label className="tk-field">
-                Toolbar button opens
+                Model
                 <select
                   className="tk-select"
-                  aria-label="Toolbar button behaviour"
-                  value={settings.launchSurface}
-                  onChange={(e) => void onPatch({ launchSurface: e.target.value as SettingsRecord['launchSurface'] })}
+                  value={settings.rerankModel}
+                  onChange={(e) => void onPatch({ rerankModel: e.target.value as SettingsRecord['rerankModel'] })}
                 >
-                  <option value="side_panel">Side panel (recommended)</option>
-                  <option value="overlay">Overlay on AI pages</option>
-                  <option value="tab">Full-page library tab</option>
+                  <option value="rerank-3-lite">rerank-3-lite (fast, cheap)</option>
+                  <option value="rerank-3">rerank-3 (most accurate)</option>
                 </select>
               </label>
+            </>
+          )}
+          {settings.rerankProvider === 'bedrock' && (
+            <>
+              {awsSummary}
               <label className="tk-field">
-                Theme
+                Model
                 <select
                   className="tk-select"
-                  aria-label="Theme"
-                  value={settings.theme}
-                  onChange={(e) => void onPatch({ theme: e.target.value as SettingsRecord['theme'] })}
+                  value={settings.bedrockRerankModel}
+                  onChange={(e) => void onPatch({ bedrockRerankModel: e.target.value as BedrockRerankModel })}
                 >
-                  <option value="system">Match system</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
+                  {BEDROCK_RERANK_OPTIONS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </label>
-            </div>
-            <p className="tk-settings-note">Shortcuts: Alt+Shift+L side panel · Alt+Shift+K overlay · Alt+Shift+M full page.</p>
-          </Section>
+              <p className="tk-settings-note">
+                Cohere Rerank 3.5 runs in us-east-1, us-west-2, ca-central-1, eu-central-1 and ap-northeast-1; Amazon Rerank
+                1.0 in us-west-2, ca-central-1, eu-central-1 and ap-northeast-1, and needs IAM access keys.
+              </p>
+            </>
+          )}
+          {settings.rerankProvider !== 'none' && (
+            <>
+              <div className="tk-field-row">
+                <label className="tk-field">
+                  Candidates to rerank
+                  <input
+                    type="number"
+                    min={5}
+                    max={100}
+                    className="tk-input"
+                    value={settings.rerankCandidates}
+                    onChange={(e) => void onPatch({ rerankCandidates: Math.min(100, Math.max(5, Number(e.target.value) || 40)) })}
+                  />
+                </label>
+              </div>
+              <Toggle
+                checked={settings.rerankInSearch}
+                onChange={(v) => void onPatch({ rerankInSearch: v })}
+                label="Rerank search results"
+                hint="Runs when you press Enter in the search box."
+              />
+              <Toggle checked={settings.rerankInAsk} onChange={(v) => void onPatch({ rerankInAsk: v })} label="Rerank the threads Ask reads" />
+              <div className="tk-field-row">
+                <button type="button" className="tk-btn" disabled={rerankTest.busy} onClick={() => void testRerank()}>
+                  Test reranker
+                </button>
+              </div>
+              <Result state={rerankTest} />
+            </>
+          )}
+        </Section>
+      </>
+    ),
 
-          <details className="tk-settings-section">
-            <summary className="tk-settings-h3">Cloudflare Worker enrichment (advanced)</summary>
-            <p className="tk-settings-note">
-              Optional self-hosted Worker (DeepSeek + MongoDB Voyage). Not needed when Claude analysis is configured.
-            </p>
-            <Toggle
-              checked={settings.cloudEnabled}
-              onChange={(v) => void onPatch({ cloudEnabled: v })}
-              label="Enable Worker enrichment"
-            />
-            <div className="tk-field-row">
+    organize: (
+      <>
+        <Section title="Automatic organization" note="Manual choices always win: locked or hand-filed threads and statuses you set are never changed.">
+          <Toggle
+            checked={settings.autoOrganize.localAnalysis}
+            onChange={(v) => void patchAuto({ localAnalysis: v })}
+            label="Analyze threads on-device as they are captured"
+            hint="Instant gist, kind, topics, decisions and next steps, with no network."
+          />
+          <Toggle
+            checked={settings.autoOrganize.autoFile}
+            onChange={(v) => void patchAuto({ autoFile: v })}
+            label="File threads into projects automatically"
+            hint="Uses provider projects, repositories, Claude, keyword rules and similar threads."
+          />
+          <Toggle
+            checked={settings.autoOrganize.autoCreateProjects}
+            onChange={(v) => void patchAuto({ autoCreateProjects: v })}
+            label="Create new projects when a clear new workstream appears"
+          />
+          <Toggle
+            checked={settings.autoOrganize.autoStatus}
+            onChange={(v) => void patchAuto({ autoStatus: v })}
+            label="Set status automatically (active, needs review, done, paused)"
+          />
+          <Toggle checked={settings.autoOrganize.autoTags} onChange={(v) => void patchAuto({ autoTags: v })} label="Add topic tags automatically" />
+        </Section>
+        <Section
+          title="Projects"
+          note="Threads that mention a project's keywords are filed there automatically, and descriptions guide Claude. Threads in a local-only project are never sent to any API."
+        >
+          {collections
+            .filter((c) => c.name !== UNFILED_PROJECT)
+            .sort((a, b) => (projectCounts[b.name] ?? 0) - (projectCounts[a.name] ?? 0) || a.name.localeCompare(b.name))
+            .map((col) => (
+              <ProjectRow key={col.name} col={col} count={projectCounts[col.name] ?? 0} onChanged={onCollectionsChanged} />
+            ))}
+        </Section>
+      </>
+    ),
+
+    privacy: (
+      <>
+        <Section
+          title="What leaves this browser"
+          note="Threads marked local-only, and threads filed in a local-only project, are never sent anywhere. A new conversation is checked when it is analyzed, so mark it local-only first if it must never leave."
+        >
+          {dataDestinations(settings).length === 0 ? (
+            <p className="tk-settings-note">Nothing. Everything runs on-device with the current settings.</p>
+          ) : (
+            <dl className="tk-diag-grid">
+              {dataDestinations(settings).map((d) => (
+                <React.Fragment key={`${d.what}-${d.where}`}>
+                  <dt>{d.what}</dt>
+                  <dd>
+                    <code>{d.where}</code>
+                  </dd>
+                </React.Fragment>
+              ))}
+            </dl>
+          )}
+        </Section>
+        <details className="tk-settings-section">
+          <summary className="tk-settings-h3">Cloudflare Worker enrichment (advanced)</summary>
+          <p className="tk-settings-note">
+            Optional self-hosted Worker (DeepSeek + MongoDB Voyage). Not needed when Claude analysis is configured.
+          </p>
+          <Toggle checked={settings.cloudEnabled} onChange={(v) => void onPatch({ cloudEnabled: v })} label="Enable Worker enrichment" />
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Worker URL
               <input
                 type="url"
-                className="tk-input tk-grow"
+                className="tk-input"
                 placeholder="https://threadkeeper-worker.example.workers.dev"
-                aria-label="Worker Endpoint URL"
                 value={settings.workerEndpointUrl}
                 onChange={(e) => void onPatch({ workerEndpointUrl: e.target.value })}
               />
-              <input
-                type="password"
-                className="tk-input"
-                placeholder="Worker Bearer Token"
-                aria-label="Worker Bearer Token"
-                value={settings.workerBearerToken}
-                onChange={(e) => void onPatch({ workerBearerToken: e.target.value })}
-              />
+            </label>
+            <label className="tk-field">
+              Daily request budget
               <input
                 type="number"
+                min={0}
                 className="tk-input"
-                aria-label="Daily cloud request budget"
                 value={settings.dailyCloudRequestBudget}
-                onChange={(e) =>
-                  void onPatch({ dailyCloudRequestBudget: Math.max(0, Number.parseInt(e.target.value || '0', 10)) })
-                }
+                onChange={(e) => void onPatch({ dailyCloudRequestBudget: Math.max(0, Number.parseInt(e.target.value || '0', 10)) })}
               />
-            </div>
-          </details>
+            </label>
+          </div>
+          <SecretInput label="Worker bearer token" value={settings.workerBearerToken} onChange={(v) => void onPatch({ workerBearerToken: v })} />
+        </details>
+      </>
+    ),
 
-          <details className="tk-settings-section">
-            <summary className="tk-settings-h3">Platform capability matrix (Y / P / N)</summary>
-            <table className="tk-matrix">
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>Adapter</th>
-                  <th>DOM</th>
-                  <th>Export</th>
-                  <th>Branches</th>
-                  <th>Time</th>
-                  <th>Cloud Task</th>
+    diagnostics: (
+      <>
+        <Section
+          title="Extension health"
+          note="Checks that the browser runs the same build as the files on disk. A mismatch is what shows “<id> is blocked · ERR_BLOCKED_BY_CLIENT” in Microsoft Edge."
+        >
+          <DiagnosticsPanel snapshot={diagnostics.snapshot} onRefresh={diagnostics.refresh} />
+        </Section>
+        <details className="tk-settings-section">
+          <summary className="tk-settings-h3">Platform capability matrix (Y / P / N)</summary>
+          <table className="tk-matrix">
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left' }}>Adapter</th>
+                <th>DOM</th>
+                <th>Export</th>
+                <th>Branches</th>
+                <th>Time</th>
+                <th>Cloud Task</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CAPABILITY_MATRIX.map((row) => (
+                <tr key={row.adapterId} title={row.notes}>
+                  <td>{row.label}</td>
+                  <td>{row.visibleDom}</td>
+                  <td>{row.fullExport}</td>
+                  <td>{row.branchHistory}</td>
+                  <td>{row.timestamps}</td>
+                  <td>{row.cloudTaskStatus}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {CAPABILITY_MATRIX.map((row) => (
-                  <tr key={row.adapterId} title={row.notes}>
-                    <td>{row.label}</td>
-                    <td>{row.visibleDom}</td>
-                    <td>{row.fullExport}</td>
-                    <td>{row.branchHistory}</td>
-                    <td>{row.timestamps}</td>
-                    <td>{row.cloudTaskStatus}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      </>
+    ),
+  };
+
+  return (
+    <dialog
+      ref={dialogRef}
+      id="tk-settings-dialog"
+      className="tk-modal-dialog tk-modal-wide tk-modal-settings"
+      aria-label="Settings"
+      onClose={onClosed}
+    >
+      <h2 className="tk-section-h2" style={{ marginBottom: 8 }}>
+        Settings
+      </h2>
+      <div className="tk-settings-layout">
+        <nav className="tk-settings-nav" aria-label="Settings sections">
+          <div className="tk-nav-list">
+            {SECTION_LABELS.map((s) => {
+              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded });
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  id={`tk-settings-tab-${s.id}`}
+                  className="tk-nav-item"
+                  aria-current={section === s.id}
+                  aria-controls="tk-settings-panel"
+                  onClick={() => setSection(s.id)}
+                >
+                  <span>{s.label}</span>
+                  {status && (
+                    <span className="tk-nav-count" data-tone={status.tone}>
+                      {status.text}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+        <div
+          className="tk-settings-panel tk-settings-stack"
+          id="tk-settings-panel"
+          role="region"
+          aria-labelledby={`tk-settings-tab-${section}`}
+          data-testid={`settings-panel-${section}`}
+        >
+          {panels[section]}
         </div>
-      )}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+      </div>
+      <div className="tk-settings-footer">
         <button type="button" className="tk-btn tk-btn-primary" onClick={() => dialogRef.current?.close()}>
           Done
         </button>

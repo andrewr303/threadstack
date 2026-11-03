@@ -3,9 +3,11 @@ import {
   extractChatGptProjectSlug,
   extractConversationIdFromUrl,
   isProviderId,
+  parseChatGptProjectRoute,
   type ProviderId,
 } from './providers.js';
 import type { UpsertThreadInput } from './db.js';
+import type { GrokXMessage } from './grok-x.js';
 
 export interface DomExtractionResult {
   provider: ProviderId;
@@ -34,6 +36,8 @@ interface DomAdapter {
   title(doc: Document, url: string, conversationId: string): string | null;
   project?(doc: Document, url: string): string | null;
   isStreaming?(el: Element): boolean;
+  /** Blocks inside a reply that are not its text (reasoning, thinking); `:scope` is the reply body. */
+  strip?: string;
 }
 
 const SKIP_TAGS = new Set([
@@ -80,8 +84,9 @@ const BLOCK_TAGS = new Set([
  * blocks as fenced code, and drops buttons, icons and screen-reader-only labels
  * ("Copy code", "You said:") that `textContent` would otherwise merge in.
  */
-export function extractReadableText(root: Element): string {
+export function extractReadableText(root: Element, skipSelector?: string): string {
   const out: string[] = [];
+  const skipped = new Set<Element>(skipSelector ? Array.from(root.querySelectorAll(skipSelector)) : []);
   const walk = (node: Node) => {
     if (node.nodeType === 3) {
       out.push(node.nodeValue ?? '');
@@ -90,7 +95,7 @@ export function extractReadableText(root: Element): string {
     if (node.nodeType !== 1) return;
     const el = node as Element;
     const tag = el.tagName.toUpperCase();
-    if (SKIP_TAGS.has(tag)) return;
+    if (SKIP_TAGS.has(tag) || skipped.has(el)) return;
     if (el.getAttribute('aria-hidden') === 'true') return;
     if (el.classList.contains('sr-only')) return;
     if (tag === 'BR') {
@@ -144,6 +149,50 @@ function firstText(doc: Document | Element, selectors: string[]): string | null 
     if (text) return text;
   }
   return null;
+}
+
+/**
+ * First readable text among the selectors' matches that is not a placeholder such as
+ * "New chat". Buttons and screen-reader labels inside a sidebar row are ignored.
+ */
+function firstTitle(doc: Document, selectors: string[], placeholder: RegExp): string | null {
+  for (const sel of selectors) {
+    for (const el of Array.from(doc.querySelectorAll(sel))) {
+      const text = extractReadableText(el).replace(/\s+/g, ' ').trim();
+      if (text && !placeholder.test(text)) return text;
+    }
+  }
+  return null;
+}
+
+const MESSAGE_KEY_ATTRS = [
+  'data-turn-key', // ChatGPT, Claude
+  'data-message-id',
+  'data-virtual-list-item-key', // DeepSeek
+  'data-archer-id', // Kimi
+] as const;
+const MESSAGE_KEY_SELECTOR = MESSAGE_KEY_ATTRS.map((attr) => `[${attr}]`).join(', ');
+
+function ownMessageKey(el: Element): string | null {
+  for (const attr of MESSAGE_KEY_ATTRS) {
+    const value = el.getAttribute(attr)?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+/**
+ * A key that names the same message wherever a virtualized list renders it: the adapter's
+ * id (data-message-id, as before, so stored ids do not change), then the turn's own key
+ * attribute, then the nearest keyed ancestor. Positional ids shift with the scroll
+ * position, so they are only the last resort.
+ */
+function stableMessageKey(turn: RawTurn): string | null {
+  if (turn.id) return turn.id;
+  const own = ownMessageKey(turn.el);
+  if (own) return own;
+  const holder = turn.el.parentElement?.closest(MESSAGE_KEY_SELECTOR);
+  return holder ? ownMessageKey(holder) : null;
 }
 
 /** Repository name from the first GitHub link on a coding-agent page (Claude Code / Codex web). */
@@ -207,7 +256,9 @@ function heuristicTurns(doc: Document): RawTurn[] {
     doc.querySelectorAll(
       '[data-testid*="message" i], [data-role], [data-author], [class*="message" i], [data-content$="message"]'
     )
-  ).filter((el) => !el.closest('nav, aside, form, [contenteditable="true"]'));
+  ).filter(
+    (el) => !el.closest('nav, aside, form, [contenteditable="true"], [contenteditable="plaintext-only"]')
+  );
   const turns: RawTurn[] = [];
   for (const el of outermost(candidates)) {
     const descriptor = [
@@ -228,55 +279,110 @@ function heuristicTurns(doc: Document): RawTurn[] {
   ).map((el) => ({ el, role: 'assistant' as const }));
 }
 
+/** Untitled-chat labels ChatGPT shows per locale; never a conversation title. */
+const CHATGPT_PLACEHOLDER_TITLE = /^(ChatGPT|Codex|New chat|Nuevo chat|Neuer Chat|Nouveau chat)$/i;
+const CHATGPT_STREAMING =
+  '[data-message-streaming="true"], [data-is-streaming="true"], .result-streaming';
+
+/** Project name for a ChatGPT Project route: sidebar label, then URL slug, then "ChatGPT - {name}". */
+function chatgptProjectName(doc: Document, url: string): string | null {
+  const route = parseChatGptProjectRoute(url);
+  if (!route) return null;
+  const hex = route.projectId.replace(/^g-p-/i, '');
+  for (const row of Array.from(doc.querySelectorAll('[data-app-action-sidebar-project-id]'))) {
+    const id = row.getAttribute('data-app-action-sidebar-project-id') ?? '';
+    if (id !== route.projectId && id !== hex && !id.startsWith(`${route.projectId}-`)) continue;
+    const label = row.getAttribute('data-app-action-sidebar-project-label')?.replace(/\s+/g, ' ').trim();
+    if (label) return label;
+  }
+  const fromSlug = extractChatGptProjectSlug(url);
+  if (fromSlug) return fromSlug;
+  const fromTitle = doc.title.match(/^ChatGPT\s+[-–—]\s+(.+)$/)?.[1]?.trim();
+  return fromTitle || null;
+}
+
 const chatgptAdapter: DomAdapter = {
-  turns: genericTurns,
+  turns(doc) {
+    const turns = genericTurns(doc);
+    // While reasoning, ChatGPT shows a transient "Thinking" assistant message that has no
+    // model slug; the real replies carry one.
+    const slugged = turns.some((t) => t.role === 'assistant' && t.model);
+    return slugged ? turns.filter((t) => t.role !== 'assistant' || t.model) : turns;
+  },
   title(doc, url, conversationId) {
-    const sidebar = conversationId
-      ? doc.querySelector(`nav a[href$="/c/${CSS_ESCAPE(conversationId)}"]`)
-      : null;
-    const sidebarTitle = sidebar?.textContent?.replace(/\s+/g, ' ').trim();
-    if (sidebarTitle) return sidebarTitle;
+    const id = conversationId ? CSS_ESCAPE(conversationId) : '';
+    const sidebar = firstTitle(
+      doc,
+      [
+        ...(id
+          ? [
+              `nav a[aria-current="page"][href$="/c/${id}"]`,
+              `#stage-slideover-sidebar a[aria-current="page"][href$="/c/${id}"]`,
+              `nav a[href$="/c/${id}"]`,
+            ]
+          : []),
+        'nav a[aria-current="page"][href*="/c/"]',
+        '#stage-slideover-sidebar a[aria-current="page"][href*="/c/"]',
+      ],
+      CHATGPT_PLACEHOLDER_TITLE
+    );
+    if (sidebar) return sidebar;
+    // "ChatGPT - {name}" is a project page title, not a conversation title.
+    if (/^ChatGPT\s+[-–—]\s+/.test(doc.title)) return null;
     const t = cleanDocTitle(doc, /\s*[-|]\s*(ChatGPT|Codex).*$/i);
-    return t && !/^(ChatGPT|Codex|New chat)$/i.test(t) ? t : null;
+    return t && !CHATGPT_PLACEHOLDER_TITLE.test(t) ? t : null;
   },
   project(doc, url) {
     return (
-      extractChatGptProjectSlug(url) ??
+      chatgptProjectName(doc, url) ??
       (detectProviderFromUrl(url) === 'codex' ? repoFromGithubLink(doc) : null)
     );
   },
   isStreaming(el) {
-    return Boolean(
-      el.classList.contains('result-streaming') || el.querySelector('.result-streaming')
-    );
+    return Boolean(el.closest(CHATGPT_STREAMING) || el.querySelector(CHATGPT_STREAMING));
   },
 };
 
 const CLAUDE_TURN_SELECTOR = [
   '[data-testid="user-message"]',
-  '.font-claude-response',
+  '.font-claude-response:not(#markdown-artifact)',
   '.font-claude-message',
   '[data-testid="assistant-message"]',
 ].join(', ');
+const CLAUDE_PLACEHOLDER_TITLE = /^(Claude|Claude Code|New chat|New session|Untitled)$/i;
 
 const claudeAdapter: DomAdapter = {
   turns(doc) {
     const generic = genericTurns(doc);
-    if (generic.length > 0) return generic;
-    return outermost(Array.from(doc.querySelectorAll(CLAUDE_TURN_SELECTOR))).map((el) => ({
-      el,
-      role: el.matches('[data-testid="user-message"]') ? ('user' as const) : ('assistant' as const),
-    }));
+    const turns =
+      generic.length > 0
+        ? generic
+        : outermost(Array.from(doc.querySelectorAll(CLAUDE_TURN_SELECTOR))).map((el) => ({
+            el,
+            role: el.matches('[data-testid="user-message"]')
+              ? ('user' as const)
+              : ('assistant' as const),
+          }));
+    // An open artifact is rendered with the reply font; it is not a message.
+    return turns.filter((t) => !t.el.closest('#markdown-artifact'));
   },
   title(doc) {
-    return (
-      firstText(doc, [
-        '[data-conversation-title]',
-        '[data-testid="chat-title-button"]',
-        '[data-testid="chat-menu-trigger"]',
-      ]) ?? cleanDocTitle(doc, /\s*[-|]\s*Claude.*$/i)
-    );
+    const t =
+      firstTitle(
+        doc,
+        [
+          '[data-row-key^="chat:"][aria-current]:not([aria-current="false"]) [data-row-label]',
+          '[aria-current="page"]',
+          '[data-conversation-title]',
+          '[data-testid="chat-title-button"]',
+          '[data-testid="chat-menu-trigger"]',
+        ],
+        CLAUDE_PLACEHOLDER_TITLE
+      ) ?? cleanDocTitle(doc, /\s*[-|]\s*Claude.*$/i);
+    return t && !CLAUDE_PLACEHOLDER_TITLE.test(t) ? t : null;
   },
+  // A reply's direct child with the transition-all class is the collapsible thinking block.
+  strip: ':scope > [class*="transition-all"]',
   project(doc, url) {
     const links = Array.from(doc.querySelectorAll('a[href^="/project/"]')).filter(
       (a) => !a.closest('nav, aside')
@@ -297,7 +403,8 @@ const grokAdapter: DomAdapter = {
     const containers = Array.from(doc.querySelectorAll('[id^="response-"]'));
     const fromContainers = containers
       .map((el) => {
-        const bubble = el.querySelector('.message-bubble') ?? el;
+        const bubble =
+          el.querySelector('.response-content-markdown') ?? el.querySelector('.message-bubble') ?? el;
         const isUser =
           /\bitems-end\b/.test(typeof el.className === 'string' ? el.className : '') ||
           Boolean(el.querySelector('.items-end .message-bubble'));
@@ -330,15 +437,23 @@ const geminiAdapter: DomAdapter = {
     });
   },
   title(doc) {
-    const selected = firstText(doc, [
-      '.conversation.selected .conversation-title',
-      '[data-test-id="conversation"].selected',
-      '.selected .conversation-title',
-    ]);
+    const selected = firstTitle(
+      doc,
+      [
+        '[data-test-id="conversation-title"]',
+        'conversation-actions .conversation-title',
+        '.conversation.selected .conversation-title',
+        '[data-test-id="conversation"].selected',
+        '.selected .conversation-title',
+        'mat-list-item.mdc-list-item--activated [mat-line]',
+      ],
+      /^(Google\s+)?Gemini$/i
+    );
     if (selected) return selected;
     const t = cleanDocTitle(doc, /\s*[-|]\s*(Google\s+)?Gemini.*$/i);
     return t && !/^(Google\s+)?Gemini$/i.test(t) ? t : null;
   },
+  strip: 'model-thoughts',
 };
 
 const perplexityAdapter: DomAdapter = {
@@ -357,15 +472,26 @@ const perplexityAdapter: DomAdapter = {
   },
 };
 
+const DEEPSEEK_THINKING = '.ds-think-content';
+
 const deepseekAdapter: DomAdapter = {
   turns(doc) {
     const messages = Array.from(doc.querySelectorAll('.ds-message'));
     if (messages.length > 0) {
       return outermost(messages).map((el) => {
-        const md = el.querySelector('.ds-markdown');
-        return md
-          ? { el, body: md, role: 'assistant' as const }
-          : { el, role: 'user' as const };
+        const isAssistant = Boolean(
+          el.querySelector(`.ds-markdown, .ds-assistant-message-main-content, ${DEEPSEEK_THINKING}`)
+        );
+        if (!isAssistant) return { el, role: 'user' as const };
+        // The reasoning is rendered as markdown too; the answer is the markdown outside it.
+        const answer = Array.from(el.querySelectorAll('.ds-markdown')).find(
+          (md) => !md.closest(DEEPSEEK_THINKING)
+        );
+        return {
+          el,
+          body: answer ?? el.querySelector('.ds-assistant-message-main-content') ?? el,
+          role: 'assistant' as const,
+        };
       });
     }
     return [];
@@ -374,24 +500,71 @@ const deepseekAdapter: DomAdapter = {
     const t = cleanDocTitle(doc, /\s*[-|]\s*DeepSeek.*$/i);
     return t && !/^DeepSeek$/i.test(t) ? t : null;
   },
+  strip: DEEPSEEK_THINKING,
 };
+
+const COPILOT_USER_TURN = '.group\\/user-message, [data-content="user-message"]';
+const COPILOT_TURN = [
+  COPILOT_USER_TURN,
+  '.group\\/ai-message',
+  '.group\\/ai-message-item',
+  '[data-content="ai-message"]',
+].join(', ');
 
 const copilotAdapter: DomAdapter = {
   turns(doc) {
-    return Array.from(
-      doc.querySelectorAll('[data-content="user-message"], [data-content="ai-message"]')
-    ).map((el) => ({
-      el,
-      role:
-        el.getAttribute('data-content') === 'user-message'
-          ? ('user' as const)
-          : ('assistant' as const),
-    }));
+    return outermost(Array.from(doc.querySelectorAll(COPILOT_TURN))).map((el) => {
+      const isUser = el.matches(COPILOT_USER_TURN);
+      return {
+        el,
+        role: isUser ? ('user' as const) : ('assistant' as const),
+        body: isUser
+          ? el.querySelector('[data-content="user-message"]') ?? el
+          : el.querySelector('.group\\/ai-message-item') ?? el,
+      };
+    });
   },
   title(doc) {
     const t = cleanDocTitle(doc, /\s*[-|]\s*(Microsoft\s+)?Copilot.*$/i);
     return t && !/^(Microsoft\s+)?Copilot/i.test(t) ? t : null;
   },
+};
+
+const AI_STUDIO_USER_TURN = '.user-prompt-container, [data-turn-role="User"]';
+
+const aiStudioAdapter: DomAdapter = {
+  turns(doc) {
+    return outermost(
+      Array.from(
+        doc.querySelectorAll(
+          `${AI_STUDIO_USER_TURN}, .model-prompt-container, [data-turn-role="Model"]`
+        )
+      )
+    ).map((el) => ({
+      el,
+      role: el.matches(AI_STUDIO_USER_TURN) ? ('user' as const) : ('assistant' as const),
+    }));
+  },
+  title(doc) {
+    const t = cleanDocTitle(doc, /\s*[-|]\s*Google AI Studio.*$/i);
+    return t && !/^(Google AI Studio|Untitled prompt|New chat)$/i.test(t) ? t : null;
+  },
+};
+
+const kimiAdapter: DomAdapter = {
+  turns(doc) {
+    return outermost(Array.from(doc.querySelectorAll('.segment-user, .segment-assistant'))).map(
+      (el) => ({
+        el,
+        role: el.matches('.segment-user') ? ('user' as const) : ('assistant' as const),
+      })
+    );
+  },
+  title(doc) {
+    const t = cleanDocTitle(doc, /\s+-\s+Kimi$/i);
+    return t && !/^Kimi$/i.test(t) ? t : null;
+  },
+  strip: '.thinking-container',
 };
 
 const mistralAdapter: DomAdapter = {
@@ -408,11 +581,15 @@ const ADAPTERS: Record<ProviderId, DomAdapter> = {
   claude: claudeAdapter,
   claude_code: claudeAdapter,
   grok: grokAdapter,
+  // No DOM selectors are known; captured from X's own responses instead (grok-x.ts).
+  grok_x: { turns: () => [], title: () => null },
   gemini: geminiAdapter,
+  ai_studio: aiStudioAdapter,
   perplexity: perplexityAdapter,
   deepseek: deepseekAdapter,
   mistral: mistralAdapter,
   copilot: copilotAdapter,
+  kimi: kimiAdapter,
   imported: { turns: () => [], title: () => null },
 };
 
@@ -434,7 +611,8 @@ export function extractVisibleDomConversation(
   const provider: ProviderId | null = isProviderId(providerAttr)
     ? providerAttr
     : detectProviderFromUrl(locationHref);
-  if (!provider || provider === 'imported') return null;
+  // Grok on X is read from X's own responses (grok-x.ts); its DOM is never scraped.
+  if (!provider || provider === 'imported' || provider === 'grok_x') return null;
 
   const convIdAttr =
     doc.documentElement.getAttribute('data-tk-conversation-id') ||
@@ -458,6 +636,7 @@ export function extractVisibleDomConversation(
   }
 
   const messages: UpsertThreadInput['messages'] = [];
+  const usedIds = new Set<string>();
   let modelSlug: string | null = null;
 
   for (let i = 0; i < turns.length; i++) {
@@ -466,9 +645,9 @@ export function extractVisibleDomConversation(
 
     // Never capture the composer or an unsent draft
     if (
-      el.closest('form') ||
-      el.closest('[data-testid="composer"]') ||
-      el.getAttribute('contenteditable') === 'true'
+      el.closest(
+        'form, [data-testid="composer"], [contenteditable="true"], [contenteditable="plaintext-only"]'
+      )
     ) {
       continue;
     }
@@ -484,7 +663,7 @@ export function extractVisibleDomConversation(
     }
 
     const bodyNode = turn.body ?? el;
-    const text = extractReadableText(bodyNode);
+    const text = extractReadableText(bodyNode, turn.role === 'user' ? undefined : adapter.strip);
     if (!text) continue;
 
     if (turn.model) modelSlug = turn.model;
@@ -493,8 +672,14 @@ export function extractVisibleDomConversation(
     const explicitTs =
       el.getAttribute('data-message-timestamp') || timeEl?.getAttribute('datetime') || null;
 
+    // Turns that share a keyed ancestor stay distinct, in a stable order.
+    const baseId = stableMessageKey(turn) ?? `${sourceConversationId}_${branchId}_m_${i}`;
+    let sourceMessageId = baseId;
+    for (let n = 2; usedIds.has(sourceMessageId); n++) sourceMessageId = `${baseId}#${n}`;
+    usedIds.add(sourceMessageId);
+
     messages.push({
-      sourceMessageId: turn.id || `${sourceConversationId}_${branchId}_m_${i}`,
+      sourceMessageId,
       role: turn.role,
       content: text,
       createdAt: unixToIsoOrNull(explicitTs),
@@ -522,8 +707,46 @@ export function extractVisibleDomConversation(
   };
 }
 
+/** The one URL a Grok-on-X conversation is filed under, whichever X host it was opened on. */
+export function grokXCanonicalUrl(conversationId: string): string {
+  return `https://x.com/i/grok?conversation=${encodeURIComponent(conversationId)}`;
+}
+
+/**
+ * A Grok-on-X conversation read from X's own GrokConversationItemsByRestId responses, in
+ * the same shape as a DOM capture. Coverage stays partial: only what X loaded is seen.
+ */
+export function grokXConversationToExtraction(
+  conversationId: string,
+  messages: GrokXMessage[]
+): DomExtractionResult {
+  const firstUser = messages.find((m) => m.role === 'user')?.text ?? '';
+  const derivedTitle = firstUser.replace(/\s+/g, ' ').slice(0, 80).trim();
+  return {
+    provider: 'grok_x',
+    sourceConversationId: conversationId,
+    branchId: 'main',
+    canonicalUrl: grokXCanonicalUrl(conversationId),
+    title: derivedTitle || 'Untitled conversation',
+    coverage: messages.length > 0 ? 'partial' : 'title_only',
+    messages: messages.map((m) => ({
+      sourceMessageId: m.id,
+      role: m.role,
+      content: m.text,
+      createdAt: m.createdAt,
+      branchPath: 'main',
+    })),
+    providerProjectName: null,
+    modelSlug: null,
+  };
+}
+
 /** Strip query strings and fragments that do not identify the conversation. */
 export function canonicalizeConversationUrl(href: string): string {
+  if (detectProviderFromUrl(href) === 'grok_x') {
+    const conv = extractConversationIdFromUrl(href);
+    return conv ? grokXCanonicalUrl(conv) : 'https://x.com/i/grok';
+  }
   try {
     const u = new URL(href);
     const keep = new URLSearchParams();

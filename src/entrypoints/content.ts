@@ -1,5 +1,11 @@
-import { extractVisibleDomConversation } from '../core/dom-capture.js';
+import {
+  extractVisibleDomConversation,
+  grokXConversationToExtraction,
+  type DomExtractionResult,
+} from '../core/dom-capture.js';
+import { mergeGrokXMessages, parseGrokXCaptureMessage, type GrokXMessage } from '../core/grok-x.js';
 import { validateWindowPostMessage } from '../core/messaging.js';
+import { detectProviderFromUrl, extractConversationIdFromUrl, isXHostname } from '../core/providers.js';
 
 const OVERLAY_DIALOG_ID = 'threadkeeper-overlay-root';
 
@@ -263,6 +269,39 @@ function armOverlayWatchdog(token: string): void {
 
 let pendingExplicitInvoke = false;
 
+/** Grok on X: messages X's own page loaded for the open conversation (see grok-x-main.ts). */
+let grokXConversation: { id: string; messages: GrokXMessage[] } | null = null;
+
+/** The conversation on screen: Grok on X from X's own responses, every other site from the DOM. */
+function extractCurrentConversation(): DomExtractionResult | null {
+  const href = window.location.href;
+  if (detectProviderFromUrl(href) === 'grok_x') {
+    const urlId = extractConversationIdFromUrl(href);
+    if (!grokXConversation || (urlId && urlId !== grokXConversation.id)) return null;
+    return grokXConversationToExtraction(grokXConversation.id, grokXConversation.messages);
+  }
+  return extractVisibleDomConversation(document, href);
+}
+
+/**
+ * Messages from the MAIN-world script on X. Any page script can post to the window, so the
+ * sender must be this window and the payload is fully re-validated; only the Grok
+ * conversation that is open (/i/grok, matching ?conversation=) is kept.
+ */
+function onGrokXWindowMessage(event: MessageEvent): void {
+  if (event.source !== window || event.origin !== window.location.origin) return;
+  const capture = parseGrokXCaptureMessage(event.data);
+  if (!capture) return;
+  const href = window.location.href;
+  if (detectProviderFromUrl(href) !== 'grok_x') return;
+  const urlId = extractConversationIdFromUrl(href);
+  const id = capture.restId ?? urlId;
+  if (!id || (urlId && urlId !== id)) return;
+  const known = grokXConversation?.id === id ? grokXConversation.messages : [];
+  grokXConversation = { id, messages: mergeGrokXMessages(known, capture.messages) };
+  schedulePassiveDomCapture();
+}
+
 function schedulePassiveDomCapture(explicitInvoke = false): void {
   if (explicitInvoke) {
     pendingExplicitInvoke = true;
@@ -274,10 +313,7 @@ function schedulePassiveDomCapture(explicitInvoke = false): void {
   captureDebounceTimer = setTimeout(() => {
     const useExplicit = pendingExplicitInvoke;
     pendingExplicitInvoke = false;
-    const extracted = extractVisibleDomConversation(
-      document,
-      window.location.href
-    );
+    const extracted = extractCurrentConversation();
     if (!extracted) return;
 
     const fingerprint = `${extracted.provider}:${extracted.sourceConversationId}:${extracted.branchId}:${extracted.title}:${extracted.providerProjectName ?? ''}:${extracted.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
@@ -341,6 +377,11 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
     }
   });
 
+  const onX = isXHostname(window.location.hostname);
+  if (onX) {
+    window.addEventListener('message', onGrokXWindowMessage);
+  }
+
   // Listen for deliberate invocation from background service worker
   if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -378,8 +419,9 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
     });
   }
 
-  // Set up zero-footprint passive DOM observer (never touches or mutates DOM)
-  if (typeof MutationObserver !== 'undefined' && document.documentElement) {
+  // Set up zero-footprint passive DOM observer (never touches or mutates DOM).
+  // Not on X: Grok there comes from X's own responses, and no other X page is captured.
+  if (!onX && typeof MutationObserver !== 'undefined' && document.documentElement) {
     const isOverlayNode = (node: Node): boolean =>
       node instanceof Element &&
       (node.id === OVERLAY_DIALOG_ID ||

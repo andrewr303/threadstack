@@ -3,11 +3,23 @@ import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import type { AiModelId, SettingsRecord } from '../schema.js';
 import { THREAD_KINDS } from '../schema.js';
+import {
+  aiCredentialsProblem,
+  aiCredentialsReady,
+  backendHost,
+  backendLabel,
+  bedrockFallbackActive,
+  createAiClient,
+  markBedrockFallbackUnsupported,
+  resolveModelId,
+  serverFallbackParams,
+} from './backends.js';
 
 /**
  * Claude access straight from the extension (service worker and manager page)
- * with the user's own API key. The key lives in extension-origin IndexedDB,
- * which host pages and content scripts cannot read.
+ * with the user's own credentials: the Anthropic API, Claude in Amazon Bedrock
+ * or Claude Platform on AWS (see backends.ts). Credentials live in
+ * extension-origin IndexedDB, which host pages and content scripts cannot read.
  */
 
 export interface ModelOption {
@@ -25,28 +37,37 @@ export const MODEL_OPTIONS: ModelOption[] = [
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', inputPerMTok: 10, outputPerMTok: 50, note: 'Most capable, premium price' },
 ];
 
-/** Models that accept the server-side refusal fallback (`fallbacks: "default"`). */
-const SERVER_FALLBACK_MODELS = new Set<AiModelId>(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1']);
-const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
-
+/** True when the selected backend (Anthropic, Bedrock or Claude Platform on AWS) is configured. */
 export function hasClaudeKey(settings: SettingsRecord): boolean {
-  return settings.anthropicApiKey.trim().length > 0;
+  return aiCredentialsReady(settings);
 }
 
 export function createClaudeClient(settings: SettingsRecord, fetchImpl?: typeof fetch): Anthropic {
-  return new Anthropic({
-    apiKey: settings.anthropicApiKey.trim(),
-    dangerouslyAllowBrowser: true,
-    maxRetries: 2,
-    timeout: 180_000,
-    ...(fetchImpl ? { fetch: fetchImpl } : {}),
-  });
+  return createAiClient(settings, { fetchImpl });
 }
 
-function fallbackParams(model: AiModelId): { betas?: string[]; fallbacks?: 'default' } {
-  return SERVER_FALLBACK_MODELS.has(model)
-    ? { betas: [SERVER_FALLBACK_BETA], fallbacks: 'default' }
-    : {};
+function isRejectedBetaHeader(err: unknown): boolean {
+  return err instanceof Anthropic.BadRequestError && /beta/i.test(err.message);
+}
+
+/**
+ * Run a beta Messages call. On Bedrock the client-side refusal fallback adds a
+ * beta header that is not confirmed there; if Bedrock rejects it, remember that
+ * and retry once without the middleware.
+ */
+async function withClient<T>(
+  settings: SettingsRecord,
+  fetchImpl: typeof fetch | undefined,
+  run: (client: Anthropic) => Promise<T>
+): Promise<T> {
+  const usesMiddleware = settings.aiBackend === 'bedrock' && bedrockFallbackActive();
+  try {
+    return await run(createAiClient(settings, { fetchImpl }));
+  } catch (err) {
+    if (!usesMiddleware || !isRejectedBetaHeader(err)) throw err;
+    markBedrockFallbackUnsupported();
+    return run(createAiClient(settings, { fetchImpl, withBedrockFallback: false }));
+  }
 }
 
 export class ClaudeCallError extends Error {
@@ -61,32 +82,43 @@ export class ClaudeCallError extends Error {
 }
 
 /** Map SDK errors (most specific first) to a user-facing message and retry policy. */
-export function toClaudeCallError(err: unknown): ClaudeCallError {
+export function toClaudeCallError(err: unknown, settings?: SettingsRecord): ClaudeCallError {
   if (err instanceof ClaudeCallError) return err;
+  const via = settings ? backendLabel(settings) : 'Anthropic API';
+  const host = settings ? backendHost(settings) : 'api.anthropic.com';
+  const credential =
+    settings?.aiBackend === 'bedrock'
+      ? settings.aws.auth === 'api_key'
+        ? 'Bedrock API key (short-term keys expire after 12 hours)'
+        : 'AWS access keys'
+      : settings?.aiBackend === 'aws_platform'
+        ? 'Claude Platform on AWS credentials (short-term keys expire after 12 hours)'
+        : 'API key';
   if (err instanceof Anthropic.AuthenticationError) {
-    return new ClaudeCallError('Anthropic rejected the API key. Check it in Settings → AI.', false, 'auth');
+    return new ClaudeCallError(`${via} rejected the ${credential}. Check it in Settings → AI models.`, false, 'auth');
   }
   if (err instanceof Anthropic.PermissionDeniedError) {
-    return new ClaudeCallError(`This API key is not allowed to make this request: ${err.message}`, false, 'auth');
+    return new ClaudeCallError(`${via} denied this request (${credential}): ${err.message}`, false, 'auth');
   }
   if (err instanceof Anthropic.NotFoundError) {
-    return new ClaudeCallError(`Model not available to this API key: ${err.message}`, false, 'bad_request');
+    return new ClaudeCallError(`Model not available through ${via}: ${err.message}`, false, 'bad_request');
   }
   if (err instanceof Anthropic.RateLimitError) {
-    return new ClaudeCallError('Rate limited by Anthropic; analysis will resume shortly.', true, 'rate_limit');
+    return new ClaudeCallError(`Rate limited by ${via}; analysis will resume shortly.`, true, 'rate_limit');
   }
   if (err instanceof Anthropic.BadRequestError) {
-    return new ClaudeCallError(`Request rejected: ${err.message}`, false, 'bad_request');
+    return new ClaudeCallError(`Request rejected by ${via}: ${err.message}`, false, 'bad_request');
   }
   if (err instanceof Anthropic.InternalServerError) {
-    return new ClaudeCallError('Anthropic is temporarily unavailable; will retry.', true, 'server');
+    return new ClaudeCallError(`${via} is temporarily unavailable; will retry.`, true, 'server');
   }
   if (err instanceof Anthropic.APIConnectionError) {
-    return new ClaudeCallError('Could not reach api.anthropic.com (network or timeout).', true, 'network');
+    const hint = settings && settings.aiBackend !== 'anthropic' ? ' If this is the first request, allow access to the AWS host in Settings → AI models.' : '';
+    return new ClaudeCallError(`Could not reach ${host} (network, timeout or missing host access).${hint}`, true, 'network');
   }
   if (err instanceof Anthropic.APIError) {
     const retryable = typeof err.status === 'number' && (err.status === 529 || err.status >= 500);
-    return new ClaudeCallError(`Anthropic API error ${err.status ?? ''}: ${err.message}`, retryable, 'server');
+    return new ClaudeCallError(`${via} error ${err.status ?? ''}: ${err.message}`, retryable, 'server');
   }
   return new ClaudeCallError(err instanceof Error ? err.message : String(err), false, 'output');
 }
@@ -217,7 +249,6 @@ export async function analyzeThreadWithClaude(
   input: AnalysisInput,
   fetchImpl?: typeof fetch
 ): Promise<{ analysis: ThreadAnalysis; model: string; inputTokens: number; outputTokens: number }> {
-  const client = createClaudeClient(settings, fetchImpl);
   const transcript = buildTranscript(input.messages);
   const header = [
     `Provider: ${input.providerLabel}`,
@@ -231,10 +262,10 @@ export async function analyzeThreadWithClaude(
     .join('\n');
 
   try {
-    const response = await client.beta.messages.parse({
-      model: settings.aiModel,
+    const response = await withClient(settings, fetchImpl, (client) => client.beta.messages.parse({
+      model: resolveModelId(settings),
       max_tokens: 16000,
-      ...fallbackParams(settings.aiModel),
+      ...serverFallbackParams(settings),
       system: [
         { type: 'text', text: ANALYSIS_SYSTEM_PROMPT },
         {
@@ -253,7 +284,7 @@ export async function analyzeThreadWithClaude(
         effort: settings.aiEffort,
         format: betaZodOutputFormat(ThreadAnalysisSchema),
       },
-    });
+    }));
     if (response.stop_reason === 'refusal') {
       throw new ClaudeCallError('Claude declined to analyze this thread.', false, 'refusal');
     }
@@ -270,7 +301,7 @@ export async function analyzeThreadWithClaude(
       outputTokens: response.usage.output_tokens,
     };
   } catch (err) {
-    throw toClaudeCallError(err);
+    throw toClaudeCallError(err, settings);
   }
 }
 
@@ -328,7 +359,6 @@ export async function planOrganizationWithClaude(
   },
   fetchImpl?: typeof fetch
 ): Promise<OrganizePlan> {
-  const client = createClaudeClient(settings, fetchImpl);
   const rows = params.threads
     .map(
       (t, i) =>
@@ -336,10 +366,10 @@ export async function planOrganizationWithClaude(
     )
     .join('\n');
   try {
-    const response = await client.beta.messages.parse({
-      model: settings.aiModel,
+    const response = await withClient(settings, fetchImpl, (client) => client.beta.messages.parse({
+      model: resolveModelId(settings),
       max_tokens: 16000,
-      ...fallbackParams(settings.aiModel),
+      ...serverFallbackParams(settings),
       system: [
         { type: 'text', text: ORGANIZE_SYSTEM_PROMPT },
         { type: 'text', text: projectsBlock(params.projects, []), cache_control: { type: 'ephemeral' } },
@@ -351,7 +381,7 @@ export async function planOrganizationWithClaude(
         },
       ],
       output_config: { effort: settings.aiEffort, format: betaZodOutputFormat(OrganizePlanSchema) },
-    });
+    }));
     if (response.stop_reason === 'refusal') {
       throw new ClaudeCallError('Claude declined this organization request.', false, 'refusal');
     }
@@ -360,7 +390,7 @@ export async function planOrganizationWithClaude(
     }
     return response.parsed_output;
   } catch (err) {
-    throw toClaudeCallError(err);
+    throw toClaudeCallError(err, settings);
   }
 }
 
@@ -400,7 +430,7 @@ export async function askLibraryWithClaude(
     .join('\n\n');
   try {
     const stream = client.messages.stream({
-      model: settings.aiModel,
+      model: resolveModelId(settings),
       max_tokens: 8000,
       system: ASK_SYSTEM_PROMPT,
       messages: [
@@ -421,7 +451,7 @@ export async function askLibraryWithClaude(
       .map((b) => b.text)
       .join('');
   } catch (err) {
-    throw toClaudeCallError(err);
+    throw toClaudeCallError(err, settings);
   }
 }
 
@@ -430,18 +460,19 @@ export async function testClaudeConnection(
   settings: SettingsRecord,
   fetchImpl?: typeof fetch
 ): Promise<{ ok: boolean; message: string }> {
-  if (!hasClaudeKey(settings)) return { ok: false, message: 'Add an Anthropic API key first.' };
+  const problem = aiCredentialsProblem(settings);
+  if (problem) return { ok: false, message: problem };
   try {
     const client = createClaudeClient(settings, fetchImpl);
     const response = await client.messages.create({
-      model: settings.aiModel,
+      model: resolveModelId(settings),
       max_tokens: 1024,
       messages: [{ role: 'user', content: 'Reply with the single word: ready' }],
       output_config: { effort: 'low' },
     });
-    return { ok: true, message: `Connected to ${response.model}.` };
+    return { ok: true, message: `Connected to ${response.model} through ${backendLabel(settings)}.` };
   } catch (err) {
-    return { ok: false, message: toClaudeCallError(err).message };
+    return { ok: false, message: toClaudeCallError(err, settings).message };
   }
 }
 

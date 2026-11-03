@@ -42,6 +42,14 @@ import { requestThreadEnrichment } from '../../core/cloud-client.js';
 import { PROVIDER_IDS, detectProviderFromUrl, extractConversationIdFromUrl, providerLabel } from '../../core/providers.js';
 import { getSmartTitle, resolveInsight } from '../../core/insights.js';
 import { LOCAL_SPACE, cosine, localHashEmbedding, primarySpace } from '../../core/embeddings.js';
+import {
+  applyRerankOrder,
+  bestMatchingExcerpt,
+  buildRerankDocument,
+  remoteRerankAllowedKeys,
+  rerankReady,
+  rerankThreads,
+} from '../../core/rerank.js';
 import { hasClaudeKey } from '../../core/ai/claude.js';
 import {
   analyzeThreadRemotely,
@@ -64,6 +72,15 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.js';
 import { AskPanel } from './AskPanel.js';
 import { SemanticNeighbors, ThreadOverview, type RelatedThread } from './ThreadOverview.js';
+import { StaleBuildBanner, useDiagnostics } from './Diagnostics.js';
+import {
+  BulkActions,
+  RowCheck,
+  THREAD_SORT_LABELS,
+  selectRange,
+  sortThreadHits,
+  type ThreadSortMode,
+} from './BulkActions.js';
 
 const RESURFACE_QUEUE_LABELS: Record<ResurfaceQueue, string> = {
   continue_working: 'Continue working',
@@ -75,6 +92,10 @@ const RESURFACE_QUEUE_LABELS: Record<ResurfaceQueue, string> = {
 };
 
 const TRANSCRIPT_PAGE = 80;
+
+const KANBAN_STATES: WorkflowState[] = ['active', 'needs_review', 'waiting', 'paused', 'done'];
+/** Threads shown per project card. */
+const CARD_ITEMS = 6;
 
 type Surface = 'overlay' | 'page' | 'sidepanel';
 
@@ -126,6 +147,7 @@ export function App() {
 
   // ---- Library data ----
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
+  const diagnostics = useDiagnostics();
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [allMessages, setAllMessages] = useState<MessageRecord[]>([]);
   const [summaries, setSummaries] = useState<StructuredSummaryRecord[]>([]);
@@ -157,6 +179,9 @@ export function App() {
   const [newProjectDraft, setNewProjectDraft] = useState<string | null>(null);
   const [showAllMessages, setShowAllMessages] = useState(false);
   const [activeTabThreadKey, setActiveTabThreadKey] = useState<string | null>(null);
+  // Checked rows for bulk actions; separate from the opened thread (selectedThreadKey).
+  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
+  const [sortMode, setSortMode] = useState<ThreadSortMode>('recent');
 
   const [titleDraft, setTitleDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
@@ -165,6 +190,9 @@ export function App() {
   const organizeDialogRef = useRef<HTMLDialogElement | null>(null);
   const importDialogRef = useRef<HTMLDialogElement | null>(null);
   const settingsDialogRef = useRef<HTMLDialogElement | null>(null);
+  const bulkDeleteDialogRef = useRef<HTMLDialogElement | null>(null);
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const checkAnchorRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const selectedKeyRef = useRef<string | null>(null);
@@ -314,7 +342,11 @@ export function App() {
     setSettings(updated);
     const affectsBackground = [
       'launchSurface',
+      'aiBackend',
       'anthropicApiKey',
+      'aws',
+      'awsPlatformWorkspaceId',
+      'awsPlatformApiKey',
       'aiModel',
       'autoOrganize',
       'embeddingProvider',
@@ -322,6 +354,8 @@ export function App() {
       'openaiApiKey',
       'ollamaUrl',
       'ollamaEmbeddingModel',
+      'bedrockEmbeddingModel',
+      'bedrockEmbeddingDimensions',
       'authorizedHosts',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
@@ -396,7 +430,8 @@ export function App() {
     [providerFilter, activeArea, stateFilter, coverageFilter]
   );
 
-  const searchResults = useMemo(() => {
+  // First stage: runs on every keystroke, so it stays local (no network).
+  const firstStageResults = useMemo(() => {
     const lexical = searchIndex.searchLocal(searchQuery, scope, 5000);
     const q = searchQuery.trim();
     if (!q || q.length < 3 || vectorRows.length === 0) return lexical;
@@ -434,6 +469,28 @@ export function App() {
     return { ...lexical, hits: Array.from(fused.values()).sort((a, b) => b.score - a.score) };
   }, [searchIndex, searchQuery, scope, vectorsByThread, vectorRows.length, insightsByThread]);
 
+  // Second stage: the reranked order from the last explicit submit, applied
+  // only while the query and filters are unchanged.
+  const searchKey = useMemo(() => JSON.stringify([searchQuery.trim(), scope]), [searchQuery, scope]);
+  const [rerankRun, setRerankRun] = useState<{
+    key: string;
+    order: string[];
+    scores: Map<string, number>;
+    note: string;
+  } | null>(null);
+  const rerankAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => rerankAbortRef.current?.abort(), [searchKey]);
+
+  const searchResults = useMemo(() => {
+    if (!rerankRun || rerankRun.key !== searchKey || rerankRun.order.length === 0) return firstStageResults;
+    const hits = applyRerankOrder(firstStageResults.hits, (h) => h.conversation.threadKey, rerankRun.order).map((h) => {
+      const s = rerankRun.scores.get(h.conversation.threadKey);
+      return s === undefined ? h : { ...h, rerankScore: s };
+    });
+    return { ...firstStageResults, hits };
+  }, [firstStageResults, rerankRun, searchKey]);
+  const rerankNote = rerankRun && rerankRun.key === searchKey ? rerankRun.note : null;
+
   const queueItemsMap = useMemo(() => {
     if (activeQueue === 'all') return null;
     const items = computeResurfacingQueueItems(conversations, summariesByThread, activeQueue);
@@ -446,6 +503,52 @@ export function App() {
     if (kindFilter !== 'all') hits = hits.filter((h) => insightsByThread.get(h.conversation.threadKey)?.kind === kindFilter);
     return hits;
   }, [searchResults.hits, queueItemsMap, kindFilter, insightsByThread]);
+
+  // ---- List order and what each view shows ----
+  const listHits: SearchHit[] = useMemo(
+    () => sortThreadHits(displayedHits, sortMode, (c) => getSmartTitle(c, insightsByThread.get(c.threadKey) ?? null)),
+    [displayedHits, sortMode, insightsByThread]
+  );
+
+  const kanbanColumns = useMemo(
+    () => KANBAN_STATES.map((state) => ({ state, hits: listHits.filter((h) => h.conversation.workflowState === state) })),
+    [listHits]
+  );
+
+  const cardGroups = useMemo(
+    () =>
+      Array.from(
+        listHits.reduce<Map<string, SearchHit[]>>((map, hit) => {
+          const proj = hit.conversation.project || 'Unassigned';
+          const list = map.get(proj) ?? [];
+          list.push(hit);
+          map.set(proj, list);
+          return map;
+        }, new Map())
+      ),
+    [listHits]
+  );
+
+  /** Threads visible in the current view, in reading order: what "Select all in view" and shift-click use. */
+  const viewKeys = useMemo(() => {
+    const shown =
+      settings?.viewMode === 'kanban'
+        ? kanbanColumns.flatMap((col) => col.hits)
+        : settings?.viewMode === 'cards'
+          ? cardGroups.flatMap(([, hits]) => hits.slice(0, CARD_ITEMS))
+          : listHits;
+    return shown.map((h) => h.conversation.threadKey);
+  }, [settings?.viewMode, kanbanColumns, cardGroups, listHits]);
+
+  // Drop checked threads that no longer exist (deleted here or elsewhere).
+  useEffect(() => {
+    setCheckedKeys((prev) => {
+      if (prev.size === 0) return prev;
+      const live = new Set(conversations.map((c) => c.threadKey));
+      const next = new Set(Array.from(prev).filter((k) => live.has(k)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [conversations]);
 
   const selectedConversation = useMemo(
     () =>
@@ -593,9 +696,69 @@ export function App() {
     void persistSettingPatch({ lastSelectedThreadKey: threadKey });
   };
 
+  /** Check or uncheck a row; shift extends from the last row checked. Never changes the opened thread. */
+  const handleToggleChecked = (threadKey: string, checked: boolean, extendRange: boolean) => {
+    const anchor = extendRange ? checkAnchorRef.current : null;
+    setCheckedKeys((prev) => selectRange(viewKeys, prev, anchor, threadKey, checked));
+    checkAnchorRef.current = threadKey;
+  };
+
+  const handleBulkChanged = async (message: string, deletedKeys: readonly string[]) => {
+    const deleted = new Set(deletedKeys);
+    if (deleted.size > 0) setCheckedKeys((prev) => new Set(Array.from(prev).filter((k) => !deleted.has(k))));
+    const opened = selectedKeyRef.current;
+    await reloadAll(opened !== null && deleted.has(opened) ? null : opened);
+    setStatusAnnouncement(message);
+  };
+
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
     void persistSettingPatch({ lastSearchQuery: val });
+  };
+
+  /** Explicit submit (Enter): rerank the top first-stage results. Never runs per keystroke. */
+  const handleSearchSubmit = async () => {
+    const q = searchQuery.trim();
+    if (!settings || !settings.rerankInSearch || !rerankReady(settings) || q.length < 2) return;
+    const key = searchKey;
+    const pool = firstStageResults.hits.slice(0, Math.max(2, Math.min(100, settings.rerankCandidates || 40)));
+    if (pool.length < 2) return;
+    rerankAbortRef.current?.abort();
+    const controller = new AbortController();
+    rerankAbortRef.current = controller;
+    try {
+      const keys = pool.map((h) => h.conversation.threadKey);
+      const allowed = await remoteRerankAllowedKeys(sharedDb, settings, keys);
+      const outcome = await rerankThreads(
+        settings,
+        q,
+        pool.map((h) => {
+          const insight = insightsByThread.get(h.conversation.threadKey) ?? null;
+          return {
+            key: h.conversation.threadKey,
+            document: buildRerankDocument({
+              title: getSmartTitle(h.conversation, insight),
+              gist: insight?.gist,
+              excerpt: bestMatchingExcerpt(messagesByThread.get(h.conversation.threadKey) ?? [], q) || h.supportingExcerpt,
+            }),
+          };
+        }),
+        allowed,
+        fetch,
+        { signal: controller.signal }
+      );
+      if (controller.signal.aborted) return;
+      const note =
+        outcome.scores.size === 0
+          ? 'Not reranked: the top results are local-only.'
+          : `Reranked with ${outcome.label}${outcome.withheld ? ` (${outcome.withheld} local-only kept in place)` : ''}`;
+      setRerankRun({ key, order: outcome.order, scores: outcome.scores, note });
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      // Non-blocking: keep the first-stage order and say why.
+      const reason = err instanceof Error ? err.message : String(err);
+      setRerankRun({ key, order: [], scores: new Map(), note: `Showing first-stage order; reranking failed: ${reason}` });
+    }
   };
 
   const handleAreaSelect = (area: string) => {
@@ -691,7 +854,7 @@ export function App() {
 
   useEffect(() => {
     const getOpenInnerModal = () =>
-      [organizeDialogRef.current, importDialogRef.current, settingsDialogRef.current].find(
+      [organizeDialogRef.current, importDialogRef.current, settingsDialogRef.current, bulkDeleteDialogRef.current].find(
         (d) => d && (d.open || d.hasAttribute('open'))
       );
 
@@ -703,6 +866,13 @@ export function App() {
         return;
       }
       if (Date.now() - lastInnerModalCloseAtRef.current < 150) return;
+      if (checkedKeys.size > 0) {
+        // The bulk bar's controls disappear with the selection; keep focus in the list toolbar.
+        if (document.activeElement?.closest('.tk-bulk-bar')) selectAllRef.current?.focus();
+        setCheckedKeys(new Set());
+        setStatusAnnouncement('Selection cleared.');
+        return;
+      }
       if (surface === 'overlay') handleCloseOverlay();
     };
 
@@ -725,14 +895,14 @@ export function App() {
         return;
       }
       if (!isEditing && (e.key === 'j' || e.key === 'k')) {
-        if (displayedHits.length === 0) return;
+        if (listHits.length === 0) return;
         e.preventDefault();
-        const curIdx = displayedHits.findIndex((h) => h.conversation.threadKey === selectedConversation?.threadKey);
+        const curIdx = listHits.findIndex((h) => h.conversation.threadKey === selectedConversation?.threadKey);
         const nextIdx =
           e.key === 'j'
-            ? Math.min(displayedHits.length - 1, Math.max(0, curIdx + 1))
+            ? Math.min(listHits.length - 1, Math.max(0, curIdx + 1))
             : Math.max(0, curIdx <= 0 ? 0 : curIdx - 1);
-        const nextKey = displayedHits[nextIdx]?.conversation.threadKey;
+        const nextKey = listHits[nextIdx]?.conversation.threadKey;
         if (nextKey) {
           handleSelectThread(nextKey);
           rowRefs.current.get(nextKey)?.focus();
@@ -758,7 +928,7 @@ export function App() {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('message', onMessage);
     };
-  }, [surface, handshakeToken, displayedHits, selectedConversation?.threadKey]);
+  }, [surface, handshakeToken, listHits, selectedConversation?.threadKey, checkedKeys.size]);
 
   const handleOpenFullPage = () => {
     const params = new URLSearchParams({ surface: 'page' });
@@ -1095,13 +1265,20 @@ export function App() {
     const isSelected = selectedConversation?.threadKey === c.threadKey;
     const queueInfo = queueItemsMap?.get(c.threadKey);
     const insight = insightsByThread.get(c.threadKey) ?? null;
+    const isChecked = checkedKeys.has(c.threadKey);
     const secondLine = queueInfo
       ? queueInfo.resurfaceReason
       : searchQuery.trim()
         ? hit.supportingExcerpt
         : summariesByThread.get(c.threadKey)?.whereYouLeftOff ?? hit.supportingExcerpt;
     return (
-      <li key={c.threadKey} className="tk-row-item">
+      <li key={c.threadKey} className="tk-row-item" data-checked={isChecked}>
+        <RowCheck
+          threadKey={c.threadKey}
+          title={getSmartTitle(c, insight)}
+          checked={isChecked}
+          onToggle={handleToggleChecked}
+        />
         <button
           ref={(el) => {
             if (el) rowRefs.current.set(c.threadKey, el);
@@ -1215,7 +1392,7 @@ export function App() {
         <div className="tk-header-actions">
           {latestUndoableLog && (
             <button type="button" className="tk-btn" onClick={() => void handleUndoLastOrganize()}>
-              Undo organize ({latestUndoableLog.snapshots.length})
+              Undo last change ({latestUndoableLog.snapshots.length})
             </button>
           )}
           <button type="button" className="tk-btn tk-btn-primary" onClick={() => void handleAutoOrganize()}>
@@ -1249,6 +1426,8 @@ export function App() {
         </div>
         {isCompact && analysisChip && <div className="tk-header-status">{analysisChip}</div>}
       </header>
+
+      <StaleBuildBanner snapshot={diagnostics.snapshot} />
 
       <div className="tk-columns" data-nav-collapsed={Boolean(settings?.sidebarCollapsed)}>
         <nav className="tk-nav" aria-label="Projects and resurfacing queues" data-drawer-open={mobileDrawerOpen}>
@@ -1364,12 +1543,24 @@ export function App() {
                   type="search"
                   className="tk-input tk-search-input"
                   aria-label="Search conversations, decisions, and messages"
-                  placeholder="Search titles, summaries, topics, decisions, messages…"
+                  placeholder={
+                    settings && settings.rerankProvider !== 'none' && settings.rerankInSearch
+                      ? 'Search titles, summaries, messages… (Enter reranks)'
+                      : 'Search titles, summaries, topics, decisions, messages…'
+                  }
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleSearchSubmit();
+                  }}
                 />
               )}
             </div>
+            {listMode === 'search' && rerankNote && (
+              <div className="tk-muted" role="status" style={{ fontSize: 12 }}>
+                {rerankNote}
+              </div>
+            )}
 
             {listMode === 'search' && (
               <div className="tk-filter-row">
@@ -1436,6 +1627,18 @@ export function App() {
                   <option value="kanban">Kanban by status</option>
                   <option value="cards">Project cards</option>
                 </select>
+                <select
+                  className="tk-select"
+                  aria-label="Sort threads"
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value as ThreadSortMode)}
+                >
+                  {(Object.keys(THREAD_SORT_LABELS) as ThreadSortMode[]).map((mode) => (
+                    <option key={mode} value={mode}>
+                      {THREAD_SORT_LABELS[mode]}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -1453,6 +1656,20 @@ export function App() {
             />
           ) : (
             <>
+              <BulkActions
+                selectedKeys={checkedKeys}
+                viewKeys={viewKeys}
+                projectNames={projectNames}
+                selectAllRef={selectAllRef}
+                deleteDialogRef={bulkDeleteDialogRef}
+                canEdit={authorized}
+                onSelectionChange={setCheckedKeys}
+                onChanged={handleBulkChanged}
+                onAnnounce={setStatusAnnouncement}
+                onDialogClosed={() => {
+                  lastInnerModalCloseAtRef.current = Date.now();
+                }}
+              />
               {activeTabConversation && !searchQuery.trim() && (
                 <div className="tk-this-tab">
                   <div className="tk-eyebrow" style={{ padding: 0 }}>
@@ -1474,8 +1691,7 @@ export function App() {
               )}
               {settings?.viewMode === 'kanban' ? (
                 <div className="tk-kanban-grid">
-                  {(['active', 'needs_review', 'waiting', 'paused', 'done'] as WorkflowState[]).map((st) => {
-                    const colHits = displayedHits.filter((h) => h.conversation.workflowState === st);
+                  {kanbanColumns.map(({ state: st, hits: colHits }) => {
                     return (
                       <div key={st} className="tk-kanban-col">
                         <div className="tk-eyebrow">
@@ -1483,24 +1699,32 @@ export function App() {
                         </div>
                         {colHits.map((hit) => {
                           const insight = insightsByThread.get(hit.conversation.threadKey) ?? null;
+                          const isChecked = checkedKeys.has(hit.conversation.threadKey);
                           return (
-                            <button
-                              key={hit.conversation.threadKey}
-                              type="button"
-                              className="tk-row-btn tk-card-btn"
-                              aria-selected={selectedConversation?.threadKey === hit.conversation.threadKey}
-                              onClick={() => handleSelectThread(hit.conversation.threadKey)}
-                            >
-                              <div className="tk-row-main">
-                                <div className="tk-row-title">{getSmartTitle(hit.conversation, insight)}</div>
-                                {insight?.gist && <div className="tk-row-gist">{insight.gist}</div>}
-                                <div className="tk-row-meta">
-                                  <span>{hit.conversation.project}</span>
-                                  <span>·</span>
-                                  <span>{providerLabel(hit.conversation.provider)}</span>
+                            <div key={hit.conversation.threadKey} className="tk-card-item" data-checked={isChecked}>
+                              <RowCheck
+                                threadKey={hit.conversation.threadKey}
+                                title={getSmartTitle(hit.conversation, insight)}
+                                checked={isChecked}
+                                onToggle={handleToggleChecked}
+                              />
+                              <button
+                                type="button"
+                                className="tk-row-btn tk-card-btn"
+                                aria-selected={selectedConversation?.threadKey === hit.conversation.threadKey}
+                                onClick={() => handleSelectThread(hit.conversation.threadKey)}
+                              >
+                                <div className="tk-row-main">
+                                  <div className="tk-row-title">{getSmartTitle(hit.conversation, insight)}</div>
+                                  {insight?.gist && <div className="tk-row-gist">{insight.gist}</div>}
+                                  <div className="tk-row-meta">
+                                    <span>{hit.conversation.project}</span>
+                                    <span>·</span>
+                                    <span>{providerLabel(hit.conversation.provider)}</span>
+                                  </div>
                                 </div>
-                              </div>
-                            </button>
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -1509,15 +1733,7 @@ export function App() {
                 </div>
               ) : settings?.viewMode === 'cards' ? (
                 <div className="tk-cards-grid">
-                  {Array.from(
-                    displayedHits.reduce<Map<string, SearchHit[]>>((map, hit) => {
-                      const proj = hit.conversation.project || 'Unassigned';
-                      const list = map.get(proj) ?? [];
-                      list.push(hit);
-                      map.set(proj, list);
-                      return map;
-                    }, new Map())
-                  ).map(([proj, projHits]) => {
+                  {cardGroups.map(([proj, projHits]) => {
                     const activeCount = projHits.filter((h) => h.conversation.workflowState === 'active').length;
                     const reviewCount = projHits.filter((h) => h.conversation.workflowState === 'needs_review').length;
                     const topicCounts = new Map<string, number>();
@@ -1551,32 +1767,41 @@ export function App() {
                           </div>
                         )}
                         <div className="tk-project-card-items">
-                          {projHits.slice(0, 6).map((hit) => (
-                            <button
-                              key={hit.conversation.threadKey}
-                              type="button"
-                              className="tk-row-btn tk-card-btn"
-                              aria-selected={selectedConversation?.threadKey === hit.conversation.threadKey}
-                              onClick={() => handleSelectThread(hit.conversation.threadKey)}
-                            >
-                              <div className="tk-row-main">
-                                <div className="tk-row-title">
-                                  {getSmartTitle(hit.conversation, insightsByThread.get(hit.conversation.threadKey) ?? null)}
-                                </div>
-                                <div className="tk-row-meta">
-                                  <span>{providerLabel(hit.conversation.provider)}</span>
-                                  <span>·</span>
-                                  <span>{relativeTime(hit.conversation.updatedAt)}</span>
-                                </div>
+                          {projHits.slice(0, CARD_ITEMS).map((hit) => {
+                            const title = getSmartTitle(hit.conversation, insightsByThread.get(hit.conversation.threadKey) ?? null);
+                            const isChecked = checkedKeys.has(hit.conversation.threadKey);
+                            return (
+                              <div key={hit.conversation.threadKey} className="tk-card-item" data-checked={isChecked}>
+                                <RowCheck
+                                  threadKey={hit.conversation.threadKey}
+                                  title={title}
+                                  checked={isChecked}
+                                  onToggle={handleToggleChecked}
+                                />
+                                <button
+                                  type="button"
+                                  className="tk-row-btn tk-card-btn"
+                                  aria-selected={selectedConversation?.threadKey === hit.conversation.threadKey}
+                                  onClick={() => handleSelectThread(hit.conversation.threadKey)}
+                                >
+                                  <div className="tk-row-main">
+                                    <div className="tk-row-title">{title}</div>
+                                    <div className="tk-row-meta">
+                                      <span>{providerLabel(hit.conversation.provider)}</span>
+                                      <span>·</span>
+                                      <span>{relativeTime(hit.conversation.updatedAt)}</span>
+                                    </div>
+                                  </div>
+                                </button>
                               </div>
-                            </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              ) : displayedHits.length === 0 ? (
+              ) : listHits.length === 0 ? (
                 <div className="tk-empty-state">
                   {conversations.length === 0 ? (
                     <>
@@ -1597,7 +1822,7 @@ export function App() {
                   )}
                 </div>
               ) : (
-                <ul className="tk-row-list">{displayedHits.map(renderRow)}</ul>
+                <ul className="tk-row-list">{listHits.map(renderRow)}</ul>
               )}
             </>
           )}

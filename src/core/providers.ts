@@ -8,11 +8,14 @@ export const PROVIDER_IDS = [
   'claude_code',
   'codex',
   'grok',
+  'grok_x',
   'gemini',
+  'ai_studio',
   'perplexity',
   'deepseek',
   'mistral',
   'copilot',
+  'kimi',
   'imported',
 ] as const;
 
@@ -75,6 +78,17 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     reopen: 'web',
     captureNote: 'Conversations on grok.com.',
   },
+  grok_x: {
+    id: 'grok_x',
+    label: 'Grok on X',
+    maker: 'xAI',
+    // X is a single-page app: /i/grok is reached without a page load, so scripts run on every
+    // X page. Only /i/grok is ever captured (see detectProviderFromUrl).
+    matchPatterns: ['https://x.com/*', 'https://twitter.com/*'],
+    reopen: 'web',
+    captureNote:
+      'Grok conversations inside X (x.com/i/grok), read from the conversation data X itself loads. Other X pages are never captured.',
+  },
   gemini: {
     id: 'gemini',
     label: 'Gemini',
@@ -82,6 +96,14 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     matchPatterns: ['https://gemini.google.com/*'],
     reopen: 'web',
     captureNote: 'Conversations and Gems on gemini.google.com.',
+  },
+  ai_studio: {
+    id: 'ai_studio',
+    label: 'Google AI Studio',
+    maker: 'Google',
+    matchPatterns: ['https://aistudio.google.com/*'],
+    reopen: 'web',
+    captureNote: 'Saved prompts and chats on aistudio.google.com.',
   },
   perplexity: {
     id: 'perplexity',
@@ -111,9 +133,21 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     id: 'copilot',
     label: 'Copilot',
     maker: 'Microsoft',
-    matchPatterns: ['https://copilot.microsoft.com/*'],
+    matchPatterns: [
+      'https://copilot.microsoft.com/*',
+      'https://copilot.com/*',
+      'https://www.copilot.com/*',
+    ],
     reopen: 'web',
-    captureNote: 'Chats on copilot.microsoft.com.',
+    captureNote: 'Chats on copilot.microsoft.com and copilot.com.',
+  },
+  kimi: {
+    id: 'kimi',
+    label: 'Kimi',
+    maker: 'Moonshot AI',
+    matchPatterns: ['https://www.kimi.com/*', 'https://kimi.com/*', 'https://kimi.ai/*'],
+    reopen: 'web',
+    captureNote: 'Chats on kimi.com.',
   },
   imported: {
     id: 'imported',
@@ -136,12 +170,59 @@ export function captureMatchPatterns(): string[] {
   );
 }
 
+/**
+ * web_accessible_resources only accepts origin patterns (scheme://host/*): any path or
+ * query in a match pattern is replaced with /*, then duplicates are dropped.
+ */
+export function toOriginMatchPatterns(patterns: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const pattern of patterns) {
+    const m = pattern.trim().match(/^(\*|[a-z][a-z0-9+.-]*):\/\/([^/?#]*)/i);
+    if (!m || (m[2] === '' && m[1].toLowerCase() !== 'file')) continue;
+    out.add(`${m[1].toLowerCase()}://${m[2].toLowerCase()}/*`);
+  }
+  return Array.from(out);
+}
+
 export function isProviderId(value: unknown): value is ProviderId {
   return typeof value === 'string' && (PROVIDER_IDS as readonly string[]).includes(value);
 }
 
 export function providerLabel(id: ProviderId | string): string {
   return isProviderId(id) ? PROVIDERS[id].label : String(id);
+}
+
+const X_HOST_RE = /^(?:www\.|mobile\.)?(?:x|twitter)\.com$/;
+
+/** x.com / twitter.com (with optional www. or mobile.), where only /i/grok is an AI page. */
+export function isXHostname(hostname: string): boolean {
+  return X_HOST_RE.test(hostname.toLowerCase());
+}
+
+const KIMI_HOSTS = new Set(['www.kimi.com', 'kimi.com', 'kimi.ai']);
+const COPILOT_HOSTS = new Set(['copilot.microsoft.com', 'copilot.com', 'www.copilot.com']);
+
+/** Provider that owns a page by host and path alone (no test hints). */
+function providerForPage(parsed: URL): ProviderId | null {
+  const host = parsed.hostname.toLowerCase();
+  const path = parsed.pathname;
+  if (host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com') {
+    return /^(?:\/u\/[^/]+)?\/codex(\/|$)/.test(path) ? 'codex' : 'chatgpt';
+  }
+  if (host === 'claude.ai' || host.endsWith('.claude.ai')) {
+    return /^\/code(\/|$)/.test(path) ? 'claude_code' : 'claude';
+  }
+  if (host === 'grok.com' || host.endsWith('.grok.com')) return 'grok';
+  // Grok inside X: only /i/grok. Every other X page is not an AI page.
+  if (isXHostname(host)) return /^\/i\/grok(\/|$)/.test(path) ? 'grok_x' : null;
+  if (host === 'gemini.google.com') return 'gemini';
+  if (host === 'aistudio.google.com') return 'ai_studio';
+  if (host === 'perplexity.ai' || host.endsWith('.perplexity.ai')) return 'perplexity';
+  if (host === 'chat.deepseek.com') return 'deepseek';
+  if (host === 'chat.mistral.ai') return 'mistral';
+  if (COPILOT_HOSTS.has(host)) return 'copilot';
+  if (KIMI_HOSTS.has(host)) return 'kimi';
+  return null;
 }
 
 /** Resolve which provider owns a page URL (path-sensitive: claude.ai/code is Claude Code). */
@@ -152,23 +233,29 @@ export function detectProviderFromUrl(url: string): ProviderId | null {
   } catch {
     return null;
   }
-  const host = parsed.hostname.toLowerCase();
-  const path = parsed.pathname;
-  if (host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com') {
-    return /^\/codex(\/|$)/.test(path) ? 'codex' : 'chatgpt';
-  }
-  if (host === 'claude.ai' || host.endsWith('.claude.ai')) {
-    return /^\/code(\/|$)/.test(path) ? 'claude_code' : 'claude';
-  }
-  if (host === 'grok.com' || host.endsWith('.grok.com')) return 'grok';
-  if (host === 'gemini.google.com') return 'gemini';
-  if (host === 'perplexity.ai' || host.endsWith('.perplexity.ai')) return 'perplexity';
-  if (host === 'chat.deepseek.com') return 'deepseek';
-  if (host === 'chat.mistral.ai') return 'mistral';
-  if (host === 'copilot.microsoft.com') return 'copilot';
+  const owner = providerForPage(parsed);
+  if (owner) return owner;
+  if (isXHostname(parsed.hostname)) return null;
   const hinted = parsed.searchParams.get('tk_provider');
   return isProviderId(hinted) ? hinted : null;
 }
+
+/**
+ * True for an https page of a registered capture provider: the pages that get the content
+ * script and may host the overlay. Unlike detectProviderFromUrl it ignores the tk_provider
+ * test hint, so an arbitrary site cannot opt itself in.
+ */
+export function isCapturePageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const owner = parsed.protocol === 'https:' ? providerForPage(parsed) : null;
+    return owner !== null && owner !== 'imported';
+  } catch {
+    return false;
+  }
+}
+
+const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** Extract a stable conversation id from a provider URL. */
 export function extractConversationIdFromUrl(url: string): string | null {
@@ -179,6 +266,23 @@ export function extractConversationIdFromUrl(url: string): string | null {
     return null;
   }
   const path = parsed.pathname;
+  switch (providerForPage(parsed)) {
+    case 'grok_x': {
+      // https://x.com/i/grok?conversation=<id>; a bare /i/grok is a new, unsaved chat.
+      const conv = parsed.searchParams.get('conversation');
+      return conv && SAFE_ID_RE.test(conv) ? conv : null;
+    }
+    case 'ai_studio': {
+      const m = path.match(/^\/prompts\/([a-zA-Z0-9_-]+)(?:\/|$)/);
+      return m && m[1] !== 'new_chat' ? m[1] : null;
+    }
+    case 'kimi': {
+      const m = path.match(/^\/chat\/([0-9a-f-]{36}|[a-z0-9]{20})(?:\/|$)/);
+      return m ? m[1] : null;
+    }
+    default:
+      break;
+  }
   const patterns: RegExp[] = [
     /\/codex\/tasks\/([a-zA-Z0-9_-]+)/, // Codex cloud task
     /\/code\/([a-zA-Z0-9_-]{6,})/, // Claude Code on the web session
@@ -200,19 +304,34 @@ export function extractConversationIdFromUrl(url: string): string | null {
 }
 
 /**
- * ChatGPT Project URLs look like /g/g-p-<hash>-<slug>/c/<id>. The slug is the
- * user's own project name, which is a strong auto-filing signal.
+ * ChatGPT Project routes: /g/g-p-<id>[-<slug>]/c/<conversation> or /g/g-p-<id>[-<slug>]/project,
+ * optionally behind /u/<n>. Current project ids are 32 hex characters; the slug is optional.
  */
-export function extractChatGptProjectSlug(url: string): string | null {
+export function parseChatGptProjectRoute(
+  url: string
+): { projectId: string; slug: string | null } | null {
   try {
-    const m = new URL(url).pathname.match(/\/g\/g-p-[a-f0-9]+-([a-z0-9-]+)(?:\/|$)/i);
+    const m = new URL(url).pathname.match(
+      /^(?:\/u\/[^/]+)?\/g\/(g-p-[0-9a-f]+)(?:-([^/?#]*))?(?:\/|$)/i
+    );
     if (!m) return null;
-    return m[1]
-      .split('-')
-      .filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+    return { projectId: m[1], slug: m[2] ? decodeURIComponent(m[2]) : null };
   } catch {
     return null;
   }
+}
+
+/**
+ * The project slug in a ChatGPT Project URL, title-cased. The slug is the user's own
+ * project name, which is a strong auto-filing signal.
+ */
+export function extractChatGptProjectSlug(url: string): string | null {
+  const slug = parseChatGptProjectRoute(url)?.slug;
+  if (!slug || !/^[a-z0-9-]+$/i.test(slug)) return null;
+  const name = slug
+    .split('-')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+  return name || null;
 }

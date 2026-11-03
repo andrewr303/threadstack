@@ -423,6 +423,9 @@ export async function undoChangeLog(
         manualTitleOverride: snap.previousManualTitleOverride,
         projectSource: snap.previousProjectSource ?? existing.projectSource,
         workflowStateSource: snap.previousWorkflowStateSource ?? existing.workflowStateSource,
+        projectReason: snap.previousProjectReason !== undefined ? snap.previousProjectReason : existing.projectReason,
+        pinned: snap.previousPinned ?? existing.pinned,
+        cloudExcluded: snap.previousCloudExcluded ?? existing.cloudExcluded,
       });
       restoredCount += 1;
     }

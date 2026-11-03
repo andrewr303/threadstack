@@ -2,11 +2,32 @@ import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const outDir = path.join(rootDir, '.output', 'chrome-mv3');
+const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+
+/**
+ * Every build gets a unique id. It is compiled into the bundles and written to
+ * the manifest as version_name, so the running extension can tell when the
+ * browser still holds a previous build's manifest (unpacked extensions only
+ * re-read manifest.json on Reload).
+ */
+function createBuildInfo() {
+  const builtAt = new Date();
+  let sha = 'nogit';
+  try {
+    sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim() || sha;
+  } catch {
+    // building outside a git checkout
+  }
+  const stamp = builtAt.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '.');
+  const buildId = `${stamp}-${sha}`;
+  return { version: pkg.version, versionName: `${pkg.version} (build ${buildId})`, buildId, builtAt: builtAt.toISOString() };
+}
 
 function createPngBuffer(size) {
   const width = size;
@@ -88,7 +109,7 @@ function createPngBuffer(size) {
  * Load the provider registry itself (compiled on the fly) so manifest host
  * permissions and content-script matches come from the same code the adapters use.
  */
-async function loadCaptureMatchPatterns() {
+async function loadManifestMatchPatterns() {
   const result = await esbuild.build({
     entryPoints: [path.join(rootDir, 'src/core/providers.ts')],
     bundle: true,
@@ -98,14 +119,28 @@ async function loadCaptureMatchPatterns() {
   });
   const source = Buffer.from(result.outputFiles[0].text).toString('base64');
   const registry = await import(`data:text/javascript;base64,${source}`);
-  const patterns = registry.captureMatchPatterns();
-  if (!Array.isArray(patterns) || patterns.length === 0) {
+  const capture = registry.captureMatchPatterns();
+  if (!Array.isArray(capture) || capture.length === 0) {
     throw new Error('Provider registry returned no capture match patterns');
   }
-  return patterns;
+  // Grok on X: X is a single-page app, so its scripts load on every X page at document_start
+  // (the MAIN-world hook must be in place before X requests the conversation).
+  const grokX = registry.PROVIDERS.grok_x.matchPatterns;
+  if (!Array.isArray(grokX) || grokX.length === 0) {
+    throw new Error('Provider registry returned no Grok on X match patterns');
+  }
+  return {
+    capture,
+    grokX,
+    domCapture: capture.filter((pattern) => !grokX.includes(pattern)),
+    // web_accessible_resources only accepts origin patterns (scheme://host/*).
+    webAccessible: registry.toOriginMatchPatterns(capture),
+  };
 }
 
 async function build() {
+  const buildInfo = createBuildInfo();
+  const define = { __TK_BUILD__: JSON.stringify(buildInfo) };
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(outDir, 'assets'), { recursive: true });
   fs.mkdirSync(path.join(outDir, 'content-scripts'), { recursive: true });
@@ -120,6 +155,7 @@ async function build() {
     platform: 'browser',
     target: ['chrome120'],
     sourcemap: false,
+    define,
   });
 
   // 2. Bundle content script (IIFE for MV3 content_scripts)
@@ -131,6 +167,19 @@ async function build() {
     platform: 'browser',
     target: ['chrome120'],
     sourcemap: false,
+    define,
+  });
+
+  // 2b. Bundle the Grok on X MAIN-world script (IIFE, no extension APIs)
+  await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/entrypoints/grok-x-main.ts')],
+    outfile: path.join(outDir, 'content-scripts/grok-x-main.js'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: ['chrome120'],
+    sourcemap: false,
+    minify: true,
   });
 
   // 3. Bundle manager UI (ESM)
@@ -143,6 +192,7 @@ async function build() {
     target: ['chrome120'],
     sourcemap: false,
     define: {
+      ...define,
       'process.env.NODE_ENV': '"production"',
     },
   });
@@ -172,11 +222,13 @@ async function build() {
   fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'Threadkeeper'), 'utf8');
 
   // 6. Write manifest.json
-  const capturePatterns = await loadCaptureMatchPatterns();
+  const patterns = await loadManifestMatchPatterns();
+  const capturePatterns = patterns.capture;
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',
-    version: '0.2.0',
+    version: buildInfo.version,
+    version_name: buildInfo.versionName,
     description:
       'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
     permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel'],
@@ -186,6 +238,8 @@ async function build() {
       'https://api.voyageai.com/*',
       'https://api.openai.com/*',
     ],
+    // AWS hosts are granted per region at runtime (Settings → AI / Embeddings), never at install.
+    optional_host_permissions: ['https://*.api.aws/*', 'https://*.amazonaws.com/*'],
     background: {
       service_worker: 'background.js',
       type: 'module',
@@ -227,9 +281,20 @@ async function build() {
     },
     content_scripts: [
       {
-        matches: capturePatterns,
+        matches: patterns.domCapture,
         js: ['content-scripts/content.js'],
         run_at: 'document_idle',
+      },
+      {
+        matches: patterns.grokX,
+        js: ['content-scripts/content.js'],
+        run_at: 'document_start',
+      },
+      {
+        matches: patterns.grokX,
+        js: ['content-scripts/grok-x-main.js'],
+        run_at: 'document_start',
+        world: 'MAIN',
       },
     ],
     // No use_dynamic_url: Edge (and older Chrome) resolve chrome.runtime.getURL() to the
@@ -239,21 +304,36 @@ async function build() {
     web_accessible_resources: [
       {
         resources: ['manager.html', 'assets/*'],
-        matches: capturePatterns,
+        matches: patterns.webAccessible,
       },
     ],
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self';",
     },
   };
+  if (manifest.web_accessible_resources.some((entry) => entry.use_dynamic_url)) {
+    // Edge blocks static-ID URLs of dynamic-URL resources: "<id> is blocked · ERR_BLOCKED_BY_CLIENT".
+    throw new Error('web_accessible_resources must not use use_dynamic_url (breaks Microsoft Edge)');
+  }
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2), 'utf8');
 
   // 7. Generate icons
   for (const size of [16, 32, 48, 128]) {
     fs.writeFileSync(path.join(outDir, 'icons', `icon-${size}.png`), createPngBuffer(size));
   }
 
-  console.log(`Built Threadkeeper MV3 extension to ${outDir}`);
+  console.log(`Built Threadkeeper ${buildInfo.versionName} to ${outDir}`);
+  console.log(
+    [
+      '',
+      'Next: reload the extension so the browser picks up the new manifest.',
+      '  Edge:   edge://extensions   → Threadkeeper → Reload',
+      '  Chrome: chrome://extensions → Threadkeeper → Reload',
+      `The extensions page should then show version ${buildInfo.versionName}.`,
+      'An open library page also offers a one-click Reload when it detects an outdated manifest.',
+    ].join('\n')
+  );
 }
 
 build().catch((err) => {

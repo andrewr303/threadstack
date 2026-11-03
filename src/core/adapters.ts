@@ -84,10 +84,12 @@ export const CAPABILITY_MATRIX: AdapterCapabilityRow[] = [
       ['codex_web', 'Codex cloud tasks (chatgpt.com/codex)'],
       ['grok_dom', 'Grok (grok.com)'],
       ['gemini_dom', 'Gemini (gemini.google.com)'],
+      ['ai_studio_dom', 'Google AI Studio (aistudio.google.com)'],
       ['perplexity_dom', 'Perplexity (perplexity.ai)'],
       ['deepseek_dom', 'DeepSeek (chat.deepseek.com)'],
       ['mistral_dom', 'Le Chat (chat.mistral.ai)'],
-      ['copilot_dom', 'Microsoft Copilot (copilot.microsoft.com)'],
+      ['copilot_dom', 'Microsoft Copilot (copilot.microsoft.com, copilot.com)'],
+      ['kimi_dom', 'Kimi (kimi.com)'],
     ] as const
   ).map(
     ([adapterId, label]): AdapterCapabilityRow => ({
@@ -104,6 +106,19 @@ export const CAPABILITY_MATRIX: AdapterCapabilityRow[] = [
         'Captures rendered turns of the open conversation with honest partial coverage; selectors fall back to generic role heuristics when the site changes.',
     })
   ),
+  {
+    adapterId: 'grok_x_page_data',
+    label: 'Grok on X (x.com/i/grok)',
+    visibleDom: 'P',
+    fullExport: 'N',
+    branchHistory: 'N',
+    timestamps: 'P',
+    artifacts: 'N',
+    cloudTaskStatus: 'N',
+    openOriginal: 'Y',
+    notes:
+      "Reads the conversation data X's own page loads for the open Grok chat (it never requests anything itself) with partial coverage; other X pages are never captured.",
+  },
   {
     adapterId: 'claude_code_cli',
     label: 'Claude Code CLI sessions (~/.claude/projects/*.jsonl)',

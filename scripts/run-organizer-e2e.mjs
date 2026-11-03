@@ -153,9 +153,14 @@ async function launch(extensionDir) {
   return { context, sw, extId: new URL(sw.url()).host };
 }
 
-/** Copy of the build whose content script uses the static-ID URL, like Edge's runtime.getURL(). */
-function edgeVariant(legacyDynamicUrl) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `tk-edge-${legacyDynamicUrl ? 'legacy' : 'fixed'}-`));
+/**
+ * Copy of the build whose content script uses the static-ID URL, like Edge's runtime.getURL().
+ * With blockFrame the overlay points at sidepanel.html, which is not web-accessible, so the browser
+ * refuses the frame (ERR_BLOCKED_BY_CLIENT) exactly as Edge did. The legacy use_dynamic_url manifest
+ * can no longer be used for this: the service worker now detects it and reloads the extension.
+ */
+function edgeVariant(blockFrame) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `tk-edge-${blockFrame ? 'blocked' : 'fixed'}-`));
   fs.cpSync(dist, dir, { recursive: true });
   const csPath = path.join(dir, 'content-scripts', 'content.js');
   const cs = fs.readFileSync(csPath, 'utf8');
@@ -164,13 +169,9 @@ function edgeVariant(legacyDynamicUrl) {
     'const extUrl = ((p) => `chrome-extension://${chrome.runtime.id}/${p}`)('
   );
   if (patched === cs) throw new Error('Could not patch content script for the Edge emulation');
-  fs.writeFileSync(csPath, patched);
-  if (legacyDynamicUrl) {
-    const manifestPath = path.join(dir, 'manifest.json');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    manifest.web_accessible_resources[0].use_dynamic_url = true;
-    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-  }
+  const final = blockFrame ? patched.replace('manager.html?surface=overlay', 'sidepanel.html?surface=overlay') : patched;
+  if (blockFrame && final === patched) throw new Error('Could not point the overlay at a non-web-accessible page');
+  fs.writeFileSync(csPath, final);
   return dir;
 }
 
@@ -205,8 +206,7 @@ async function edgeChecks() {
     await invokeOverlay(sw, 'claude.ai/chat');
     await page.locator('#threadkeeper-overlay-root').waitFor({ state: 'detached', timeout: 9000 });
     await page.waitForTimeout(500);
-    // The fallback must be the background's OPEN_MANAGER_FALLBACK handler opening one new tab. That tab
-    // is itself blocked (empty URL) only because this variant re-adds the legacy manifest flag.
+    // The fallback must be the background's OPEN_MANAGER_FALLBACK handler opening one new tab.
     const fallback = await sw.evaluate(async () => ({
       log: globalThis.__threadkeeperGetSecurityRejections().map((r) => r.reason),
       tabs: (await chrome.tabs.query({})).length,
@@ -258,6 +258,7 @@ async function organizerChecks() {
   await page.screenshot({ path: path.join(out, '01-library-on-device.png') });
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.locator('dialog#tk-settings-dialog nav button', { hasText: 'AI models' }).click();
   await page.locator('input[aria-label="Anthropic API key"]').fill('sk-ant-e2e-test-key');
   await page.locator('dialog#tk-settings-dialog button', { hasText: 'Test' }).first().click();
   await page.locator('dialog#tk-settings-dialog .tk-settings-result', { hasText: 'Connected' }).waitFor({ timeout: 8000 });

@@ -8,20 +8,19 @@ import { buildThreadKey, type SettingsRecord } from '../core/schema.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import { validateRuntimeMessageSender } from '../core/messaging.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
-import { isProviderId, type CaptureProviderId } from '../core/providers.js';
+import { isCapturePageUrl, isProviderId, type CaptureProviderId } from '../core/providers.js';
 import {
   nextDueAnalysisAt,
   processThreadLocally,
   runAnalysisJobs,
 } from '../core/pipeline.js';
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
+import { autoHealStaleManifest } from '../core/diagnostics.js';
 
 const db = new ThreadkeeperDB();
 
 const ANALYSIS_DUE_ALARM = 'tk-analysis-due';
 const ANALYSIS_SWEEP_ALARM = 'tk-analysis-sweep';
-const AI_PAGE_RE =
-  /^https:\/\/(chatgpt\.com|chat\.openai\.com|claude\.ai|grok\.com|gemini\.google\.com|(www\.)?perplexity\.ai|chat\.deepseek\.com|chat\.mistral\.ai|copilot\.microsoft\.com)\//i;
 
 let organizeCtxCache: { ctx: OrganizeContext; at: number } | null = null;
 let analysisRun: Promise<unknown> | null = null;
@@ -186,8 +185,9 @@ export async function invokeOverlayOnTab(
     await seedSyntheticWorkbenchLibrary(db);
   }
 
+  // AI pages come from the provider registry (x.com counts only on /i/grok).
   const canInjectOverlay =
-    typeof tabId === 'number' && typeof tabUrl === 'string' && AI_PAGE_RE.test(tabUrl);
+    typeof tabId === 'number' && typeof tabUrl === 'string' && isCapturePageUrl(tabUrl);
 
   if (canInjectOverlay && tabId !== undefined) {
     const handshakeToken = generateHandshakeToken();
@@ -284,6 +284,25 @@ async function initializeBackground(): Promise<void> {
     await chrome.alarms.create(ANALYSIS_SWEEP_ALARM, { periodInMinutes: 3 });
   }
   await scheduleAnalysisAlarm();
+}
+
+// A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
+// (e.g. one with use_dynamic_url, which Edge blocks). Reload once per build.
+if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest && chrome.storage?.local) {
+  void autoHealStaleManifest({
+    manifest: chrome.runtime.getManifest(),
+    storage: chrome.storage.local,
+    reload: () => chrome.runtime.reload(),
+  })
+    .then((outcome) => {
+      if (outcome !== 'ok') {
+        securityRejectionLog.push({
+          timestamp: new Date().toISOString(),
+          reason: `Running manifest does not match this build (${outcome})`,
+        });
+      }
+    })
+    .catch((err) => console.warn('[threadkeeper] manifest self-check failed', err));
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
@@ -410,6 +429,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (typeof sender.tab?.id === 'number') await deleteTabHandshake(sender.tab.id);
         const openedTab = await openManagerTab();
         sendResponse({ ok: true, tabId: openedTab });
+        return;
+      }
+
+      if (message.type === 'GET_DIAGNOSTICS') {
+        sendResponse({ ok: true, recentEvents: securityRejectionLog.slice(-20) });
         return;
       }
 

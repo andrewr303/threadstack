@@ -1,0 +1,107 @@
+{"id": "src_A01", "url": "https://github.com/Nagi-ovo/gemini-voyager/tree/13f0fd209c20c66b57c9f585f477128709691484", "org": "Nagi-ovo (voyager-crew)", "type": "repository", "quality_rating": "B", "commit": "13f0fd209c20c66b57c9f585f477128709691484"}
+{"id": "src_A02", "url": "https://github.com/dlamarre-dev/AI-Gemini-Folders/tree/b87c5cfd546075df60152e9472c05a65c64b9100", "org": "dlamarre-dev (Studios Illogika)", "type": "repository", "quality_rating": "B", "commit": "b87c5cfd546075df60152e9472c05a65c64b9100"}
+{"id": "src_A03", "url": "https://github.com/pionxzh/chatgpt-exporter/tree/6935bc1f9aba3a8767755d01fecaf31420f3bc19", "org": "pionxzh", "type": "repository", "quality_rating": "B", "commit": "6935bc1f9aba3a8767755d01fecaf31420f3bc19"}
+{"id": "src_A04", "url": "https://github.com/InledGroup/open-ai-exporter/tree/a11f5ffa7fd2a67f3bf07e2f3d94d4da32c4f52d", "org": "InledGroup", "type": "repository", "quality_rating": "C", "commit": "a11f5ffa7fd2a67f3bf07e2f3d94d4da32c4f52d"}
+{"id": "src_A05", "url": "https://github.com/revivalstack/ai-chat-exporter/tree/4ce218d1290956703489870aafa2adfdf4448f38", "org": "revivalstack", "type": "repository", "quality_rating": "C", "commit": "4ce218d1290956703489870aafa2adfdf4448f38"}
+{"id": "src_A06", "url": "https://github.com/shiquda/chat2note/tree/8d2a8aa1a367fca26f348565fde9f862f371e1fe", "org": "shiquda", "type": "repository", "quality_rating": "C", "commit": "8d2a8aa1a367fca26f348565fde9f862f371e1fe"}
+{"id": "src_A07", "url": "https://github.com/wanxb/ai-chat-slice/tree/a712e02f1669931ea5a7e0c069d3974f21811218", "org": "wanxb", "type": "repository", "quality_rating": "D", "commit": "a712e02f1669931ea5a7e0c069d3974f21811218"}
+{"id": "src_A08", "url": "https://github.com/Drolese/Grok2Blogger/tree/2d386075511d2dd78d54748bab7e3523222815c9", "org": "Drolese", "type": "repository", "quality_rating": "D", "commit": "2d386075511d2dd78d54748bab7e3523222815c9"}
+{"id": "src_A09", "url": "https://github.com/mingyan9989/grok-chat-bookmark/tree/3f973333318d43c0e06083542235d2d326b39330", "org": "mingyan9989", "type": "repository", "quality_rating": "D", "commit": "3f973333318d43c0e06083542235d2d326b39330"}
+{"id": "src_A10", "url": "https://github.com/ryoppippi/ccusage/tree/8995f3b7fd7110b8f37564f7d0468acc7a7d6b20", "org": "ryoppippi", "type": "repository", "quality_rating": "B", "commit": "8995f3b7fd7110b8f37564f7d0468acc7a7d6b20"}
+{"id": "src_A11", "url": "https://github.com/openai/codex/tree/80a8710546cfab76aa13503645fccc3af1e5ec35/codex-rs", "org": "OpenAI", "type": "repository", "quality_rating": "A", "commit": "80a8710546cfab76aa13503645fccc3af1e5ec35"}
+{"id": "src_A12", "url": "https://code.claude.com/docs/en/claude-directory", "org": "Anthropic", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_A13", "url": "https://github.com/anthropics/claude-code/blob/964d69565952a176ac1975ed218362991db71433/CHANGELOG.md", "org": "Anthropic", "type": "official_release", "quality_rating": "A", "commit": "964d69565952a176ac1975ed218362991db71433"}
+{"id": "src_A14", "url": "https://github.com/simonw/claude-code-transcripts/tree/316fd093aca3c9c0ad8aa70092711aee3adacc6e", "org": "simonw", "type": "repository", "quality_rating": "C", "commit": "316fd093aca3c9c0ad8aa70092711aee3adacc6e"}
+{"id": "src_A15", "url": "https://github.com/crafter-station/jsonl-debug/tree/7a5b3b4a7720c64e56647554fc7e35678463a26b", "org": "crafter-station", "type": "repository", "quality_rating": "C", "commit": "7a5b3b4a7720c64e56647554fc7e35678463a26b"}
+{"id": "src_A16", "url": "https://github.com/skillsynchq/txcript/blob/c60e686e7ed30e67019288eed80c4be478512d64/docs/formats/claude-code.md", "org": "skillsynchq", "type": "repository", "quality_rating": "C", "commit": "c60e686e7ed30e67019288eed80c4be478512d64"}
+{"id": "src_A17", "url": "https://greasyfork.org/en/scripts/559517-chatgpt-fold/code", "org": "Greasy Fork (ChatGPT Fold author)", "type": "other", "quality_rating": "C"}
+{"id": "src_A18", "url": "https://awesome-repositories.com/repositories/nagi-ovo-gemini-voyager", "org": "awesome-repositories.com", "type": "other", "quality_rating": "D"}
+{"id": "src_A19", "url": "file:///home/user/threadkeeper/src/core (dom-capture.ts, providers.ts, cli-sessions.ts, importers.ts)", "org": "avrcorp/threadkeeper", "type": "repository", "quality_rating": "A", "commit": "62fd24b4ae2647ed456925a2e8898a0cccabf7d9"}
+{"id": "src_A20", "url": "https://codex.danielvaughan.com/2026/06/08/codex-cli-session-lifecycle-archive-resume-fork-rollout-persistence-management/", "org": "danielvaughan.com", "type": "blog", "quality_rating": "D"}
+{"id": "src_A21", "url": "https://github.com/Nagi-ovo/gemini-voyager/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "13f0fd209c20c66b57c9f585f477128709691484"}
+{"id": "src_A22", "url": "https://github.com/dlamarre-dev/AI-Gemini-Folders/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "b87c5cfd546075df60152e9472c05a65c64b9100"}
+{"id": "src_A23", "url": "https://github.com/pionxzh/chatgpt-exporter/commits/master.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "6935bc1f9aba3a8767755d01fecaf31420f3bc19"}
+{"id": "src_A24", "url": "https://github.com/revivalstack/ai-chat-exporter/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "4ce218d1290956703489870aafa2adfdf4448f38"}
+{"id": "src_A25", "url": "https://github.com/shiquda/chat2note/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "8d2a8aa1a367fca26f348565fde9f862f371e1fe"}
+{"id": "src_A26", "url": "https://github.com/InledGroup/open-ai-exporter/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "a11f5ffa7fd2a67f3bf07e2f3d94d4da32c4f52d"}
+{"id": "src_A27", "url": "https://github.com/ryoppippi/ccusage/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "8995f3b7fd7110b8f37564f7d0468acc7a7d6b20"}
+{"id": "src_A28", "url": "https://github.com/Drolese/Grok2Blogger/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "2d386075511d2dd78d54748bab7e3523222815c9"}
+{"id": "src_B01", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B02", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-use.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B03", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-permissions.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B04", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-messages-api.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B05", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B06", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-managed-agents-openai.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B07", "url": "https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock", "org": "Anthropic", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B08", "url": "https://claude.com/docs/third-party/claude-desktop/mantle", "org": "Anthropic", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_B09", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-text.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B10", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B11", "url": "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html", "org": "AWS", "type": "api", "quality_rating": "A"}
+{"id": "src_B12", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-embed-v4.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B13", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-embed-v4.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B14", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-embed-v3.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B15", "url": "https://docs.cohere.com/docs/embeddings", "org": "Cohere", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_B16", "url": "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent-runtime_Rerank.html", "org": "AWS", "type": "api", "quality_rating": "A"}
+{"id": "src_B17", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/rerank-use.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B18", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/rerank-supported.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B19", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/rerank-prereq.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B20", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-rerank-3-5.html", "org": "AWS", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_B21", "url": "https://docs.aws.amazon.com/general/latest/gr/bedrock.html", "org": "AWS", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B22", "url": "https://docs.opensearch.org/latest/tutorials/reranking/reranking-cohere-bedrock/", "org": "OpenSearch Project", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_B23", "url": "https://docs.opensearch.org/latest/tutorials/reranking/reranking-bedrock/", "org": "OpenSearch Project", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_B24", "url": "https://raw.githubusercontent.com/continuedev/continue/5522c6f44ca0ac3528b37244818fbfa39b5af470/core/llm/llms/Bedrock.ts", "org": "continuedev", "type": "repository", "quality_rating": "C", "commit": "5522c6f44ca0ac3528b37244818fbfa39b5af470"}
+{"id": "src_B25", "url": "https://github.com/maximhq/bifrost/discussions/2294", "org": "maximhq", "type": "other", "quality_rating": "D"}
+{"id": "src_B26", "url": "https://dev.to/aws-builders/how-to-use-rerank-models-in-amazon-bedrock-5dm3", "org": "community (AWS Builders, dev.to)", "type": "blog", "quality_rating": "D"}
+{"id": "src_B27", "url": "https://registry.npmjs.org/@aws-sdk/client-bedrock-runtime/-/client-bedrock-runtime-3.1161.0.tgz", "org": "AWS", "type": "official_release", "quality_rating": "A"}
+{"id": "src_B28", "url": "https://registry.npmjs.org/@aws-sdk/client-bedrock-agent-runtime/-/client-bedrock-agent-runtime-3.1161.0.tgz", "org": "AWS", "type": "official_release", "quality_rating": "A"}
+{"id": "src_B29", "url": "https://raw.githubusercontent.com/aws/aws-bedrock-token-generator-js/86277e1489354192c64ffc8f995601daacc1f715/src/token.ts", "org": "AWS", "type": "repository", "quality_rating": "A", "commit": "86277e1489354192c64ffc8f995601daacc1f715"}
+{"id": "src_B30", "url": "https://registry.npmjs.org/@aws/bedrock-token-generator", "org": "AWS", "type": "official_release", "quality_rating": "B"}
+{"id": "src_B31", "url": "https://developer.chrome.com/docs/extensions/develop/concepts/network-requests", "org": "Google Chrome", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B32", "url": "https://developer.chrome.com/docs/extensions/reference/api/permissions", "org": "Google Chrome", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B33", "url": "https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns", "org": "Google Chrome", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_B34", "url": "https://raw.githubusercontent.com/mhart/aws4fetch/f279a7ea80611b6f601617d7b3234054990165ae/src/main.js", "org": "mhart (Michael Hart)", "type": "repository", "quality_rating": "B", "commit": "f279a7ea80611b6f601617d7b3234054990165ae"}
+{"id": "src_B35", "url": "https://registry.npmjs.org/aws4fetch", "org": "npm registry", "type": "official_release", "quality_rating": "B"}
+{"id": "src_B36", "url": "https://github.com/mhart/aws4fetch/commits/master.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "f279a7ea80611b6f601617d7b3234054990165ae"}
+{"id": "src_B37", "url": "https://registry.npmjs.org/@smithy/signature-v4", "org": "npm registry (smithy-lang/AWS)", "type": "official_release", "quality_rating": "B"}
+{"id": "src_B38", "url": "https://aws.amazon.com/blogs/security/securing-amazon-bedrock-api-keys-best-practices-for-implementation-and-management/", "org": "AWS", "type": "blog", "quality_rating": "B"}
+{"id": "src_B39", "url": "https://github.com/continuedev/continue/pull/11798", "org": "continuedev", "type": "other", "quality_rating": "C"}
+{"id": "src_B40", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints-region-availability.html", "org": "AWS", "type": "official_docs", "quality_rating": "C"}
+{"id": "src_B41", "url": "https://docs.cohere.com/docs/amazon-bedrock", "org": "Cohere", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_B42", "url": "https://github.com/continuedev/continue/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "5522c6f44ca0ac3528b37244818fbfa39b5af470"}
+{"id": "src_B43", "url": "https://github.com/aws/aws-bedrock-token-generator-js/commits/main.atom", "org": "GitHub", "type": "other", "quality_rating": "B", "commit": "86277e1489354192c64ffc8f995601daacc1f715"}
+{"id": "src_B44", "url": "https://aws.amazon.com/blogs/aws/amazon-titan-text-v2-now-available-in-amazon-bedrock-optimized-for-improving-rag/", "org": "AWS", "type": "blog", "quality_rating": "B"}
+{"id": "src_B45", "url": "file:///home/user/threadkeeper/.output/chrome-mv3/manifest.json (generated by scripts/build-extension.mjs L182-183)", "org": "avrcorp/threadkeeper", "type": "other", "quality_rating": "B"}
+{"id": "src_C01", "url": "https://docs.voyageai.com/docs/embeddings", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C02", "url": "https://docs.voyageai.com/docs/reranker", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C03", "url": "https://docs.voyageai.com/reference/reranker-api", "org": "Voyage AI", "type": "api", "quality_rating": "B"}
+{"id": "src_C04", "url": "https://docs.voyageai.com/reference/embeddings-api", "org": "Voyage AI", "type": "api", "quality_rating": "B"}
+{"id": "src_C05", "url": "https://docs.voyageai.com/docs/pricing", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C06", "url": "https://docs.voyageai.com/docs/rate-limits", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C07", "url": "https://docs.voyageai.com/docs/error-codes", "org": "Voyage AI", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_C08", "url": "https://docs.voyageai.com/docs/faq", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C09", "url": "https://docs.voyageai.com/docs/api-key-and-installation", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C10", "url": "https://docs.voyageai.com/docs/contextualized-chunk-embeddings", "org": "Voyage AI", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C11", "url": "https://blog.voyageai.com/2026/09/30/rerank-3/", "org": "Voyage AI", "type": "official_release", "quality_rating": "A"}
+{"id": "src_C12", "url": "https://www.mongodb.com/docs/voyageai/models/rerankers/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C13", "url": "https://www.mongodb.com/docs/voyageai/models/text-embeddings/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C14", "url": "https://www.mongodb.com/docs/voyageai/models/lifecycle/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C15", "url": "https://www.mongodb.com/docs/voyageai/api-reference/overview/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C16", "url": "https://www.mongodb.com/docs/voyageai/management/billing/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C17", "url": "https://www.mongodb.com/docs/voyageai/management/rate-limits/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C18", "url": "https://www.mongodb.com/docs/api/doc/atlas-embedding-and-reranking-api.json", "org": "MongoDB", "type": "api", "quality_rating": "A"}
+{"id": "src_C19", "url": "https://www.mongodb.com/docs/voyageai/tutorials/migrate-to-atlas/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C20", "url": "https://www.mongodb.com/docs/voyageai/api-and-clients/", "org": "MongoDB", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C21", "url": "https://api.voyageai.com/v1/rerank", "org": "Voyage AI (live unauthenticated OPTIONS/POST probe, 2026-11-03T01:44:35Z)", "type": "api", "quality_rating": "B"}
+{"id": "src_C22", "url": "https://ai.mongodb.com/v1/rerank", "org": "MongoDB (live unauthenticated OPTIONS/POST probe, 2026-11-03T01:44:37Z)", "type": "api", "quality_rating": "B"}
+{"id": "src_C23", "url": "https://developer.chrome.com/docs/extensions/develop/concepts/network-requests", "org": "Google Chrome", "type": "official_docs", "quality_rating": "A"}
+{"id": "src_C24", "url": "https://github.com/tobi/qmd/blob/86d2365d17fc682e491c2c53d1e4a884aee8682a/src/store.ts", "org": "tobi (GitHub)", "type": "repository", "quality_rating": "B", "commit": "86d2365d17fc682e491c2c53d1e4a884aee8682a"}
+{"id": "src_C25", "url": "https://github.com/voyage-ai/typescript-sdk/tree/32450b47de8309430ee4d2d82f81b4c850e22ef9", "org": "Voyage AI (GitHub)", "type": "repository", "quality_rating": "C", "commit": "32450b47de8309430ee4d2d82f81b4c850e22ef9"}
+{"id": "src_C26", "url": "https://github.com/vercel/ai/blob/30548ee7f96f2ea823dd44b003ccd3a2cf5f4cce/packages/ai/src/rerank/rerank.ts", "org": "Vercel (GitHub)", "type": "repository", "quality_rating": "B", "commit": "30548ee7f96f2ea823dd44b003ccd3a2cf5f4cce"}
+{"id": "src_C27", "url": "https://github.com/patelvivekdev/voyageai-ai-provider/blob/8ce1f0b8bf60948b9bb7fa638803c5c4ebd4a05f/src/reranking/voyage-reranking-model.ts", "org": "patelvivekdev (GitHub, community)", "type": "repository", "quality_rating": "C", "commit": "8ce1f0b8bf60948b9bb7fa638803c5c4ebd4a05f"}
+{"id": "src_C28", "url": "https://vercel.com/changelog/voyage-rerank-3-and-rerank-3-lite-are-now-available-on-ai-gateway", "org": "Vercel", "type": "official_release", "quality_rating": "B"}
+{"id": "src_C29", "url": "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/retrievers/text-similarity-reranker-retriever", "org": "Elastic", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_C30", "url": "https://docs.cohere.com/docs/rerank", "org": "Cohere", "type": "official_docs", "quality_rating": "B"}
+{"id": "src_C31", "url": "file:///home/user/threadkeeper (src/core/search.ts, src/entrypoints/manager/AskPanel.tsx, src/entrypoints/manager/App.tsx, src/core/embeddings.ts, src/core/cloud-client.ts, src/core/schema.ts, scripts/build-extension.mjs, worker/src/voyage.ts)", "org": "avrcorp/threadkeeper", "type": "repository", "quality_rating": "A", "commit": "efd8193f63c8a15acb3fabdeea2cd0dc29e39621"}
+{"id": "src_X01", "url": "https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/microsoft-edge-stable_155.0.4283.62-1_amd64.deb", "org": "microsoft", "type": "official_release", "quality_rating": "A"}
+{"id": "src_X02", "url": "https://github.com/aws/aws-sig-v4-test-suite", "org": "aws", "type": "standards_document", "quality_rating": "A"}
+{"id": "src_X03", "url": "https://registry.npmjs.org/@anthropic-ai/bedrock-sdk", "org": "anthropic", "type": "official_release", "quality_rating": "A"}
