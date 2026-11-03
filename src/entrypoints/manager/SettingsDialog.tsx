@@ -11,6 +11,7 @@ import { CAPABILITY_MATRIX } from '../../core/adapters.js';
 import { CAPTURE_PROVIDER_IDS, PROVIDERS } from '../../core/providers.js';
 import { MODEL_OPTIONS, estimateAnalysisCostUsd, testClaudeConnection } from '../../core/ai/claude.js';
 import { embedTexts, remoteSpace } from '../../core/embeddings.js';
+import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -134,6 +135,7 @@ export function SettingsDialog({
   const [showKey, setShowKey] = useState(false);
   const [testState, setTestState] = useState<{ busy: boolean; message: string | null; ok?: boolean }>({ busy: false, message: null });
   const [embedTest, setEmbedTest] = useState<string | null>(null);
+  const diagnostics = useDiagnostics();
 
   const patchAuto = (patch: Partial<AutoOrganizeSettings>) =>
     settings ? onPatch({ autoOrganize: { ...settings.autoOrganize, ...patch } }) : Promise.resolve();
@@ -449,6 +451,13 @@ export function SettingsDialog({
                 />
               ))}
             </div>
+          </Section>
+
+          <Section
+            title="Diagnostics"
+            note="Checks that the browser runs the same build as the files on disk. A mismatch is what shows “<id> is blocked · ERR_BLOCKED_BY_CLIENT” in Microsoft Edge."
+          >
+            <DiagnosticsPanel snapshot={diagnostics.snapshot} onRefresh={diagnostics.refresh} />
           </Section>
 
           <Section title="Appearance & toolbar button">

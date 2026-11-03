@@ -1521,3 +1521,112 @@ details.tk-settings-section > summary.tk-settings-h3 {
   gap: 10px;
   font-size: 13px;
 }
+
+/* Stale-build banner and diagnostics */
+.tk-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 16px 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--warn);
+  border-radius: 8px;
+  background: var(--paper-2);
+}
+
+.tk-banner[data-tone="danger"] {
+  border-left-color: var(--danger);
+}
+
+.tk-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  color: var(--ink-2);
+}
+
+.tk-banner-body strong {
+  color: var(--ink);
+}
+
+.tk-diag {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tk-diag-status {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.tk-diag-status[data-ok="false"] {
+  background: rgba(140, 58, 46, 0.10);
+}
+
+.tk-diag-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.tk-diag-grid dt {
+  color: var(--ink-3);
+}
+
+.tk-diag-grid dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tk-diag-grid code[data-mismatch="true"] {
+  color: var(--danger);
+}
+
+.tk-diag-issues {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tk-diag-issues li[data-severity="error"] strong {
+  color: var(--danger);
+}
+
+.tk-diag-fix {
+  display: block;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.tk-diag-log ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+}
+
+.tk-diag-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .tk-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tk-diag-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

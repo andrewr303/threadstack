@@ -15,6 +15,7 @@ import {
   runAnalysisJobs,
 } from '../core/pipeline.js';
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
+import { autoHealStaleManifest } from '../core/diagnostics.js';
 
 const db = new ThreadkeeperDB();
 
@@ -286,6 +287,25 @@ async function initializeBackground(): Promise<void> {
   await scheduleAnalysisAlarm();
 }
 
+// A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
+// (e.g. one with use_dynamic_url, which Edge blocks). Reload once per build.
+if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest && chrome.storage?.local) {
+  void autoHealStaleManifest({
+    manifest: chrome.runtime.getManifest(),
+    storage: chrome.storage.local,
+    reload: () => chrome.runtime.reload(),
+  })
+    .then((outcome) => {
+      if (outcome !== 'ok') {
+        securityRejectionLog.push({
+          timestamp: new Date().toISOString(),
+          reason: `Running manifest does not match this build (${outcome})`,
+        });
+      }
+    })
+    .catch((err) => console.warn('[threadkeeper] manifest self-check failed', err));
+}
+
 if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
     void initializeBackground();
@@ -410,6 +430,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (typeof sender.tab?.id === 'number') await deleteTabHandshake(sender.tab.id);
         const openedTab = await openManagerTab();
         sendResponse({ ok: true, tabId: openedTab });
+        return;
+      }
+
+      if (message.type === 'GET_DIAGNOSTICS') {
+        sendResponse({ ok: true, recentEvents: securityRejectionLog.slice(-20) });
         return;
       }
 

@@ -11,7 +11,8 @@ export type PrivilegedCommandType =
   | 'UPDATE_SETTINGS'
   | 'RUN_RESUMABLE_JOBS'
   | 'SETTINGS_CHANGED'
-  | 'RUN_ANALYSIS_NOW';
+  | 'RUN_ANALYSIS_NOW'
+  | 'GET_DIAGNOSTICS';
 
 export type ContentScriptCommandType =
   | 'PASSIVE_DOM_CAPTURE'
@@ -73,6 +74,7 @@ const PRIVILEGED_TYPES = new Set<string>([
   'RUN_RESUMABLE_JOBS',
   'SETTINGS_CHANGED',
   'RUN_ANALYSIS_NOW',
+  'GET_DIAGNOSTICS',
 ]);
 
 const CONTENT_SCRIPT_TYPES = new Set<string>([

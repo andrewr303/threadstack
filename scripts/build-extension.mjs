@@ -2,11 +2,32 @@ import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const outDir = path.join(rootDir, '.output', 'chrome-mv3');
+const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+
+/**
+ * Every build gets a unique id. It is compiled into the bundles and written to
+ * the manifest as version_name, so the running extension can tell when the
+ * browser still holds a previous build's manifest (unpacked extensions only
+ * re-read manifest.json on Reload).
+ */
+function createBuildInfo() {
+  const builtAt = new Date();
+  let sha = 'nogit';
+  try {
+    sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim() || sha;
+  } catch {
+    // building outside a git checkout
+  }
+  const stamp = builtAt.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '.');
+  const buildId = `${stamp}-${sha}`;
+  return { version: pkg.version, versionName: `${pkg.version} (build ${buildId})`, buildId, builtAt: builtAt.toISOString() };
+}
 
 function createPngBuffer(size) {
   const width = size;
@@ -106,6 +127,8 @@ async function loadCaptureMatchPatterns() {
 }
 
 async function build() {
+  const buildInfo = createBuildInfo();
+  const define = { __TK_BUILD__: JSON.stringify(buildInfo) };
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(outDir, 'assets'), { recursive: true });
   fs.mkdirSync(path.join(outDir, 'content-scripts'), { recursive: true });
@@ -120,6 +143,7 @@ async function build() {
     platform: 'browser',
     target: ['chrome120'],
     sourcemap: false,
+    define,
   });
 
   // 2. Bundle content script (IIFE for MV3 content_scripts)
@@ -131,6 +155,7 @@ async function build() {
     platform: 'browser',
     target: ['chrome120'],
     sourcemap: false,
+    define,
   });
 
   // 3. Bundle manager UI (ESM)
@@ -143,6 +168,7 @@ async function build() {
     target: ['chrome120'],
     sourcemap: false,
     define: {
+      ...define,
       'process.env.NODE_ENV': '"production"',
     },
   });
@@ -176,7 +202,8 @@ async function build() {
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',
-    version: '0.2.0',
+    version: buildInfo.version,
+    version_name: buildInfo.versionName,
     description:
       'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
     permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel'],
@@ -246,14 +273,29 @@ async function build() {
       extension_pages: "script-src 'self'; object-src 'self';",
     },
   };
+  if (manifest.web_accessible_resources.some((entry) => entry.use_dynamic_url)) {
+    // Edge blocks static-ID URLs of dynamic-URL resources: "<id> is blocked · ERR_BLOCKED_BY_CLIENT".
+    throw new Error('web_accessible_resources must not use use_dynamic_url (breaks Microsoft Edge)');
+  }
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2), 'utf8');
 
   // 7. Generate icons
   for (const size of [16, 32, 48, 128]) {
     fs.writeFileSync(path.join(outDir, 'icons', `icon-${size}.png`), createPngBuffer(size));
   }
 
-  console.log(`Built Threadkeeper MV3 extension to ${outDir}`);
+  console.log(`Built Threadkeeper ${buildInfo.versionName} to ${outDir}`);
+  console.log(
+    [
+      '',
+      'Next: reload the extension so the browser picks up the new manifest.',
+      '  Edge:   edge://extensions   → Threadkeeper → Reload',
+      '  Chrome: chrome://extensions → Threadkeeper → Reload',
+      `The extensions page should then show version ${buildInfo.versionName}.`,
+      'An open library page also offers a one-click Reload when it detects an outdated manifest.',
+    ].join('\n')
+  );
 }
 
 build().catch((err) => {

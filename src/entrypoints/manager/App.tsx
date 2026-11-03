@@ -64,6 +64,7 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.js';
 import { AskPanel } from './AskPanel.js';
 import { SemanticNeighbors, ThreadOverview, type RelatedThread } from './ThreadOverview.js';
+import { StaleBuildBanner, useDiagnostics } from './Diagnostics.js';
 
 const RESURFACE_QUEUE_LABELS: Record<ResurfaceQueue, string> = {
   continue_working: 'Continue working',
@@ -126,6 +127,7 @@ export function App() {
 
   // ---- Library data ----
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
+  const diagnostics = useDiagnostics();
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [allMessages, setAllMessages] = useState<MessageRecord[]>([]);
   const [summaries, setSummaries] = useState<StructuredSummaryRecord[]>([]);
@@ -1249,6 +1251,8 @@ export function App() {
         </div>
         {isCompact && analysisChip && <div className="tk-header-status">{analysisChip}</div>}
       </header>
+
+      <StaleBuildBanner snapshot={diagnostics.snapshot} />
 
       <div className="tk-columns" data-nav-collapsed={Boolean(settings?.sidebarCollapsed)}>
         <nav className="tk-nav" aria-label="Projects and resurfacing queues" data-drawer-open={mobileDrawerOpen}>
