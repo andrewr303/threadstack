@@ -238,8 +238,16 @@ async function build() {
       'https://api.voyageai.com/*',
       'https://api.openai.com/*',
     ],
-    // AWS hosts are granted per region at runtime (Settings → AI / Embeddings), never at install.
-    optional_host_permissions: ['https://*.api.aws/*', 'https://*.amazonaws.com/*'],
+    // AWS hosts (per region), MongoDB Atlas model hosts (per geography) and Cohere are granted at
+    // runtime from Settings → Search & embeddings, never at install.
+    optional_host_permissions: [
+      'https://*.api.aws/*',
+      'https://*.amazonaws.com/*',
+      'https://ai.mongodb.com/*',
+      'https://us.ai.mongodb.com/*',
+      'https://eu.ai.mongodb.com/*',
+      'https://api.cohere.com/*',
+    ],
     background: {
       service_worker: 'background.js',
       type: 'module',

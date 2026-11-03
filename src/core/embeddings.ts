@@ -19,6 +19,19 @@ import {
   hasHostAccess,
   isValidAwsRegion,
 } from './aws.js';
+import {
+  COHERE_BASE_URL,
+  COHERE_ORIGIN,
+  MONGODB_KEY_HINT,
+  bedrockEmbeddingDims,
+  cohereEffectiveDimensions,
+  cohereEmbeddingInfo,
+  cohereSupportsDimensions,
+  isBedrockCohereEmbedding,
+  isBedrockCohereV3,
+  mongodbBaseUrl,
+  mongodbOrigin,
+} from './model-apis.js';
 
 /**
  * Embedding spaces. Vectors are only ever compared within one space id, so
@@ -50,6 +63,26 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
       return settings.voyageApiKey.trim()
         ? { id: `voyage:${settings.voyageModel}`, provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55 }
         : null;
+    case 'mongodb':
+      // Atlas serves the same Voyage models as voyageai.com, but vectors are keyed by their own
+      // space: the requested size is part of it, and a different host is a different account.
+      return settings.mongodbApiKey.trim()
+        ? {
+            id: `mongodb:${settings.mongodbEmbeddingModel}:${settings.mongodbEmbeddingDimensions}`,
+            provider: 'mongodb',
+            model: settings.mongodbEmbeddingModel,
+            relatedThreshold: 0.55,
+            dimensions: settings.mongodbEmbeddingDimensions,
+          }
+        : null;
+    case 'cohere': {
+      if (!settings.cohereApiKey.trim()) return null;
+      const info = cohereEmbeddingInfo(settings.cohereEmbeddingModel);
+      const dims = cohereEffectiveDimensions(info.id, settings.cohereEmbeddingDimensions);
+      // Pro and Fast of one generation share a vector space, so they share an id: index with
+      // Pro and query with Fast (or switch) without rebuilding the library.
+      return { id: `cohere:${info.family}:${dims}`, provider: 'cohere', model: info.id, relatedThreshold: 0.5, dimensions: dims };
+    }
     case 'openai':
       return settings.openaiApiKey.trim()
         ? { id: `openai:${settings.openaiEmbeddingModel}`, provider: 'openai', model: settings.openaiEmbeddingModel, relatedThreshold: 0.5 }
@@ -62,11 +95,11 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
       // The output size is part of the space: 256- and 1024-dim vectors never mix.
       return awsCredentialsReady(settings.aws)
         ? {
-            id: `bedrock:${settings.bedrockEmbeddingModel}:${settings.bedrockEmbeddingDimensions}`,
+            id: `bedrock:${settings.bedrockEmbeddingModel}:${bedrockEmbeddingDims(settings)}`,
             provider: 'bedrock',
             model: settings.bedrockEmbeddingModel,
             relatedThreshold: 0.5,
-            dimensions: settings.bedrockEmbeddingDimensions,
+            dimensions: bedrockEmbeddingDims(settings),
           }
         : null;
     default:
@@ -199,9 +232,10 @@ export async function postJson(
   if (!res.ok) {
     let detail = '';
     try {
-      const data = (await res.json()) as { error?: { message?: string } | string; detail?: string };
+      // OpenAI/Voyage: error or error.message or detail. Cohere: message.
+      const data = (await res.json()) as { error?: { message?: string } | string; detail?: string; message?: string };
       detail =
-        typeof data.error === 'string' ? data.error : data.error?.message ?? data.detail ?? '';
+        typeof data.error === 'string' ? data.error : data.error?.message ?? data.detail ?? data.message ?? '';
     } catch {
       // non-JSON error body
     }
@@ -253,6 +287,27 @@ export function embeddingHostOrigins(settings: SettingsRecord): string[] {
     : [];
 }
 
+/**
+ * Origins the configured hosted embedding provider needs the user to grant. Voyage, OpenAI
+ * and Anthropic hosts are granted at install; Atlas, Cohere and AWS are asked for on a click.
+ */
+export function embeddingApiOrigins(settings: SettingsRecord): string[] {
+  switch (settings.embeddingProvider) {
+    case 'mongodb':
+      return [mongodbOrigin(settings.mongodbGeography)];
+    case 'cohere':
+      return [COHERE_ORIGIN];
+    case 'bedrock':
+      return embeddingHostOrigins(settings);
+    default:
+      return [];
+  }
+}
+
+function hostOf(origin: string): string {
+  return origin.replace(/^https:\/\//, '').replace(/\/\*$/, '');
+}
+
 function checkDims(vector: number[], dims: number, model: string): number[] {
   if (vector.length !== dims) {
     throw new EmbeddingError(`${model} returned ${vector.length}-dimensional vectors, expected ${dims}`);
@@ -296,7 +351,7 @@ async function embedWithBedrock(
       `Threadkeeper has no access to bedrock-runtime.${region}.amazonaws.com yet. Allow it in Settings → Search & embeddings.`
     );
   }
-  const dims = space.dimensions ?? settings.bedrockEmbeddingDimensions;
+  const dims = space.dimensions ?? bedrockEmbeddingDims(settings);
   const url = bedrockRuntimeUrl(region, `/model/${encodeURIComponent(space.model)}/invoke`);
   const awsFetch = createAwsFetch(settings.aws, { service: 'bedrock', baseFetch: fetchImpl });
   const invoke = async (body: unknown): Promise<unknown> => {
@@ -308,7 +363,9 @@ async function embedWithBedrock(
     }
   };
 
-  if (space.model === 'cohere.embed-v4:0') {
+  if (isBedrockCohereEmbedding(space.model as Parameters<typeof isBedrockCohereV3>[0])) {
+    // Embed v3 returns a fixed 1024 dimensions and rejects output_dimension; v4 takes it.
+    const v3 = isBedrockCohereV3(space.model as Parameters<typeof isBedrockCohereV3>[0]);
     const out: number[][] = [];
     for (let i = 0; i < texts.length; i += COHERE_EMBED_BATCH) {
       const batch = texts.slice(i, i + COHERE_EMBED_BATCH);
@@ -316,9 +373,9 @@ async function embedWithBedrock(
         await invoke({
           texts: batch,
           input_type: inputType === 'query' ? 'search_query' : 'search_document',
-          output_dimension: dims,
+          ...(v3 ? {} : { output_dimension: dims }),
           embedding_types: ['float'],
-          truncate: 'RIGHT',
+          truncate: v3 ? 'END' : 'RIGHT',
         })
       );
       if (!rows || rows.length !== batch.length) throw new EmbeddingError('Cohere Embed returned an unexpected number of vectors');
@@ -337,6 +394,93 @@ async function embedWithBedrock(
   });
 }
 
+async function requireOrigins(origins: string[], where: string): Promise<void> {
+  if (origins.length > 0 && !(await hasHostAccess(origins))) {
+    throw new EmbeddingError(
+      `Threadkeeper has no access to ${hostOf(origins[0])} yet. Allow it in Settings → Search & embeddings (${where}).`
+    );
+  }
+}
+
+/** Atlas answers 401/403 for a key from another geography or from voyageai.com; say so. */
+async function withMongoDbHint<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    if (err instanceof EmbeddingError && (err.status === 401 || err.status === 403) && !err.message.includes('Atlas')) {
+      throw new EmbeddingError(`${err.message}. ${MONGODB_KEY_HINT}`, err.status);
+    }
+    throw err;
+  }
+}
+
+/** Voyage models on MongoDB Atlas: the Voyage request shape on ai.mongodb.com with an Atlas key. */
+async function embedWithMongoDb(
+  settings: SettingsRecord,
+  space: EmbeddingSpace,
+  texts: string[],
+  inputType: 'document' | 'query',
+  fetchImpl: typeof fetch
+): Promise<number[][]> {
+  await requireOrigins([mongodbOrigin(settings.mongodbGeography)], 'MongoDB Atlas');
+  const url = `${mongodbBaseUrl(settings.mongodbGeography)}/embeddings`;
+  const dims = space.dimensions ?? settings.mongodbEmbeddingDimensions;
+  const out: number[][] = [];
+  const batchSize = 48;
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    const data = (await withMongoDbHint(() =>
+      postJson(
+        fetchImpl,
+        url,
+        { Authorization: `Bearer ${settings.mongodbApiKey.trim()}` },
+        { input: batch, model: space.model, input_type: inputType, output_dimension: dims, truncation: true }
+      )
+    )) as { data?: Array<{ embedding: number[]; index: number }> };
+    const rows = [...(data.data ?? [])].sort((a, b) => a.index - b.index);
+    if (rows.length !== batch.length) throw new EmbeddingError('MongoDB Atlas returned an unexpected number of vectors');
+    out.push(...rows.map((r) => checkDims(r.embedding, dims, space.model)));
+  }
+  return out;
+}
+
+/**
+ * Cohere v2 /embed: `texts` (at most 96), `input_type`, `embedding_types: ["float"]`, and
+ * `output_dimension` for embed-v4.0 and newer. The answer is `embeddings.float`.
+ */
+async function embedWithCohere(
+  settings: SettingsRecord,
+  space: EmbeddingSpace,
+  texts: string[],
+  inputType: 'document' | 'query',
+  fetchImpl: typeof fetch
+): Promise<number[][]> {
+  await requireOrigins([COHERE_ORIGIN], 'Cohere');
+  const model = cohereEmbeddingInfo(settings.cohereEmbeddingModel).id;
+  const dims = space.dimensions ?? cohereEffectiveDimensions(model, settings.cohereEmbeddingDimensions);
+  const out: number[][] = [];
+  for (let i = 0; i < texts.length; i += COHERE_EMBED_BATCH) {
+    const batch = texts.slice(i, i + COHERE_EMBED_BATCH);
+    const data = await postJson(
+      fetchImpl,
+      `${COHERE_BASE_URL}/embed`,
+      { Authorization: `Bearer ${settings.cohereApiKey.trim()}` },
+      {
+        model,
+        texts: batch,
+        input_type: inputType === 'query' ? 'search_query' : 'search_document',
+        embedding_types: ['float'],
+        truncate: 'END',
+        ...(cohereSupportsDimensions(model) ? { output_dimension: dims } : {}),
+      }
+    );
+    const rows = parseCohereEmbeddings(data);
+    if (!rows || rows.length !== batch.length) throw new EmbeddingError('Cohere returned an unexpected number of vectors');
+    out.push(...rows.map((r) => checkDims(r, dims, model)));
+  }
+  return out;
+}
+
 /** Embed texts in the given space. Remote providers are batched. */
 export async function embedTexts(
   settings: SettingsRecord,
@@ -348,6 +492,8 @@ export async function embedTexts(
   if (texts.length === 0) return [];
   if (space.provider === 'local') return texts.map((t) => localHashEmbedding(t));
   if (space.provider === 'bedrock') return embedWithBedrock(settings, space, texts, inputType, fetchImpl);
+  if (space.provider === 'mongodb') return embedWithMongoDb(settings, space, texts, inputType, fetchImpl);
+  if (space.provider === 'cohere') return embedWithCohere(settings, space, texts, inputType, fetchImpl);
 
   const batchSize = 48;
   const out: number[][] = [];

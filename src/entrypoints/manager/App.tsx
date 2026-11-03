@@ -356,6 +356,13 @@ export function App() {
       'ollamaEmbeddingModel',
       'bedrockEmbeddingModel',
       'bedrockEmbeddingDimensions',
+      'mongodbApiKey',
+      'mongodbGeography',
+      'mongodbEmbeddingModel',
+      'mongodbEmbeddingDimensions',
+      'cohereApiKey',
+      'cohereEmbeddingModel',
+      'cohereEmbeddingDimensions',
       'authorizedHosts',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });

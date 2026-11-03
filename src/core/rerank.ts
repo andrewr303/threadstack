@@ -18,11 +18,13 @@ import {
   isValidAwsRegion,
 } from './aws.js';
 import { EmbeddingError, postJson } from './embeddings.js';
+import { COHERE_BASE_URL, COHERE_ORIGIN, MONGODB_KEY_HINT, mongodbBaseUrl, mongodbOrigin } from './model-apis.js';
 
 /**
  * Second-stage reranking for search and Ask.
  *
- * A cross-encoder (Voyage rerank-3 / rerank-3-lite, or Cohere Rerank 3.5 /
+ * A cross-encoder (Voyage rerank-3 / rerank-3-lite directly or through
+ * MongoDB Atlas, Cohere Rerank v5 / v4 / v3.5 directly, or Cohere Rerank 3.5 /
  * Amazon Rerank 1.0 on Amazon Bedrock) re-reads the best first-stage
  * candidates against the query. Only short per-thread documents are sent
  * (title, gist, one excerpt), only on an explicit submit, and never for
@@ -71,6 +73,10 @@ export function rerankModelLabel(settings: SettingsRecord): string {
   switch (settings.rerankProvider) {
     case 'voyage':
       return settings.rerankModel;
+    case 'mongodb':
+      return `${settings.mongodbRerankModel} (Atlas)`;
+    case 'cohere':
+      return `Cohere ${settings.cohereRerankModel}`;
     case 'bedrock':
       return BEDROCK_RERANK_LABELS[settings.bedrockRerankModel] ?? settings.bedrockRerankModel;
     default:
@@ -83,6 +89,10 @@ export function rerankProblem(settings: SettingsRecord): string | null {
   switch (settings.rerankProvider) {
     case 'voyage':
       return settings.voyageApiKey.trim() ? null : 'Add a Voyage API key to rerank with Voyage.';
+    case 'mongodb':
+      return settings.mongodbApiKey.trim() ? null : 'Add a MongoDB Atlas model API key to rerank with Atlas.';
+    case 'cohere':
+      return settings.cohereApiKey.trim() ? null : 'Add a Cohere API key to rerank with Cohere.';
     case 'bedrock': {
       const { aws } = settings;
       const region = aws.region.trim();
@@ -104,6 +114,21 @@ export function rerankProblem(settings: SettingsRecord): string | null {
   }
 }
 
+/** The configured provider's model id, used in cache keys so scores never cross models. */
+function rerankModelId(settings: SettingsRecord): string {
+  switch (settings.rerankProvider) {
+    case 'voyage':
+      return settings.rerankModel;
+    case 'mongodb':
+      // Same model name on a different account/host is a different scoring service.
+      return `${settings.mongodbRerankModel}@${settings.mongodbGeography}`;
+    case 'cohere':
+      return settings.cohereRerankModel;
+    default:
+      return settings.bedrockRerankModel;
+  }
+}
+
 export function rerankReady(settings: SettingsRecord): boolean {
   return rerankProblem(settings) === null;
 }
@@ -117,6 +142,10 @@ export function rerankHostOrigins(settings: SettingsRecord): string[] {
   switch (settings.rerankProvider) {
     case 'voyage':
       return ['https://api.voyageai.com/*'];
+    case 'mongodb':
+      return [mongodbOrigin(settings.mongodbGeography)];
+    case 'cohere':
+      return [COHERE_ORIGIN];
     case 'bedrock':
       return isValidAwsRegion(settings.aws.region)
         ? awsHostOrigins(settings.aws.region, [settings.aws.auth === 'iam' ? 'agent' : 'runtime'])
@@ -211,6 +240,45 @@ async function rerankWithVoyage(
   return parseScoredList(isRecord(body) ? body.data : undefined, 'relevance_score', documents.length, 'Voyage');
 }
 
+/** Voyage rerank models on MongoDB Atlas: the Voyage request shape on ai.mongodb.com with an Atlas key. */
+async function rerankWithMongoDb(
+  settings: SettingsRecord,
+  query: string,
+  documents: string[],
+  fetchImpl: typeof fetch
+): Promise<RerankResult[]> {
+  try {
+    const body = await postJson(
+      fetchImpl,
+      `${mongodbBaseUrl(settings.mongodbGeography)}/rerank`,
+      { Authorization: `Bearer ${settings.mongodbApiKey.trim()}` },
+      { query, documents, model: settings.mongodbRerankModel, top_k: documents.length, truncation: true }
+    );
+    return parseScoredList(isRecord(body) ? body.data : undefined, 'relevance_score', documents.length, 'MongoDB Atlas');
+  } catch (err) {
+    if (err instanceof EmbeddingError && (err.status === 401 || err.status === 403)) {
+      throw new EmbeddingError(`${err.message}. ${MONGODB_KEY_HINT}`, err.status);
+    }
+    throw err;
+  }
+}
+
+/** Cohere v2 /rerank: `results` sorted best first, each `{index, relevance_score}` in [0, 1]. */
+async function rerankWithCohere(
+  settings: SettingsRecord,
+  query: string,
+  documents: string[],
+  fetchImpl: typeof fetch
+): Promise<RerankResult[]> {
+  const body = await postJson(
+    fetchImpl,
+    `${COHERE_BASE_URL}/rerank`,
+    { Authorization: `Bearer ${settings.cohereApiKey.trim()}` },
+    { model: settings.cohereRerankModel, query, documents, top_n: documents.length }
+  );
+  return parseScoredList(isRecord(body) ? body.results : undefined, 'relevance_score', documents.length, 'Cohere');
+}
+
 /** Rerank API (Agents for Amazon Bedrock Runtime). SigV4 only, signed as service "bedrock". */
 async function rerankWithBedrockRerankApi(
   settings: SettingsRecord,
@@ -297,7 +365,7 @@ export async function rerankDocuments(
   if (!q || documents.length === 0 || topK <= 0) return [];
 
   const provider = settings.rerankProvider;
-  const model = provider === 'voyage' ? settings.rerankModel : settings.bedrockRerankModel;
+  const model = rerankModelId(settings);
   const queryHash = computeDeterministicHash(q);
   const capped = documents.slice(0, RERANK_MAX_DOCUMENTS).map((d) => d.trim().slice(0, RERANK_MAX_DOC_CHARS));
 
@@ -328,9 +396,13 @@ export async function rerankDocuments(
       const results =
         provider === 'voyage'
           ? await rerankWithVoyage(settings, q, texts, call)
-          : settings.aws.auth === 'iam'
-            ? await rerankWithBedrockRerankApi(settings, q, texts, call)
-            : await rerankWithBedrockInvokeModel(settings, q, texts, call);
+          : provider === 'mongodb'
+            ? await rerankWithMongoDb(settings, q, texts, call)
+            : provider === 'cohere'
+              ? await rerankWithCohere(settings, q, texts, call)
+              : settings.aws.auth === 'iam'
+                ? await rerankWithBedrockRerankApi(settings, q, texts, call)
+                : await rerankWithBedrockInvokeModel(settings, q, texts, call);
       for (const r of results) {
         const p = pending[r.index];
         scores.set(p.index, r.score);
