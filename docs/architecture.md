@@ -2,6 +2,42 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
+## v0.5 changes (2026-11-03)
+
+v0.5 joins four workstreams; each has its own section below (Still link, opt-in AI products and any AI site,
+Paperclip sync, analysis v2). What holds them together:
+
+1. **One provider registry.** `providers.ts` is the single API for every provider: `category` is required
+   (`chat`, `coding_agent`, `agent`, `builder`, `search`, `companion`, the values of Still's protocol), plus
+   `hostAccess`, `captureMode`, `defaultEnabled`, `idParams` and `selectorConfidence`. `providerCategory` /
+   `isProviderCategory` serve the manager filters, the Settings → Capture groups and the Still payloads, facets and
+   `filters.categories`. `paperclip` (category `agent`) and `imported` have `hostAccess: 'none'`; they are the
+   `NON_CAPTURE_PROVIDER_IDS`, so `CaptureProviderId` / `isCaptureProviderId` exclude them, the capture gate rejects
+   them and the DOM reader never runs for them. A registry test keeps the two lists in step.
+2. **Defaults for every id.** `DEFAULT_ACCOUNT_IDS` is a `Record<ProviderId, …>` (a new id does not compile
+   without one); `normalizeSettings` fills `boundAccounts` for every provider and `authorizedHosts` for every capture
+   provider (registry defaults), and normalizes the nested `sidebarDock` and `paperclip` settings.
+3. **Service worker.** One `onMessage` handler (privileged types: `CAPTURE_TAB_NOW`, `CAPTURE_SITES_CHANGED`,
+   `PAPERCLIP_SYNC_NOW`, `DOCK_*`) and a separate `onMessageExternal` listener for Still. Startup creates the analysis,
+   dock (`tk-dock-reconcile`, `tk-dock-daily`) and Paperclip alarms, registers runtime content scripts, reconciles the
+   Still ledger and kicks the drain. `SETTINGS_CHANGED` re-registers capture scripts, runs the Still privacy pass and
+   reschedules Paperclip. Threads stored by capture (`organizeStoredThread`), finished analysis jobs and Paperclip syncs
+   all mark their threads dirty for Still.
+4. **Still payloads read the real records.** `dock/payload.ts` and `dock/query.ts` use the typed analysis v2 fields
+   (`ThreadInsight.overview`, `produced`, `analysisVersion`; `ExtensionSummaryOutput.keyPoints`, `nextStep`;
+   `ExtractedItem.rationale`) and `ConversationRecord.agentLabel`. `analysisVersion` is 0 without an AI insight and
+   1 for an AI insight written before v2.
+5. **Upgrading summaries from Still.** `threads.analyze` queues `requested` analysis jobs (`enqueueAnalysis(…,
+   { requested: true })`), the same path as Settings → "Upgrade older summaries": they run even when automatic analysis
+   is off and re-analyze a current AI insight whose `analysisVersion` is older than `ANALYSIS_VERSION`. Threads whose
+   analysis is current and v2 are reported `fresh`.
+6. **Manifest.** `host_permissions` stays the v0.4 list. `optional_host_permissions` holds the opt-in products' hosts,
+   `https://*/*` and `http://*/*` (added sites) and `http://localhost/*`, `http://127.0.0.1/*` (Paperclip on this
+   computer). `connect.html` (Still consent) is built but not web-accessible.
+7. **Settings.** Sections: General, Capture (`CaptureSettings.tsx`), Paperclip (`PaperclipSettings.tsx`), AI models
+   (with "Upgrade older summaries"), Amazon Web Services, Search & embeddings, Organization, Privacy & limits, Sidebar
+   Dock (`SidebarDock.tsx`), Diagnostics.
+
 ## Still (Sidebar Dock) link (2026-11-03)
 
 Threadkeeper talks to the separate Still extension over `chrome.runtime.onMessageExternal` / `sendMessage(id)`

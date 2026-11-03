@@ -104,10 +104,10 @@ Extension ids of unpacked builds depend on the folder path, so neither side can 
    `{ requestId }` after Deny. `requestId` here is the envelope `requestId` of Still's `pair.request` (the envelope key
    and the field are the same key): Still sends its pending request id as that envelope's `requestId`, and Threadkeeper
    reuses it as the `requestId` of `pair.granted` / `pair.denied`. A repeated `pair.request` from the same sender
-   replaces the pending request's `requestId` and code (the expiry stays). Still accepts them only from the id it sent the pending request to, with the matching
-   `requestId`, while that request is pending (Still's pending request also expires after 10 minutes). Threadkeeper
-   counts itself paired only once Still acknowledges `pair.granted` with `ok: true`, and retries delivery every 30 s
-   until the request expires. After `pair.granted` Still is `paired` but **not configured**: nothing syncs until the
+   replaces the pending request's `requestId` and code but keeps the original expiry. Still accepts them only from the
+   id it sent the pending request to, with the matching `requestId`, while that request is pending (Still's pending
+   request also expires after 10 minutes). Threadkeeper counts itself paired only once Still acknowledges
+   `pair.granted` with `ok: true`, and retries delivery every 30 s until the request expires. After `pair.granted` Still is `paired` but **not configured**: nothing syncs until the
    user chooses what to sync and presses **Start syncing**, which sends `sync.configure`.
 5. **`pair.revoke`** (either side, paired only) `{}`: both sides forget the pairing. Threadkeeper clears its outbox, sent
    ledger, tracked list and stored prefs for that peer (after first flushing pending `local_only` removals, best
