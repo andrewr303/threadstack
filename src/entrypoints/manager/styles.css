@@ -226,6 +226,7 @@ body,
 .tk-select:focus-visible,
 .tk-row-btn:focus-visible,
 .tk-nav-item:focus-visible,
+.tk-link-btn:focus-visible,
 .tk-evidence-marker:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1628,5 +1629,110 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
   .tk-diag-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Settings: section navigation beside one scrolling panel */
+.tk-modal-settings {
+  width: min(96vw, 980px);
+}
+
+.tk-modal-settings[open] {
+  display: flex;
+  flex-direction: column;
+  height: min(86vh, 760px);
+  overflow: hidden;
+}
+
+.tk-settings-layout {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tk-settings-nav {
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.tk-settings-panel {
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.tk-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.tk-settings-nav .tk-nav-count {
+  white-space: nowrap;
+}
+
+.tk-nav-count[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.tk-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tk-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tk-plain-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .tk-modal-settings[open] {
+    height: 92vh;
+  }
+
+  .tk-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .tk-settings-nav .tk-nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .tk-settings-nav .tk-nav-item {
+    width: auto;
+    min-height: 32px;
+  }
+
+  .tk-settings-nav .tk-nav-item[aria-current="true"] {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .tk-settings-nav .tk-nav-count {
+    display: none;
   }
 }

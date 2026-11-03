@@ -258,6 +258,7 @@ async function organizerChecks() {
   await page.screenshot({ path: path.join(out, '01-library-on-device.png') });
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.locator('dialog#tk-settings-dialog nav button', { hasText: 'AI models' }).click();
   await page.locator('input[aria-label="Anthropic API key"]').fill('sk-ant-e2e-test-key');
   await page.locator('dialog#tk-settings-dialog button', { hasText: 'Test' }).first().click();
   await page.locator('dialog#tk-settings-dialog .tk-settings-result', { hasText: 'Connected' }).waitFor({ timeout: 8000 });
