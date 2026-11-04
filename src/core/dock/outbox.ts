@@ -55,9 +55,14 @@ export function inScope(conv: Pick<ConversationRecord, 'provider' | 'project'>, 
   return false;
 }
 
-/** The ledger row, if it belongs to the current peer and epoch. */
+/** The ledger row, if it belongs to the current peer and epoch (held rows included). */
 export function ledgerFor(row: DockSentRecord | undefined, dock: SidebarDockSettings): DockSentRecord | undefined {
   return row && row.peerId === dock.pairedId && row.epoch === dock.peerEpoch ? row : undefined;
+}
+
+/** The ledger row of a thread Still holds in sync (not one it kept or trashed after a removal). */
+function liveLedger(row: DockSentRecord | undefined): DockSentRecord | undefined {
+  return row && !row.held ? row : undefined;
 }
 
 export interface MarkOptions {
@@ -202,11 +207,12 @@ export async function reconcileDock(
       }
       const wanted = inScope(conv, dock.prefs) ? !(t?.dismissed ?? false) : Boolean(t && !t.dismissed);
       if (!wanted) {
-        if (ledger) removals.out_of_scope.push(conv.threadKey);
+        // A held row was already removed as out_of_scope (or deleted): Still answered, nothing to repeat.
+        if (ledger && !ledger.held) removals.out_of_scope.push(conv.threadKey);
         continue;
       }
       const digest = cheapDigestOf(conv, ai[i]?.generatedAt, local[i]?.generatedAt);
-      if (!ledger || ledger.cheapDigest !== digest || ledger.prefsHash !== prefsHash) dirty.push(conv.threadKey);
+      if (!ledger || ledger.held || ledger.cheapDigest !== digest || ledger.prefsHash !== prefsHash) dirty.push(conv.threadKey);
     }
     if (dirty.length) queued += await markDockDirty(db, dirty, { immediate: true, now: now() });
     for (const reason of ['local_only', 'deleted', 'out_of_scope'] as const) {
@@ -220,7 +226,8 @@ export async function reconcileDock(
   }
 
   // Ledger entries whose thread no longer exists: deleted in Threadkeeper.
-  const sentKeys = (await db.dockSent.toCollection().primaryKeys()) as string[];
+  // A row held after a `deleted` removal was already answered and is not repeated.
+  const sentKeys = (await db.dockSent.filter((r) => r.held !== 'deleted').primaryKeys()) as string[];
   for (let i = 0; i < sentKeys.length; i += 500) {
     const chunk = sentKeys.slice(i, i + 500);
     const convs = await db.conversations.bulkGet(chunk);
@@ -234,7 +241,9 @@ export async function reconcileDock(
 
 /**
  * Privacy fast path (no full reconcile): every thread in the ledger that may no longer be shared
- * gets an immediate `local_only` removal.
+ * gets an immediate `local_only` removal. Outbox rows of such threads (pending, or leased by a
+ * running drain whose push may already be on its way) are marked dirty again, so their ack keeps
+ * the row and it is re-decided with the new settings: dropped if it was never sent, removed if it was.
  */
 export async function queuePrivacyRemovals(db: ThreadkeeperDB, settings: SettingsRecord, now = Date.now()): Promise<number> {
   const dock = settings.sidebarDock;
@@ -248,13 +257,26 @@ export async function queuePrivacyRemovals(db: ThreadkeeperDB, settings: Setting
     const convs = await db.conversations.bulkGet(chunk.map((r) => r.threadKey));
     for (let j = 0; j < chunk.length; j++) {
       const conv = convs[j];
-      if (!conv) deleted.push(chunk[j].threadKey);
-      else if (!(await isShareable(db, conv, settings, localOnly))) removals.push(conv.threadKey);
+      if (!conv) {
+        if (chunk[j].held !== 'deleted') deleted.push(chunk[j].threadKey);
+      } else if (!(await isShareable(db, conv, settings, localOnly))) removals.push(conv.threadKey);
+    }
+  }
+  const sentSet = new Set(ledger.map((r) => r.threadKey));
+  const pending = ((await db.dockOutbox.filter((r) => r.op === 'upsert').primaryKeys()) as string[]).filter((k) => !sentSet.has(k));
+  const recheck: string[] = [];
+  for (let i = 0; i < pending.length; i += 500) {
+    const chunk = pending.slice(i, i + 500);
+    const convs = await db.conversations.bulkGet(chunk);
+    for (let j = 0; j < chunk.length; j++) {
+      const conv = convs[j];
+      if (conv && !(await isShareable(db, conv, settings, localOnly))) recheck.push(conv.threadKey);
     }
   }
   let queued = 0;
   if (removals.length) queued += await markDockDirty(db, removals, { immediate: true, remove: 'local_only', now });
   if (deleted.length) queued += await markDockDirty(db, deleted, { immediate: true, remove: 'deleted', now });
+  if (recheck.length) queued += await markDockDirty(db, recheck, { immediate: true, now });
   return queued;
 }
 
@@ -300,6 +322,11 @@ export interface DrainOptions {
   /** Called with `not_paired` answers; returns true when the pairing was dropped. */
   onNotPaired?: () => Promise<boolean>;
   onDelivered?: (info: { at: number }) => Promise<void> | void;
+  /**
+   * Re-reads the settings. Called before every claim and every upsert batch, so a privacy change
+   * made while a drain runs applies to the rest of that drain.
+   */
+  loadSettings?: () => Promise<SettingsRecord>;
   onError?: (message: string) => Promise<void> | void;
 }
 
@@ -390,7 +417,7 @@ async function decide(
     return { action: 'remove', reason: row.reason };
   }
   const records = await loadThreadRecords(db, row.threadKey);
-  if (!records) return ledger ? { action: 'remove', reason: 'deleted' } : { action: 'drop' };
+  if (!records) return ledger && ledger.held !== 'deleted' ? { action: 'remove', reason: 'deleted' } : { action: 'drop' };
   const { conv } = records;
   if (!(await isShareable(db, conv, settings, localOnly))) {
     // Never sent: nothing to take back. Sent before: Still must forget it.
@@ -401,16 +428,18 @@ async function decide(
   if (!manual) {
     if (!dock.configured) return { action: 'drop' };
     const wanted = inScope(conv, dock.prefs) ? !(tracked?.dismissed ?? false) : Boolean(tracked && !tracked.dismissed);
-    if (!wanted) return ledger ? { action: 'remove', reason: 'out_of_scope' } : { action: 'drop' };
+    if (!wanted) return ledger && !ledger.held ? { action: 'remove', reason: 'out_of_scope' } : { action: 'drop' };
   }
+  // Still kept or trashed a held chat after a removal: push it as if it had never been sent.
+  const live = liveLedger(ledger);
   const shareTranscripts = transcriptsShared(dock) && !row.noTranscript;
-  const needTranscript = shareTranscripts && (row.wantTranscript || !ledger || ledger.transcriptRevision !== conv.sourceRevision);
+  const needTranscript = shareTranscripts && (row.wantTranscript || !live || live.transcriptRevision !== conv.sourceRevision);
   const probe = await buildThreadPayload(db, settings, row.threadKey, { transcript: 'none', seq: 0, records, localOnly });
   if (!probe) return { action: 'drop' };
-  if (!manual && ledger) {
-    const samePrefs = ledger.prefsHash === prefsHashOf(dock);
-    if (ledger.fingerprint === probe.fingerprint && !needTranscript && samePrefs) return { action: 'drop', digest };
-    if (ledger.fingerprint !== probe.fingerprint && !dock.prefs.autoUpdate && !row.wantTranscript && samePrefs) return { action: 'drop', digest };
+  if (!manual && live) {
+    const samePrefs = live.prefsHash === prefsHashOf(dock);
+    if (live.fingerprint === probe.fingerprint && !needTranscript && samePrefs) return { action: 'drop', digest };
+    if (live.fingerprint !== probe.fingerprint && !dock.prefs.autoUpdate && !row.wantTranscript && samePrefs) return { action: 'drop', digest };
   }
   const payload = needTranscript
     ? await buildThreadPayload(db, settings, row.threadKey, { transcript: 'full', seq: 0, records, localOnly })
@@ -438,19 +467,41 @@ async function fitPayload(db: ThreadkeeperDB, settings: SettingsRecord, payload:
   return bare ?? payload;
 }
 
-async function runDrain(db: ThreadkeeperDB, settings: SettingsRecord, send: DockSend, options: DrainOptions): Promise<DrainResult> {
+/** Give leased rows back at once, to be re-decided by the next claim. */
+async function releaseRows(db: ThreadkeeperDB, rows: DockOutboxRecord[], nowMs: number): Promise<void> {
+  await db.transaction('rw', db.dockOutbox, async () => {
+    for (const row of rows) {
+      const current = await db.dockOutbox.get(row.threadKey);
+      if (current) await db.dockOutbox.put({ ...current, leaseUntil: '', notBefore: isoAt(nowMs) });
+    }
+  });
+}
+
+async function runDrain(db: ThreadkeeperDB, initialSettings: SettingsRecord, send: DockSend, options: DrainOptions): Promise<DrainResult> {
+  let settings = initialSettings;
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const started = now();
   const budget = options.budgetMs ?? 25_000;
   const result: DrainResult = { pushes: 0, delivered: 0, removed: 0, dropped: 0, failed: 0, stoppedReason: null, nextDueAt: null };
-  const dock = settings.sidebarDock;
+  let dock = settings.sidebarDock;
   if (!dock.pairedId) {
     result.stoppedReason = 'Not paired';
     return finish();
   }
-  const localOnly = await localOnlyProjectNames(db);
+  let localOnly: ReadonlySet<string> = await localOnlyProjectNames(db);
   let maxBatch = MAX_PUSH_THREADS;
+
+  /** Fresh settings and local-only projects; false when the pairing is gone. */
+  async function refresh(): Promise<boolean> {
+    if (!options.loadSettings) return true;
+    settings = await options.loadSettings();
+    dock = settings.sidebarDock;
+    localOnly = await localOnlyProjectNames(db);
+    if (dock.pairedId) return true;
+    result.stoppedReason = 'Not paired';
+    return false;
+  }
 
   async function finish(): Promise<DrainResult> {
     const next = await db.dockOutbox.orderBy('notBefore').first();
@@ -459,6 +510,7 @@ async function runDrain(db: ThreadkeeperDB, settings: SettingsRecord, send: Dock
   }
 
   outer: while (now() - started < budget) {
+    if (!(await refresh())) break;
     const rows = await claimRows(db, now(), Boolean(options.onlyLocalOnly));
     if (rows.length === 0) break;
     const ledgerRows = await db.dockSent.bulkGet(rows.map((r) => r.threadKey));
@@ -509,7 +561,17 @@ async function runDrain(db: ThreadkeeperDB, settings: SettingsRecord, send: Dock
             result.failed += 1;
             continue;
           }
-          await db.dockSent.delete(row.threadKey);
+          // local_only always drops Still's copy; deleted/out_of_scope follow Still's preference
+          // (kept, or moved to Trash as 'removed'), so the chat may still hold the thread's data.
+          // Such a row stays in the ledger as held, so a later privacy change still removes it.
+          const status = answered.get(row.threadKey);
+          if (reason === 'local_only' || status === 'missing') {
+            await db.dockSent.delete(row.threadKey);
+          } else {
+            const prev = ledgerFor(await db.dockSent.get(row.threadKey), dock);
+            if (prev) await db.dockSent.put({ ...prev, held: reason });
+            else await db.dockSent.delete(row.threadKey);
+          }
           await ackRow(db, row);
           result.removed += 1;
         }
@@ -532,6 +594,22 @@ async function runDrain(db: ThreadkeeperDB, settings: SettingsRecord, send: Dock
           await failRows(db, queue.map((u) => u.row), now(), '', { penalty: false, retryAfterMs: 1000 });
           break outer;
         }
+        // Settings may have changed since decide(): re-check each thread with fresh ones just
+        // before it is sent. One that may no longer be shared goes back to be re-decided.
+        if (!(await refresh())) {
+          await releaseRows(db, queue.map((u) => u.row), now());
+          break outer;
+        }
+        const stillShareable: typeof upserts = [];
+        const revoked: DockOutboxRecord[] = [];
+        for (const u of queue) {
+          const conv = await db.conversations.get(u.row.threadKey);
+          if (conv && (await isShareable(db, conv, settings, localOnly))) stillShareable.push(u);
+          else revoked.push(u.row);
+        }
+        if (revoked.length) await releaseRows(db, revoked, now());
+        queue = stillShareable;
+        if (!queue.length) break;
         const batch: typeof upserts = [];
         let bytes = 0;
         const seqStart = await allocateSeq(db, Math.min(maxBatch, queue.length));

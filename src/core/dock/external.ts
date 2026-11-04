@@ -941,6 +941,7 @@ export class DockService {
     if (!settings.sidebarDock.pairedId) return null;
     const result = await drainDock(this.db, settings, (t, f, o) => this.sendToDock(t, f, o), {
       now: this.now,
+      loadSettings: () => this.settings(),
       sleep: this.deps.sleep,
       onNotPaired: () => this.onNotPaired(),
       onDelivered: async ({ at }) => {

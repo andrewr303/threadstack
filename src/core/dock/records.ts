@@ -41,6 +41,12 @@ export interface DockSentRecord {
   cheapDigest: string;
   itemId: string;
   sentAt: string;
+  /**
+   * Set after a `deleted` / `out_of_scope` removal Still answered without dropping the chat's data
+   * (kept, or moved to Trash): Still may still hold the thread, so a later privacy change must
+   * still send `local_only`, but the removal itself is not repeated and nothing is treated as synced.
+   */
+  held?: 'deleted' | 'out_of_scope';
 }
 
 /** Threads Still asked for explicitly (threads.get track, Send to Still); kept in sync under every scope. */

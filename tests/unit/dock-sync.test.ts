@@ -132,7 +132,15 @@ describe('sync: configure, reconcile and drain', () => {
     expect(removes).toEqual(
       expect.arrayContaining([expect.objectContaining({ threadKeys: [a], reason: 'deleted' }), expect.objectContaining({ threadKeys: [b], reason: 'out_of_scope' })])
     );
-    expect(await h.db.dockSent.count()).toBe(0);
+    // Still answered 'removed' (moved to Trash under its preference): the chats may still hold
+    // the threads, so the ledger keeps them as held, for a later local_only removal.
+    expect((await h.db.dockSent.get(a))?.held).toBe('deleted');
+    expect((await h.db.dockSent.get(b))?.held).toBe('out_of_scope');
+    // Answered removals are not repeated.
+    h.clock.t += 11 * 60_000;
+    await h.dock.reconcile(true);
+    await h.dock.drain();
+    expect(h.still.of('threads.remove')).toHaveLength(removes.length);
   });
 
   it('busy is honoured without penalty; unreachable backs off 1/5/30/120 minutes; hello resets it', async () => {
