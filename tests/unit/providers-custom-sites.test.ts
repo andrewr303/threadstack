@@ -222,4 +222,25 @@ describe('capture decisions', () => {
     const foreign = decideCapture({ ...base, payload: { ...payload, canonicalUrl: 'https://evil.example/' }, sender: sender('http://localhost:3000/c/c1?utm=1') });
     expect(foreign).toMatchObject({ ok: true, canonicalUrl: 'http://localhost:3000/c/c1' });
   });
+
+  it('accepts self-hosted LobeChat on an added site, and still checks its hosted page as a provider', () => {
+    const lobeSites = addCustomSite(EMPTY_CUSTOM_SITES, 'https://lobe.example.com', NOW);
+    const payload = { provider: 'lobechat', sourceConversationId: 'lobe.example.com~s1_t1', canonicalUrl: 'https://lobe.example.com/chat?session=s1&topic=t1' };
+    const page = sender('https://lobe.example.com/chat?session=s1&topic=t1');
+    expect(decideCapture({ ...base, sites: lobeSites, payload, sender: page })).toMatchObject({
+      ok: true,
+      provider: 'lobechat',
+      sourceConversationId: 'lobe.example.com~s1_t1',
+      canonicalUrl: 'https://lobe.example.com/chat?session=s1&topic=t1',
+      site: { origin: 'https://lobe.example.com' },
+    });
+    // The id must carry that site's prefix; an origin the user did not add is not a LobeChat page.
+    expect(decideCapture({ ...base, sites: lobeSites, payload: { ...payload, sourceConversationId: 'other.example~s1' }, sender: page })).toMatchObject({ ok: false, error: expect.any(String) });
+    expect(decideCapture({ ...base, sites: EMPTY_CUSTOM_SITES, payload, sender: page })).toMatchObject({ ok: false, error: expect.stringMatching(/LobeChat page/) });
+    // The hosted app keeps the provider rules (off by default, no site prefix).
+    const hosted = { provider: 'lobechat', sourceConversationId: 's1_t1' };
+    const hostedPage = sender('https://app.lobehub.com/chat?session=s1&topic=t1');
+    expect(decideCapture({ ...base, sites: lobeSites, payload: hosted, sender: hostedPage })).toMatchObject({ ok: false, skipped: 'provider_not_authorized' });
+    expect(decideCapture({ ...base, sites: lobeSites, authorizedHosts: { ...auth, lobechat: true }, payload: hosted, sender: hostedPage })).toMatchObject({ ok: true, provider: 'lobechat', site: null });
+  });
 });

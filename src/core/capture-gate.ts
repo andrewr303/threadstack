@@ -5,6 +5,7 @@
 // token the background itself handed to that tab moments ago.
 
 import {
+  CUSTOM_SITE_PROVIDER_IDS,
   PROVIDERS,
   isCaptureProviderId,
   isProviderAllowedOnUrl,
@@ -62,8 +63,15 @@ export function decideCapture(input: {
   );
   const info = PROVIDERS[provider];
 
-  if (info.hostAccess === 'custom') {
-    const site = matchCustomSite(input.sites, pageUrl);
+  // Self-hosted apps on a site the user added. Most are custom-only providers; LobeChat also has a
+  // hosted page (app.lobehub.com, an optional provider), so its self-hosted copies on an added site
+  // take this branch too, while captures from its hosted page go through the provider checks below.
+  const selfHosted =
+    info.hostAccess !== 'custom' && CUSTOM_SITE_PROVIDER_IDS.includes(provider) && !isProviderAllowedOnUrl(provider, pageUrl)
+      ? matchCustomSite(input.sites, pageUrl)
+      : null;
+  if (info.hostAccess === 'custom' || selfHosted) {
+    const site = selfHosted ?? matchCustomSite(input.sites, pageUrl);
     if (!site) return { ok: false, skipped: 'site_not_added' };
     // Ids are namespaced by the site so two self-hosted apps never share a thread.
     if (!conv.startsWith(`${siteConversationKey(site.origin)}~`)) return { ok: false, error: 'Conversation id does not belong to this site' };
