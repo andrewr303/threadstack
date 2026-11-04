@@ -21,7 +21,7 @@ import { LOCAL_SPACE, cosine, embedTexts, localHashEmbedding, primarySpace, remo
 import { buildRerankDocument, rerankReady, rerankThreads } from '../rerank.js';
 import { computeDeterministicHash } from '../schema.js';
 import { remoteModelsAllowed } from './state.js';
-import { buildThreadSummary } from './payload.js';
+import { buildThreadSummary, redactSecrets } from './payload.js';
 import {
   threadHash,
   type ContextRequest,
@@ -105,7 +105,12 @@ function toCachedTranscript(revision: number, list: MessageRecord[]): CachedTran
   let offset = 0;
   for (const m of sorted) {
     if (chars >= CACHE_THREAD_CHARS) break;
-    const text = (m.content ?? '').slice(0, Math.min(CACHE_MESSAGE_CHARS, CACHE_THREAD_CHARS - chars));
+    const limit = Math.min(CACHE_MESSAGE_CHARS, CACHE_THREAD_CHARS - chars);
+    // Tool and system output is redacted before it is cached, so no match, excerpt or passage
+    // built from the cache can quote a secret (as the payload path does for transcripts). The
+    // margin lets a secret that straddles the cut still be recognised.
+    const raw = (m.content ?? '').slice(0, limit + 4096);
+    const text = (m.role === 'tool' || m.role === 'system' ? redactSecrets(raw) : raw).slice(0, limit);
     messages.push({ ordinal: m.ordinal, role: m.role, text });
     const lower = text.toLowerCase();
     offsets.push(offset);

@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
 import { PROTO } from '../../src/core/dock/protocol.js';
 import { saveSettingsPatch, updateManualThreadFields } from '../../src/core/db.js';
+import { clearDockQueryCache } from '../../src/core/dock/query.js';
 import { fakeStill, harness, msg, pairDirect, seed, stillSender, thread } from './dock-helpers.js';
 
 type Payload = { threadKey: string; transcript: { included: boolean }; seq: number; fingerprint: string };
@@ -138,5 +139,39 @@ describe('removals Still answers without dropping the chat', () => {
     await configure(h, { scope: 'projects', projects: ['HypeStake'] });
     await configure(h, { scope: 'projects', projects: ['Other'] });
     expect(await h.db.dockSent.get(b)).toBeUndefined();
+  });
+});
+
+describe('threads.search never quotes secrets from tool or system output', () => {
+  it('an exact phrase match inside a tool message returns a redacted excerpt', async () => {
+    clearDockQueryCache();
+    const h = await harness();
+    const key = await seed(
+      h.db,
+      thread(
+        'env1',
+        'Deploy script',
+        [
+          ['user', 'Set up the deploy environment for me.'],
+          ['tool', 'export ANTHROPIC_API_KEY=sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv1234567890\nexport REGION=us-east-1'],
+          ['system', 'Bearer abcdefghijklmnopqrstuvwxyz0123 issued for session'],
+          ['assistant', 'The environment is ready.'],
+        ],
+        { provider: 'claude_code', project: 'General research', categoryLocked: true, workspacePath: '/repo' }
+      )
+    );
+    await pairDirect(h);
+    for (const query of ['ANTHROPIC_API_KEY', 'issued for session']) {
+      const res = (await h.dock.handleExternalMessage(msg('threads.search', { query, limit: 5, excerpts: true }), stillSender())) as Record<string, unknown>;
+      const results = res.results as Array<{ threadKey: string; excerpt?: { text: string; role: string } }>;
+      expect(results.map((r) => r.threadKey)).toEqual([key]);
+      expect(results[0].excerpt?.text).toContain('[redacted]');
+      const json = JSON.stringify(res);
+      expect(json).not.toContain('sk-ant-api03');
+      expect(json).not.toContain('abcdefghijklmnopqrstuvwxyz0123');
+    }
+    // Searching for the secret value itself finds nothing to quote.
+    const bySecret = (await h.dock.handleExternalMessage(msg('threads.search', { query: 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv1234567890', limit: 5 }), stillSender())) as Record<string, unknown>;
+    expect(JSON.stringify(bySecret)).not.toContain('sk-ant-api03');
   });
 });
