@@ -1,10 +1,11 @@
 // Regression tests for verified review findings on the Sidebar Dock (Still) link.
 import 'fake-indexeddb/auto';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { allocateSeq } from '../../src/core/dock/state.js';
 import { PROTO } from '../../src/core/dock/protocol.js';
 import { saveSettingsPatch, updateManualThreadFields } from '../../src/core/db.js';
 import { clearDockQueryCache } from '../../src/core/dock/query.js';
-import { fakeStill, harness, msg, pairDirect, putInsight, seed, stillSender, thread } from './dock-helpers.js';
+import { fakeStill, freshDb, harness, msg, pairDirect, putInsight, seed, stillSender, thread } from './dock-helpers.js';
 
 type Payload = { threadKey: string; transcript: { included: boolean }; seq: number; fingerprint: string };
 const pushedKeys = (h: Awaited<ReturnType<typeof harness>>) =>
@@ -202,5 +203,29 @@ describe('threads.get with a transcript window', () => {
     const pushes = h.still.of('threads.upsert');
     expect(pushes).toHaveLength(2);
     expect(JSON.stringify(pushes[1].message.threads)).toContain('Fresh analysis gist');
+  });
+});
+
+describe('seq after a Threadkeeper data reset', () => {
+  it('a fresh database starts above every seq an earlier database handed out', async () => {
+    const t0 = Date.parse('2026-11-01T12:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    try {
+      const before = freshDb();
+      const first = await allocateSeq(before, 20);
+      const next = await allocateSeq(before, 1);
+      expect(next).toBe(first + 20);
+      expect(Number.isSafeInteger(next)).toBe(true);
+      // The database is lost (reinstall, cleared site data); a minute later a new one starts.
+      clock.mockReturnValue(t0 + 60_000);
+      const after = freshDb();
+      const restarted = await allocateSeq(after, 1);
+      expect(restarted).toBeGreaterThan(next);
+      // Still monotonic within one database even when the clock goes back.
+      clock.mockReturnValue(t0);
+      expect(await allocateSeq(after, 1)).toBe(restarted + 1);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

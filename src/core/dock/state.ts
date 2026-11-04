@@ -248,13 +248,17 @@ export async function setMeta(db: ThreadkeeperDB, key: string, value: unknown): 
   await db.dockMeta.put({ key, value });
 }
 
+const SEQ_EPOCH_MS = 1_700_000_000_000;
+
 /** Reserve `count` consecutive values of the persisted, Threadkeeper-wide monotonic `seq`. */
 export async function allocateSeq(db: ThreadkeeperDB, count: number): Promise<number> {
   return db.transaction('rw', db.dockMeta, async () => {
     const row = await db.dockMeta.get('seq');
     const current = typeof row?.value === 'number' && Number.isFinite(row.value) ? row.value : 0;
-    // Wall-clock floor: a lost dockMeta row (reset database) still never goes backwards in practice.
-    const start = Math.max(current + 1, Date.now() * 1000 - 1_700_000_000_000_000);
+    // Wall-clock floor (microseconds since 2023-11-14, a safe integer for centuries): a lost dockMeta
+    // row (reset or reinstalled database) still starts above every seq handed out before, as long as
+    // fewer than a million were allocated per second.
+    const start = Math.max(current + 1, (Date.now() - SEQ_EPOCH_MS) * 1000);
     await db.dockMeta.put({ key: 'seq', value: start + Math.max(1, count) - 1 });
     return start;
   });
