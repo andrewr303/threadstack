@@ -4,7 +4,6 @@ import {
   PaperclipClient,
   PaperclipError,
   discoverServer,
-  hostPermissionPattern,
   isLoopbackServer,
   normalizeServerUrl,
   probeServer,
@@ -20,6 +19,7 @@ import {
   type PaperclipSyncState,
 } from '../../core/paperclip/sync.js';
 import { relativeTime } from './shared.js';
+import { paperclipPermissionOrigins } from '../../core/host-access.js';
 
 type Note = { message: string | null; ok?: boolean };
 
@@ -38,12 +38,7 @@ export function paperclipSectionStatus(pc: PaperclipSettingsRecord, state: Paper
   return { text: 'On' };
 }
 
-/** Origins to ask for: both loopback names for a local server (so ports 3100-3110 can be tried), else the server's host. */
-export function paperclipPermissionOrigins(serverUrl: string): string[] {
-  if (isLoopbackServer(serverUrl)) return ['http://localhost/*', 'http://127.0.0.1/*'];
-  const pattern = hostPermissionPattern(serverUrl);
-  return pattern ? [pattern] : [];
-}
+export { paperclipPermissionOrigins };
 
 /** Persisted sync state, kept live through chrome.storage change events. */
 export function usePaperclipSyncState(): PaperclipSyncState {

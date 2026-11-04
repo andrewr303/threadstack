@@ -83,11 +83,30 @@ export function normalizeSiteOrigin(input: string): OriginCheck {
   if (url.protocol === 'http:' && !isPrivateHost(url.hostname)) {
     return { ok: false, error: 'Use the https:// address. Plain http is allowed only for sites on this computer or your local network.' };
   }
-  const known = detectProviderFromUrl(url.href);
+  const known = detectProviderFromUrl(url.href) ?? providerOwningHost(url.hostname);
   if (known && PROVIDERS[known].hostAccess !== 'custom') {
     return { ok: false, error: `${PROVIDERS[known].label} is already supported. Turn it on in the list above.` };
   }
   return { ok: true, origin: url.origin, host: url.host };
+}
+
+/**
+ * A provider whose pages live on this host, even when its root page is not one of them
+ * (github.com/copilot, x.com/i/grok, huggingface.co/chat…). Adding such a host as a site would
+ * capture the whole host and share its host access with that provider's toggle.
+ */
+function providerOwningHost(hostname: string): CaptureProviderId | null {
+  const host = hostname.toLowerCase();
+  for (const id of CAPTURE_PROVIDER_IDS) {
+    if (PROVIDERS[id].hostAccess === 'custom') continue;
+    for (const pattern of toOriginMatchPatterns(PROVIDERS[id].matchPatterns)) {
+      const m = pattern.match(/^[^:]+:\/\/([^/]+)\//);
+      const h = m?.[1];
+      if (!h) continue;
+      if (h === host || (h.startsWith('*.') && (host === h.slice(2) || host.endsWith(h.slice(1))))) return id;
+    }
+  }
+  return null;
 }
 
 /** Match pattern for an origin. Chrome patterns cannot name a port, so they cover every port of the host. */

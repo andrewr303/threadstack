@@ -28,6 +28,7 @@ import {
   writeCustomSites,
   type CustomSitesState,
 } from '../../core/custom-sites.js';
+import { releasableOrigins } from '../../core/host-access.js';
 
 interface Props {
   settings: SettingsRecord;
@@ -149,8 +150,13 @@ export function CaptureSettings({ settings, onPatch }: Props) {
         setResult({ ok: false, text: `Access to ${info.label} was not granted, so it stays off.` });
         return;
       }
-      await onPatch({ authorizedHosts: { ...settings.authorizedHosts, [id]: on } });
-      if (!on && info.hostAccess === 'optional') await removeOrigins(origins);
+      const authorizedHosts = { ...settings.authorizedHosts, [id]: on };
+      await onPatch({ authorizedHosts });
+      if (!on && info.hostAccess === 'optional') {
+        // Keep what an added site, another provider or Paperclip still relies on.
+        const users = { sites: await readCustomSites(storage()), authorizedHosts, paperclip: settings.paperclip };
+        await removeOrigins(releasableOrigins(origins, users));
+      }
       await sendToBackground({ type: 'CAPTURE_SITES_CHANGED', patterns: on ? runtimeMatchPatterns(id) : [] });
       setResult(null);
       await refreshAccess();
@@ -220,8 +226,9 @@ export function CaptureSettings({ settings, onPatch }: Props) {
       if (area) await writeCustomSites(area, next);
       setSites(next);
       const pattern = originMatchPattern(origin);
-      // Another added site on the same host (a different port) still needs the access.
-      if (!next.sites.some((s) => originMatchPattern(s.origin) === pattern)) await removeOrigins([pattern]);
+      // Another added site on the same host (a different port), a provider that is on, or the
+      // Paperclip server may still need the access.
+      await removeOrigins(releasableOrigins([pattern], { sites: next, authorizedHosts: settings.authorizedHosts, paperclip: settings.paperclip }));
       await sendToBackground({ type: 'CAPTURE_SITES_CHANGED', patterns: [] });
       setResult({ ok: true, text: `Removed ${new URL(origin).host}. Threads already captured from it stay in the library.` });
       await refreshAccess();
