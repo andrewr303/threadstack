@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { PROTO } from '../../src/core/dock/protocol.js';
 import { saveSettingsPatch, updateManualThreadFields } from '../../src/core/db.js';
 import { clearDockQueryCache } from '../../src/core/dock/query.js';
-import { fakeStill, harness, msg, pairDirect, seed, stillSender, thread } from './dock-helpers.js';
+import { fakeStill, harness, msg, pairDirect, putInsight, seed, stillSender, thread } from './dock-helpers.js';
 
 type Payload = { threadKey: string; transcript: { included: boolean }; seq: number; fingerprint: string };
 const pushedKeys = (h: Awaited<ReturnType<typeof harness>>) =>
@@ -173,5 +173,34 @@ describe('threads.search never quotes secrets from tool or system output', () =>
     // Searching for the secret value itself finds nothing to quote.
     const bySecret = (await h.dock.handleExternalMessage(msg('threads.search', { query: 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv1234567890', limit: 5 }), stillSender())) as Record<string, unknown>;
     expect(JSON.stringify(bySecret)).not.toContain('sk-ant-api03');
+  });
+});
+
+describe('threads.get with a transcript window', () => {
+  it('does not mark pending metadata as delivered', async () => {
+    const h = await harness();
+    const a = await seed(h.db, thread('a', 'Alpha', [['user', 'alpha question'], ['assistant', 'alpha answer']]));
+    await pairDirect(h, {}, false);
+    await configure(h);
+    expect(h.still.of('threads.upsert')).toHaveLength(1);
+    const before = (await h.db.dockSent.get(a))!;
+
+    // A new AI analysis lands; its push waits for the debounce.
+    await putInsight(h.db, a, { gist: 'Fresh analysis gist' });
+    await h.dock.markDirty([a]);
+    // Meanwhile Still loads a transcript window (track: true), merging only the messages.
+    const res = (await h.dock.handleExternalMessage(
+      msg('threads.get', { threadKeys: [a], transcript: 'window', window: { from: 0, count: 50 }, track: true }),
+      stillSender()
+    )) as Record<string, unknown>;
+    expect((res.threads as Payload[]).map((t) => t.threadKey)).toEqual([a]);
+    expect((await h.db.dockSent.get(a))?.fingerprint).toBe(before.fingerprint);
+    expect((await h.db.dockTracked.get(a))?.dismissed).toBe(false);
+
+    h.clock.t += 5 * 60_000;
+    await h.dock.drain();
+    const pushes = h.still.of('threads.upsert');
+    expect(pushes).toHaveLength(2);
+    expect(JSON.stringify(pushes[1].message.threads)).toContain('Fresh analysis gist');
   });
 });

@@ -535,9 +535,13 @@ export class DockService {
       threads.push(fitted);
     }
     if (req.track && threads.length) {
+      await trackThreads(this.db, threads.map((t) => t.threadKey), this.now());
+    }
+    // Still applies 'none' and 'full' gets as imports; record them so the next reconcile does not push
+    // them again. A 'window' get only feeds a transcript window into a chat Still already holds; its
+    // title, analysis and tags are not applied, so it must not mark the current metadata as delivered.
+    if (req.track && threads.length && req.transcript !== 'window') {
       const keys = threads.map((t) => t.threadKey);
-      await trackThreads(this.db, keys, this.now());
-      // Still applies these as imports; record them so the next reconcile does not push them again.
       const records = await Promise.all(keys.map((k) => loadThreadRecords(this.db, k)));
       const prev = await this.db.dockSent.bulkGet(keys);
       await this.db.dockSent.bulkPut(
