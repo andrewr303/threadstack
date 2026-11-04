@@ -120,6 +120,46 @@ describe('pairing with consent and a one-time code', () => {
     await h.dock.idle();
   });
 
+  it('a paired-only message from Still while pair.granted is in flight acknowledges the grant (no not_paired race)', async () => {
+    // Real Chrome: Still accepts pair.granted, and its settings page asks for facets before Still's ack reaches us.
+    let h!: Awaited<ReturnType<typeof harness>>;
+    const early: unknown[] = [];
+    const still = fakeStill({
+      'pair.granted': async () => {
+        early.push(await h.dock.handleExternalMessage(msg('facets'), stillSender()));
+        early.push(await h.dock.handleExternalMessage(msg('hello', { epoch: 'epoch-A' }), stillSender()));
+        return { ok: true, proto: PROTO };
+      },
+    });
+    h = await harness({ still });
+    await h.dock.handleExternalMessage(request(), stillSender());
+    // An unpaired-style hello (no epoch) from the granted sender does not count as an ack.
+    expect(await h.dock.handleExternalMessage(msg('hello'), stillSender())).toMatchObject({ ok: true, paired: false });
+    expect(await h.dock.decide({ requestId: 'req-00000001', allow: true, code: '123456' })).toEqual({ ok: true, status: 'paired' });
+    expect(early[0]).toMatchObject({ ok: true });
+    expect(early[1]).toMatchObject({ ok: true, paired: true });
+    const dock = await settingsOf(h);
+    expect(dock).toMatchObject({ pairedId: STILL_ID, configured: false, peerEpoch: 'epoch-A' });
+    expect(await h.dock.getPending()).toBeNull();
+    // The late explicit ack did not reset the pairing a second time: configure, then the ack path is a no-op.
+    await h.dock.idle();
+  });
+
+  it('a late ack never resets a pairing Still already configured', async () => {
+    let h!: Awaited<ReturnType<typeof harness>>;
+    const still = fakeStill({
+      'pair.granted': async () => {
+        await h.dock.handleExternalMessage(msg('sync.configure', { prefs: { scope: 'all', projects: [], providers: [], transcripts: true, autoUpdate: true }, epoch: 'epoch-A' }), stillSender());
+        return { ok: true, proto: PROTO };
+      },
+    });
+    h = await harness({ still });
+    await h.dock.handleExternalMessage(request(), stillSender());
+    expect(await h.dock.decide({ requestId: 'req-00000001', allow: true, code: '123456' })).toEqual({ ok: true, status: 'paired' });
+    expect(await settingsOf(h)).toMatchObject({ pairedId: STILL_ID, configured: true });
+    await h.dock.idle();
+  });
+
   it('stops when Still no longer waits, and expires after 10 minutes', async () => {
     const still = fakeStill({ 'pair.granted': () => ({ ok: false, proto: PROTO, error: { code: 'bad_request', message: 'No pending request' } }) });
     const h = await harness({ still });

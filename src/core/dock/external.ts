@@ -227,9 +227,17 @@ export class DockService {
       this.reject(`Rejected message from ${who.id}: ${env.message}`);
       return errorResponse(env.code, env.message);
     }
-    const settings = await this.settings();
+    let settings = await this.settings();
+    let paired = settings.sidebarDock.pairedId !== '' && settings.sidebarDock.pairedId === who.id;
+    // Still marks itself paired when it accepts pair.granted and may talk to us at once (its settings page asks for facets,
+    // its worker says hello), before our delivery of pair.granted has seen Still's ack. Such a message proves the ack.
+    if (!paired && (!UNPAIRED_TYPES.has(env.type) || (env.type === 'hello' && parseHello(env.message).epoch))) {
+      if (await this.acceptImplicitAck(who.id)) {
+        settings = await this.settings();
+        paired = true;
+      }
+    }
     const dock = settings.sidebarDock;
-    const paired = dock.pairedId !== '' && dock.pairedId === who.id;
     if (!paired && !UNPAIRED_TYPES.has(env.type)) {
       this.reject(`Rejected ${env.type} from unpaired ${who.id}`);
       return errorResponse('not_paired', 'This extension is not connected to Threadkeeper');
@@ -626,6 +634,50 @@ export class DockService {
     return this.deliverGrant();
   }
 
+  private pairLock: Promise<unknown> = Promise.resolve();
+
+  /**
+   * Completes the granted request `requestId` once (pair.granted acknowledged, explicitly or implicitly). A no-op when
+   * that request is no longer pending, so a late ack of a delivery never resets a pairing that is already in use.
+   */
+  private finishPairing(requestId: string): Promise<boolean> {
+    const run = this.pairLock.then(async () => {
+      const nowMs = this.now();
+      const state = await readPendingState(this.session, nowMs);
+      const pending = state.pending;
+      if (!pending?.granted || pending.requestId !== requestId) return false;
+      // Settings first, the pending request last: a message read in between sees either the grant or the pairing.
+      await clearDockLink(this.db);
+      await patchDockSettings(this.db, {
+        pairedId: pending.senderId,
+        pairedName: pending.appName,
+        pairedAt: new Date(nowMs).toISOString(),
+        configured: false,
+        peerEpoch: pending.epoch,
+        allowRemoteModels: pending.granted.allowRemoteModels,
+        lastError: '',
+        lastErrorAt: '',
+      });
+      state.pending = null;
+      await writePendingState(this.session, state);
+      this.deps.schedulePairRetry?.(false);
+      // After pairing: find private threads Still may hold from an earlier pairing.
+      this.spawn(() => this.statusSweep());
+      this.deps.broadcast?.();
+      return true;
+    });
+    this.pairLock = run.catch(() => undefined);
+    return run;
+  }
+
+  /** A paired-only message from the sender we granted (and are still delivering pair.granted to) acknowledges the grant. */
+  private async acceptImplicitAck(senderId: string): Promise<boolean> {
+    const pending = (await readPendingState(this.session, this.now())).pending;
+    if (pending?.granted && pending.senderId === senderId) await this.finishPairing(pending.requestId);
+    else await this.pairLock; // a pairing being finished right now
+    return (await this.settings()).sidebarDock.pairedId === senderId;
+  }
+
   /** Deliver pair.granted; pairing completes only when Still acknowledges it (retried every 30 s). */
   async deliverGrant(): Promise<{ ok: true; status: 'paired' | 'granted' } | { ok: false; error: string; status?: 'expired' }> {
     const nowMs = this.now();
@@ -643,23 +695,11 @@ export class DockService {
       { to: pending.senderId, timeoutMs: 10_000 }
     );
     if (res.ok) {
-      state.pending = null;
-      await writePendingState(this.session, state);
-      await clearDockLink(this.db);
-      await patchDockSettings(this.db, {
-        pairedId: pending.senderId,
-        pairedName: pending.appName,
-        pairedAt: new Date(nowMs).toISOString(),
-        configured: false,
-        peerEpoch: pending.epoch,
-        allowRemoteModels: pending.granted.allowRemoteModels,
-        lastError: '',
-        lastErrorAt: '',
-      });
-      this.deps.schedulePairRetry?.(false);
-      // After pairing: find private threads Still may hold from an earlier pairing.
-      this.spawn(() => this.statusSweep());
-      this.deps.broadcast?.();
+      await this.finishPairing(pending.requestId);
+      return { ok: true, status: 'paired' };
+    }
+    // Still may have acknowledged meanwhile (implicitly, by talking to us as its paired peer).
+    if ((await this.settings()).sidebarDock.pairedId === pending.senderId && !(await readPendingState(this.session, this.now())).pending) {
       return { ok: true, status: 'paired' };
     }
     if (res.error.code === 'unreachable' || res.error.code === 'busy' || res.error.code === 'internal') {
