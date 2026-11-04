@@ -332,3 +332,22 @@ Still sends `threads.untrack`.
   (≤ 100 chats per write).
 - A change to the transcript-sharing settings (Still's `transcripts` pref or Threadkeeper's "Share full transcripts")
   changes the ledger's prefs hash and re-offers the affected threads.
+
+## Testing
+
+Both repositories test their own side against a fake partner (Still: `tests/threadkeeper-*.test.mjs`; Threadkeeper:
+`tests/unit/dock-*.test.ts`). The two real extensions are tested together in Chromium by Still's
+`scripts/e2e-threadkeeper.mjs` (Playwright, which the repositories do not install):
+
+```sh
+(cd threadkeeper && npm run build)
+TK_EXTENSION_DIR=$PWD/threadkeeper/.output/chrome-mv3 node sidebar-dock/scripts/e2e-threadkeeper.mjs --out /tmp/still-tk-e2e
+```
+
+It loads both unpacked extensions in a fresh profile, seeds Threadkeeper (its Import dialog plus its service worker
+database: a ChatGPT chat, a long Claude Code session, a Paperclip agent thread, a thread in the local-only "Personal"
+project and an analysis v2), pairs through Still's settings card and Threadkeeper's consent window with the code, starts
+syncing, checks the chat pages (Summary, Transcript, `#msg-N`, find in chat, dark mode, side panel), updates, local-only
+removal, the assistant's thread tools, **Send to Still**, and Still with Threadkeeper gone. Screenshots and
+`report.json` go to `--out`; any failed check or console error in a page or worker exits with 1. `--until <step>` stops
+after a step, `--bail` at the first failing one, `--headed` shows the browser.
