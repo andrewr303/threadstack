@@ -18,7 +18,7 @@ import {
   isValidAwsRegion,
 } from './aws.js';
 import { EmbeddingError, postJson } from './embeddings.js';
-import { COHERE_BASE_URL, COHERE_ORIGIN, MONGODB_KEY_HINT, mongodbBaseUrl, mongodbOrigin } from './model-apis.js';
+import { COHERE_BASE_URL, COHERE_ORIGIN, MONGODB_KEY_HINT, mongodbBaseUrl, mongodbOrigin, voyageBaseUrl, voyageOrigin } from './model-apis.js';
 
 /**
  * Second-stage reranking for search and Ask.
@@ -51,8 +51,6 @@ export const RERANK_MAX_DOCUMENTS = 1000;
 export const RERANK_MAX_DOC_CHARS = 1500;
 const RERANK_MAX_QUERY_CHARS = 2000;
 const RERANK_TIMEOUT_MS = 8000;
-
-const VOYAGE_RERANK_URL = 'https://api.voyageai.com/v1/rerank';
 
 /** In-region availability of the Bedrock rerankers (no geo or global inference profiles). */
 export const BEDROCK_RERANK_REGIONS: Record<BedrockRerankModel, readonly string[]> = {
@@ -118,7 +116,7 @@ export function rerankProblem(settings: SettingsRecord): string | null {
 function rerankModelId(settings: SettingsRecord): string {
   switch (settings.rerankProvider) {
     case 'voyage':
-      return settings.rerankModel;
+      return `${settings.rerankModel}@${voyageBaseUrl(settings)}`;
     case 'mongodb':
       // Same model name on a different account/host is a different scoring service.
       return `${settings.mongodbRerankModel}@${settings.mongodbGeography}`;
@@ -141,7 +139,7 @@ export function rerankReady(settings: SettingsRecord): boolean {
 export function rerankHostOrigins(settings: SettingsRecord): string[] {
   switch (settings.rerankProvider) {
     case 'voyage':
-      return ['https://api.voyageai.com/*'];
+      return [voyageOrigin(settings)];
     case 'mongodb':
       return [mongodbOrigin(settings.mongodbGeography)];
     case 'cohere':
@@ -233,7 +231,7 @@ async function rerankWithVoyage(
   // scores let the cache serve any later subset.
   const body = await postJson(
     fetchImpl,
-    VOYAGE_RERANK_URL,
+    `${voyageBaseUrl(settings)}/rerank`,
     { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
     { query, documents, model: settings.rerankModel, top_k: documents.length, truncation: true }
   );

@@ -1,0 +1,28 @@
+
+> threadkeeper@0.5.0 test:catchup
+> node scripts/run-catchup-e2e.mjs
+
+[catchup-e2e] ok — packaged extension build matches disk: 0.5.0 (build 20261105.054637-3d90769)
+[catchup-e2e] browser: 153.0.8010.12; isolated fixture profile
+[catchup-e2e] ok — a conversation whose page shows 2 messages is stored complete from the site's own data (4 messages, full, network_observer)
+[catchup-e2e] ok — only the active branch is stored, in order
+[catchup-e2e] ok — a later DOM capture neither drops nor duplicates messages and keeps the complete copy
+[catchup-e2e] ok — Check capture reports the complete conversation data for the open tab
+[catchup-e2e] ok — the capture report holds no titles or message text
+[catchup-e2e] ok — all-history import is available by default
+[catchup-e2e] ok — ChatGPT: "Done: 2 imported, 1 already up to date." (3 in the window, 1 unchanged, the 60-day-old one left out)
+[catchup-e2e] ok — a signed-out Claude is reported in plain words, not as a hang
+[catchup-e2e] ok — the two new conversations are stored complete with the history_sync source
+[catchup-e2e] ok — a conversation outside the 30-day window is not imported
+[catchup-e2e] ok — it was never even fetched
+[catchup-e2e] ok — the unchanged conversation was not fetched again (only the page's own load)
+[catchup-e2e] ok — Catch up only ever sends GET requests
+[catchup-e2e] ok — no tab is left open (3 before, 3 after)
+[catchup-e2e] ok — the on-device brief counts the recent conversations ("3 conversations across 1 project in the last 30 days.")
+[catchup-e2e] ok — a thread link in the brief opens that thread
+[catchup-e2e] ok — all-history import stores old and archived chats in full
+[catchup-e2e] ok — rerunning all-history import creates no duplicate threads
+[catchup-e2e] ok — Claude all-history imports both recent and 400-day-old conversations in full
+[catchup-e2e] ok — Catch up has no horizontal overflow at 420px (0px)
+[catchup-e2e] ok — no page errors
+[catchup-e2e] passed — screenshots in evidence/catchup

@@ -1,0 +1,74 @@
+
+> threadkeeper@0.5.0 test
+> vitest run tests/unit/history-sync.test.ts
+
+
+ RUN  v3.2.7 /Users/andrew/dev/threadkeeper
+
+ ❯ tests/unit/history-sync.test.ts (37 tests | 1 failed) 98ms
+   × ChatGPT history sync > waits for a conversation to be stored before reporting completion 8ms
+     → expected true to be false // Object.is equality
+   ✓ ChatGPT history sync > imports more than 500 old chats across every page, including archived chats, and resumes by skipping stored copies 21ms
+   ✓ ChatGPT history sync > reports a repeated full page as incomplete instead of looping or claiming all history was read 1ms
+   ✓ ChatGPT history sync > reads every conversation in the window, newest first, and nothing older 0ms
+   ✓ ChatGPT history sync > only sends GET requests with the session cookie, the bearer token and the device id 0ms
+   ✓ ChatGPT history sync > selects a workspace account only when the account cookie names one 0ms
+   ✓ ChatGPT history sync > skips conversations already stored in full and unchanged, and reads changed ones 0ms
+   ✓ ChatGPT history sync > pauses between conversations and never runs them in parallel 0ms
+   ✓ ChatGPT history sync > stops at the cap 1ms
+   ✓ ChatGPT history sync > stops when cancelled and says so 0ms
+   ✓ ChatGPT history sync > reports a signed-out session instead of failing quietly 0ms
+   ✓ ChatGPT history sync > treats a 403 or a non-JSON answer as a block to resolve by hand, and does not keep asking 0ms
+   ✓ ChatGPT history sync > retries a 429 with the server's wait, then gives up with a rate-limit error 2ms
+   ✓ ChatGPT history sync > retries a transient 500 and recovers 0ms
+   ✓ ChatGPT history sync > survives one malformed conversation but stops after three in a row 0ms
+   ✓ ChatGPT history sync > flags an unexpected list format as unsupported 0ms
+   ✓ Claude history sync > reads all old history beyond the recent-run and content-script caps without filtering starred chats 10ms
+   ✓ Claude history sync > uses the active organization, the paged list, and reads the active branch of each chat 0ms
+   ✓ Claude history sync > falls back to the original list endpoint, and finds the organization when there is no cookie 0ms
+   ✓ sync helpers > only skips full authoritative copies in the currently bound account and workspace 9ms
+   ✓ sync helpers > clamps the window to 1 to 31 days and computes the cutoff 0ms
+   ✓ sync helpers > rebuilds events from untrusted input and rejects the rest 0ms
+   ✓ sync helpers > every site has a plain-language failure for every error 0ms
+   ✓ sidebar history > finds conversation links of the provider only, newest first, without duplicates or routes 10ms
+   ✓ sidebar history > scrolls the sidebar container to load more, stops when nothing new arrives, and puts it back 5ms
+   ✓ Catch up orchestration > passes all-history scope and no recent cutoff or cap through to the reader, excluding sidebar-only sites 1ms
+   ✓ Catch up orchestration > reports a rejected reader start immediately instead of waiting for the idle timeout 0ms
+   ✓ Catch up orchestration > runs the page-side reader in the user's open tab, stores what it reports, and ends with a summary 0ms
+   ✓ Catch up orchestration > opens a background tab when none is open, and closes it afterwards 0ms
+   ✓ Catch up orchestration > ignores events from another tab, another run or another site 0ms
+   ✓ Catch up orchestration > explains a signed-out site instead of hanging 0ms
+   ✓ Catch up orchestration > turns a reader that goes silent into a timeout, keeping what it stored 0ms
+   ✓ Catch up orchestration > refuses a second run, sites whose capture is off, and an empty request 0ms
+   ✓ Catch up orchestration > opens each sidebar conversation in its own background tab and counts it once capture stores it 3ms
+   ✓ Catch up orchestration > does not count an early capture with no messages as the conversation 20ms
+   ✓ Catch up orchestration > reports an empty sidebar plainly 0ms
+   ✓ Catch up orchestration > runs the complete-history sites before the tab-by-tab ones 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/history-sync.test.ts > ChatGPT history sync > waits for a conversation to be stored before reporting completion
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/unit/history-sync.test.ts:119:24
+    117|     await started;
+    118|     await new Promise((resolve) => setTimeout(resolve, 0));
+    119|     try { expect(done).toBe(false); }
+       |                        ^
+    120|     finally { release(); await run; }
+    121|     expect(done).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 passed (37)
+   Start at  22:46:01
+   Duration  835ms (transform 139ms, setup 0ms, collect 224ms, tests 98ms, environment 289ms, prepare 63ms)
+

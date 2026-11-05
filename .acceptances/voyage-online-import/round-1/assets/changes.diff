@@ -1,0 +1,819 @@
+diff --git a/README.md b/README.md
+index 8ea3faa..3e2cf2b 100644
+--- a/README.md
++++ b/README.md
+@@ -21,7 +21,7 @@ Everything is stored locally in your browser. AI analysis is optional and uses y
+   - Subagent transcripts and other side files are never imported as threads of their own. A Codex fork is filed as a branch of the thread it came from, without the history it replayed, and a reverted Codex thread keeps its newest rollout.
+   - A Claude Code session is titled by your rename if you made one, else by its agent name, its generated title, its summary, or its first prompt, in that order.
+ - **Complete capture on ChatGPT and Claude:** both apps load each conversation as one JSON document. Threadkeeper reads that response as the page receives it (it never alters it and sends no request of its own), so a conversation is stored whole, with the site's message ids, timestamps, model and active branch, even when the page only renders part of it. Page reading stays as the live fallback and merges with it by message id, so nothing is dropped or stored twice.
+-- **Catch up, no export needed:** **Import / Export → Catch up from your accounts** pulls the last 7, 14 or 30 days from the sites you are signed in to. ChatGPT and Claude are read through your own signed-in session in this browser: it lists recent conversations, skips the ones already stored and unchanged, then reads the rest one at a time with a pause between them. It only sends GET requests, stops if the site asks it to slow down or shows a check, and can be cancelled. Gemini, Grok, Perplexity, DeepSeek, Kimi, Le Chat, Copilot and AI Studio have no history Threadkeeper can read directly, so it opens your most recent chats in a background tab, a few seconds each (no dates, so it takes the newest 30). Everything imported is summarized and filed like any other thread, and a catch-up brief says where things stand across the period.
++- **Import online history, no export needed:** **Import / Export → Import from online accounts → All history** reads old and recent ChatGPT and Claude conversations through your signed-in session in this browser, without the recent import's 300-chat cap. It pages through the active account/workspace, includes archived ChatGPT conversations, skips complete unchanged copies, and reads each remaining chat with a pause. Cancel at any time and run again to continue; imported copies are kept. Keep the browser and source tabs open. Deleted/unavailable chats cannot be recovered, and changed site formats or repeated pages stop the run with an error. The last 7, 14 or 30 days remain available for recent catch-up and its optional brief. In recent mode, Gemini, Grok, Perplexity, DeepSeek, Kimi, Le Chat, Copilot and AI Studio use their sidebar links (newest 30). Imported conversations follow your existing summarization, filing and privacy settings.
+ - **Paperclip agent companies:** connect your [Paperclip](https://github.com/paperclipai/paperclip) server in **Settings → Paperclip** and every issue becomes a thread: the task, its comment thread, and the transcripts of the agent runs that worked on it, in time order. Details below.
+ - **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
+ 
+@@ -107,7 +107,7 @@ On-device vectors (feature-hashed, 384 dims) are always maintained and need no k
+ 
+ | Provider | Models | Notes |
+ |---|---|---|
+-| Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | API key from voyageai.com |
++| Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | Atlas model API key (default endpoint: ai.mongodb.com); select Legacy Voyage for voyageai.com keys |
+ | MongoDB Atlas (Voyage) | The same four Voyage models, 256 to 2048 dimensions | A model API key created in Atlas, with the geography it was issued for (`ai.mongodb.com`, `us.ai.mongodb.com` or `eu.ai.mongodb.com`). It does not work on voyageai.com, and a voyageai.com key does not work here |
+ | Cohere | `embed-v5.0-fast`, `embed-v5.0-pro`, `embed-v4.0`, `embed-multilingual-v3.0`, `embed-english-v3.0` | API key from dashboard.cohere.com, called directly on `api.cohere.com`. v5.0 and v4.0 take 256 to 2048 or 1536 dimensions (default here 1024); v5.0 Pro and Fast share one vector space, so you can index with Pro and query with Fast |
+ | Amazon Bedrock | Amazon Titan Text Embeddings V2, Cohere Embed v4 (256, 512 or 1024 dimensions), Cohere Embed English v3 and Multilingual v3 (fixed 1024) | Uses the AWS credentials in Settings |
+@@ -122,7 +122,7 @@ A reranker re-scores the best first-stage candidates of a search (when you press
+ 
+ | Reranker | Models | Notes |
+ |---|---|---|
+-| Voyage AI | `rerank-3-lite` (default), `rerank-3` | Voyage API key |
++| Voyage AI | `rerank-3-lite` (default), `rerank-3` | Atlas model API key; endpoint setting shared with embeddings, with explicit Legacy Voyage support |
+ | MongoDB Atlas (Voyage) | `rerank-3-lite`, `rerank-3`, `rerank-2.5-lite`, `rerank-2.5` | Atlas model API key and geography, as above |
+ | Cohere | `rerank-v5.0-fast`, `rerank-v5.0-pro`, `rerank-v4.0-fast`, `rerank-v4.0-pro`, `rerank-v3.5` | Cohere API key, called directly on `api.cohere.com` |
+ | Amazon Bedrock | Cohere Rerank 3.5, Amazon Rerank 1.0 | With IAM keys it uses the Bedrock Rerank API. Bedrock API keys are not accepted there, so with an API key Cohere Rerank 3.5 is called directly (experimental). Cohere Rerank 3.5 runs in us-east-1, us-west-2, ca-central-1, eu-central-1 and ap-northeast-1 |
+diff --git a/src/core/embeddings.ts b/src/core/embeddings.ts
+index d9b3807..d5fdcc2 100644
+--- a/src/core/embeddings.ts
++++ b/src/core/embeddings.ts
+@@ -31,6 +31,8 @@ import {
+   isBedrockCohereV3,
+   mongodbBaseUrl,
+   mongodbOrigin,
++  voyageBaseUrl,
++  voyageOrigin,
+ } from './model-apis.js';
+ 
+ /**
+@@ -60,8 +62,12 @@ export function localSpace(): EmbeddingSpace {
+ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
+   switch (settings.embeddingProvider) {
+     case 'voyage':
++      // Keep existing legacy vectors intact; Atlas uses a distinct space after migration.
+       return settings.voyageApiKey.trim()
+-        ? { id: `voyage:${settings.voyageModel}`, provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55 }
++        ? {
++            id: settings.voyageEndpoint === 'legacy' ? `voyage:${settings.voyageModel}` : `voyage:mongodb:${settings.voyageModel}`,
++            provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55,
++          }
+         : null;
+     case 'mongodb':
+       // Atlas serves the same Voyage models as voyageai.com, but vectors are keyed by their own
+@@ -288,11 +294,13 @@ export function embeddingHostOrigins(settings: SettingsRecord): string[] {
+ }
+ 
+ /**
+- * Origins the configured hosted embedding provider needs the user to grant. Voyage, OpenAI
+- * and Anthropic hosts are granted at install; Atlas, Cohere and AWS are asked for on a click.
++ * Origins the configured hosted embedding provider needs the user to grant. Legacy Voyage,
++ * OpenAI and Anthropic are granted at install; Atlas, Cohere and AWS are asked for on a click.
+  */
+ export function embeddingApiOrigins(settings: SettingsRecord): string[] {
+   switch (settings.embeddingProvider) {
++    case 'voyage':
++      return [voyageOrigin(settings)];
+     case 'mongodb':
+       return [mongodbOrigin(settings.mongodbGeography)];
+     case 'cohere':
+@@ -494,6 +502,7 @@ export async function embedTexts(
+   if (space.provider === 'bedrock') return embedWithBedrock(settings, space, texts, inputType, fetchImpl);
+   if (space.provider === 'mongodb') return embedWithMongoDb(settings, space, texts, inputType, fetchImpl);
+   if (space.provider === 'cohere') return embedWithCohere(settings, space, texts, inputType, fetchImpl);
++  if (space.provider === 'voyage') await requireOrigins([voyageOrigin(settings)], 'Voyage');
+ 
+   const batchSize = 48;
+   const out: number[][] = [];
+@@ -502,7 +511,7 @@ export async function embedTexts(
+     if (space.provider === 'voyage') {
+       const data = (await postJson(
+         fetchImpl,
+-        'https://api.voyageai.com/v1/embeddings',
++        `${voyageBaseUrl(settings)}/embeddings`,
+         { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
+         { input: batch, model: space.model, input_type: inputType, truncation: true }
+       )) as { data?: Array<{ embedding: number[]; index: number }> };
+diff --git a/src/core/history-sync.ts b/src/core/history-sync.ts
+index 0d777d6..495c6d8 100644
+--- a/src/core/history-sync.ts
++++ b/src/core/history-sync.ts
+@@ -139,6 +139,7 @@ export const SYNC_MAX_SIDEBAR = 30;
+ export interface SyncRequest {
+   providers: SyncProviderId[];
+   days: number;
++  scope?: 'recent' | 'all';
+ }
+ 
+ export function clampSyncDays(days: unknown): number {
+@@ -246,6 +247,7 @@ export interface SyncState {
+   runId: string | null;
+   running: boolean;
+   days: number;
++  scope?: 'recent' | 'all';
+   startedAt: string | null;
+   finishedAt: string | null;
+   providers: SyncProviderState[];
+@@ -258,6 +260,7 @@ export function initialSyncState(runId: string, req: SyncRequest, nowIso: string
+     runId,
+     running: true,
+     days: clampSyncDays(req.days),
++    scope: req.scope === 'all' ? 'all' : 'recent',
+     startedAt: nowIso,
+     finishedAt: null,
+     providers: req.providers.flatMap((id) => {
+diff --git a/src/core/model-apis.ts b/src/core/model-apis.ts
+index 12ede81..58fac80 100644
+--- a/src/core/model-apis.ts
++++ b/src/core/model-apis.ts
+@@ -22,6 +22,15 @@ import type {
+ // MongoDB Atlas (Voyage)
+ // ---------------------------------------------------------------------------
+ 
++/** Atlas is the default for Voyage model keys. Legacy keys need an explicit legacy endpoint. */
++export function voyageBaseUrl(settings: Pick<SettingsRecord, 'voyageEndpoint'>): string {
++  return settings.voyageEndpoint === 'legacy' ? 'https://api.voyageai.com/v1' : 'https://ai.mongodb.com/v1';
++}
++
++export function voyageOrigin(settings: Pick<SettingsRecord, 'voyageEndpoint'>): string {
++  return `${new URL(voyageBaseUrl(settings)).origin}/*`;
++}
++
+ /** One host per geography. A model API key is only valid on the geography it was created for. */
+ export const MONGODB_AI_BASE_URLS: Record<MongoDbGeography, string> = {
+   global: 'https://ai.mongodb.com/v1',
+diff --git a/src/core/rerank.ts b/src/core/rerank.ts
+index f639470..5ab7537 100644
+--- a/src/core/rerank.ts
++++ b/src/core/rerank.ts
+@@ -18,7 +18,7 @@ import {
+   isValidAwsRegion,
+ } from './aws.js';
+ import { EmbeddingError, postJson } from './embeddings.js';
+-import { COHERE_BASE_URL, COHERE_ORIGIN, MONGODB_KEY_HINT, mongodbBaseUrl, mongodbOrigin } from './model-apis.js';
++import { COHERE_BASE_URL, COHERE_ORIGIN, MONGODB_KEY_HINT, mongodbBaseUrl, mongodbOrigin, voyageBaseUrl, voyageOrigin } from './model-apis.js';
+ 
+ /**
+  * Second-stage reranking for search and Ask.
+@@ -52,8 +52,6 @@ export const RERANK_MAX_DOC_CHARS = 1500;
+ const RERANK_MAX_QUERY_CHARS = 2000;
+ const RERANK_TIMEOUT_MS = 8000;
+ 
+-const VOYAGE_RERANK_URL = 'https://api.voyageai.com/v1/rerank';
+-
+ /** In-region availability of the Bedrock rerankers (no geo or global inference profiles). */
+ export const BEDROCK_RERANK_REGIONS: Record<BedrockRerankModel, readonly string[]> = {
+   'cohere.rerank-v3-5:0': ['us-east-1', 'us-west-2', 'ca-central-1', 'eu-central-1', 'ap-northeast-1'],
+@@ -118,7 +116,7 @@ export function rerankProblem(settings: SettingsRecord): string | null {
+ function rerankModelId(settings: SettingsRecord): string {
+   switch (settings.rerankProvider) {
+     case 'voyage':
+-      return settings.rerankModel;
++      return `${settings.rerankModel}@${voyageBaseUrl(settings)}`;
+     case 'mongodb':
+       // Same model name on a different account/host is a different scoring service.
+       return `${settings.mongodbRerankModel}@${settings.mongodbGeography}`;
+@@ -141,7 +139,7 @@ export function rerankReady(settings: SettingsRecord): boolean {
+ export function rerankHostOrigins(settings: SettingsRecord): string[] {
+   switch (settings.rerankProvider) {
+     case 'voyage':
+-      return ['https://api.voyageai.com/*'];
++      return [voyageOrigin(settings)];
+     case 'mongodb':
+       return [mongodbOrigin(settings.mongodbGeography)];
+     case 'cohere':
+@@ -233,7 +231,7 @@ async function rerankWithVoyage(
+   // scores let the cache serve any later subset.
+   const body = await postJson(
+     fetchImpl,
+-    VOYAGE_RERANK_URL,
++    `${voyageBaseUrl(settings)}/rerank`,
+     { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
+     { query, documents, model: settings.rerankModel, top_k: documents.length, truncation: true }
+   );
+diff --git a/src/core/schema.ts b/src/core/schema.ts
+index bbbbc10..00996e0 100644
+--- a/src/core/schema.ts
++++ b/src/core/schema.ts
+@@ -806,6 +806,8 @@ export interface SettingsRecord {
+   aiAnalysesDate: string;
+   embeddingProvider: EmbeddingProviderId;
+   voyageApiKey: string;
++  /** Shared by Voyage embeddings and reranking; Atlas-issued keys use MongoDB. */
++  voyageEndpoint: 'mongodb' | 'legacy';
+   voyageModel: 'voyage-4-lite' | 'voyage-4' | 'voyage-4-large' | 'voyage-code-4';
+   openaiApiKey: string;
+   openaiEmbeddingModel: 'text-embedding-3-small' | 'text-embedding-3-large';
+@@ -949,6 +951,7 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
+   aiAnalysesDate: '',
+   embeddingProvider: 'local',
+   voyageApiKey: '',
++  voyageEndpoint: 'mongodb',
+   voyageModel: 'voyage-4-lite',
+   openaiApiKey: '',
+   openaiEmbeddingModel: 'text-embedding-3-small',
+diff --git a/src/core/site-history.ts b/src/core/site-history.ts
+index 11c88b3..06e4777 100644
+--- a/src/core/site-history.ts
++++ b/src/core/site-history.ts
+@@ -28,6 +28,7 @@ export interface ApiSyncParams {
+   sinceMs: number;
+   /** Most conversations to read in one run. */
+   max: number;
++  scope?: 'recent' | 'all';
+   /** Site conversation id → updatedAt already stored in full; those not updated since are skipped. */
+   known: Record<string, string>;
+   origin: string;
+@@ -129,7 +130,6 @@ function parseChatGptList(json: unknown): ListedConversation[] | null {
+   for (const raw of items) {
+     const item = rec(raw);
+     if (!item || typeof item.id !== 'string') continue;
+-    if (item.is_archived === true) continue;
+     out.push({
+       id: item.id.toLowerCase(),
+       title: typeof item.title === 'string' ? item.title : '',
+@@ -142,20 +142,27 @@ function parseChatGptList(json: unknown): ListedConversation[] | null {
+ 
+ async function listChatGpt(p: ApiSyncParams, headers: Record<string, string>): Promise<ListedConversation[]> {
+   const found: ListedConversation[] = [];
+-  let stale = 0;
+-  for (let offset = 0; found.length < p.max && stale < 2; offset += CHATGPT_PAGE) {
+-    if (p.isCancelled()) break;
+-    const page = parseChatGptList(
+-      await getJson(p, `${p.origin}/backend-api/conversations?offset=${offset}&limit=${CHATGPT_PAGE}&order=updated&is_archived=false`, headers)
+-    );
+-    if (page === null) throw new SyncFailure('unsupported', 'list shape');
+-    if (page.length === 0) break;
+-    const recent = page.filter((c) => (c.updatedAt ? Date.parse(c.updatedAt) >= p.sinceMs : true));
+-    found.push(...recent);
+-    // Newest first: a page with nothing recent means everything after it is older too.
+-    stale = recent.length === 0 ? stale + 1 : 0;
+-    if (page.length < CHATGPT_PAGE) break;
+-    await p.sleep(PAUSE_MIN_MS);
++  const seen = new Set<string>();
++  for (const archived of p.scope === 'all' ? [false, true] : [false]) {
++    let stale = 0;
++    for (let offset = 0; found.length < p.max && stale < 2; offset += CHATGPT_PAGE) {
++      if (p.isCancelled()) break;
++      const page = parseChatGptList(
++        await getJson(p, `${p.origin}/backend-api/conversations?offset=${offset}&limit=${CHATGPT_PAGE}&order=updated&is_archived=${archived}`, headers)
++      );
++      if (page === null) throw new SyncFailure('unsupported', 'list shape');
++      if (page.length === 0) break;
++      const fresh = page.filter((c) => !seen.has(c.id));
++      if (fresh.length === 0) throw new SyncFailure('unsupported', 'repeated history page');
++      fresh.forEach((c) => seen.add(c.id));
++      const recent = fresh.filter((c) => p.scope === 'all' || !c.updatedAt || Date.parse(c.updatedAt) >= p.sinceMs);
++      found.push(...recent);
++      p.emit({ kind: 'phase', runId: p.runId, provider: p.provider, phase: 'listing', total: found.length, message: `Found ${found.length} conversations` });
++      // Newest first: a page with nothing recent means everything after it is older too.
++      stale = recent.length === 0 ? stale + 1 : 0;
++      if (page.length < CHATGPT_PAGE) break;
++      await p.sleep(PAUSE_MIN_MS);
++    }
+   }
+   return found.slice(0, p.max);
+ }
+@@ -198,7 +205,7 @@ async function listClaude(p: ApiSyncParams, org: string): Promise<ListedConversa
+   let stale = 0;
+   // The paged list is the current one; fall back to the original if the site does not know it.
+   let base = `${p.origin}/api/organizations/${org}/chat_conversations_v2`;
+-  let query = (offset: number) => `limit=${CLAUDE_PAGE}&offset=${offset}&starred=false&consistency=eventual`;
++  let query = (offset: number) => `limit=${CLAUDE_PAGE}&offset=${offset}${p.scope === 'all' ? '' : '&starred=false'}&consistency=eventual`;
+   for (let offset = 0; found.length < p.max && stale < 2; offset += CLAUDE_PAGE) {
+     if (p.isCancelled()) break;
+     let json: unknown;
+@@ -217,9 +224,11 @@ async function listClaude(p: ApiSyncParams, org: string): Promise<ListedConversa
+     if (page === null) throw new SyncFailure('unsupported', 'list shape');
+     if (page.length === 0) break;
+     const fresh = page.filter((c) => !seen.has(c.id));
++    if (fresh.length === 0) throw new SyncFailure('unsupported', 'repeated history page');
+     fresh.forEach((c) => seen.add(c.id));
+-    const recent = fresh.filter((c) => (c.updatedAt ? Date.parse(c.updatedAt) >= p.sinceMs : true));
++    const recent = fresh.filter((c) => p.scope === 'all' || !c.updatedAt || Date.parse(c.updatedAt) >= p.sinceMs);
+     found.push(...recent);
++    p.emit({ kind: 'phase', runId: p.runId, provider: p.provider, phase: 'listing', total: found.length, message: `Found ${found.length} conversations` });
+     stale = recent.length === 0 ? stale + 1 : 0;
+     if (page.length < CLAUDE_PAGE) break;
+     await p.sleep(PAUSE_MIN_MS);
+@@ -246,7 +255,7 @@ export async function runApiSync(p: ApiSyncParams): Promise<void> {
+   const label = p.provider === 'chatgpt' ? 'ChatGPT' : 'Claude';
+   const random = p.random ?? Math.random;
+   try {
+-    p.emit({ kind: 'phase', ...base, phase: 'listing', total: null, message: 'Listing recent conversations' });
++    p.emit({ kind: 'phase', ...base, phase: 'listing', total: null, message: p.scope === 'all' ? 'Listing all conversations' : 'Listing recent conversations' });
+     let listed: ListedConversation[];
+     let headers: Record<string, string> = {};
+     let org = '';
+diff --git a/src/core/sync-env.ts b/src/core/sync-env.ts
+index 67b6157..9c54e51 100644
+--- a/src/core/sync-env.ts
++++ b/src/core/sync-env.ts
+@@ -87,10 +87,13 @@ export function createChromeSyncEnv(
+     },
+     async knownUpdatedAt(provider: SyncProviderId) {
+       const known: Record<string, string> = {};
++      const settings = await deps.loadSettings();
++      const bound = settings.boundAccounts[provider];
+       const rows = await db.conversations.where('provider').equals(provider).toArray();
+       for (const c of rows) {
+         // Only a complete copy from the site itself can stand in for a fresh read.
+-        if (c.branchId === 'main' && c.coverage === 'full' && isAuthoritativeSource(c.captureSource) && c.updatedAt) {
++        if (c.accountId === bound.accountId && c.workspaceId === bound.workspaceId
++          && c.branchId === 'main' && c.coverage === 'full' && isAuthoritativeSource(c.captureSource) && c.updatedAt) {
+           known[c.sourceConversationId.toLowerCase()] = c.updatedAt;
+         }
+       }
+diff --git a/src/core/sync-orchestrator.ts b/src/core/sync-orchestrator.ts
+index 7a6e3f0..6c268cf 100644
+--- a/src/core/sync-orchestrator.ts
++++ b/src/core/sync-orchestrator.ts
+@@ -88,14 +88,16 @@ export class HistorySyncOrchestrator {
+   async start(request: SyncRequest): Promise<{ started: boolean; reason?: string }> {
+     if (this.running) return { started: false, reason: 'Catch up is already running.' };
+     const enabled = await this.env.enabledProviders();
+-    const providers = request.providers.filter((id, i, all) => all.indexOf(id) === i && syncProviderInfo(id) && enabled.has(id));
++    const scope = request.scope === 'all' ? 'all' : 'recent';
++    const providers = request.providers.filter((id, i, all) => all.indexOf(id) === i && syncProviderInfo(id) && enabled.has(id)
++      && (scope !== 'all' || syncProviderInfo(id)?.strategy === 'api'));
+     if (providers.length === 0) return { started: false, reason: 'No site to catch up on is switched on for capture.' };
+     // Sites with a complete history first: they finish fastest and cost the site least.
+     providers.sort((a, b) => Number(syncProviderInfo(a)?.strategy !== 'api') - Number(syncProviderInfo(b)?.strategy !== 'api'));
+ 
+     this.cancelled = false;
+     const days = clampSyncDays(request.days);
+-    this.state = initialSyncState(this.env.newRunId(), { providers, days }, new Date(this.env.now()).toISOString());
++    this.state = initialSyncState(this.env.newRunId(), { providers, days, scope }, new Date(this.env.now()).toISOString());
+     await this.save(true);
+     this.running = this.runAll(providers, days).finally(() => {
+       this.running = null;
+@@ -174,7 +176,7 @@ export class HistorySyncOrchestrator {
+   }
+ 
+   private async runAll(providers: SyncProviderId[], days: number): Promise<void> {
+-    const sinceMs = syncCutoffMs(days, this.env.now());
++    const sinceMs = this.state.scope === 'all' ? 0 : syncCutoffMs(days, this.env.now());
+     for (const id of providers) {
+       if (this.cancelled) {
+         this.patch(id, { status: 'cancelled', message: 'Cancelled' });
+@@ -230,7 +232,12 @@ export class HistorySyncOrchestrator {
+     this.active = run;
+     try {
+       this.patch(info.id, { status: 'listing' });
+-      await this.env.sendToTab(tabId, { type: 'TK_HISTORY_SYNC_RUN', runId, provider: info.id, sinceMs, max: SYNC_MAX_API, known });
++      const reply = await this.env.sendToTab(tabId, {
++        type: 'TK_HISTORY_SYNC_RUN', runId, provider: info.id, sinceMs,
++        max: this.state.scope === 'all' ? Number.MAX_SAFE_INTEGER : SYNC_MAX_API,
++        scope: this.state.scope, known,
++      }) as { ok?: boolean } | undefined;
++      if (!reply?.ok) return this.fail(info, 'unsupported');
+       // Wait for "done" or "error", but not forever: a stalled page ends the run.
+       for (;;) {
+         if (this.cancelled) break;
+diff --git a/src/entrypoints/background.ts b/src/entrypoints/background.ts
+index 49a5356..25d0a3b 100644
+--- a/src/entrypoints/background.ts
++++ b/src/entrypoints/background.ts
+@@ -966,7 +966,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+           return;
+         }
+         const providers = Array.isArray(message.providers) ? message.providers.filter(isSyncProviderId) : [];
+-        const started = await syncOrchestrator.start({ providers, days: clampSyncDays(message.days) });
++        const started = await syncOrchestrator.start({ providers, days: clampSyncDays(message.days), scope: message.scope === 'all' ? 'all' : 'recent' });
+         sendResponse({ ok: started.started, error: started.reason });
+         return;
+       }
+diff --git a/src/entrypoints/content.ts b/src/entrypoints/content.ts
+index 62fc17f..99872da 100644
+--- a/src/entrypoints/content.ts
++++ b/src/entrypoints/content.ts
+@@ -588,7 +588,8 @@ function startApiSync(message: Record<string, unknown>): { ok: boolean; error?:
+   const onChatGpt = host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com';
+   const onClaude = host === 'claude.ai' || host.endsWith('.claude.ai');
+   if ((provider !== 'chatgpt' || !onChatGpt) && (provider !== 'claude' || !onClaude)) return { ok: false, error: 'wrong_site' };
+-  if (typeof message.runId !== 'string' || typeof message.sinceMs !== 'number' || typeof message.max !== 'number') {
++  if (typeof message.runId !== 'string' || typeof message.sinceMs !== 'number' || !Number.isFinite(message.sinceMs)
++    || typeof message.max !== 'number' || !Number.isFinite(message.max)) {
+     return { ok: false, error: 'bad_request' };
+   }
+   if (syncRunning) return { ok: false, error: 'busy' };
+@@ -602,7 +603,8 @@ function startApiSync(message: Record<string, unknown>): { ok: boolean; error?:
+     provider,
+     runId: message.runId,
+     sinceMs: message.sinceMs,
+-    max: Math.min(500, Math.max(1, Math.round(message.max))),
++    max: message.scope === 'all' ? Number.MAX_SAFE_INTEGER : Math.min(500, Math.max(1, Math.round(message.max))),
++    scope: message.scope === 'all' ? 'all' : 'recent',
+     known,
+     origin: window.location.origin,
+     cookies: document.cookie,
+diff --git a/src/entrypoints/manager/App.tsx b/src/entrypoints/manager/App.tsx
+index 639d8c8..ac52f3f 100644
+--- a/src/entrypoints/manager/App.tsx
++++ b/src/entrypoints/manager/App.tsx
+@@ -363,6 +363,7 @@ export function App() {
+       'autoOrganize',
+       'embeddingProvider',
+       'voyageApiKey',
++      'voyageEndpoint',
+       'openaiApiKey',
+       'ollamaUrl',
+       'ollamaEmbeddingModel',
+diff --git a/src/entrypoints/manager/CatchUp.tsx b/src/entrypoints/manager/CatchUp.tsx
+index 37feadb..daa5b45 100644
+--- a/src/entrypoints/manager/CatchUp.tsx
++++ b/src/entrypoints/manager/CatchUp.tsx
+@@ -63,7 +63,7 @@ function statusLine(p: SyncProviderState): string {
+     case 'opening':
+       return 'Opening the site';
+     case 'listing':
+-      return 'Finding recent conversations';
++      return p.message ?? 'Finding conversations';
+     case 'fetching':
+       return `Reading ${progressOf(p)} of ${p.listed}`;
+     case 'cancelled':
+@@ -74,7 +74,7 @@ function statusLine(p: SyncProviderState): string {
+       const parts = [`${p.stored} imported`];
+       if (p.skipped) parts.push(`${p.skipped} already up to date`);
+       if (p.failed) parts.push(`${p.failed} could not be read`);
+-      return `Done: ${parts.join(', ')}.`;
++      return `Done: ${parts.join(', ')}.${p.message ? ` ${p.message}` : ''}`;
+     }
+   }
+ }
+@@ -90,6 +90,7 @@ function runSummary(state: SyncState): string {
+ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+   const sync = useSyncState();
+   const [days, setDays] = useState(SYNC_DEFAULT_DAYS);
++  const [scope, setScope] = useState<'recent' | 'all'>('all');
+   const [selected, setSelected] = useState<Set<SyncProviderId>>(new Set(['chatgpt', 'claude']));
+   const [startError, setStartError] = useState<string | null>(null);
+   const [brief, setBrief] = useState<CatchUpBrief | null>(null);
+@@ -145,14 +146,15 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+     setStartError(null);
+     if (!hasRuntime()) return setStartError('Catch up needs the extension running.');
+     try {
+-      const reply = (await chrome.runtime.sendMessage({ type: 'START_HISTORY_SYNC', providers: Array.from(selected), days })) as
++      const providers = Array.from(selected).filter((id) => available.some((p) => p.id === id && (scope !== 'all' || p.strategy === 'api')));
++      const reply = (await chrome.runtime.sendMessage({ type: 'START_HISTORY_SYNC', providers, days, scope })) as
+         | { ok?: boolean; error?: string }
+         | undefined;
+       if (!reply?.ok) setStartError(reply?.error ?? 'Catch up could not start.');
+     } catch {
+       setStartError('Could not reach the extension. Reload it and try again.');
+     }
+-  }, [selected, days]);
++  }, [selected, days, scope, available]);
+ 
+   const cancel = () => void chrome.runtime.sendMessage({ type: 'CANCEL_HISTORY_SYNC' }).catch(() => undefined);
+ 
+@@ -177,13 +179,18 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+   return (
+     <section className="tk-settings-section" aria-labelledby="tk-catchup-h">
+       <h3 className="tk-settings-h3" id="tk-catchup-h">
+-        Catch up from your accounts
++        Import from online accounts
+       </h3>
+       <p className="tk-settings-note">
+-        Pull your recent conversations straight from the sites you are signed in to, with no export. Threadkeeper reads
++        Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. Threadkeeper reads
+         through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then
+         summarized and filed like any other thread.
+       </p>
++      <p className="tk-settings-note">
++        All history reads every available page in the active account or workspace, including archived ChatGPT chats.
++        Keep the browser and site tabs open while it runs. Cancel at any time; run it again to skip complete, unchanged
++        conversations and continue importing. Deleted or unavailable chats cannot be recovered.
++      </p>
+ 
+       {settings && claude && settings.autoOrganize.aiAnalysis && (
+         <p className="tk-settings-note" data-testid="catchup-ai-note">
+@@ -195,7 +202,11 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+       <div className="tk-field-row">
+         <label className="tk-field">
+           How far back
+-          <select className="tk-select" value={days} disabled={sync.running} onChange={(e) => setDays(Number(e.target.value))}>
++          <select className="tk-select" value={scope === 'all' ? 'all' : days} disabled={sync.running} onChange={(e) => {
++            setScope(e.target.value === 'all' ? 'all' : 'recent');
++            if (e.target.value !== 'all') setDays(Number(e.target.value));
++          }}>
++            <option value="all">All history — Claude & ChatGPT</option>
+             {DAY_CHOICES.map((d) => (
+               <option key={d} value={d}>
+                 Last {d} days
+@@ -216,7 +227,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+           </label>
+         ))}
+       </div>
+-      {slower.length > 0 && (
++      {scope !== 'all' && slower.length > 0 && (
+         <details className="tk-catchup-more">
+           <summary className="tk-muted">Other sites (slower)</summary>
+           <p className="tk-settings-note">
+@@ -244,7 +255,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+           </button>
+         ) : (
+           <button type="button" className="tk-btn tk-btn-primary" disabled={selected.size === 0 || !settings} onClick={() => void start()}>
+-            Catch up
++            {scope === 'all' ? 'Import all online conversations' : 'Catch up'}
+           </button>
+         )}
+       </div>
+@@ -267,7 +278,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
+         </ul>
+       )}
+ 
+-      {!sync.running && sync.runId && sync.providers.length > 0 && (
++      {!sync.running && sync.runId && sync.scope !== 'all' && sync.providers.length > 0 && (
+         <div className="tk-catchup-brief-controls">
+           <p className="tk-settings-note">
+             {claude
+diff --git a/src/entrypoints/manager/SettingsDialog.tsx b/src/entrypoints/manager/SettingsDialog.tsx
+index 79b0b9e..213c2e8 100644
+--- a/src/entrypoints/manager/SettingsDialog.tsx
++++ b/src/entrypoints/manager/SettingsDialog.tsx
+@@ -47,6 +47,7 @@ import {
+   cohereEmbeddingInfo,
+   cohereSupportsDimensions,
+   isBedrockCohereV3,
++  voyageBaseUrl,
+ } from '../../core/model-apis.js';
+ import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
+ import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
+@@ -261,7 +262,7 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
+   if (aiCredentialsReady(settings)) {
+     out.push({ what: 'Claude analysis, Organize and Ask', where: backendHost(settings) });
+   }
+-  if (settings.embeddingProvider === 'voyage' && settings.voyageApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.voyageai.com' });
++  if (settings.embeddingProvider === 'voyage' && settings.voyageApiKey.trim()) out.push({ what: 'Embeddings', where: new URL(voyageBaseUrl(settings)).host });
+   if (settings.embeddingProvider === 'mongodb' && settings.mongodbApiKey.trim()) {
+     out.push({ what: 'Embeddings', where: new URL(MONGODB_GEOGRAPHY_URLS[settings.mongodbGeography]).host });
+   }
+@@ -272,7 +273,7 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
+     out.push({ what: 'Embeddings', where: `bedrock-runtime.${settings.aws.region}.amazonaws.com` });
+   }
+   if (settings.rerankProvider === 'voyage' && settings.voyageApiKey.trim()) {
+-    out.push({ what: 'Reranking (short excerpts)', where: 'api.voyageai.com' });
++    out.push({ what: 'Reranking (short excerpts)', where: new URL(voyageBaseUrl(settings)).host });
+   }
+   if (settings.rerankProvider === 'mongodb' && settings.mongodbApiKey.trim()) {
+     out.push({ what: 'Reranking (short excerpts)', where: new URL(MONGODB_GEOGRAPHY_URLS[settings.mongodbGeography]).host });
+@@ -331,6 +332,20 @@ function sectionStatus(
+   }
+ }
+ 
++function VoyageEndpoint({ settings, onPatch }: Pick<Props, 'onPatch'> & { settings: SettingsRecord }) {
++  return (
++    <label className="tk-field">
++      Voyage API endpoint (shared by embeddings and reranking)
++      <select className="tk-select" value={settings.voyageEndpoint}
++        onChange={(e) => void onPatch({ voyageEndpoint: e.target.value as SettingsRecord['voyageEndpoint'] })}>
++        <option value="mongodb">MongoDB Atlas — ai.mongodb.com</option>
++        <option value="legacy">Legacy Voyage — api.voyageai.com</option>
++      </select>
++      <span className="tk-settings-note">Use MongoDB Atlas for Atlas model API keys. Use Legacy Voyage for keys from voyageai.com. For US/EU scoped keys, choose the MongoDB Atlas provider and matching geography.</span>
++    </label>
++  );
++}
++
+ function SecretInput({
+   value,
+   onChange,
+@@ -963,6 +978,7 @@ export function SettingsDialog({
+           </label>
+           {settings.embeddingProvider === 'voyage' && (
+             <>
++              <VoyageEndpoint settings={settings} onPatch={onPatch} />
+               <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+               <label className="tk-field">
+                 Model
+@@ -1257,6 +1273,7 @@ export function SettingsDialog({
+           )}
+           {settings.rerankProvider === 'voyage' && (
+             <>
++              <VoyageEndpoint settings={settings} onPatch={onPatch} />
+               {settings.embeddingProvider !== 'voyage' && (
+                 <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+               )}
+diff --git a/tests/unit/history-sync.test.ts b/tests/unit/history-sync.test.ts
+index 39be999..3f1cdbd 100644
+--- a/tests/unit/history-sync.test.ts
++++ b/tests/unit/history-sync.test.ts
+@@ -13,6 +13,9 @@ import { runApiSync, type ApiSyncParams } from '../../src/core/site-history.js';
+ import { loadSidebarConversations, readSidebarConversations } from '../../src/core/sidebar-history.js';
+ import { HistorySyncOrchestrator, SYNC_IDLE_TIMEOUT_MS, type SyncEnv } from '../../src/core/sync-orchestrator.js';
+ import { validateSiteConversation, type SiteConversation } from '../../src/core/site-api.js';
++import { ThreadkeeperDB } from '../../src/core/db.js';
++import { DEFAULT_SETTINGS, type ConversationRecord } from '../../src/core/schema.js';
++import { createChromeSyncEnv } from '../../src/core/sync-env.js';
+ 
+ const DAY = 86_400_000;
+ const NOW = Date.parse('2026-11-03T12:00:00Z');
+@@ -59,6 +62,7 @@ function fakeChatGpt(daysAgoByIndex: number[], opts: { unauthorized?: boolean }
+       if (url.endsWith('/api/auth/session')) return opts.unauthorized ? json({}) : json({ accessToken: 'tok' });
+       const list = url.match(/\/backend-api\/conversations\?offset=(\d+)&limit=(\d+)/);
+       if (list) {
++        if (new URL(url).searchParams.get('is_archived') === 'true') return json({ items: [] });
+         const offset = Number(list[1]);
+         const limit = Number(list[2]);
+         const items = daysAgoByIndex.slice(offset, offset + limit).map((d, i) => ({
+@@ -98,6 +102,32 @@ function params(site: FakeSite, patch: Partial<ApiSyncParams> = {}) {
+ }
+ 
+ describe('ChatGPT history sync', () => {
++  it('imports more than 500 old chats across every page, including archived chats, and resumes by skipping stored copies', async () => {
++    const site = fakeChatGpt(Array.from({ length: 620 }, (_, i) => i + 100));
++    site.failWith = (url) => {
++      if (url.includes('/conversations?') && url.includes('is_archived=true')) {
++        return json({ items: [{ id: id(999), title: 'Archived', update_time: iso(999), is_archived: true }] });
++      }
++      return null;
++    };
++    const { p, events } = params(site, { scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER, known: { [id(1)]: iso(0) } });
++    await runApiSync(p);
++    expect(events.filter((e) => e.kind === 'conversation')).toHaveLength(620);
++    expect(events.filter((e) => e.kind === 'skipped')).toEqual([expect.objectContaining({ id: id(1), reason: 'up_to_date' })]);
++    expect(events.at(-1)).toMatchObject({ kind: 'done', listed: 621 });
++    expect(site.calls.some((u) => u.endsWith(`/conversation/${id(620)}`))).toBe(true);
++    expect(site.calls.some((u) => u.endsWith(`/conversation/${id(999)}`))).toBe(true);
++    expect(site.calls.some((u) => u.endsWith(`/conversation/${id(1)}`))).toBe(false);
++  });
++
++  it('reports a repeated full page as incomplete instead of looping or claiming all history was read', async () => {
++    const site = fakeChatGpt([]);
++    site.failWith = (url) => url.includes('/conversations?') ? json({ items: Array.from({ length: 28 }, (_, i) => ({ id: id(i + 1), update_time: iso(1) })) }) : null;
++    const { p, events } = params(site, { scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER });
++    await runApiSync(p);
++    expect(events.at(-1)).toMatchObject({ kind: 'error', code: 'unsupported' });
++    expect(site.calls.filter((u) => u.includes('/conversations?'))).toHaveLength(2);
++  });
+   it('reads every conversation in the window, newest first, and nothing older', async () => {
+     // 5 conversations: 1, 2, 10, 29 days old (in the window) and 45 days old (out of it).
+     const site = fakeChatGpt([1, 2, 10, 29, 45]);
+@@ -295,6 +325,15 @@ describe('Claude history sync', () => {
+   };
+   const run = (s: FakeSite, patch: Partial<ApiSyncParams> = {}) => params(s, { provider: 'claude', origin: 'https://claude.ai', cookies: `lastActiveOrg=${ORG}`, ...patch });
+ 
++  it('reads all old history beyond the recent-run and content-script caps without filtering starred chats', async () => {
++    const s = site(Array.from({ length: 550 }, (_, i) => i + 100));
++    const { p, events } = run(s, { scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER });
++    await runApiSync(p);
++    expect(events.filter((e) => e.kind === 'conversation')).toHaveLength(550);
++    expect(events.at(-1)).toMatchObject({ kind: 'done', listed: 550 });
++    expect(s.calls.filter((u) => u.includes('/chat_conversations_v2?')).every((u) => !u.includes('starred=false'))).toBe(true);
++  });
++
+   it('uses the active organization, the paged list, and reads the active branch of each chat', async () => {
+     const s = site([1, 3, 50]);
+     const { p, events } = run(s);
+@@ -321,6 +360,22 @@ describe('Claude history sync', () => {
+ // ---------------------------------------------------------------------------
+ 
+ describe('sync helpers', () => {
++  it('only skips full authoritative copies in the currently bound account and workspace', async () => {
++    const db = new ThreadkeeperDB('history-resume-account-test');
++    const bound = DEFAULT_SETTINGS.boundAccounts.chatgpt;
++    try {
++      await db.conversations.bulkPut([
++        { threadKey: 'mine', provider: 'chatgpt', sourceConversationId: id(1), accountId: bound.accountId, workspaceId: bound.workspaceId, branchId: 'main', coverage: 'full', captureSource: 'history_sync', updatedAt: iso(1) },
++        { threadKey: 'other-account', provider: 'chatgpt', sourceConversationId: id(2), accountId: 'other', workspaceId: bound.workspaceId, branchId: 'main', coverage: 'full', captureSource: 'history_sync', updatedAt: iso(1) },
++        { threadKey: 'other-workspace', provider: 'chatgpt', sourceConversationId: id(3), accountId: bound.accountId, workspaceId: 'other', branchId: 'main', coverage: 'full', captureSource: 'history_sync', updatedAt: iso(1) },
++        { threadKey: 'partial', provider: 'chatgpt', sourceConversationId: id(4), accountId: bound.accountId, workspaceId: bound.workspaceId, branchId: 'main', coverage: 'partial', captureSource: 'history_sync', updatedAt: iso(1) },
++      ] as ConversationRecord[]);
++      const env = createChromeSyncEnv(db, { loadSettings: async () => DEFAULT_SETTINGS, storeConversation: async () => 'stored' });
++      expect(await env.knownUpdatedAt('chatgpt')).toEqual({ [id(1)]: iso(1) });
++    } finally {
++      await db.delete();
++    }
++  });
+   it('clamps the window to 1 to 31 days and computes the cutoff', () => {
+     expect(clampSyncDays(30)).toBe(30);
+     expect(clampSyncDays(0)).toBe(1);
+@@ -478,6 +533,27 @@ const conv = (n: number, provider: 'chatgpt' | 'claude' = 'chatgpt'): SiteConver
+ });
+ 
+ describe('Catch up orchestration', () => {
++  it('passes all-history scope and no recent cutoff or cap through to the reader, excluding sidebar-only sites', async () => {
++    const f = fakeEnv({ tabs: { chatgpt: 7 } });
++    const orch = new HistorySyncOrchestrator(f.env);
++    f.handlers.onSend = (tabId, message) => {
++      if (message.type === 'TK_HISTORY_SYNC_RUN') void orch.handleEvent({ kind: 'done', runId: message.runId as string, provider: 'chatgpt', listed: 0, message: null }, tabId);
++    };
++    await orch.start({ providers: ['chatgpt', 'gemini'], days: 30, scope: 'all' });
++    await orch.idle();
++    expect(f.sent[0].message).toMatchObject({ scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER });
++    expect(orch.state.scope).toBe('all');
++    expect(orch.state.providers.map((p) => p.provider)).toEqual(['chatgpt']);
++  });
++
++  it('reports a rejected reader start immediately instead of waiting for the idle timeout', async () => {
++    const f = fakeEnv({ tabs: { chatgpt: 7 } });
++    f.env.sendToTab = async () => ({ ok: false, error: 'busy' });
++    const orch = new HistorySyncOrchestrator(f.env);
++    await orch.start({ providers: ['chatgpt'], days: 30, scope: 'all' });
++    await orch.idle();
++    expect(orch.state.providers[0].status).toBe('error');
++  });
+   it('runs the page-side reader in the user\'s open tab, stores what it reports, and ends with a summary', async () => {
+     const f = fakeEnv({ tabs: { chatgpt: 7 } });
+     const orch = new HistorySyncOrchestrator(f.env);
+diff --git a/tests/unit/model-apis.test.ts b/tests/unit/model-apis.test.ts
+index 921090f..484c996 100644
+--- a/tests/unit/model-apis.test.ts
++++ b/tests/unit/model-apis.test.ts
+@@ -64,6 +64,13 @@ const cohere = (patch: Partial<SettingsRecord> = {}): SettingsRecord => ({
+ });
+ 
+ describe('settings migration', () => {
++  it('routes existing Voyage settings to Atlas without losing the key or model', () => {
++    const s = normalizeSettings({ voyageApiKey: 'atlas-key', voyageModel: 'voyage-4', rerankProvider: 'voyage' });
++    expect(s.voyageEndpoint).toBe('mongodb');
++    expect(s.voyageApiKey).toBe('atlas-key');
++    expect(s.voyageModel).toBe('voyage-4');
++    expect(normalizeSettings({ ...s, voyageEndpoint: 'legacy' }).voyageEndpoint).toBe('legacy');
++  });
+   it('fills the new provider fields for a record saved before they existed', () => {
+     const old = { ...DEFAULT_SETTINGS } as Partial<SettingsRecord>;
+     for (const k of ['mongodbApiKey', 'cohereApiKey', 'cohereEmbeddingModel', 'mongodbGeography'] as const) delete old[k];
+@@ -74,6 +81,48 @@ describe('settings migration', () => {
+   });
+ });
+ 
++describe('Voyage endpoint routing', () => {
++  const settings: SettingsRecord = {
++    ...DEFAULT_SETTINGS, embeddingProvider: 'voyage', rerankProvider: 'voyage', voyageApiKey: '  atlas-key  ',
++  };
++
++  it.each(['mongodb', 'legacy'] as const)('uses the selected %s host for documents, queries, reranking and permissions', async (voyageEndpoint) => {
++    const s = { ...settings, voyageEndpoint };
++    const host = voyageEndpoint === 'legacy' ? 'https://api.voyageai.com' : 'https://ai.mongodb.com';
++    const { calls, fetchImpl } = recordingFetch((call) => call.url.endsWith('/embeddings')
++      ? { data: (call.body.input as string[]).map((_, index) => ({ index, embedding: [0.1, 0.2] })).reverse() }
++      : { data: [{ index: 1, relevance_score: 0.9 }, { index: 0, relevance_score: 0.1 }] });
++    const space = remoteSpace(s)!;
++    expect(await embedTexts(s, space, ['a', 'b'], 'document', fetchImpl)).toHaveLength(2);
++    expect(await embedTexts(s, space, ['q'], 'query', fetchImpl)).toHaveLength(1);
++    expect(await rerankDocuments(s, 'q', ['a', 'b'], 1, fetchImpl, { bypassCache: true })).toEqual([{ index: 1, score: 0.9 }]);
++    expect(calls.map((c) => c.url)).toEqual([`${host}/v1/embeddings`, `${host}/v1/embeddings`, `${host}/v1/rerank`]);
++    expect(calls.map((c) => c.headers.get('authorization'))).toEqual(Array(3).fill('Bearer atlas-key'));
++    expect(calls.slice(0, 2).map((c) => c.body.input_type)).toEqual(['document', 'query']);
++    expect(embeddingApiOrigins(s)).toEqual([`${host}/*`]);
++    expect(rerankHostOrigins(s)).toEqual([`${host}/*`]);
++  });
++
++  it('keeps vectors and rerank scores separate when switching endpoints', async () => {
++    clearRerankCache();
++    const legacy = { ...settings, voyageEndpoint: 'legacy' as const };
++    expect(remoteSpace(legacy)?.id).toBe('voyage:voyage-4-lite');
++    expect(remoteSpace(settings)?.id).not.toBe(remoteSpace(legacy)?.id);
++    const { calls, fetchImpl } = recordingFetch(() => ({ data: [{ index: 0, relevance_score: 0.8 }] }));
++    await rerankDocuments(settings, 'endpoint-cache-probe', ['a'], 1, fetchImpl);
++    await rerankDocuments(legacy, 'endpoint-cache-probe', ['a'], 1, fetchImpl);
++    expect(calls).toHaveLength(2);
++  });
++
++  it('reports an Atlas authorization failure without retrying the key on another host', async () => {
++    const { calls, fetchImpl } = recordingFetch(() => ({ detail: 'This API key cannot access this endpoint.' }), 403);
++    expect(await testEmbedding(settings, fetchImpl)).toMatchObject({ ok: false, message: expect.stringContaining('ai.mongodb.com returned HTTP 403') });
++    expect(await testReranker(settings, fetchImpl)).toMatchObject({ ok: false, message: expect.stringContaining('ai.mongodb.com returned HTTP 403') });
++    expect(calls).toHaveLength(2);
++    expect(calls.every((c) => c.url.startsWith('https://ai.mongodb.com/v1/'))).toBe(true);
++  });
++});
++
+ describe('MongoDB Atlas (Voyage) embeddings', () => {
+   it('uses the geography host and puts the size in the space id', () => {
+     expect(mongodbBaseUrl('global')).toBe('https://ai.mongodb.com/v1');
+diff --git a/tests/unit/organizer.test.ts b/tests/unit/organizer.test.ts
+index ce55084..b8e7dca 100644
+--- a/tests/unit/organizer.test.ts
++++ b/tests/unit/organizer.test.ts
+@@ -468,9 +468,9 @@ describe('Embeddings', () => {
+ 
+     const voyage = { ...base, embeddingProvider: 'voyage' as const, voyageApiKey: 'pa-test' };
+     const vs = remoteSpace(voyage)!;
+-    expect(vs.id).toBe('voyage:voyage-4-lite');
++    expect(vs.id).toBe('voyage:mongodb:voyage-4-lite');
+     await embedTexts(voyage, vs, ['a', 'b'], 'document', fetchStub);
+-    expect(seen[0]).toMatchObject({ url: 'https://api.voyageai.com/v1/embeddings', auth: 'Bearer pa-test' });
++    expect(seen[0]).toMatchObject({ url: 'https://ai.mongodb.com/v1/embeddings', auth: 'Bearer pa-test' });
+     expect(seen[0].body).toMatchObject({ model: 'voyage-4-lite', input_type: 'document', input: ['a', 'b'] });
+ 
+     const openai = { ...base, embeddingProvider: 'openai' as const, openaiApiKey: 'sk-test' };
+diff --git a/tests/unit/rerank.test.ts b/tests/unit/rerank.test.ts
+index d2215ce..70e050b 100644
+--- a/tests/unit/rerank.test.ts
++++ b/tests/unit/rerank.test.ts
+@@ -79,7 +79,7 @@ describe('Voyage rerank', () => {
+     const { calls, fetchImpl } = recordingFetch(voyageScores);
+     const out = await rerankDocuments(voyage, 'webhook fix', ['plain', 'the best one', 'a good one'], 2, fetchImpl);
+     expect(calls).toHaveLength(1);
+-    expect(calls[0].url).toBe('https://api.voyageai.com/v1/rerank');
++    expect(calls[0].url).toBe('https://ai.mongodb.com/v1/rerank');
+     expect(calls[0].headers.get('authorization')).toBe('Bearer pa-key');
+     expect(calls[0].body).toEqual({
+       query: 'webhook fix',
+@@ -209,7 +209,7 @@ describe('Bedrock rerank', () => {
+   });
+ 
+   it('names the host each credential kind needs', () => {
+-    expect(rerankHostOrigins(voyage)).toEqual(['https://api.voyageai.com/*']);
++    expect(rerankHostOrigins(voyage)).toEqual(['https://ai.mongodb.com/*']);
+     expect(rerankHostOrigins(bedrock({ ...IAM, region: 'us-west-2' }))).toEqual([
+       'https://bedrock-agent-runtime.us-west-2.amazonaws.com/*',
+     ]);

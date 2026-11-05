@@ -573,11 +573,14 @@ let syncRunning = false;
 
 const sleepMs = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-function emitSyncEvent(event: SyncEvent): void {
+async function emitSyncEvent(event: SyncEvent): Promise<void> {
   try {
-    chrome.runtime.sendMessage({ type: 'HISTORY_SYNC_EVENT', event }, () => void chrome.runtime.lastError);
+    // The worker replies after storage completes. Await it before sending done,
+    // which may close an owned source tab and end the run.
+    const reply = await chrome.runtime.sendMessage({ type: 'HISTORY_SYNC_EVENT', event });
+    if (!reply?.ok) syncCancelled = true;
   } catch {
-    // extension reloaded; the service worker's idle watchdog ends the run
+    syncCancelled = true;
   }
 }
 
@@ -588,7 +591,8 @@ function startApiSync(message: Record<string, unknown>): { ok: boolean; error?: 
   const onChatGpt = host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com';
   const onClaude = host === 'claude.ai' || host.endsWith('.claude.ai');
   if ((provider !== 'chatgpt' || !onChatGpt) && (provider !== 'claude' || !onClaude)) return { ok: false, error: 'wrong_site' };
-  if (typeof message.runId !== 'string' || typeof message.sinceMs !== 'number' || typeof message.max !== 'number') {
+  if (typeof message.runId !== 'string' || typeof message.sinceMs !== 'number' || !Number.isFinite(message.sinceMs)
+    || typeof message.max !== 'number' || !Number.isFinite(message.max)) {
     return { ok: false, error: 'bad_request' };
   }
   if (syncRunning) return { ok: false, error: 'busy' };
@@ -602,7 +606,8 @@ function startApiSync(message: Record<string, unknown>): { ok: boolean; error?: 
     provider,
     runId: message.runId,
     sinceMs: message.sinceMs,
-    max: Math.min(500, Math.max(1, Math.round(message.max))),
+    max: message.scope === 'all' ? Number.MAX_SAFE_INTEGER : Math.min(500, Math.max(1, Math.round(message.max))),
+    scope: message.scope === 'all' ? 'all' : 'recent',
     known,
     origin: window.location.origin,
     cookies: document.cookie,

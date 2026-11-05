@@ -1,0 +1,15 @@
+{
+  "tool": "mcp__synara__browser_open",
+  "url": "http://127.0.0.1:47831/manager.html",
+  "result": {
+    "error": {
+      "code": "BrowserHostUnavailable",
+      "effectMayHaveCommitted": false,
+      "message": "No browser host is available for this workspace.",
+      "phase": "runtime",
+      "retryable": true
+    },
+    "type": "synara_browser_error",
+    "version": 1
+  }
+}

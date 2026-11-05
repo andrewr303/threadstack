@@ -64,6 +64,13 @@ const cohere = (patch: Partial<SettingsRecord> = {}): SettingsRecord => ({
 });
 
 describe('settings migration', () => {
+  it('routes existing Voyage settings to Atlas without losing the key or model', () => {
+    const s = normalizeSettings({ voyageApiKey: 'atlas-key', voyageModel: 'voyage-4', rerankProvider: 'voyage' });
+    expect(s.voyageEndpoint).toBe('mongodb');
+    expect(s.voyageApiKey).toBe('atlas-key');
+    expect(s.voyageModel).toBe('voyage-4');
+    expect(normalizeSettings({ ...s, voyageEndpoint: 'legacy' }).voyageEndpoint).toBe('legacy');
+  });
   it('fills the new provider fields for a record saved before they existed', () => {
     const old = { ...DEFAULT_SETTINGS } as Partial<SettingsRecord>;
     for (const k of ['mongodbApiKey', 'cohereApiKey', 'cohereEmbeddingModel', 'mongodbGeography'] as const) delete old[k];
@@ -71,6 +78,48 @@ describe('settings migration', () => {
     expect(s.mongodbGeography).toBe('global');
     expect(s.cohereEmbeddingModel).toBe('embed-v5.0-fast');
     expect(s.mongodbApiKey).toBe('');
+  });
+});
+
+describe('Voyage endpoint routing', () => {
+  const settings: SettingsRecord = {
+    ...DEFAULT_SETTINGS, embeddingProvider: 'voyage', rerankProvider: 'voyage', voyageApiKey: '  atlas-key  ',
+  };
+
+  it.each(['mongodb', 'legacy'] as const)('uses the selected %s host for documents, queries, reranking and permissions', async (voyageEndpoint) => {
+    const s = { ...settings, voyageEndpoint };
+    const host = voyageEndpoint === 'legacy' ? 'https://api.voyageai.com' : 'https://ai.mongodb.com';
+    const { calls, fetchImpl } = recordingFetch((call) => call.url.endsWith('/embeddings')
+      ? { data: (call.body.input as string[]).map((_, index) => ({ index, embedding: [0.1, 0.2] })).reverse() }
+      : { data: [{ index: 1, relevance_score: 0.9 }, { index: 0, relevance_score: 0.1 }] });
+    const space = remoteSpace(s)!;
+    expect(await embedTexts(s, space, ['a', 'b'], 'document', fetchImpl)).toHaveLength(2);
+    expect(await embedTexts(s, space, ['q'], 'query', fetchImpl)).toHaveLength(1);
+    expect(await rerankDocuments(s, 'q', ['a', 'b'], 1, fetchImpl, { bypassCache: true })).toEqual([{ index: 1, score: 0.9 }]);
+    expect(calls.map((c) => c.url)).toEqual([`${host}/v1/embeddings`, `${host}/v1/embeddings`, `${host}/v1/rerank`]);
+    expect(calls.map((c) => c.headers.get('authorization'))).toEqual(Array(3).fill('Bearer atlas-key'));
+    expect(calls.slice(0, 2).map((c) => c.body.input_type)).toEqual(['document', 'query']);
+    expect(embeddingApiOrigins(s)).toEqual([`${host}/*`]);
+    expect(rerankHostOrigins(s)).toEqual([`${host}/*`]);
+  });
+
+  it('keeps vectors and rerank scores separate when switching endpoints', async () => {
+    clearRerankCache();
+    const legacy = { ...settings, voyageEndpoint: 'legacy' as const };
+    expect(remoteSpace(legacy)?.id).toBe('voyage:voyage-4-lite');
+    expect(remoteSpace(settings)?.id).not.toBe(remoteSpace(legacy)?.id);
+    const { calls, fetchImpl } = recordingFetch(() => ({ data: [{ index: 0, relevance_score: 0.8 }] }));
+    await rerankDocuments(settings, 'endpoint-cache-probe', ['a'], 1, fetchImpl);
+    await rerankDocuments(legacy, 'endpoint-cache-probe', ['a'], 1, fetchImpl);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('reports an Atlas authorization failure without retrying the key on another host', async () => {
+    const { calls, fetchImpl } = recordingFetch(() => ({ detail: 'This API key cannot access this endpoint.' }), 403);
+    expect(await testEmbedding(settings, fetchImpl)).toMatchObject({ ok: false, message: expect.stringContaining('ai.mongodb.com returned HTTP 403') });
+    expect(await testReranker(settings, fetchImpl)).toMatchObject({ ok: false, message: expect.stringContaining('ai.mongodb.com returned HTTP 403') });
+    expect(calls).toHaveLength(2);
+    expect(calls.every((c) => c.url.startsWith('https://ai.mongodb.com/v1/'))).toBe(true);
   });
 });
 

@@ -363,6 +363,7 @@ export function App() {
       'autoOrganize',
       'embeddingProvider',
       'voyageApiKey',
+      'voyageEndpoint',
       'openaiApiKey',
       'ollamaUrl',
       'ollamaEmbeddingModel',

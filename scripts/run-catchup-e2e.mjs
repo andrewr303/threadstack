@@ -18,7 +18,7 @@ import { chromium } from 'playwright';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, '.output', 'chrome-mv3');
-const out = path.join(root, 'evidence', 'catchup');
+const out = process.env.TK_CATCHUP_EVIDENCE_DIR || path.join(root, 'evidence', 'catchup');
 const executablePath = process.env.CHROME_EXECUTABLE_PATH || undefined;
 fs.mkdirSync(out, { recursive: true });
 
@@ -30,7 +30,9 @@ function check(condition, message) {
 
 const DAY = 86_400_000;
 // Whole seconds, so a time survives the round trip through epoch seconds exactly.
-const secs = (daysAgo) => Math.floor((Date.now() - daysAgo * DAY) / 1000);
+// Keep source dates stable across runs; wall-clock fixtures falsely look updated on every read.
+const fixtureNow = Math.floor(Date.now() / 1000);
+const secs = (daysAgo) => fixtureNow - daysAgo * DAY / 1000;
 const iso = (daysAgo) => new Date(secs(daysAgo) * 1000).toISOString();
 const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
@@ -68,6 +70,7 @@ const CONVERSATIONS = [
   { n: 2, daysAgo: 10, title: 'Quarterly launch plan' },
   { n: 3, daysAgo: 20, title: 'Hiring scorecard' },
   { n: 4, daysAgo: 60, title: 'Old pricing experiment' },
+  { n: 5, daysAgo: 400, title: 'Archived planning notes', archived: true },
 ];
 const json = (body, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
@@ -102,7 +105,8 @@ async function launch() {
     if (url.pathname === '/api/auth/session') return r.fulfill(json({ accessToken: 'mock-token' }));
     if (url.pathname === '/backend-api/conversations') {
       const offset = Number(url.searchParams.get('offset') ?? 0);
-      const items = CONVERSATIONS.slice(offset, offset + 28).map((c) => ({ id: uuid(c.n), title: c.title, create_time: iso(c.daysAgo + 1), update_time: iso(c.daysAgo) }));
+      const archived = url.searchParams.get('is_archived') === 'true';
+      const items = CONVERSATIONS.filter((c) => Boolean(c.archived) === archived).slice(offset, offset + 28).map((c) => ({ id: uuid(c.n), title: c.title, create_time: iso(c.daysAgo + 1), update_time: iso(c.daysAgo), is_archived: Boolean(c.archived) }));
       return r.fulfill(json({ items, total: CONVERSATIONS.length, limit: 28, offset }));
     }
     const detail = url.pathname.match(/^\/backend-api\/conversation\/([0-9a-f-]{36})$/);
@@ -142,6 +146,10 @@ const storedThreads = (sw) =>
 
 async function run() {
   const { context, sw, extId, requests } = await launch();
+  const build = JSON.parse(fs.readFileSync(path.join(dist, 'build-info.json'), 'utf8'));
+  const loadedVersion = await sw.evaluate(() => chrome.runtime.getManifest().version_name);
+  check(loadedVersion === build.versionName, `packaged extension build matches disk: ${loadedVersion}`);
+  log(`browser: ${context.browser()?.version() ?? 'unknown'}; isolated fixture profile`);
   const errors = [];
 
   // 1 + 2. Capture: the DOM shows two messages; the page's own data holds all four.
@@ -185,6 +193,8 @@ async function run() {
   await page.getByRole('button', { name: 'Import / Export', exact: true }).click();
   const section = page.locator('section[aria-labelledby="tk-catchup-h"]');
   await section.waitFor();
+  check(await section.getByRole('button', { name: 'Import all online conversations', exact: true }).isVisible(), 'all-history import is available by default');
+  await section.getByRole('combobox', { name: 'How far back' }).selectOption('30');
   await page.screenshot({ path: path.join(out, '02-catchup-idle.png') });
   const tabsBefore = await sw.evaluate(async () => (await chrome.tabs.query({})).length);
   await section.getByRole('button', { name: 'Catch up', exact: true }).click();
@@ -218,6 +228,54 @@ async function run() {
   await page.locator('.tk-detail-title').waitFor({ timeout: 5000 });
   check(true, 'a thread link in the brief opens that thread');
 
+  // All-history import adds old + archived chats, then a second run skips every copy.
+  await page.getByRole('button', { name: 'Import / Export', exact: true }).click();
+  await section.getByRole('combobox', { name: 'How far back' }).selectOption('all');
+  await section.getByRole('button', { name: 'Import all online conversations', exact: true }).click();
+  try {
+    await chatgptRow.locator('.tk-sync-status', { hasText: /^Done: 2 imported, 3 already up to date/ }).waitFor({ timeout: 20000 });
+  } catch (err) {
+    console.error('All-history observed UI:', await section.innerText());
+    console.error('All-history stored fixture threads:', await storedThreads(sw));
+    await page.screenshot({ path: path.join(out, 'all-history-failure.png') });
+    await context.close();
+    throw err;
+  }
+  await claudeRow.locator('.tk-sync-status', { hasText: /Sign in to Claude/ }).waitFor({ timeout: 20000 });
+  rows = await storedThreads(sw);
+  check(rows.some((r) => r.id === uuid(4) && r.count === 4) && rows.some((r) => r.id === uuid(5) && r.count === 4), 'all-history import stores old and archived chats in full');
+  await page.screenshot({ path: path.join(out, '06-all-history.png') });
+  await section.getByRole('button', { name: 'Import all online conversations', exact: true }).click();
+  await chatgptRow.locator('.tk-sync-status', { hasText: /^Done: 0 imported, 5 already up to date/ }).waitFor({ timeout: 20000 });
+  await claudeRow.locator('.tk-sync-status', { hasText: /Sign in to Claude/ }).waitFor({ timeout: 20000 });
+  check((await storedThreads(sw)).length === rows.length, 'rerunning all-history import creates no duplicate threads');
+
+  // Switch the isolated Claude fixture from signed out to signed in.
+  const org = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const claudeChats = [{ n: 11, daysAgo: 2 }, { n: 12, daysAgo: 400 }];
+  await context.unroute('https://claude.ai/**');
+  await context.route('https://claude.ai/**', (r) => {
+    const url = new URL(r.request().url());
+    if (url.pathname === '/api/organizations') return r.fulfill(json([{ uuid: org, capabilities: ['chat'] }]));
+    if (/\/chat_conversations(?:_v2)?$/.test(url.pathname)) {
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      return r.fulfill(json(claudeChats.slice(offset).map((c) => ({ uuid: uuid(c.n), name: `Claude history ${c.n}`, created_at: iso(c.daysAgo + 1), updated_at: iso(c.daysAgo) }))));
+    }
+    const c = claudeChats.find((c) => url.pathname.endsWith(`/chat_conversations/${uuid(c.n)}`));
+    if (c) return r.fulfill(json({ uuid: uuid(c.n), name: `Claude history ${c.n}`, created_at: iso(c.daysAgo + 1), updated_at: iso(c.daysAgo),
+      chat_messages: [
+        { uuid: `u-${c.n}`, sender: 'human', index: 0, content: [{ type: 'text', text: `Question ${c.n}` }] },
+        { uuid: `a-${c.n}`, sender: 'assistant', index: 1, content: [{ type: 'text', text: `Answer ${c.n}` }] },
+      ] }));
+    return r.fulfill({ status: 200, contentType: 'text/html', body: '<html><head><title>Claude</title></head><body>Claude history fixture</body></html>' });
+  });
+  await section.getByRole('checkbox', { name: /^ChatGPT/ }).uncheck();
+  await section.getByRole('button', { name: 'Import all online conversations', exact: true }).click();
+  await claudeRow.locator('.tk-sync-status', { hasText: /^Done: 2 imported/ }).waitFor({ timeout: 20000 });
+  rows = await storedThreads(sw);
+  check(claudeChats.every((c) => rows.some((r) => r.id === uuid(c.n) && r.count === 2 && r.coverage === 'full')), 'Claude all-history imports both recent and 400-day-old conversations in full');
+  await page.screenshot({ path: path.join(out, '07-claude-all-history.png') });
+
   // 6. Narrow layout and errors.
   const narrow = await context.newPage();
   await narrow.setViewportSize({ width: 420, height: 860 });
@@ -235,6 +293,12 @@ async function run() {
   await narrow.screenshot({ path: path.join(out, '05-catchup-420.png') });
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join('; ')}` : ''}`);
+  fs.writeFileSync(path.join(out, 'execution.json'), JSON.stringify({
+    capturedAt: new Date().toISOString(), command: 'npm run test:catchup', browser: context.browser()?.version(),
+    build, loadedVersion, extensionUrl: `chrome-extension://${extId}/manager.html`,
+    siteMode: 'mocked Claude and ChatGPT routes in an isolated test profile',
+    assertions: 'capture, recent import, all-history old/archived import, duplicate skipping, Claude recent/old import, 420px overflow, no page errors',
+  }, null, 2));
   await context.close();
 }
 

@@ -139,6 +139,7 @@ export const SYNC_MAX_SIDEBAR = 30;
 export interface SyncRequest {
   providers: SyncProviderId[];
   days: number;
+  scope?: 'recent' | 'all';
 }
 
 export function clampSyncDays(days: unknown): number {
@@ -246,6 +247,7 @@ export interface SyncState {
   runId: string | null;
   running: boolean;
   days: number;
+  scope?: 'recent' | 'all';
   startedAt: string | null;
   finishedAt: string | null;
   providers: SyncProviderState[];
@@ -258,6 +260,7 @@ export function initialSyncState(runId: string, req: SyncRequest, nowIso: string
     runId,
     running: true,
     days: clampSyncDays(req.days),
+    scope: req.scope === 'all' ? 'all' : 'recent',
     startedAt: nowIso,
     finishedAt: null,
     providers: req.providers.flatMap((id) => {

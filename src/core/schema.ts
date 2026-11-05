@@ -806,6 +806,8 @@ export interface SettingsRecord {
   aiAnalysesDate: string;
   embeddingProvider: EmbeddingProviderId;
   voyageApiKey: string;
+  /** Shared by Voyage embeddings and reranking; Atlas-issued keys use MongoDB. */
+  voyageEndpoint: 'mongodb' | 'legacy';
   voyageModel: 'voyage-4-lite' | 'voyage-4' | 'voyage-4-large' | 'voyage-code-4';
   openaiApiKey: string;
   openaiEmbeddingModel: 'text-embedding-3-small' | 'text-embedding-3-large';
@@ -949,6 +951,7 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   aiAnalysesDate: '',
   embeddingProvider: 'local',
   voyageApiKey: '',
+  voyageEndpoint: 'mongodb',
   voyageModel: 'voyage-4-lite',
   openaiApiKey: '',
   openaiEmbeddingModel: 'text-embedding-3-small',

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "title": "Voyage endpoint fix and online history import",
+  "requirement": "Fix Voyage embedding/rerank Atlas routing and add all-history imports from Claude and ChatGPT websites.",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Voyage embeddings and reranking work with the matching Atlas endpoint."
+    },
+    {
+      "id": "R2",
+      "text": "Import all available old and recent Claude/ChatGPT conversations through signed-in sessions."
+    },
+    {
+      "id": "R3",
+      "text": "Settings and Import UI expose endpoint and all-history choices."
+    }
+  ],
+  "createdAt": "2026-11-05T05:28:35.083469+00:00",
+  "runtime": {
+    "expected": "browseros-neo",
+    "observed": null,
+    "selection": "fallback",
+    "tools": [
+      "mcp__synara__browser_status",
+      "mcp__synara__browser_open"
+    ],
+    "fallbacks": [
+      {
+        "runtime": "browseros-neo",
+        "status": "unavailable",
+        "reason": "Neo tools are not exposed."
+      },
+      {
+        "runtime": "codex-in-app-browser",
+        "status": "unavailable",
+        "reason": "Synara browser_open returned BrowserHostUnavailable; no workspace browser host is available."
+      }
+    ]
+  },
+  "context": {
+    "url": "http://127.0.0.1:47831/manager.html",
+    "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree; diff SHA256 00b2522cd022bd87ccbf8b19ed928e1a28df09b7bda3d45d2b7348235f668b9d",
+    "buildIdentity": "20261105.052712-3d90769 (disk only)",
+    "buildVerified": false,
+    "role": "No authenticated extension/browser session available"
+  },
+  "plan": [
+    {
+      "id": "voyage-api",
+      "requirements": [
+        "R1"
+      ],
+      "title": "Atlas embedding and rerank requests succeed",
+      "category": "Threadkeeper",
+      "verifier": "agent",
+      "method": "In the built extension, use the configured Atlas model key and Test both Voyage services.",
+      "expected": "Both succeed against ai.mongodb.com; legacy routing remains explicit.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "all-history",
+      "requirements": [
+        "R2"
+      ],
+      "title": "Import old and recent chats from online accounts",
+      "category": "Threadkeeper",
+      "verifier": "agent",
+      "method": "Sign in to Claude and ChatGPT, open Import / Export, select All history, start, observe progress, cancel and run again.",
+      "expected": "Older chats import beyond 500, duplicates are skipped and partial progress is kept.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "settings-import-ui",
+      "requirements": [
+        "R3"
+      ],
+      "title": "Endpoint and import controls are usable",
+      "category": "Threadkeeper",
+      "verifier": "agent",
+      "method": "Inspect endpoint settings and Import controls at desktop and narrow widths.",
+      "expected": "Controls and destinations match the chosen host; all-history and recent import are reachable.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "voyage-api",
+      "name": "Atlas embedding and rerank requests succeed",
+      "category": "Threadkeeper",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Live extension browser unavailable (BrowserHostUnavailable). Authenticated provider/API behavior and visual layout were not verified. Targeted tests are supporting evidence only.",
+      "evidence": []
+    },
+    {
+      "id": "all-history",
+      "name": "Import old and recent chats from online accounts",
+      "category": "Threadkeeper",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Live extension browser unavailable (BrowserHostUnavailable). Authenticated provider/API behavior and visual layout were not verified. Targeted tests are supporting evidence only.",
+      "evidence": []
+    },
+    {
+      "id": "settings-import-ui",
+      "name": "Endpoint and import controls are usable",
+      "category": "Threadkeeper",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Live extension browser unavailable (BrowserHostUnavailable). Authenticated provider/API behavior and visual layout were not verified. Targeted tests are supporting evidence only.",
+      "evidence": []
+    }
+  ],
+  "coverageGaps": [
+    "No live authenticated Atlas API request was made.",
+    "No live signed-in Claude/ChatGPT import was executed. Private website endpoints can change.",
+    "No screenshots or extension runtime evidence; local temporary server was stopped."
+  ]
+}

@@ -28,12 +28,13 @@ export interface ApiSyncParams {
   sinceMs: number;
   /** Most conversations to read in one run. */
   max: number;
+  scope?: 'recent' | 'all';
   /** Site conversation id → updatedAt already stored in full; those not updated since are skipped. */
   known: Record<string, string>;
   origin: string;
   cookies: string;
   fetchImpl: typeof fetch;
-  emit: (event: SyncEvent) => void;
+  emit: (event: SyncEvent) => void | Promise<void>;
   isCancelled: () => boolean;
   sleep: (ms: number) => Promise<void>;
   random?: () => number;
@@ -129,7 +130,6 @@ function parseChatGptList(json: unknown): ListedConversation[] | null {
   for (const raw of items) {
     const item = rec(raw);
     if (!item || typeof item.id !== 'string') continue;
-    if (item.is_archived === true) continue;
     out.push({
       id: item.id.toLowerCase(),
       title: typeof item.title === 'string' ? item.title : '',
@@ -142,20 +142,27 @@ function parseChatGptList(json: unknown): ListedConversation[] | null {
 
 async function listChatGpt(p: ApiSyncParams, headers: Record<string, string>): Promise<ListedConversation[]> {
   const found: ListedConversation[] = [];
-  let stale = 0;
-  for (let offset = 0; found.length < p.max && stale < 2; offset += CHATGPT_PAGE) {
-    if (p.isCancelled()) break;
-    const page = parseChatGptList(
-      await getJson(p, `${p.origin}/backend-api/conversations?offset=${offset}&limit=${CHATGPT_PAGE}&order=updated&is_archived=false`, headers)
-    );
-    if (page === null) throw new SyncFailure('unsupported', 'list shape');
-    if (page.length === 0) break;
-    const recent = page.filter((c) => (c.updatedAt ? Date.parse(c.updatedAt) >= p.sinceMs : true));
-    found.push(...recent);
-    // Newest first: a page with nothing recent means everything after it is older too.
-    stale = recent.length === 0 ? stale + 1 : 0;
-    if (page.length < CHATGPT_PAGE) break;
-    await p.sleep(PAUSE_MIN_MS);
+  const seen = new Set<string>();
+  for (const archived of p.scope === 'all' ? [false, true] : [false]) {
+    let stale = 0;
+    for (let offset = 0; found.length < p.max && stale < 2; offset += CHATGPT_PAGE) {
+      if (p.isCancelled()) break;
+      const page = parseChatGptList(
+        await getJson(p, `${p.origin}/backend-api/conversations?offset=${offset}&limit=${CHATGPT_PAGE}&order=updated&is_archived=${archived}`, headers)
+      );
+      if (page === null) throw new SyncFailure('unsupported', 'list shape');
+      if (page.length === 0) break;
+      const fresh = page.filter((c) => !seen.has(c.id));
+      if (fresh.length === 0) throw new SyncFailure('unsupported', 'repeated history page');
+      fresh.forEach((c) => seen.add(c.id));
+      const recent = fresh.filter((c) => p.scope === 'all' || !c.updatedAt || Date.parse(c.updatedAt) >= p.sinceMs);
+      found.push(...recent);
+      await p.emit({ kind: 'phase', runId: p.runId, provider: p.provider, phase: 'listing', total: found.length, message: `Found ${found.length} conversations` });
+      // Newest first: a page with nothing recent means everything after it is older too.
+      stale = recent.length === 0 ? stale + 1 : 0;
+      if (page.length < CHATGPT_PAGE) break;
+      await p.sleep(PAUSE_MIN_MS);
+    }
   }
   return found.slice(0, p.max);
 }
@@ -198,7 +205,7 @@ async function listClaude(p: ApiSyncParams, org: string): Promise<ListedConversa
   let stale = 0;
   // The paged list is the current one; fall back to the original if the site does not know it.
   let base = `${p.origin}/api/organizations/${org}/chat_conversations_v2`;
-  let query = (offset: number) => `limit=${CLAUDE_PAGE}&offset=${offset}&starred=false&consistency=eventual`;
+  let query = (offset: number) => `limit=${CLAUDE_PAGE}&offset=${offset}${p.scope === 'all' ? '' : '&starred=false'}&consistency=eventual`;
   for (let offset = 0; found.length < p.max && stale < 2; offset += CLAUDE_PAGE) {
     if (p.isCancelled()) break;
     let json: unknown;
@@ -217,9 +224,11 @@ async function listClaude(p: ApiSyncParams, org: string): Promise<ListedConversa
     if (page === null) throw new SyncFailure('unsupported', 'list shape');
     if (page.length === 0) break;
     const fresh = page.filter((c) => !seen.has(c.id));
+    if (fresh.length === 0) throw new SyncFailure('unsupported', 'repeated history page');
     fresh.forEach((c) => seen.add(c.id));
-    const recent = fresh.filter((c) => (c.updatedAt ? Date.parse(c.updatedAt) >= p.sinceMs : true));
+    const recent = fresh.filter((c) => p.scope === 'all' || !c.updatedAt || Date.parse(c.updatedAt) >= p.sinceMs);
     found.push(...recent);
+    await p.emit({ kind: 'phase', runId: p.runId, provider: p.provider, phase: 'listing', total: found.length, message: `Found ${found.length} conversations` });
     stale = recent.length === 0 ? stale + 1 : 0;
     if (page.length < CLAUDE_PAGE) break;
     await p.sleep(PAUSE_MIN_MS);
@@ -246,7 +255,7 @@ export async function runApiSync(p: ApiSyncParams): Promise<void> {
   const label = p.provider === 'chatgpt' ? 'ChatGPT' : 'Claude';
   const random = p.random ?? Math.random;
   try {
-    p.emit({ kind: 'phase', ...base, phase: 'listing', total: null, message: 'Listing recent conversations' });
+    await p.emit({ kind: 'phase', ...base, phase: 'listing', total: null, message: p.scope === 'all' ? 'Listing all conversations' : 'Listing recent conversations' });
     let listed: ListedConversation[];
     let headers: Record<string, string> = {};
     let org = '';
@@ -258,16 +267,16 @@ export async function runApiSync(p: ApiSyncParams): Promise<void> {
       listed = await listClaude(p, org);
     }
     if (p.isCancelled()) {
-      p.emit({ kind: 'done', ...base, listed: listed.length, message: 'Cancelled' });
+      await p.emit({ kind: 'done', ...base, listed: listed.length, message: 'Cancelled' });
       return;
     }
-    p.emit({ kind: 'phase', ...base, phase: 'fetching', total: listed.length, message: null });
+    await p.emit({ kind: 'phase', ...base, phase: 'fetching', total: listed.length, message: null });
 
     let failures = 0;
     for (const item of listed) {
       if (p.isCancelled()) break;
       if (isUpToDate(item, p.known)) {
-        p.emit({ kind: 'skipped', ...base, id: item.id, reason: 'up_to_date' });
+        await p.emit({ kind: 'skipped', ...base, id: item.id, reason: 'up_to_date' });
         continue;
       }
       try {
@@ -283,10 +292,10 @@ export async function runApiSync(p: ApiSyncParams): Promise<void> {
           p.provider === 'chatgpt' ? parseChatGptConversation(json, item.id) : parseClaudeConversation(json, item.id);
         if (!conv) throw new SyncFailure('unsupported', 'conversation shape');
         if (conv.messages.length === 0) {
-          p.emit({ kind: 'skipped', ...base, id: item.id, reason: 'empty' });
+          await p.emit({ kind: 'skipped', ...base, id: item.id, reason: 'empty' });
         } else {
           // The list's title and time are the site's current ones; the document may omit them.
-          p.emit({
+          await p.emit({
             kind: 'conversation',
             ...base,
             conversation: { ...conv, title: conv.title || item.title, updatedAt: conv.updatedAt ?? item.updatedAt, createdAt: conv.createdAt ?? item.createdAt },
@@ -297,16 +306,16 @@ export async function runApiSync(p: ApiSyncParams): Promise<void> {
         // Auth, challenge and rate-limit answers end the run; one bad conversation does not.
         if (err instanceof SyncFailure && (err.code === 'needs_login' || err.code === 'blocked' || err.code === 'rate_limited')) throw err;
         failures += 1;
-        p.emit({ kind: 'failed', ...base, id: item.id, message: err instanceof SyncFailure ? err.message : 'Unexpected error' });
+        await p.emit({ kind: 'failed', ...base, id: item.id, message: err instanceof SyncFailure ? err.message : 'Unexpected error' });
         if (failures >= MAX_CONSECUTIVE_FAILURES) {
           throw err instanceof SyncFailure ? err : new SyncFailure('unsupported', 'repeated failures');
         }
       }
       await p.sleep(PAUSE_MIN_MS + random() * PAUSE_SPREAD_MS);
     }
-    p.emit({ kind: 'done', ...base, listed: listed.length, message: p.isCancelled() ? 'Cancelled' : null });
+    await p.emit({ kind: 'done', ...base, listed: listed.length, message: p.isCancelled() ? 'Cancelled' : null });
   } catch (err) {
     const code: SyncErrorCode = err instanceof SyncFailure ? err.code : 'network';
-    p.emit({ kind: 'error', ...base, code, message: describeSyncError(code, label) });
+    await p.emit({ kind: 'error', ...base, code, message: describeSyncError(code, label) });
   }
 }

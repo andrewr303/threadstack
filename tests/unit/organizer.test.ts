@@ -468,9 +468,9 @@ describe('Embeddings', () => {
 
     const voyage = { ...base, embeddingProvider: 'voyage' as const, voyageApiKey: 'pa-test' };
     const vs = remoteSpace(voyage)!;
-    expect(vs.id).toBe('voyage:voyage-4-lite');
+    expect(vs.id).toBe('voyage:mongodb:voyage-4-lite');
     await embedTexts(voyage, vs, ['a', 'b'], 'document', fetchStub);
-    expect(seen[0]).toMatchObject({ url: 'https://api.voyageai.com/v1/embeddings', auth: 'Bearer pa-test' });
+    expect(seen[0]).toMatchObject({ url: 'https://ai.mongodb.com/v1/embeddings', auth: 'Bearer pa-test' });
     expect(seen[0].body).toMatchObject({ model: 'voyage-4-lite', input_type: 'document', input: ['a', 'b'] });
 
     const openai = { ...base, embeddingProvider: 'openai' as const, openaiApiKey: 'sk-test' };

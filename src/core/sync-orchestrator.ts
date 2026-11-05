@@ -88,14 +88,16 @@ export class HistorySyncOrchestrator {
   async start(request: SyncRequest): Promise<{ started: boolean; reason?: string }> {
     if (this.running) return { started: false, reason: 'Catch up is already running.' };
     const enabled = await this.env.enabledProviders();
-    const providers = request.providers.filter((id, i, all) => all.indexOf(id) === i && syncProviderInfo(id) && enabled.has(id));
+    const scope = request.scope === 'all' ? 'all' : 'recent';
+    const providers = request.providers.filter((id, i, all) => all.indexOf(id) === i && syncProviderInfo(id) && enabled.has(id)
+      && (scope !== 'all' || syncProviderInfo(id)?.strategy === 'api'));
     if (providers.length === 0) return { started: false, reason: 'No site to catch up on is switched on for capture.' };
     // Sites with a complete history first: they finish fastest and cost the site least.
     providers.sort((a, b) => Number(syncProviderInfo(a)?.strategy !== 'api') - Number(syncProviderInfo(b)?.strategy !== 'api'));
 
     this.cancelled = false;
     const days = clampSyncDays(request.days);
-    this.state = initialSyncState(this.env.newRunId(), { providers, days }, new Date(this.env.now()).toISOString());
+    this.state = initialSyncState(this.env.newRunId(), { providers, days, scope }, new Date(this.env.now()).toISOString());
     await this.save(true);
     this.running = this.runAll(providers, days).finally(() => {
       this.running = null;
@@ -174,7 +176,7 @@ export class HistorySyncOrchestrator {
   }
 
   private async runAll(providers: SyncProviderId[], days: number): Promise<void> {
-    const sinceMs = syncCutoffMs(days, this.env.now());
+    const sinceMs = this.state.scope === 'all' ? 0 : syncCutoffMs(days, this.env.now());
     for (const id of providers) {
       if (this.cancelled) {
         this.patch(id, { status: 'cancelled', message: 'Cancelled' });
@@ -230,7 +232,12 @@ export class HistorySyncOrchestrator {
     this.active = run;
     try {
       this.patch(info.id, { status: 'listing' });
-      await this.env.sendToTab(tabId, { type: 'TK_HISTORY_SYNC_RUN', runId, provider: info.id, sinceMs, max: SYNC_MAX_API, known });
+      const reply = await this.env.sendToTab(tabId, {
+        type: 'TK_HISTORY_SYNC_RUN', runId, provider: info.id, sinceMs,
+        max: this.state.scope === 'all' ? Number.MAX_SAFE_INTEGER : SYNC_MAX_API,
+        scope: this.state.scope, known,
+      }) as { ok?: boolean } | undefined;
+      if (!reply?.ok) return this.fail(info, 'unsupported');
       // Wait for "done" or "error", but not forever: a stalled page ends the run.
       for (;;) {
         if (this.cancelled) break;
