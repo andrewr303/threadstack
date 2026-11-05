@@ -22,6 +22,15 @@ import type {
 // MongoDB Atlas (Voyage)
 // ---------------------------------------------------------------------------
 
+/** Atlas is the default for Voyage model keys. Legacy keys need an explicit legacy endpoint. */
+export function voyageBaseUrl(settings: Pick<SettingsRecord, 'voyageEndpoint'>): string {
+  return settings.voyageEndpoint === 'legacy' ? 'https://api.voyageai.com/v1' : 'https://ai.mongodb.com/v1';
+}
+
+export function voyageOrigin(settings: Pick<SettingsRecord, 'voyageEndpoint'>): string {
+  return `${new URL(voyageBaseUrl(settings)).origin}/*`;
+}
+
 /** One host per geography. A model API key is only valid on the geography it was created for. */
 export const MONGODB_AI_BASE_URLS: Record<MongoDbGeography, string> = {
   global: 'https://ai.mongodb.com/v1',

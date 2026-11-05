@@ -31,6 +31,8 @@ import {
   isBedrockCohereV3,
   mongodbBaseUrl,
   mongodbOrigin,
+  voyageBaseUrl,
+  voyageOrigin,
 } from './model-apis.js';
 
 /**
@@ -60,8 +62,12 @@ export function localSpace(): EmbeddingSpace {
 export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
   switch (settings.embeddingProvider) {
     case 'voyage':
+      // Keep existing legacy vectors intact; Atlas uses a distinct space after migration.
       return settings.voyageApiKey.trim()
-        ? { id: `voyage:${settings.voyageModel}`, provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55 }
+        ? {
+            id: settings.voyageEndpoint === 'legacy' ? `voyage:${settings.voyageModel}` : `voyage:mongodb:${settings.voyageModel}`,
+            provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55,
+          }
         : null;
     case 'mongodb':
       // Atlas serves the same Voyage models as voyageai.com, but vectors are keyed by their own
@@ -288,11 +294,13 @@ export function embeddingHostOrigins(settings: SettingsRecord): string[] {
 }
 
 /**
- * Origins the configured hosted embedding provider needs the user to grant. Voyage, OpenAI
- * and Anthropic hosts are granted at install; Atlas, Cohere and AWS are asked for on a click.
+ * Origins the configured hosted embedding provider needs the user to grant. Legacy Voyage,
+ * OpenAI and Anthropic are granted at install; Atlas, Cohere and AWS are asked for on a click.
  */
 export function embeddingApiOrigins(settings: SettingsRecord): string[] {
   switch (settings.embeddingProvider) {
+    case 'voyage':
+      return [voyageOrigin(settings)];
     case 'mongodb':
       return [mongodbOrigin(settings.mongodbGeography)];
     case 'cohere':
@@ -494,6 +502,7 @@ export async function embedTexts(
   if (space.provider === 'bedrock') return embedWithBedrock(settings, space, texts, inputType, fetchImpl);
   if (space.provider === 'mongodb') return embedWithMongoDb(settings, space, texts, inputType, fetchImpl);
   if (space.provider === 'cohere') return embedWithCohere(settings, space, texts, inputType, fetchImpl);
+  if (space.provider === 'voyage') await requireOrigins([voyageOrigin(settings)], 'Voyage');
 
   const batchSize = 48;
   const out: number[][] = [];
@@ -502,7 +511,7 @@ export async function embedTexts(
     if (space.provider === 'voyage') {
       const data = (await postJson(
         fetchImpl,
-        'https://api.voyageai.com/v1/embeddings',
+        `${voyageBaseUrl(settings)}/embeddings`,
         { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
         { input: batch, model: space.model, input_type: inputType, truncation: true }
       )) as { data?: Array<{ embedding: number[]; index: number }> };

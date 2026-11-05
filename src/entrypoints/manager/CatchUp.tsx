@@ -63,7 +63,7 @@ function statusLine(p: SyncProviderState): string {
     case 'opening':
       return 'Opening the site';
     case 'listing':
-      return 'Finding recent conversations';
+      return p.message ?? 'Finding conversations';
     case 'fetching':
       return `Reading ${progressOf(p)} of ${p.listed}`;
     case 'cancelled':
@@ -74,7 +74,7 @@ function statusLine(p: SyncProviderState): string {
       const parts = [`${p.stored} imported`];
       if (p.skipped) parts.push(`${p.skipped} already up to date`);
       if (p.failed) parts.push(`${p.failed} could not be read`);
-      return `Done: ${parts.join(', ')}.`;
+      return `Done: ${parts.join(', ')}.${p.message ? ` ${p.message}` : ''}`;
     }
   }
 }
@@ -90,6 +90,7 @@ function runSummary(state: SyncState): string {
 export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
   const sync = useSyncState();
   const [days, setDays] = useState(SYNC_DEFAULT_DAYS);
+  const [scope, setScope] = useState<'recent' | 'all'>('all');
   const [selected, setSelected] = useState<Set<SyncProviderId>>(new Set(['chatgpt', 'claude']));
   const [startError, setStartError] = useState<string | null>(null);
   const [brief, setBrief] = useState<CatchUpBrief | null>(null);
@@ -145,14 +146,15 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
     setStartError(null);
     if (!hasRuntime()) return setStartError('Catch up needs the extension running.');
     try {
-      const reply = (await chrome.runtime.sendMessage({ type: 'START_HISTORY_SYNC', providers: Array.from(selected), days })) as
+      const providers = Array.from(selected).filter((id) => available.some((p) => p.id === id && (scope !== 'all' || p.strategy === 'api')));
+      const reply = (await chrome.runtime.sendMessage({ type: 'START_HISTORY_SYNC', providers, days, scope })) as
         | { ok?: boolean; error?: string }
         | undefined;
       if (!reply?.ok) setStartError(reply?.error ?? 'Catch up could not start.');
     } catch {
       setStartError('Could not reach the extension. Reload it and try again.');
     }
-  }, [selected, days]);
+  }, [selected, days, scope, available]);
 
   const cancel = () => void chrome.runtime.sendMessage({ type: 'CANCEL_HISTORY_SYNC' }).catch(() => undefined);
 
@@ -177,12 +179,17 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
   return (
     <section className="tk-settings-section" aria-labelledby="tk-catchup-h">
       <h3 className="tk-settings-h3" id="tk-catchup-h">
-        Catch up from your accounts
+        Import from online accounts
       </h3>
       <p className="tk-settings-note">
-        Pull your recent conversations straight from the sites you are signed in to, with no export. Threadkeeper reads
+        Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. Threadkeeper reads
         through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then
         summarized and filed like any other thread.
+      </p>
+      <p className="tk-settings-note">
+        All history reads every available page in the active account or workspace, including archived ChatGPT chats.
+        Keep the browser and site tabs open while it runs. Cancel at any time; run it again to skip complete, unchanged
+        conversations and continue importing. Deleted or unavailable chats cannot be recovered.
       </p>
 
       {settings && claude && settings.autoOrganize.aiAnalysis && (
@@ -195,7 +202,11 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
       <div className="tk-field-row">
         <label className="tk-field">
           How far back
-          <select className="tk-select" value={days} disabled={sync.running} onChange={(e) => setDays(Number(e.target.value))}>
+          <select className="tk-select" value={scope === 'all' ? 'all' : days} disabled={sync.running} onChange={(e) => {
+            setScope(e.target.value === 'all' ? 'all' : 'recent');
+            if (e.target.value !== 'all') setDays(Number(e.target.value));
+          }}>
+            <option value="all">All history — Claude & ChatGPT</option>
             {DAY_CHOICES.map((d) => (
               <option key={d} value={d}>
                 Last {d} days
@@ -216,7 +227,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
           </label>
         ))}
       </div>
-      {slower.length > 0 && (
+      {scope !== 'all' && slower.length > 0 && (
         <details className="tk-catchup-more">
           <summary className="tk-muted">Other sites (slower)</summary>
           <p className="tk-settings-note">
@@ -244,7 +255,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
           </button>
         ) : (
           <button type="button" className="tk-btn tk-btn-primary" disabled={selected.size === 0 || !settings} onClick={() => void start()}>
-            Catch up
+            {scope === 'all' ? 'Import all online conversations' : 'Catch up'}
           </button>
         )}
       </div>
@@ -267,7 +278,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
         </ul>
       )}
 
-      {!sync.running && sync.runId && sync.providers.length > 0 && (
+      {!sync.running && sync.runId && sync.scope !== 'all' && sync.providers.length > 0 && (
         <div className="tk-catchup-brief-controls">
           <p className="tk-settings-note">
             {claude

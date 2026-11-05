@@ -87,10 +87,13 @@ export function createChromeSyncEnv(
     },
     async knownUpdatedAt(provider: SyncProviderId) {
       const known: Record<string, string> = {};
+      const settings = await deps.loadSettings();
+      const bound = settings.boundAccounts[provider];
       const rows = await db.conversations.where('provider').equals(provider).toArray();
       for (const c of rows) {
         // Only a complete copy from the site itself can stand in for a fresh read.
-        if (c.branchId === 'main' && c.coverage === 'full' && isAuthoritativeSource(c.captureSource) && c.updatedAt) {
+        if (c.accountId === bound.accountId && c.workspaceId === bound.workspaceId
+          && c.branchId === 'main' && c.coverage === 'full' && isAuthoritativeSource(c.captureSource) && c.updatedAt) {
           known[c.sourceConversationId.toLowerCase()] = c.updatedAt;
         }
       }

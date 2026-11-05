@@ -47,6 +47,7 @@ import {
   cohereEmbeddingInfo,
   cohereSupportsDimensions,
   isBedrockCohereV3,
+  voyageBaseUrl,
 } from '../../core/model-apis.js';
 import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
 import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
@@ -261,7 +262,7 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
   if (aiCredentialsReady(settings)) {
     out.push({ what: 'Claude analysis, Organize and Ask', where: backendHost(settings) });
   }
-  if (settings.embeddingProvider === 'voyage' && settings.voyageApiKey.trim()) out.push({ what: 'Embeddings', where: 'api.voyageai.com' });
+  if (settings.embeddingProvider === 'voyage' && settings.voyageApiKey.trim()) out.push({ what: 'Embeddings', where: new URL(voyageBaseUrl(settings)).host });
   if (settings.embeddingProvider === 'mongodb' && settings.mongodbApiKey.trim()) {
     out.push({ what: 'Embeddings', where: new URL(MONGODB_GEOGRAPHY_URLS[settings.mongodbGeography]).host });
   }
@@ -272,7 +273,7 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
     out.push({ what: 'Embeddings', where: `bedrock-runtime.${settings.aws.region}.amazonaws.com` });
   }
   if (settings.rerankProvider === 'voyage' && settings.voyageApiKey.trim()) {
-    out.push({ what: 'Reranking (short excerpts)', where: 'api.voyageai.com' });
+    out.push({ what: 'Reranking (short excerpts)', where: new URL(voyageBaseUrl(settings)).host });
   }
   if (settings.rerankProvider === 'mongodb' && settings.mongodbApiKey.trim()) {
     out.push({ what: 'Reranking (short excerpts)', where: new URL(MONGODB_GEOGRAPHY_URLS[settings.mongodbGeography]).host });
@@ -329,6 +330,20 @@ function sectionStatus(
     default:
       return null;
   }
+}
+
+function VoyageEndpoint({ settings, onPatch }: Pick<Props, 'onPatch'> & { settings: SettingsRecord }) {
+  return (
+    <label className="tk-field">
+      Voyage API endpoint (shared by embeddings and reranking)
+      <select className="tk-select" value={settings.voyageEndpoint}
+        onChange={(e) => void onPatch({ voyageEndpoint: e.target.value as SettingsRecord['voyageEndpoint'] })}>
+        <option value="mongodb">MongoDB Atlas — ai.mongodb.com</option>
+        <option value="legacy">Legacy Voyage — api.voyageai.com</option>
+      </select>
+      <span className="tk-settings-note">Use MongoDB Atlas for Atlas model API keys. Use Legacy Voyage for keys from voyageai.com. For US/EU scoped keys, choose the MongoDB Atlas provider and matching geography.</span>
+    </label>
+  );
 }
 
 function SecretInput({
@@ -963,6 +978,7 @@ export function SettingsDialog({
           </label>
           {settings.embeddingProvider === 'voyage' && (
             <>
+              <VoyageEndpoint settings={settings} onPatch={onPatch} />
               <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
               <label className="tk-field">
                 Model
@@ -1257,6 +1273,7 @@ export function SettingsDialog({
           )}
           {settings.rerankProvider === 'voyage' && (
             <>
+              <VoyageEndpoint settings={settings} onPatch={onPatch} />
               {settings.embeddingProvider !== 'voyage' && (
                 <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
               )}

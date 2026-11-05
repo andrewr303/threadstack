@@ -1,0 +1,15 @@
+{
+  "files": {
+    "assets/05-catchup-420.png": "ef771e83fa51321242ceb691aff20cea2832b9b7895a2a34bbdc3cefe296b056",
+    "assets/06-all-history.png": "59fc576b89c4d83e1e1f56167eb85a858f634ccd1ff83b44651f19dba01a973f",
+    "assets/07-claude-all-history.png": "36fb646ebe3c7c6a955629ad6c7278c37ef4dfcfc6672702c19969c48925e966",
+    "assets/e2e-fixture-failure.log": "41fe4eeffd456ec3f3da77ca57c4a7c37ecf37f20c9e57f5153f44f4be1ddfdb",
+    "assets/extension-e2e.log": "08535316bc359018f9a2b3f9a4e076e7b948319ae435cb2f0302fb3463c355f4",
+    "report.md": "3de7348382159926b2fa0c3fe2278d55d232e6b6288dfcc4217d3d43addedc5a",
+    "result.json": "15504c1aa46f9afe160ae18c87f617918a327580cbb75a5776f0fcc8a923e61b"
+  },
+  "missingFiles": [],
+  "schemaVersion": 1,
+  "sealedAt": "2026-11-05T05:51:10.422529+00:00",
+  "verdictAtSeal": "blocked"
+}

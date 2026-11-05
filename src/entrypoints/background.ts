@@ -966,7 +966,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           return;
         }
         const providers = Array.isArray(message.providers) ? message.providers.filter(isSyncProviderId) : [];
-        const started = await syncOrchestrator.start({ providers, days: clampSyncDays(message.days) });
+        const started = await syncOrchestrator.start({ providers, days: clampSyncDays(message.days), scope: message.scope === 'all' ? 'all' : 'recent' });
         sendResponse({ ok: started.started, error: started.reason });
         return;
       }

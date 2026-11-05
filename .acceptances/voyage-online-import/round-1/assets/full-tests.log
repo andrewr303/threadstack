@@ -1,0 +1,318 @@
+
+> threadkeeper@0.5.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/andrew/dev/threadkeeper
+
+ ✓ tests/unit/dock-background.test.ts (4 tests) 342ms
+ ✓ tests/unit/dock-pairing.test.ts (13 tests) 149ms
+ ✓ tests/unit/cli-sessions.test.ts (33 tests) 178ms
+ ✓ tests/unit/dock-review-fixes.test.ts (8 tests) 339ms
+ ✓ tests/unit/summary-v2.test.ts (21 tests) 353ms
+ ✓ tests/unit/dock-ui.test.ts (24 tests) 287ms
+ ✓ tests/unit/bulk.test.ts (28 tests) 406ms
+ ✓ tests/unit/core.test.ts (17 tests) 500ms
+ ✓ tests/unit/dock-query.test.ts (15 tests) 502ms
+ ✓ tests/unit/dock-sync.test.ts (15 tests) 615ms
+ ✓ tests/unit/capture.test.ts (42 tests) 155ms
+ ✓ tests/unit/providers-adapters.test.ts (28 tests) 111ms
+ ✓ tests/unit/host-access.test.ts (6 tests) 121ms
+ ✓ tests/unit/dock-payload.test.ts (15 tests) 150ms
+ ✓ tests/unit/history-sync.test.ts (36 tests) 109ms
+ ✓ tests/unit/merge.test.ts (13 tests) 112ms
+ ✓ tests/unit/rerank.test.ts (26 tests) 132ms
+ ✓ tests/unit/site-data.test.ts (21 tests) 137ms
+ ✓ tests/unit/providers-content-site.test.ts (5 tests) 43ms
+ ✓ tests/unit/paperclip-settings.test.ts (15 tests) 81ms
+ ✓ tests/unit/providers-content-xchat.test.ts (3 tests) 35ms
+ ✓ tests/unit/message-identity.test.ts (6 tests) 42ms
+ ✓ tests/unit/organizer.test.ts (31 tests) 567ms
+ ✓ tests/unit/bedrock-embeddings.test.ts (10 tests) 101ms
+ ✓ tests/unit/model-apis.test.ts (27 tests) 57ms
+ ✓ tests/unit/paperclip-client.test.ts (17 tests) 31ms
+ ✓ tests/unit/providers-registry.test.ts (108 tests) 23ms
+ ✓ tests/unit/online-import-ui.test.tsx (1 test) 49ms
+ ✓ tests/unit/aws.test.ts (6 tests) 9ms
+ ✓ tests/unit/diagnostics.test.ts (12 tests) 6ms
+ ✓ tests/unit/providers-custom-sites.test.ts (17 tests) 11ms
+ ✓ tests/unit/capture-check.test.ts (10 tests) 2ms
+ ✓ tests/unit/paperclip-mapper.test.ts (18 tests) 6ms
+ ✓ tests/unit/paperclip-sync.test.ts (18 tests) 1580ms
+   ✓ Paperclip sync > pages through many issues  1152ms
+ ✓ tests/unit/dock-protocol.test.ts (18 tests) 9ms
+ ✓ tests/unit/dock-scale.test.ts (1 test) 2257ms
+   ✓ library scale > reconciles, searches and counts 4000 threads within budget  2256ms
+(node:92586) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/unit/catch-up.test.ts (11 tests | 4 failed) 4120ms
+   ✓ collectCatchUpThreads > returns the window newest first and skips tombstoned and synthetic threads 37ms
+   ✓ collectCatchUpThreads > prefers Claude analysis, takes decisions and next steps from the stored summary, and flags local-only threads 15ms
+   ✓ buildLocalBrief > groups by project, orders by recent activity, dedupes and caps, and lists loose ends 0ms
+   ✓ buildLocalBrief > says so plainly when nothing happened 0ms
+   ✓ generateCatchUpBrief > without a key it returns the on-device brief and makes no request 16ms
+   × generateCatchUpBrief > sends only notes of threads that may leave the device, never message text, and keeps local-only threads in the brief 1302ms
+     → expected [] to have a length of 1 but got +0
+   ✓ generateCatchUpBrief > drops a workstream whose threads are all invented, and still shows the real threads  1478ms
+   × generateCatchUpBrief > falls back to the on-device brief with a note when Claude fails 1263ms
+     → expected 'Claude could not write the brief, so …' to match /rejected the API key/
+   ✓ generateCatchUpBrief > does not call Claude when every recent thread is local-only 6ms
+   × last brief storage > round-trips through localStorage 2ms
+     → expected null to deeply equal { …(11) }
+     → Cannot read properties of undefined (reading 'clear')
+   × last brief storage > rejects malformed stored values instead of rendering them 0ms
+     → Cannot read properties of undefined (reading 'setItem')
+     → Cannot read properties of undefined (reading 'clear')
+ ❯ tests/unit/ai-backends.test.ts (9 tests | 8 failed) 10500ms
+   × AI backends > Anthropic API: api.anthropic.com, bare model id, server-side fallback 1206ms
+     → Could not reach api.anthropic.com (network, timeout or missing host access).
+   × AI backends > Amazon Bedrock with an API key: Mantle endpoint, bearer key, anthropic.-prefixed model, no server-side fallback 1221ms
+     → Could not reach bedrock-mantle.us-west-2.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+   × AI backends > Amazon Bedrock with IAM keys: SigV4 for bedrock-mantle, no API key header 1362ms
+     → expected false to be true // Object.is equality
+   × AI backends > Amazon Bedrock with IAM keys keeps headers and body when the SDK passes a Request (fallback middleware) 1360ms
+     → Could not reach bedrock-mantle.eu-central-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+   × AI backends > Bedrock: a 400 on a model without the fallback middleware is not mistaken for a rejected beta header 1358ms
+     → expected [Function] to throw error matching /Request rejected/ but got 'Could not reach bedrock-mantle.us-eas…'
+   × AI backends > Bedrock: retries without the fallback middleware if Bedrock rejects its beta header 1314ms
+     → Could not reach bedrock-mantle.us-east-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+   × AI backends > Claude Platform on AWS: workspace header, Bearer key, bare model id, server-side fallback 1326ms
+     → Could not reach aws-external-anthropic.us-west-2.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+   × AI backends > streams Ask through the selected backend 1351ms
+     → Could not reach bedrock-mantle.us-east-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+   ✓ AI backends > reports what is missing per backend and maps model ids 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Anthropic API: api.anthropic.com, bare model id, server-side fallback
+ClaudeCallError: Could not reach api.anthropic.com (network, timeout or missing host access).
+ ❯ toClaudeCallError src/core/ai/claude.ts:117:12
+    115|   if (err instanceof Anthropic.APIConnectionError) {
+    116|     const hint = settings && settings.aiBackend !== 'anthropic' ? ' If…
+    117|     return new ClaudeCallError(`Could not reach ${host} (network, time…
+       |            ^
+    118|   }
+    119|   if (err instanceof Anthropic.APIError) {
+ ❯ analyzeThreadWithClaude src/core/ai/claude.ts:407:11
+ ❯ tests/unit/ai-backends.test.ts:87:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Amazon Bedrock with an API key: Mantle endpoint, bearer key, anthropic.-prefixed model, no server-side fallback
+ClaudeCallError: Could not reach bedrock-mantle.us-west-2.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+ ❯ toClaudeCallError src/core/ai/claude.ts:117:12
+    115|   if (err instanceof Anthropic.APIConnectionError) {
+    116|     const hint = settings && settings.aiBackend !== 'anthropic' ? ' If…
+    117|     return new ClaudeCallError(`Could not reach ${host} (network, time…
+       |            ^
+    118|   }
+    119|   if (err instanceof Anthropic.APIError) {
+ ❯ analyzeThreadWithClaude src/core/ai/claude.ts:407:11
+ ❯ tests/unit/ai-backends.test.ts:103:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Amazon Bedrock with IAM keys: SigV4 for bedrock-mantle, no API key header
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/unit/ai-backends.test.ts:120:20
+    118|     });
+    119|     const res = await testClaudeConnection(s, messagesFetch(calls));
+    120|     expect(res.ok).toBe(true);
+       |                    ^
+    121|     expect(res.message).toContain('Amazon Bedrock (us-east-1)');
+    122|     expect(calls[0].url).toBe('https://bedrock-mantle.us-east-1.api.aw…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Amazon Bedrock with IAM keys keeps headers and body when the SDK passes a Request (fallback middleware)
+ClaudeCallError: Could not reach bedrock-mantle.eu-central-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+ ❯ toClaudeCallError src/core/ai/claude.ts:117:12
+    115|   if (err instanceof Anthropic.APIConnectionError) {
+    116|     const hint = settings && settings.aiBackend !== 'anthropic' ? ' If…
+    117|     return new ClaudeCallError(`Could not reach ${host} (network, time…
+       |            ^
+    118|   }
+    119|   if (err instanceof Anthropic.APIError) {
+ ❯ analyzeThreadWithClaude src/core/ai/claude.ts:407:11
+ ❯ tests/unit/ai-backends.test.ts:133:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Bedrock: a 400 on a model without the fallback middleware is not mistaken for a rejected beta header
+AssertionError: expected [Function] to throw error matching /Request rejected/ but got 'Could not reach bedrock-mantle.us-eas…'
+
+- Expected: 
+/Request rejected/
+
++ Received: 
+"Could not reach bedrock-mantle.us-east-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models."
+
+ ❯ tests/unit/ai-backends.test.ts:151:5
+    149|       })
+    150|     );
+    151|     await expect(analyzeThreadWithClaude(s, INPUT, fetchImpl)).rejects…
+       |     ^
+    152|     expect(calls).toHaveLength(1);
+    153|     expect(bedrockFallbackActive()).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Bedrock: retries without the fallback middleware if Bedrock rejects its beta header
+ClaudeCallError: Could not reach bedrock-mantle.us-east-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+ ❯ toClaudeCallError src/core/ai/claude.ts:117:12
+    115|   if (err instanceof Anthropic.APIConnectionError) {
+    116|     const hint = settings && settings.aiBackend !== 'anthropic' ? ' If…
+    117|     return new ClaudeCallError(`Could not reach ${host} (network, time…
+       |            ^
+    118|   }
+    119|   if (err instanceof Anthropic.APIError) {
+ ❯ analyzeThreadWithClaude src/core/ai/claude.ts:407:11
+ ❯ tests/unit/ai-backends.test.ts:167:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > Claude Platform on AWS: workspace header, Bearer key, bare model id, server-side fallback
+ClaudeCallError: Could not reach aws-external-anthropic.us-west-2.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+ ❯ toClaudeCallError src/core/ai/claude.ts:117:12
+    115|   if (err instanceof Anthropic.APIConnectionError) {
+    116|     const hint = settings && settings.aiBackend !== 'anthropic' ? ' If…
+    117|     return new ClaudeCallError(`Could not reach ${host} (network, time…
+       |            ^
+    118|   }
+    119|   if (err instanceof Anthropic.APIError) {
+ ❯ analyzeThreadWithClaude src/core/ai/claude.ts:407:11
+ ❯ tests/unit/ai-backends.test.ts:183:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  tests/unit/ai-backends.test.ts > AI backends > streams Ask through the selected backend
+ClaudeCallError: Could not reach bedrock-mantle.us-east-1.api.aws (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.
+ ❯ toClaudeCallError src/core/ai/claude.ts:117:12
+    115|   if (err instanceof Anthropic.APIConnectionError) {
+    116|     const hint = settings && settings.aiBackend !== 'anthropic' ? ' If…
+    117|     return new ClaudeCallError(`Could not reach ${host} (network, time…
+       |            ^
+    118|   }
+    119|   if (err instanceof Anthropic.APIError) {
+ ❯ askLibraryWithClaude src/core/ai/claude.ts:557:11
+ ❯ tests/unit/ai-backends.test.ts:206:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  tests/unit/catch-up.test.ts > generateCatchUpBrief > sends only notes of threads that may leave the device, never message text, and keeps local-only threads in the brief
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/unit/catch-up.test.ts:224:19
+    222|     const brief = await generateCatchUpBrief(db, claudeSettings(), { d…
+    223| 
+    224|     expect(calls).toHaveLength(1);
+       |                   ^
+    225|     const sent = JSON.stringify(calls[0].body);
+    226|     expect(sent).toContain('Gist of x');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  tests/unit/catch-up.test.ts > generateCatchUpBrief > falls back to the on-device brief with a note when Claude fails
+AssertionError: expected 'Claude could not write the brief, so …' to match /rejected the API key/
+
+- Expected: 
+/rejected the API key/
+
++ Received: 
+"Claude could not write the brief, so this one was built on this device. Could not reach api.anthropic.com (network, timeout or missing host access)."
+
+ ❯ tests/unit/catch-up.test.ts:263:24
+    261|     expect(brief.model).toBeNull();
+    262|     expect(brief.note).toMatch(/built on this device/);
+    263|     expect(brief.note).toMatch(/rejected the API key/);
+       |                        ^
+    264|     expect(brief.threadCount).toBe(4);
+    265|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  tests/unit/catch-up.test.ts > last brief storage > round-trips through localStorage
+AssertionError: expected null to deeply equal { …(11) }
+
+- Expected: 
+{
+  "days": 30,
+  "generatedAt": "2026-11-03T12:00:00.000Z",
+  "headline": "1 conversation across 1 project in the last 30 days.",
+  "looseEnds": [],
+  "model": null,
+  "note": null,
+  "sinceIso": "2026-10-04T12:00:00.000Z",
+  "source": "local",
+  "threadCount": 1,
+  "withheld": 0,
+  "workstreams": [
+    {
+      "name": "Alpha",
+      "nextSteps": [],
+      "openLoops": [],
+      "threadKeys": [
+        "k1",
+      ],
+      "where": "g",
+    },
+  ],
+}
+
++ Received: 
+null
+
+ ❯ tests/unit/catch-up.test.ts:285:35
+    283|     expect(await loadLastBrief()).toBeNull();
+    284|     await saveLastBrief(brief);
+    285|     expect(await loadLastBrief()).toEqual(brief);
+       |                                   ^
+    286|   });
+    287| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+ FAIL  tests/unit/catch-up.test.ts > last brief storage > round-trips through localStorage
+ FAIL  tests/unit/catch-up.test.ts > last brief storage > rejects malformed stored values instead of rendering them
+TypeError: Cannot read properties of undefined (reading 'clear')
+ ❯ tests/unit/catch-up.test.ts:279:32
+    277| 
+    278| describe('last brief storage', () => {
+    279|   afterEach(() => localStorage.clear());
+       |                                ^
+    280|   const brief: CatchUpBrief = buildLocalBrief([thread({ threadKey: 'k1…
+    281| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
+
+ FAIL  tests/unit/catch-up.test.ts > last brief storage > rejects malformed stored values instead of rendering them
+TypeError: Cannot read properties of undefined (reading 'setItem')
+ ❯ tests/unit/catch-up.test.ts:290:20
+    288|   it('rejects malformed stored values instead of rendering them', asyn…
+    289|     for (const bad of ['{"headline": 3}', 'not json', '[]', JSON.strin…
+    290|       localStorage.setItem('tk_last_catch_up', bad);
+       |                    ^
+    291|       expect(await loadLastBrief()).toBeNull();
+    292|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
+
+
+ Test Files  2 failed | 36 passed (38)
+      Tests  12 failed | 696 passed (708)
+   Start at  22:27:33
+   Duration  11.10s (transform 1.06s, setup 0ms, collect 5.96s, tests 24.23s, environment 7.35s, prepare 1.29s)
+

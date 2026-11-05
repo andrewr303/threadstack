@@ -79,7 +79,7 @@ describe('Voyage rerank', () => {
     const { calls, fetchImpl } = recordingFetch(voyageScores);
     const out = await rerankDocuments(voyage, 'webhook fix', ['plain', 'the best one', 'a good one'], 2, fetchImpl);
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('https://api.voyageai.com/v1/rerank');
+    expect(calls[0].url).toBe('https://ai.mongodb.com/v1/rerank');
     expect(calls[0].headers.get('authorization')).toBe('Bearer pa-key');
     expect(calls[0].body).toEqual({
       query: 'webhook fix',
@@ -209,7 +209,7 @@ describe('Bedrock rerank', () => {
   });
 
   it('names the host each credential kind needs', () => {
-    expect(rerankHostOrigins(voyage)).toEqual(['https://api.voyageai.com/*']);
+    expect(rerankHostOrigins(voyage)).toEqual(['https://ai.mongodb.com/*']);
     expect(rerankHostOrigins(bedrock({ ...IAM, region: 'us-west-2' }))).toEqual([
       'https://bedrock-agent-runtime.us-west-2.amazonaws.com/*',
     ]);

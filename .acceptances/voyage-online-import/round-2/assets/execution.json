@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-11-05T05:49:18.615Z",
+  "command": "npm run test:catchup",
+  "browser": "153.0.8010.12",
+  "build": {
+    "version": "0.5.0",
+    "versionName": "0.5.0 (build 20261105.054637-3d90769)",
+    "buildId": "20261105.054637-3d90769",
+    "builtAt": "2026-11-05T05:46:37.250Z"
+  },
+  "loadedVersion": "0.5.0 (build 20261105.054637-3d90769)",
+  "extensionUrl": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+  "siteMode": "mocked Claude and ChatGPT routes in an isolated test profile",
+  "assertions": "capture, recent import, all-history old/archived import, duplicate skipping, Claude recent/old import, 420px overflow, no page errors"
+}

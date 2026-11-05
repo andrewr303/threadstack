@@ -13,6 +13,9 @@ import { runApiSync, type ApiSyncParams } from '../../src/core/site-history.js';
 import { loadSidebarConversations, readSidebarConversations } from '../../src/core/sidebar-history.js';
 import { HistorySyncOrchestrator, SYNC_IDLE_TIMEOUT_MS, type SyncEnv } from '../../src/core/sync-orchestrator.js';
 import { validateSiteConversation, type SiteConversation } from '../../src/core/site-api.js';
+import { ThreadkeeperDB } from '../../src/core/db.js';
+import { DEFAULT_SETTINGS, type ConversationRecord } from '../../src/core/schema.js';
+import { createChromeSyncEnv } from '../../src/core/sync-env.js';
 
 const DAY = 86_400_000;
 const NOW = Date.parse('2026-11-03T12:00:00Z');
@@ -59,6 +62,7 @@ function fakeChatGpt(daysAgoByIndex: number[], opts: { unauthorized?: boolean } 
       if (url.endsWith('/api/auth/session')) return opts.unauthorized ? json({}) : json({ accessToken: 'tok' });
       const list = url.match(/\/backend-api\/conversations\?offset=(\d+)&limit=(\d+)/);
       if (list) {
+        if (new URL(url).searchParams.get('is_archived') === 'true') return json({ items: [] });
         const offset = Number(list[1]);
         const limit = Number(list[2]);
         const items = daysAgoByIndex.slice(offset, offset + limit).map((d, i) => ({
@@ -88,7 +92,7 @@ function params(site: FakeSite, patch: Partial<ApiSyncParams> = {}) {
     origin: 'https://chatgpt.com',
     cookies: 'oai-did=device-1; _account=personal',
     fetchImpl: site.fetchImpl,
-    emit: (e) => events.push(e),
+    emit: (e) => { events.push(e); },
     isCancelled: () => false,
     sleep: async () => undefined,
     random: () => 0,
@@ -98,6 +102,50 @@ function params(site: FakeSite, patch: Partial<ApiSyncParams> = {}) {
 }
 
 describe('ChatGPT history sync', () => {
+  it('waits for a conversation to be stored before reporting completion', async () => {
+    const site = fakeChatGpt([1]);
+    let release!: () => void;
+    const stored = new Promise<void>((resolve) => { release = resolve; });
+    let receiptStarted!: () => void;
+    const started = new Promise<void>((resolve) => { receiptStarted = resolve; });
+    let done = false;
+    const { p } = params(site, { emit: async (event) => {
+      if (event.kind === 'conversation') { receiptStarted(); await stored; }
+      if (event.kind === 'done') done = true;
+    } });
+    const run = runApiSync(p);
+    await started;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try { expect(done).toBe(false); }
+    finally { release(); await run; }
+    expect(done).toBe(true);
+  });
+  it('imports more than 500 old chats across every page, including archived chats, and resumes by skipping stored copies', async () => {
+    const site = fakeChatGpt(Array.from({ length: 620 }, (_, i) => i + 100));
+    site.failWith = (url) => {
+      if (url.includes('/conversations?') && url.includes('is_archived=true')) {
+        return json({ items: [{ id: id(999), title: 'Archived', update_time: iso(999), is_archived: true }] });
+      }
+      return null;
+    };
+    const { p, events } = params(site, { scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER, known: { [id(1)]: iso(0) } });
+    await runApiSync(p);
+    expect(events.filter((e) => e.kind === 'conversation')).toHaveLength(620);
+    expect(events.filter((e) => e.kind === 'skipped')).toEqual([expect.objectContaining({ id: id(1), reason: 'up_to_date' })]);
+    expect(events.at(-1)).toMatchObject({ kind: 'done', listed: 621 });
+    expect(site.calls.some((u) => u.endsWith(`/conversation/${id(620)}`))).toBe(true);
+    expect(site.calls.some((u) => u.endsWith(`/conversation/${id(999)}`))).toBe(true);
+    expect(site.calls.some((u) => u.endsWith(`/conversation/${id(1)}`))).toBe(false);
+  });
+
+  it('reports a repeated full page as incomplete instead of looping or claiming all history was read', async () => {
+    const site = fakeChatGpt([]);
+    site.failWith = (url) => url.includes('/conversations?') ? json({ items: Array.from({ length: 28 }, (_, i) => ({ id: id(i + 1), update_time: iso(1) })) }) : null;
+    const { p, events } = params(site, { scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER });
+    await runApiSync(p);
+    expect(events.at(-1)).toMatchObject({ kind: 'error', code: 'unsupported' });
+    expect(site.calls.filter((u) => u.includes('/conversations?'))).toHaveLength(2);
+  });
   it('reads every conversation in the window, newest first, and nothing older', async () => {
     // 5 conversations: 1, 2, 10, 29 days old (in the window) and 45 days old (out of it).
     const site = fakeChatGpt([1, 2, 10, 29, 45]);
@@ -295,6 +343,15 @@ describe('Claude history sync', () => {
   };
   const run = (s: FakeSite, patch: Partial<ApiSyncParams> = {}) => params(s, { provider: 'claude', origin: 'https://claude.ai', cookies: `lastActiveOrg=${ORG}`, ...patch });
 
+  it('reads all old history beyond the recent-run and content-script caps without filtering starred chats', async () => {
+    const s = site(Array.from({ length: 550 }, (_, i) => i + 100));
+    const { p, events } = run(s, { scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER });
+    await runApiSync(p);
+    expect(events.filter((e) => e.kind === 'conversation')).toHaveLength(550);
+    expect(events.at(-1)).toMatchObject({ kind: 'done', listed: 550 });
+    expect(s.calls.filter((u) => u.includes('/chat_conversations_v2?')).every((u) => !u.includes('starred=false'))).toBe(true);
+  });
+
   it('uses the active organization, the paged list, and reads the active branch of each chat', async () => {
     const s = site([1, 3, 50]);
     const { p, events } = run(s);
@@ -321,6 +378,22 @@ describe('Claude history sync', () => {
 // ---------------------------------------------------------------------------
 
 describe('sync helpers', () => {
+  it('only skips full authoritative copies in the currently bound account and workspace', async () => {
+    const db = new ThreadkeeperDB('history-resume-account-test');
+    const bound = DEFAULT_SETTINGS.boundAccounts.chatgpt;
+    try {
+      await db.conversations.bulkPut([
+        { threadKey: 'mine', provider: 'chatgpt', sourceConversationId: id(1), accountId: bound.accountId, workspaceId: bound.workspaceId, branchId: 'main', coverage: 'full', captureSource: 'history_sync', updatedAt: iso(1) },
+        { threadKey: 'other-account', provider: 'chatgpt', sourceConversationId: id(2), accountId: 'other', workspaceId: bound.workspaceId, branchId: 'main', coverage: 'full', captureSource: 'history_sync', updatedAt: iso(1) },
+        { threadKey: 'other-workspace', provider: 'chatgpt', sourceConversationId: id(3), accountId: bound.accountId, workspaceId: 'other', branchId: 'main', coverage: 'full', captureSource: 'history_sync', updatedAt: iso(1) },
+        { threadKey: 'partial', provider: 'chatgpt', sourceConversationId: id(4), accountId: bound.accountId, workspaceId: bound.workspaceId, branchId: 'main', coverage: 'partial', captureSource: 'history_sync', updatedAt: iso(1) },
+      ] as ConversationRecord[]);
+      const env = createChromeSyncEnv(db, { loadSettings: async () => DEFAULT_SETTINGS, storeConversation: async () => 'stored' });
+      expect(await env.knownUpdatedAt('chatgpt')).toEqual({ [id(1)]: iso(1) });
+    } finally {
+      await db.delete();
+    }
+  });
   it('clamps the window to 1 to 31 days and computes the cutoff', () => {
     expect(clampSyncDays(30)).toBe(30);
     expect(clampSyncDays(0)).toBe(1);
@@ -478,6 +551,27 @@ const conv = (n: number, provider: 'chatgpt' | 'claude' = 'chatgpt'): SiteConver
 });
 
 describe('Catch up orchestration', () => {
+  it('passes all-history scope and no recent cutoff or cap through to the reader, excluding sidebar-only sites', async () => {
+    const f = fakeEnv({ tabs: { chatgpt: 7 } });
+    const orch = new HistorySyncOrchestrator(f.env);
+    f.handlers.onSend = (tabId, message) => {
+      if (message.type === 'TK_HISTORY_SYNC_RUN') void orch.handleEvent({ kind: 'done', runId: message.runId as string, provider: 'chatgpt', listed: 0, message: null }, tabId);
+    };
+    await orch.start({ providers: ['chatgpt', 'gemini'], days: 30, scope: 'all' });
+    await orch.idle();
+    expect(f.sent[0].message).toMatchObject({ scope: 'all', sinceMs: 0, max: Number.MAX_SAFE_INTEGER });
+    expect(orch.state.scope).toBe('all');
+    expect(orch.state.providers.map((p) => p.provider)).toEqual(['chatgpt']);
+  });
+
+  it('reports a rejected reader start immediately instead of waiting for the idle timeout', async () => {
+    const f = fakeEnv({ tabs: { chatgpt: 7 } });
+    f.env.sendToTab = async () => ({ ok: false, error: 'busy' });
+    const orch = new HistorySyncOrchestrator(f.env);
+    await orch.start({ providers: ['chatgpt'], days: 30, scope: 'all' });
+    await orch.idle();
+    expect(orch.state.providers[0].status).toBe('error');
+  });
   it('runs the page-side reader in the user\'s open tab, stores what it reports, and ends with a summary', async () => {
     const f = fakeEnv({ tabs: { chatgpt: 7 } });
     const orch = new HistorySyncOrchestrator(f.env);
