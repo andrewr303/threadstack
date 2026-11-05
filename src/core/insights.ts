@@ -581,6 +581,36 @@ function suggestStatus(
   return { status: 'active', reason: last.role === 'user' ? 'Your last message has no reply yet' : 'Recently active' };
 }
 
+function endSentence(text: string): string {
+  return /[.!?…"”]$/.test(text) ? text : `${text}.`;
+}
+
+/**
+ * One on-device overview paragraph from the opening request, the latest exchange and the topics. Cheap
+ * and deterministic; Claude's analysis replaces it with a real narrative.
+ */
+function localOverview(
+  conv: ConversationRecord,
+  userMsgs: MessageRecord[],
+  lastUser: MessageRecord | undefined,
+  lastAssistant: MessageRecord | undefined,
+  topics: string[]
+): string {
+  const parts: string[] = [];
+  const opening = userMsgs[0] ? firstSentence(userMsgs[0].content, 180) : '';
+  if (opening) parts.push(`You opened with: "${opening.replace(/[.!?]+$/, '')}".`);
+  if (lastUser && lastUser !== userMsgs[0]) {
+    const latest = firstSentence(lastUser.content, 160);
+    if (latest) parts.push(`Most recently you asked: "${latest.replace(/[.!?]+$/, '')}".`);
+  }
+  if (lastAssistant) {
+    const reply = firstSentence(lastAssistant.content, 180);
+    if (reply) parts.push(`The latest ${providerLabel(conv.provider)} reply: ${endSentence(reply)}`);
+  }
+  if (topics.length > 0) parts.push(`Covers ${topics.slice(0, 5).join(', ')}.`);
+  return parts.join(' ');
+}
+
 export interface LocalAnalysisResult {
   insight: ThreadInsight;
   summary: ExtensionSummaryOutput | null;
@@ -627,11 +657,7 @@ export function analyzeThreadLocally(
   const status = suggestStatus(conv, sorted, nowMs);
   const lastUserAsk = lastUser ? firstSentence(lastUser.content, 180) : null;
 
-  const summaryParts: string[] = [];
-  if (userMsgs[0]) summaryParts.push(`Started by asking: ${firstSentence(userMsgs[0].content, 180)}`);
-  if (lastUser && lastUser !== userMsgs[0]) summaryParts.push(`Most recently: ${lastUserAsk}`);
-  if (lastAssistant) summaryParts.push(`Latest reply: ${firstSentence(lastAssistant.content, 180)}`);
-  if (topics.length > 0) summaryParts.push(`Covers ${topics.slice(0, 5).join(', ')}.`);
+  const overviewParagraph = localOverview(conv, userMsgs, lastUser, lastAssistant, topics);
 
   const insight: ThreadInsight = {
     insightKey: insightKeyFor('local', conv.threadKey),
@@ -643,7 +669,8 @@ export function analyzeThreadLocally(
     generatedAt: new Date(nowMs).toISOString(),
     title,
     gist,
-    summary: summaryParts.join(' ') || 'Only the title has been captured so far.',
+    summary: overviewParagraph || 'Only the title has been captured so far.',
+    overview: overviewParagraph ? [overviewParagraph] : [],
     userGoal: userMsgs[0] ? firstSentence(userMsgs[0].content, 220) : null,
     outcome:
       status.status === 'done' && lastAssistant ? firstSentence(lastAssistant.content, 220) : null,
@@ -717,7 +744,10 @@ export function sanitizeSummaryForGrounding(
     }
     const msg = byOrdinal.get(resolved)!;
     const speaker = it.speaker === 'user_committed' && msg.role !== 'user' ? 'assistant_suggested' : it.speaker;
-    return { ...it, messageIndexes: [resolved], speaker };
+    const kept: ExtractedItem = { ...it, messageIndexes: [resolved], speaker };
+    // A rationale is commentary, not evidence: drop it (not the item) when it reads like an instruction.
+    if (typeof it.rationale === 'string' && containsPromptInjectionAttempt(it.rationale)) kept.rationale = null;
+    return kept;
   };
   const clean = (items: ExtractedItem[]) => items.map(keep).filter((x): x is ExtractedItem => x !== null);
   const validIdx = (idxs: number[]) => idxs.filter((i) => byOrdinal.has(i));
@@ -738,6 +768,15 @@ export function sanitizeSummaryForGrounding(
     openQuestions: clean(summary.openQuestions),
     actionItems: clean(summary.actionItems),
     constraints: clean(summary.constraints),
+    ...(summary.keyPoints !== undefined ? { keyPoints: clean(summary.keyPoints) } : {}),
+    ...(summary.nextStep !== undefined
+      ? {
+          nextStep:
+            typeof summary.nextStep === 'string' && summary.nextStep.trim() && !containsPromptInjectionAttempt(summary.nextStep)
+              ? summary.nextStep.trim()
+              : null,
+        }
+      : {}),
   };
 }
 

@@ -10,9 +10,26 @@ import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv } from '../core/sync-env.js
 import { EMPTY_SYNC_STATE, clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
 import { siteConversationTitle, type SiteConversation } from '../core/site-api.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
-import { validateRuntimeMessageSender } from '../core/messaging.js';
+import { DOCK_COMMAND_TYPES, captureSenderUrl, validateDockPageSender, validateRuntimeMessageSender } from '../core/messaging.js';
+import { DockService } from '../core/dock/external.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
-import { isCapturePageUrl, isProviderId, type CaptureProviderId } from '../core/providers.js';
+import {
+  PROVIDERS,
+  detectProviderFromUrl,
+  isCapturePageUrl,
+  isCaptureProviderId,
+  isProviderAllowedOnUrl,
+  isProviderId,
+  type CaptureProviderId,
+} from '../core/providers.js';
+import { EXPLICIT_GRANT_MS, decideCapture, newGrantToken, type ExplicitGrant } from '../core/capture-gate.js';
+import {
+  CONTENT_SCRIPT_FILE,
+  chromeCaptureScriptEnv,
+  matchCustomSite,
+  readCustomSites,
+  reconcileCaptureScripts,
+} from '../core/custom-sites.js';
 import {
   nextDueAnalysisAt,
   processThreadLocally,
@@ -21,11 +38,25 @@ import {
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
 import { autoHealStaleManifest, readDiskBuildInfo } from '../core/diagnostics.js';
 import { BUILD_INFO } from '../core/build-info.js';
+import {
+  PAPERCLIP_SYNC_ALARM,
+  PAPERCLIP_SYNC_PERIOD_MINUTES,
+  chromeStateStore as paperclipStateStore,
+  runPaperclipSync,
+  type SyncOutcome,
+} from '../core/paperclip/sync.js';
+import { PaperclipLiveHint } from '../core/paperclip/live.js';
+import { normalizeServerUrl } from '../core/paperclip/client.js';
 
 const db = new ThreadkeeperDB();
 
 const ANALYSIS_DUE_ALARM = 'tk-analysis-due';
 const ANALYSIS_SWEEP_ALARM = 'tk-analysis-sweep';
+// Sidebar Dock (Still) link.
+const DOCK_DRAIN_ALARM = 'tk-dock-drain';
+const DOCK_RECONCILE_ALARM = 'tk-dock-reconcile';
+const DOCK_DAILY_ALARM = 'tk-dock-daily';
+const DOCK_PAIR_ALARM = 'tk-dock-pair';
 
 let organizeCtxCache: { ctx: OrganizeContext; at: number } | null = null;
 let analysisRun: Promise<unknown> | null = null;
@@ -72,7 +103,15 @@ function kickAnalysis(): Promise<unknown> {
   if (analysisRun) return analysisRun;
   analysisRun = (async () => {
     try {
-      const summary = await runAnalysisJobs(db, { maxJobs: 8, timeBudgetMs: 240_000 });
+      const finished: string[] = [];
+      const summary = await runAnalysisJobs(db, {
+        maxJobs: 8,
+        timeBudgetMs: 240_000,
+        onJobDone: (threadKey, status) => {
+          if (status !== 'skipped') finished.push(threadKey);
+        },
+      });
+      if (finished.length) await dock.markDirty(finished).catch(() => undefined);
       if (summary.processed > 0) {
         organizeCtxCache = null;
         broadcastLibraryChanged();
@@ -98,7 +137,94 @@ async function organizeStoredThread(threadKey: string, settings: SettingsRecord)
   } catch (err) {
     console.warn('[threadkeeper] local organize failed', err);
   }
+  await dock.markDirty([threadKey]).catch((err) => console.warn('[threadkeeper] Still sync mark failed', err));
   broadcastLibraryChanged(threadKey);
+}
+
+// ---------------------------------------------------------------------------
+// Paperclip: issues, comments and agent runs from the user's Paperclip server
+// ---------------------------------------------------------------------------
+
+let paperclipRun: Promise<SyncOutcome> | null = null;
+let paperclipHint: PaperclipLiveHint | null = null;
+
+/** One Paperclip sync at a time per service-worker lifetime; later callers share the running one. */
+function kickPaperclipSync(options: { force?: boolean; budgetMs?: number; maxIssues?: number } = {}): Promise<SyncOutcome> {
+  if (paperclipRun) return paperclipRun;
+  paperclipRun = (async () => {
+    try {
+      const settings = await ensureStarterCollectionsAndSettings(db);
+      const outcome = await runPaperclipSync({
+        db,
+        settings,
+        store: paperclipStateStore(),
+        force: options.force,
+        budgetMs: options.budgetMs,
+        maxIssues: options.maxIssues,
+        organize: async (threadKeys, s) => {
+          const ctx = await getOrganizeContext(s);
+          for (const threadKey of threadKeys) {
+            const outcome = await processThreadLocally(db, threadKey, { settings: s, ctx });
+            if (outcome.createdProject) organizeCtxCache = null;
+          }
+          // Still link: synced Paperclip threads are pushed like any other organized thread.
+          await dock.markDirty(threadKeys).catch(() => undefined);
+        },
+      });
+      if (outcome.threadKeys.length > 0) {
+        organizeCtxCache = null;
+        broadcastLibraryChanged();
+        await scheduleAnalysisAlarm();
+      }
+      await refreshPaperclipHint(settings);
+      // A sync that stopped at its budget continues soon instead of waiting for the next period.
+      if (outcome.status === 'partial' && chrome.alarms) {
+        await chrome.alarms.create(`${PAPERCLIP_SYNC_ALARM}-continue`, { when: Date.now() + 30_000 });
+      }
+      return outcome;
+    } finally {
+      paperclipRun = null;
+    }
+  })();
+  return paperclipRun;
+}
+
+/** Live events from a local (local_trusted) server schedule a sync sooner; polling covers the rest. */
+async function refreshPaperclipHint(settings: SettingsRecord): Promise<void> {
+  const pc = settings.paperclip;
+  const wanted = pc.enabled && pc.liveUpdates && pc.deploymentMode === 'local_trusted';
+  if (!wanted) {
+    paperclipHint?.close();
+    paperclipHint = null;
+    return;
+  }
+  const state = await paperclipStateStore().load();
+  const companyIds = Object.keys(state.companies);
+  if (companyIds.length === 0) return;
+  if (paperclipHint?.isOpen && paperclipHint.matches(pc.serverUrl, companyIds)) return;
+  paperclipHint?.close();
+  paperclipHint = new PaperclipLiveHint({
+    serverUrl: pc.serverUrl,
+    companyIds,
+    onChange: () => void kickPaperclipSync(),
+  });
+  paperclipHint.open();
+}
+
+/** Sync every few minutes while Paperclip is set up; nothing at all otherwise. */
+async function schedulePaperclipAlarm(settings?: SettingsRecord): Promise<void> {
+  if (!chrome.alarms) return;
+  const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
+  if (!s.paperclip.enabled) {
+    await chrome.alarms.clear(PAPERCLIP_SYNC_ALARM);
+    paperclipHint?.close();
+    paperclipHint = null;
+    return;
+  }
+  const existing = await chrome.alarms.get(PAPERCLIP_SYNC_ALARM);
+  if (!existing) {
+    await chrome.alarms.create(PAPERCLIP_SYNC_ALARM, { delayInMinutes: 0.5, periodInMinutes: PAPERCLIP_SYNC_PERIOD_MINUTES });
+  }
 }
 
 /** Store a conversation read by Catch up. Deleted threads stay deleted (tombstones), and a site whose capture is off is skipped. */
@@ -180,6 +306,192 @@ async function openManagerTab(query?: Record<string, string>): Promise<number | 
   return created.id;
 }
 const securityRejectionLog: Array<{ timestamp: string; reason: string }> = [];
+
+function logSecurity(reason: string): void {
+  securityRejectionLog.push({ timestamp: new Date().toISOString(), reason });
+  if (securityRejectionLog.length > 200) securityRejectionLog.splice(0, securityRejectionLog.length - 200);
+}
+
+/** Consent window for a Still pair request: a top-level popup (connect.html is not web-accessible). */
+async function openDockConsentWindow(): Promise<void> {
+  const url = chrome.runtime.getURL('connect.html');
+  try {
+    if (chrome.windows?.create) {
+      await chrome.windows.create({ url, type: 'popup', width: 480, height: 640, focused: true });
+      return;
+    }
+  } catch {
+    // fall back to a tab
+  }
+  await chrome.tabs.create({ url });
+}
+
+const dock = new DockService({
+  db,
+  ownId: typeof chrome !== 'undefined' && chrome.runtime?.id ? chrome.runtime.id : '',
+  version:
+    typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : BUILD_INFO.version,
+  sendExternal: (extensionId, message) => chrome.runtime.sendMessage(extensionId, message),
+  openConsentWindow: openDockConsentWindow,
+  openThread: async (threadKey) => {
+    await openManagerTab({ threadKey });
+  },
+  kickAnalysis: () => {
+    organizeCtxCache = null;
+    void kickAnalysis();
+  },
+  scheduleDrain: (atMs) => {
+    if (!chrome.alarms) return;
+    if (atMs === null) void chrome.alarms.clear(DOCK_DRAIN_ALARM);
+    else void chrome.alarms.create(DOCK_DRAIN_ALARM, { when: Math.max(atMs, Date.now() + 30_000) });
+  },
+  schedulePairRetry: (on) => {
+    if (!chrome.alarms) return;
+    if (on) void chrome.alarms.create(DOCK_PAIR_ALARM, { periodInMinutes: 0.5 });
+    else void chrome.alarms.clear(DOCK_PAIR_ALARM);
+  },
+  broadcast: () => {
+    try {
+      void chrome.runtime.sendMessage({ type: 'DOCK_CHANGED' }).catch(() => undefined);
+    } catch {
+      // no listeners open
+    }
+  },
+  log: logSecurity,
+});
+
+// Still (Sidebar Dock) talks to Threadkeeper only on the external channel, with its own validator;
+// external messages never reach the internal handler. Registered synchronously at top level.
+if (typeof chrome !== 'undefined' && chrome.runtime?.onMessageExternal) {
+  chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    void dock.handleExternalMessage(message, sender).then(sendResponse, () =>
+      sendResponse({ ok: false, proto: 'still-threadkeeper/1', error: { code: 'internal', message: 'Threadkeeper failed' } })
+    );
+    return true;
+  });
+}
+
+// ---- Capture on runtime-granted sites (optional providers, sites added in Settings) ----------
+
+/** Per-tab proof that the user asked for that tab (overlay opened, or "Capture this tab"). */
+const explicitGrants = new Map<number, ExplicitGrant>();
+/** "Capture this tab" waits for the capture its token produces. */
+const explicitWaiters = new Map<number, { token: string; resolve: (result: CaptureTabResult) => void }>();
+
+interface CaptureTabResult {
+  ok: boolean;
+  status?: string;
+  error?: string;
+  title?: string;
+  messages?: number;
+  provider?: string;
+}
+
+function grantExplicitCapture(tabId: number, kind: ExplicitGrant['kind'], token = newGrantToken()): string {
+  explicitGrants.set(tabId, { token, kind, expiresAt: Date.now() + EXPLICIT_GRANT_MS });
+  return token;
+}
+
+let captureSitesQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Register / unregister the runtime content scripts so they match settings, added sites and
+ * granted access. Runs one at a time: a settings change, a permission event and the page's own
+ * notice often arrive together, and overlapping runs would register the same id twice.
+ */
+function reconcileCaptureSites(settings?: SettingsRecord): Promise<void> {
+  captureSitesQueue = captureSitesQueue.then(() => reconcileCaptureSitesNow(settings)).catch(() => undefined);
+  return captureSitesQueue;
+}
+
+async function reconcileCaptureSitesNow(settings?: SettingsRecord): Promise<void> {
+  const env = chromeCaptureScriptEnv();
+  if (!env) return;
+  const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
+  const sites = await readCustomSites(chrome.storage?.local);
+  const result = await reconcileCaptureScripts(env, { authorizedHosts: s.authorizedHosts, sites: sites.sites });
+  if (result.error) {
+    securityRejectionLog.push({ timestamp: new Date().toISOString(), reason: `Could not update capture scripts: ${result.error}` });
+  }
+}
+
+/** Load the reader into tabs already open on newly granted pages (registration only affects new loads). */
+async function injectIntoOpenTabs(patterns: string[]): Promise<void> {
+  if (patterns.length === 0 || !chrome.tabs?.query || !chrome.scripting?.executeScript) return;
+  try {
+    const tabs = await chrome.tabs.query({ url: patterns });
+    for (const tab of tabs) {
+      if (typeof tab.id !== 'number') continue;
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] }).catch(() => undefined);
+    }
+  } catch {
+    // no access to those tabs yet
+  }
+}
+
+/** Whether Threadkeeper may read this page at all: a provider page it has access to, or an added site. */
+async function capturablePage(url: string): Promise<{ ok: true; label: string } | { ok: false; error: string }> {
+  const provider = detectProviderFromUrl(url);
+  if (provider && PROVIDERS[provider].hostAccess !== 'custom' && isProviderAllowedOnUrl(provider, url)) {
+    return { ok: true, label: PROVIDERS[provider].label };
+  }
+  const site = matchCustomSite(await readCustomSites(chrome.storage?.local), url);
+  if (site) return { ok: true, label: site.label };
+  return { ok: false, error: 'This tab is not an AI page Threadkeeper reads. Add the site under "Any AI site" first.' };
+}
+
+/** Settings → Capture → "Capture this tab": save the conversation open in the given (or active) tab. */
+async function captureTabNow(requestedTabId?: number): Promise<CaptureTabResult> {
+  let tab: chrome.tabs.Tab | undefined;
+  try {
+    tab =
+      typeof requestedTabId === 'number'
+        ? await chrome.tabs.get(requestedTabId)
+        : (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+  } catch {
+    tab = undefined;
+  }
+  if (!tab || typeof tab.id !== 'number') return { ok: false, error: 'There is no tab to capture.' };
+  const url = tab.url ?? '';
+  if (url.startsWith('chrome-extension://') || url.startsWith('edge://') || url.startsWith('chrome://')) {
+    return { ok: false, error: 'Switch to the tab with the chat, then use Capture this tab from the side panel.' };
+  }
+  if (!url) return { ok: false, error: 'Threadkeeper has no access to this tab. Turn its site on (or add it) under Capture first.' };
+  const page = await capturablePage(url);
+  if (!page.ok) return { ok: false, error: page.error };
+  const tabId = tab.id;
+  const token = grantExplicitCapture(tabId, 'capture');
+  const result = new Promise<CaptureTabResult>((resolve) => {
+    explicitWaiters.get(tabId)?.resolve({ ok: false, error: 'Replaced by a newer request.' });
+    explicitWaiters.set(tabId, { token, resolve });
+    setTimeout(() => {
+      if (explicitWaiters.get(tabId)?.token !== token) return;
+      explicitWaiters.delete(tabId);
+      resolve({ ok: false, error: 'No conversation was found on this tab. Open the chat itself, wait for the reply to finish, then try again.' });
+    }, 10_000);
+  });
+  const ask = () => chrome.tabs.sendMessage(tabId, { type: 'TK_CAPTURE_NOW', explicitToken: token });
+  try {
+    await ask();
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: [CONTENT_SCRIPT_FILE] });
+      await ask();
+    } catch {
+      explicitWaiters.delete(tabId);
+      return { ok: false, error: `Threadkeeper could not read this ${page.label} tab. Reload the tab and try again.` };
+    }
+  }
+  return result;
+}
+
+function settleExplicitWaiter(tabId: number | undefined, token: unknown, result: CaptureTabResult): void {
+  if (typeof tabId !== 'number' || typeof token !== 'string') return;
+  const waiter = explicitWaiters.get(tabId);
+  if (!waiter || waiter.token !== token) return;
+  explicitWaiters.delete(tabId);
+  waiter.resolve(result);
+}
 type HandshakeEntry = { token: string; redeemed: boolean };
 const tabHandshakeTokens = new Map<number, HandshakeEntry>();
 const SESSION_HANDSHAKE_KEY = 'tk_tab_handshakes';
@@ -251,6 +563,7 @@ async function deleteTabHandshake(tabId: number): Promise<void> {
 if (typeof chrome !== 'undefined' && chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener((tabId) => {
     void deleteTabHandshake(tabId);
+    explicitGrants.delete(tabId);
   });
 }
 
@@ -279,6 +592,8 @@ export async function invokeOverlayOnTab(
   if (canInjectOverlay && tabId !== undefined) {
     const handshakeToken = generateHandshakeToken();
     await setTabHandshake(tabId, { token: handshakeToken, redeemed: false });
+    // Opening Threadkeeper on a page counts as asking for it (except where capture is explicit-only).
+    grantExplicitCapture(tabId, 'overlay', handshakeToken);
     try {
       const resp = (await chrome.tabs.sendMessage(tabId, {
         type: 'TOGGLE_THREADKEEPER_OVERLAY',
@@ -369,8 +684,23 @@ async function initializeBackground(): Promise<void> {
   if (chrome.alarms) {
     await chrome.alarms.create('threadkeeper-resumable-jobs', { periodInMinutes: 5 });
     await chrome.alarms.create(ANALYSIS_SWEEP_ALARM, { periodInMinutes: 3 });
+    await chrome.alarms.create(DOCK_RECONCILE_ALARM, { periodInMinutes: 15 });
+    await chrome.alarms.create(DOCK_DAILY_ALARM, { periodInMinutes: 24 * 60 });
   }
   await scheduleAnalysisAlarm();
+  // Still link: catch up with anything changed while the browser was closed (no-op when unpaired;
+  // skipped when the last full pass is under 10 minutes old), then push what is due.
+  await dock.reconcile(false).catch((err) => console.warn('[threadkeeper] Still reconcile failed', err));
+  await reconcileCaptureSites(settings);
+  dock.kickDrain();
+  await schedulePaperclipAlarm(settings);
+}
+
+// Host access granted or withdrawn (in Settings, or on the browser's extension page): keep the
+// runtime content scripts in line.
+if (typeof chrome !== 'undefined' && chrome.permissions?.onAdded) {
+  chrome.permissions.onAdded.addListener(() => void reconcileCaptureSites());
+  chrome.permissions.onRemoved.addListener(() => void reconcileCaptureSites());
 }
 
 // A rebuilt-but-not-reloaded unpacked extension keeps the previous manifest
@@ -420,6 +750,16 @@ if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
       });
     } else if (alarm.name === ANALYSIS_DUE_ALARM || alarm.name === ANALYSIS_SWEEP_ALARM) {
       void kickAnalysis();
+    } else if (alarm.name === DOCK_DRAIN_ALARM) {
+      void dock.drain();
+    } else if (alarm.name === DOCK_RECONCILE_ALARM) {
+      void dock.reconcile(false);
+    } else if (alarm.name === DOCK_DAILY_ALARM) {
+      void dock.daily();
+    } else if (alarm.name === DOCK_PAIR_ALARM) {
+      void dock.deliverGrant();
+    } else if (alarm.name === PAPERCLIP_SYNC_ALARM || alarm.name === `${PAPERCLIP_SYNC_ALARM}-continue`) {
+      void kickPaperclipSync();
     }
   });
 }
@@ -453,27 +793,49 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
 
+      if (message.type === 'GET_CAPTURE_SITE') {
+        // The content script on a page no provider owns asks whether the user added this site.
+        const pageUrl = captureSenderUrl(sender);
+        const site = pageUrl ? matchCustomSite(await readCustomSites(chrome.storage?.local), pageUrl) : null;
+        sendResponse(site ? { ok: true, site: { origin: site.origin } } : { ok: false });
+        return;
+      }
+
       if (message.type === 'PASSIVE_DOM_CAPTURE') {
         const settings = await ensureStarterCollectionsAndSettings(db);
-        const rawProvider = message.payload?.provider;
-        if (!isProviderId(rawProvider) || rawProvider === 'imported') {
-          sendResponse({ ok: false, error: 'Unknown capture provider' });
-          return;
-        }
-        const provider: CaptureProviderId = rawProvider;
-        if (!settings.authorizedHosts[provider] && !message.explicitInvoke) {
-          sendResponse({
+        const tabId = sender.tab?.id;
+        const decision = decideCapture({
+          payload: message.payload,
+          explicitToken: message.explicitToken,
+          sender,
+          authorizedHosts: settings.authorizedHosts,
+          sites: await readCustomSites(chrome.storage?.local),
+          grant: typeof tabId === 'number' ? explicitGrants.get(tabId) : null,
+          now: Date.now(),
+        });
+        if (!decision.ok) {
+          if (decision.error) {
+            securityRejectionLog.push({ timestamp: new Date().toISOString(), reason: `Rejected capture: ${decision.error}` });
+          }
+          const label = isProviderId(message.payload?.provider) ? PROVIDERS[message.payload.provider as CaptureProviderId].label : 'this site';
+          settleExplicitWaiter(tabId, message.explicitToken, {
             ok: false,
-            skipped: 'provider_not_authorized',
+            error:
+              decision.error ??
+              (decision.skipped === 'provider_not_authorized'
+                ? `Capture is off for ${label}. Turn it on under AI products, then try again.`
+                : 'Threadkeeper did not save this tab.'),
           });
+          sendResponse(decision.error ? { ok: false, error: decision.error } : { ok: false, skipped: decision.skipped });
           return;
         }
+        const provider = decision.provider;
         const bound = settings.boundAccounts[provider];
         const threadKey = buildThreadKey({
           provider,
           accountId: bound.accountId,
           workspaceId: bound.workspaceId,
-          sourceConversationId: message.payload.sourceConversationId,
+          sourceConversationId: decision.sourceConversationId,
           branchId: message.payload.branchId,
         });
         // A content script may only claim the two passive sources; "full" is the site's own
@@ -481,6 +843,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         const passiveSource = message.payload.captureSource === 'network_observer' ? 'network_observer' : 'dom_observer';
         const result = await upsertThread(db, {
           ...message.payload,
+          sourceConversationId: decision.sourceConversationId,
+          canonicalUrl: decision.canonicalUrl,
           captureSource: passiveSource,
           coverage:
             passiveSource === 'network_observer' && message.payload.coverage === 'full'
@@ -499,6 +863,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           threadKey,
           coverage: result.record?.coverage,
         });
+        settleExplicitWaiter(tabId, message.explicitToken, {
+          ok: true,
+          status: result.status,
+          provider,
+          title: typeof message.payload.title === 'string' ? message.payload.title : undefined,
+          messages: Array.isArray(message.payload.messages) ? message.payload.messages.length : 0,
+        });
         if (result.status === 'stored') {
           // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
           await organizeStoredThread(threadKey, settings);
@@ -506,6 +877,19 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             syncOrchestrator.noteCapture(sender.tab.id, message.payload.sourceConversationId, message.payload.messages.length);
           }
         }
+        return;
+      }
+
+      if (message.type === 'CAPTURE_TAB_NOW') {
+        sendResponse(await captureTabNow(typeof message.tabId === 'number' ? message.tabId : undefined));
+        return;
+      }
+
+      if (message.type === 'CAPTURE_SITES_CHANGED') {
+        await reconcileCaptureSites();
+        const patterns = Array.isArray(message.patterns) ? message.patterns.filter((p: unknown): p is string => typeof p === 'string') : [];
+        await injectIntoOpenTabs(patterns);
+        sendResponse({ ok: true });
         return;
       }
 
@@ -537,7 +921,20 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         organizeCtxCache = null;
         await applyLaunchBehavior();
         await scheduleAnalysisAlarm();
+        const settings = await ensureStarterCollectionsAndSettings(db);
+        await reconcileCaptureSites(settings);
+        // Excluded providers may have changed: take back what Still may no longer hold.
+        await dock.syncNow({ privacy: true }).catch(() => undefined);
+        await schedulePaperclipAlarm(settings);
+        await refreshPaperclipHint(settings);
         sendResponse({ ok: true });
+        return;
+      }
+
+      if (message.type === 'PAPERCLIP_SYNC_NOW') {
+        // Sync now: ignores the failure backoff and gets a larger budget than the periodic sync.
+        const outcome = await kickPaperclipSync({ force: true, budgetMs: 240_000, maxIssues: 1000 });
+        sendResponse({ ok: outcome.status !== 'error', outcome });
         return;
       }
 
@@ -636,6 +1033,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         'EXPORT_BUNDLE',
         'UPDATE_SETTINGS',
         'RUN_RESUMABLE_JOBS',
+        'DOCK_SEND',
       ]);
 
       if (isEmbeddedInHostTab && privilegedOverlayTypes.has(message.type)) {
@@ -655,6 +1053,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           });
           return;
         }
+      }
+
+      if (DOCK_COMMAND_TYPES.has(message.type)) {
+        sendResponse(await handleDockCommand(message, sender));
+        return;
       }
 
       if (message.type === 'OPEN_FULL_PAGE_MANAGER') {
@@ -692,7 +1095,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           });
           return;
         }
-        if (typeof message.canonicalUrl !== 'string' || !/^https:\/\//i.test(message.canonicalUrl)) {
+        // Paperclip usually runs on this computer over plain http; only its own configured origin is allowed.
+        const paperclipOrigin =
+          message.provider === 'paperclip' ? normalizeServerUrl(settings.paperclip.serverUrl) : null;
+        const isPaperclipPage =
+          typeof message.canonicalUrl === 'string' &&
+          paperclipOrigin !== null &&
+          normalizeServerUrl(message.canonicalUrl) === paperclipOrigin &&
+          message.canonicalUrl.startsWith(`${paperclipOrigin}/`);
+        if (typeof message.canonicalUrl !== 'string' || (!/^https:\/\//i.test(message.canonicalUrl) && !isPaperclipPage)) {
           sendResponse({ ok: false, status: 'no_web_url' });
           return;
         }
@@ -769,12 +1180,70 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   });
 }
 
+/** Internal DOCK_* messages from Threadkeeper's own pages (sender already validated as privileged). */
+async function handleDockCommand(
+  message: Record<string, unknown> & { type: string },
+  sender: chrome.runtime.MessageSender
+): Promise<Record<string, unknown>> {
+  const topLevelOnly = new Set(['DOCK_DECIDE', 'DOCK_UNPAIR', 'DOCK_SET_OPTIONS', 'DOCK_UNBLOCK', 'DOCK_OPEN_CONSENT']);
+  if (topLevelOnly.has(message.type)) {
+    const check = validateDockPageSender(message.type, sender, chrome.runtime.id);
+    if (!check.allowed) {
+      logSecurity(check.reason ?? `Rejected ${message.type}`);
+      return { ok: false, error: 'Open Threadkeeper in its own window to do this.' };
+    }
+  }
+  switch (message.type) {
+    case 'DOCK_SYNC_NOW':
+      return dock.syncNow({ threadKeys: message.threadKeys, privacy: message.privacy });
+    case 'DOCK_GET_STATE':
+      return { ok: true, state: await dock.getState() };
+    case 'DOCK_PENDING':
+      return { ok: true, pending: await dock.getPending() };
+    case 'DOCK_DECIDE':
+      return dock.decide({
+        requestId: message.requestId,
+        allow: message.allow,
+        code: message.code,
+        allowRemoteModels: message.allowRemoteModels,
+      });
+    case 'DOCK_UNPAIR':
+      return dock.unpair();
+    case 'DOCK_SEND':
+      return dock.sendThreads(message.threadKeys, message.target);
+    case 'DOCK_COLLECTIONS':
+      return dock.collections();
+    case 'DOCK_STATUS_FOR':
+      return dock.statusFor(message.threadKeys);
+    case 'DOCK_SET_OPTIONS':
+      return {
+        ok: true,
+        state: await dock.setOptions({
+          allowSearch: message.allowSearch,
+          shareTranscripts: message.shareTranscripts,
+          allowRemoteModels: message.allowRemoteModels,
+        }),
+      };
+    case 'DOCK_UNBLOCK':
+      return dock.unblock(message.extensionId);
+    case 'DOCK_RESYNC':
+      return dock.resync();
+    case 'DOCK_OPEN_CONSENT':
+      if (!(await dock.getPending())) return { ok: false, error: 'No request is waiting.' };
+      await openDockConsentWindow();
+      return { ok: true };
+    default:
+      return { ok: false, error: `Unknown ${message.type}` };
+  }
+}
+
 // Expose test-harness entrypoints on ServiceWorker globalThis for packaged-extension acceptance testing
 (globalThis as unknown as Record<string, unknown>).__threadkeeperInvokeAction =
   invokeOverlayOnTab;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperGetSecurityRejections =
   () => [...securityRejectionLog];
 (globalThis as unknown as Record<string, unknown>).__threadkeeperDb = db;
+(globalThis as unknown as Record<string, unknown>).__threadkeeperDock = dock;
 (globalThis as unknown as Record<string, unknown>).__threadkeeperClearInMemoryHandshakes =
   () => {
     tabHandshakeTokens.clear();

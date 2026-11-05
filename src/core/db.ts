@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import { PROVIDER_IDS, CAPTURE_PROVIDER_IDS } from './providers.js';
+import { PROVIDER_IDS, CAPTURE_PROVIDER_IDS, PROVIDERS } from './providers.js';
 import {
   STARTER_AREAS,
   normalizeSettings,
@@ -30,6 +30,7 @@ import {
 import { normalizeTags } from './organization.js';
 import { looksDerivedTitle, mergeCapturedMessages } from './merge.js';
 import type { PortableBundle } from './adapters.js';
+import type { DockMetaRecord, DockOutboxRecord, DockSentRecord, DockTrackedRecord } from './dock/records.js';
 
 export class ThreadkeeperDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
@@ -47,6 +48,10 @@ export class ThreadkeeperDB extends Dexie {
   insights!: Table<ThreadInsight, string>;
   threadVectors!: Table<ThreadVectorRecord, string>;
   handles!: Table<StoredHandleRecord, string>;
+  dockOutbox!: Table<DockOutboxRecord, string>;
+  dockSent!: Table<DockSentRecord, string>;
+  dockTracked!: Table<DockTrackedRecord, string>;
+  dockMeta!: Table<DockMetaRecord, string>;
 
   constructor(dbName = 'ThreadkeeperDB') {
     super(dbName);
@@ -81,7 +86,8 @@ export class ThreadkeeperDB extends Dexie {
           .modify((raw: Partial<SettingsRecord>) => {
             const next = normalizeSettings(raw);
             for (const id of CAPTURE_PROVIDER_IDS) {
-              next.authorizedHosts[id] = true;
+              // Only the providers that were capturable in v1; later ones keep their own default.
+              if (PROVIDERS[id].defaultEnabled) next.authorizedHosts[id] = true;
             }
             next.settingsVersion = 2;
             Object.assign(raw, next);
@@ -109,6 +115,14 @@ export class ThreadkeeperDB extends Dexie {
             if (!col.keywords) col.keywords = [];
           });
       });
+    // v3: the Sidebar Dock (Still) link — outbox, sent ledger, tracked threads, counters.
+    // New tables only; pairing itself lives in settings.sidebarDock (normalizeSettings fills it).
+    this.version(3).stores({
+      dockOutbox: 'threadKey, notBefore',
+      dockSent: 'threadKey',
+      dockTracked: 'threadKey',
+      dockMeta: 'key',
+    });
   }
 }
 
@@ -208,6 +222,8 @@ export interface UpsertThreadInput {
   modelSlug?: string | null;
   resumeCommand?: string | null;
   projectSource?: ProjectSource;
+  agentLabel?: string | null;
+  linkedThreadKeys?: string[];
   messages: Array<{
     sourceMessageId: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
@@ -257,7 +273,7 @@ export function buildChunksFromMessages(
   return chunks;
 }
 
-async function findMatchingTombstone(
+export async function findMatchingTombstone(
   db: ThreadkeeperDB,
   input: {
     threadKey: string;
@@ -472,6 +488,10 @@ export async function upsertThread(
           existing?.workflowStateSource ??
           (input.workflowState && input.workflowState !== 'active' ? 'manual' : 'auto'),
       };
+      const agentLabel = input.agentLabel ?? existing?.agentLabel;
+      if (agentLabel) record.agentLabel = agentLabel;
+      const linkedThreadKeys = input.linkedThreadKeys ?? existing?.linkedThreadKeys;
+      if (linkedThreadKeys?.length) record.linkedThreadKeys = linkedThreadKeys;
 
       await db.conversations.put(record);
       if (contentChanged && !record.isSyntheticBenchmark) {
@@ -686,6 +706,9 @@ export async function applySummaryEnrichment(
     suggestedProject: params.summary.suggestedProject,
     suggestedTags: params.summary.suggestedTags,
     confidence: params.summary.confidence,
+    // Analysis v2 fields (absent on on-device and older summaries).
+    ...(params.summary.keyPoints !== undefined ? { keyPoints: params.summary.keyPoints } : {}),
+    ...(params.summary.nextStep !== undefined ? { nextStep: params.summary.nextStep } : {}),
     groundingVerified: true,
   };
 

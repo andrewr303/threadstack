@@ -10,6 +10,16 @@ import {
 import { exportThreadToMarkdown, type PortableBundle } from '../../core/adapters.js';
 import { normalizeTag, undoChangeLog } from '../../core/organization.js';
 import { WORKFLOW_LABELS, openModal, sharedDb } from './shared.js';
+import {
+  NEW_COLLECTION,
+  describeSendOutcome,
+  dockSyncNow,
+  sendThreadsToStill,
+  stillTargetFromChoice,
+  targetLabel,
+  useStillCollections,
+} from './dock.js';
+import { StillTargetPicker } from './SidebarDock.js';
 
 // ---- List order ----
 
@@ -133,7 +143,8 @@ type BulkAction =
   | 'local_on'
   | 'local_off'
   | 'export_markdown'
-  | 'export_portable';
+  | 'export_portable'
+  | 'send_still';
 
 const EDIT_ACTIONS: Array<[BulkAction, string]> = [
   ['move', 'Move to project'],
@@ -149,6 +160,13 @@ const EXPORT_ACTIONS: Array<[BulkAction, string]> = [
   ['export_markdown', 'Markdown handoff'],
   ['export_portable', 'Portable JSON'],
 ];
+
+const SHARE_ACTIONS: Array<[BulkAction, string]> = [['send_still', 'Send to Still…']];
+
+/** Edits that can make a thread private (or shareable again): Still must hear about them at once. */
+export function bulkPatchAffectsPrivacy(patch: BulkThreadPatch): boolean {
+  return patch.cloudExcluded !== undefined || patch.project !== undefined;
+}
 
 const WORKFLOW_STATES = Object.keys(WORKFLOW_LABELS) as WorkflowState[];
 
@@ -174,6 +192,8 @@ interface Props {
   onChanged: (message: string, deletedKeys: readonly string[]) => Promise<void>;
   onAnnounce: (message: string) => void;
   onDialogClosed: () => void;
+  /** Threadkeeper is connected to Still: offer "Send to Still…". */
+  stillPaired?: boolean;
 }
 
 export function BulkActions({
@@ -187,6 +207,7 @@ export function BulkActions({
   onChanged,
   onAnnounce,
   onDialogClosed,
+  stillPaired = false,
 }: Props) {
   const [action, setAction] = useState<BulkAction>('move');
   // Empty until chosen: the most used project (first in the list) is offered first.
@@ -195,6 +216,10 @@ export function BulkActions({
   const [tagDraft, setTagDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<BulkResult | null>(null);
+  const [stillChoice, setStillChoice] = useState('');
+  const [stillNewName, setStillNewName] = useState('');
+  const effectiveAction: BulkAction = action === 'send_still' && !stillPaired ? 'move' : action;
+  const stillCollections = useStillCollections(effectiveAction === 'send_still' && selectedKeys.size > 0);
 
   const count = selectedKeys.size;
   const viewSet = new Set(viewKeys);
@@ -249,6 +274,10 @@ export function BulkActions({
     run(async () => {
       const entry = await applyBulkThreadEdit(sharedDb, orderedSelection, patch, describe);
       if (!entry) return { text: 'Nothing changed: the selected threads no longer exist.', reload: true };
+      dockSyncNow(
+        entry.snapshots.map((snap) => snap.threadKey),
+        { privacy: bulkPatchAffectsPrivacy(patch) }
+      );
       return { text: `${entry.description}.`, changeId: entry.changeId, reload: true };
     });
 
@@ -268,9 +297,20 @@ export function BulkActions({
       };
     });
 
+  const sendToStill = () =>
+    run(async () => {
+      const target = stillTargetFromChoice(stillChoice, stillNewName);
+      if (!target.ok) throw new Error(target.error);
+      const outcome = await sendThreadsToStill(orderedSelection, target.target);
+      const line = describeSendOutcome(outcome, targetLabel(stillChoice, stillNewName, stillCollections.collections));
+      if (!line.ok) throw new Error(line.text);
+      if (stillChoice === NEW_COLLECTION) setStillNewName('');
+      return { text: line.text, reload: false };
+    });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    switch (action) {
+    switch (effectiveAction) {
       case 'move':
         return void edit({ project: target }, (n) => `Moved ${threadCount(n)} to ${target} (locked)`);
       case 'status':
@@ -291,12 +331,17 @@ export function BulkActions({
         return void exportAs('markdown');
       case 'export_portable':
         return void exportAs('portable');
+      case 'send_still':
+        return void sendToStill();
     }
   };
 
   const handleUndo = (changeId: string, text: string) =>
     void run(async () => {
+      const undone = await sharedDb.changeLogs.get(changeId);
       const res = await undoChangeLog(sharedDb, changeId);
+      // Undo can flip local-only or move threads between projects.
+      if (res.restoredCount > 0) dockSyncNow(undone?.snapshots.map((snap) => snap.threadKey) ?? [], { privacy: true });
       return {
         text: res.restoredCount > 0 ? `Undid “${text.replace(/\.$/, '')}”.` : 'That change was already undone.',
         reload: true,
@@ -308,6 +353,7 @@ export function BulkActions({
     deleteDialogRef.current?.close();
     void run(async () => {
       const n = await deleteConversationsCascade(sharedDb, keys);
+      dockSyncNow(keys, { privacy: true });
       focusSelectAll();
       return { text: `Deleted ${threadCount(n)}. Each left a tombstone.`, deletedKeys: keys, reload: true };
     });
@@ -371,7 +417,7 @@ export function BulkActions({
               <select
                 className="tk-select"
                 aria-label="Action for the selected threads"
-                value={action}
+                value={effectiveAction}
                 onChange={(e) => setAction(e.target.value as BulkAction)}
               >
                 <optgroup label="Change">
@@ -388,8 +434,27 @@ export function BulkActions({
                     </option>
                   ))}
                 </optgroup>
+                {stillPaired && (
+                  <optgroup label="Share">
+                    {SHARE_ACTIONS.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
-              {action === 'move' && (
+              {effectiveAction === 'send_still' && (
+                <StillTargetPicker
+                  compact
+                  choice={stillChoice}
+                  newName={stillNewName}
+                  collections={stillCollections}
+                  onChoice={setStillChoice}
+                  onNewName={setStillNewName}
+                />
+              )}
+              {effectiveAction === 'move' && (
                 <select
                   className="tk-select tk-bulk-target"
                   aria-label="Project to move the selected threads to"
@@ -403,7 +468,7 @@ export function BulkActions({
                   ))}
                 </select>
               )}
-              {action === 'status' && (
+              {effectiveAction === 'status' && (
                 <select
                   className="tk-select tk-bulk-target"
                   aria-label="Status for the selected threads"
@@ -417,7 +482,7 @@ export function BulkActions({
                   ))}
                 </select>
               )}
-              {action === 'tag' && (
+              {effectiveAction === 'tag' && (
                 <input
                   type="text"
                   className="tk-input tk-bulk-target"
@@ -430,9 +495,17 @@ export function BulkActions({
               <button
                 type="submit"
                 className="tk-btn tk-btn-primary"
-                disabled={busy || (action === 'tag' && !tag)}
+                disabled={
+                  busy ||
+                  (effectiveAction === 'tag' && !tag) ||
+                  (effectiveAction === 'send_still' && stillChoice === NEW_COLLECTION && !stillNewName.trim())
+                }
               >
-                {action === 'export_markdown' || action === 'export_portable' ? 'Export' : 'Apply'}
+                {effectiveAction === 'export_markdown' || effectiveAction === 'export_portable'
+                  ? 'Export'
+                  : effectiveAction === 'send_still'
+                    ? 'Send'
+                    : 'Apply'}
               </button>
             </form>
           )}

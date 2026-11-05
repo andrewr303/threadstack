@@ -6,9 +6,12 @@ import {
   type StructuredSummaryRecord,
   type RelationshipRecord,
   type ProviderId,
+  type ThreadInsight,
 } from './schema.js';
+import { buildSummaryMarkdown } from './summary-markdown.js';
 import type { UpsertThreadInput, ThreadkeeperDB } from './db.js';
 import { upsertThread } from './db.js';
+import { providerLabel } from './providers.js';
 
 export type CapabilitySupport = 'Y' | 'P' | 'N';
 
@@ -562,15 +565,21 @@ export async function importPortableBundle(
   return { importedCount, skippedTombstones };
 }
 
+/**
+ * The Markdown handoff for one thread: metadata, the summary (same builder as "Copy summary"), the
+ * user's notes and the captured transcript. `insight` is optional so callers without it still get the
+ * grounded summary sections.
+ */
 export function exportThreadToMarkdown(
   conv: ConversationRecord,
   messages: MessageRecord[],
-  summary: StructuredSummaryRecord | null
+  summary: StructuredSummaryRecord | null,
+  insight: ThreadInsight | null = null
 ): string {
   const lines: string[] = [];
   lines.push(`# ${getDisplayTitle(conv)}`);
   lines.push('');
-  lines.push(`- **Provider**: ${conv.provider}`);
+  lines.push(`- **Provider**: ${providerLabel(conv.provider)}`);
   lines.push(`- **Project / Area**: ${conv.project}${conv.categoryLocked ? ' (locked)' : ''}`);
   lines.push(`- **Workflow State**: ${conv.workflowState}`);
   lines.push(`- **Capture Coverage**: ${conv.coverage} (rev ${conv.sourceRevision})`);
@@ -578,46 +587,20 @@ export function exportThreadToMarkdown(
   if (conv.tags.length > 0) {
     lines.push(`- **Tags**: ${conv.tags.join(', ')}`);
   }
+  if (insight && insight.topics.length > 0) {
+    lines.push(`- **Topics**: ${insight.topics.join(', ')}`);
+  }
+  if (conv.workspacePath) {
+    lines.push(`- **Workspace**: ${conv.workspacePath}${conv.gitBranch ? ` (branch ${conv.gitBranch})` : ''}`);
+  }
+  if (conv.resumeCommand) {
+    lines.push(`- **Resume**: \`${conv.resumeCommand}\``);
+  }
   lines.push('');
 
-  if (summary) {
-    lines.push('## Where you left off');
-    lines.push(
-      `${summary.whereYouLeftOff} _(evidence: ${summary.whereYouLeftOffMessageIndexes.map((i) => `m${i + 1}`).join(', ')})_`
-    );
+  if (summary || insight) {
+    lines.push(buildSummaryMarkdown({ conv, insight, summary }, { title: false, context: false }).trimEnd());
     lines.push('');
-    lines.push('## Current status');
-    lines.push(
-      `${summary.currentStatus} _(evidence: ${summary.currentStatusMessageIndexes.map((i) => `m${i + 1}`).join(', ')})_`
-    );
-    lines.push('');
-    if (summary.decisions.length > 0) {
-      lines.push('## Decisions');
-      for (const d of summary.decisions) {
-        lines.push(
-          `- [${d.speaker === 'user_committed' ? 'Committed' : 'Suggested'} · ${d.messageIndexes.map((i) => `m${i + 1}`).join(', ')}] ${d.text}`
-        );
-      }
-      lines.push('');
-    }
-    if (summary.openQuestions.length > 0) {
-      lines.push('## Open questions');
-      for (const q of summary.openQuestions) {
-        lines.push(
-          `- [${q.messageIndexes.map((i) => `m${i + 1}`).join(', ')}] ${q.text}`
-        );
-      }
-      lines.push('');
-    }
-    if (summary.actionItems.length > 0) {
-      lines.push('## Action items');
-      for (const a of summary.actionItems) {
-        lines.push(
-          `- [${a.messageIndexes.map((i) => `m${i + 1}`).join(', ')}] ${a.text}`
-        );
-      }
-      lines.push('');
-    }
   }
 
   if (conv.manualNotes.trim().length > 0) {

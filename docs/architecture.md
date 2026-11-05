@@ -2,6 +2,109 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
+## v0.5 changes (2026-11-03)
+
+v0.5 joins four workstreams; each has its own section below (Still link, opt-in AI products and any AI site,
+Paperclip sync, analysis v2). What holds them together:
+
+1. **One provider registry.** `providers.ts` is the single API for every provider: `category` is required
+   (`chat`, `coding_agent`, `agent`, `builder`, `search`, `companion`, the values of Still's protocol), plus
+   `hostAccess`, `captureMode`, `defaultEnabled`, `idParams` and `selectorConfidence`. `providerCategory` /
+   `isProviderCategory` serve the manager filters, the Settings → Capture groups and the Still payloads, facets and
+   `filters.categories`. `paperclip` (category `agent`) and `imported` have `hostAccess: 'none'`; they are the
+   `NON_CAPTURE_PROVIDER_IDS`, so `CaptureProviderId` / `isCaptureProviderId` exclude them, the capture gate rejects
+   them and the DOM reader never runs for them. A registry test keeps the two lists in step.
+2. **Defaults for every id.** `DEFAULT_ACCOUNT_IDS` is a `Record<ProviderId, …>` (a new id does not compile
+   without one); `normalizeSettings` fills `boundAccounts` for every provider and `authorizedHosts` for every capture
+   provider (registry defaults), and normalizes the nested `sidebarDock` and `paperclip` settings.
+3. **Service worker.** One `onMessage` handler (privileged types: `CAPTURE_TAB_NOW`, `CAPTURE_SITES_CHANGED`,
+   `PAPERCLIP_SYNC_NOW`, `DOCK_*`) and a separate `onMessageExternal` listener for Still. Startup creates the analysis,
+   dock (`tk-dock-reconcile`, `tk-dock-daily`) and Paperclip alarms, registers runtime content scripts, reconciles the
+   Still ledger and kicks the drain. `SETTINGS_CHANGED` re-registers capture scripts, runs the Still privacy pass and
+   reschedules Paperclip. Threads stored by capture (`organizeStoredThread`), finished analysis jobs and Paperclip syncs
+   all mark their threads dirty for Still.
+4. **Still payloads read the real records.** `dock/payload.ts` and `dock/query.ts` use the typed analysis v2 fields
+   (`ThreadInsight.overview`, `produced`, `analysisVersion`; `ExtensionSummaryOutput.keyPoints`, `nextStep`;
+   `ExtractedItem.rationale`) and `ConversationRecord.agentLabel`. `analysisVersion` is 0 without an AI insight and
+   1 for an AI insight written before v2.
+5. **Upgrading summaries from Still.** `threads.analyze` queues `requested` analysis jobs (`enqueueAnalysis(…,
+   { requested: true })`), the same path as Settings → "Upgrade older summaries": they run even when automatic analysis
+   is off and re-analyze a current AI insight whose `analysisVersion` is older than `ANALYSIS_VERSION`. Threads whose
+   analysis is current and v2 are reported `fresh`.
+6. **Manifest.** `host_permissions` stays the v0.4 list. `optional_host_permissions` holds the opt-in products' hosts,
+   `https://*/*` and `http://*/*` (added sites) and `http://localhost/*`, `http://127.0.0.1/*` (Paperclip on this
+   computer). `connect.html` (Still consent) is built but not web-accessible.
+7. **Settings.** Sections: General, Capture (`CaptureSettings.tsx`), Paperclip (`PaperclipSettings.tsx`), AI models
+   (with "Upgrade older summaries"), Amazon Web Services, Search & embeddings, Organization, Privacy & limits, Sidebar
+   Dock (`SidebarDock.tsx`), Diagnostics.
+
+## Still (Sidebar Dock) link (2026-11-03)
+
+Threadkeeper talks to the separate Still extension over `chrome.runtime.onMessageExternal` / `sendMessage(id)`
+(protocol `still-threadkeeper/1`, `docs/sidebar-dock-integration.md`). All of it lives in `src/core/dock/`:
+
+- `protocol.ts` — constants, `threadHash` (two FNV-1a 64 over UTF-8; shared test vectors), shapes, hand validators
+  for every message and every response from Still.
+- `state.ts` — pairing in `settings.sidebarDock` (written only through `patchDockSettings`, a transactional nested
+  merge, so the worker and the manager never overwrite each other); the single pending pair request in
+  `chrome.storage.session` (`tk.dock.pending.v1`); counters (`seq`) and cursors in the `dockMeta` table.
+- `payload.ts` — `ThreadSummary` / `ThreadPayload` from the conversation, the resolved insight and the structured
+  summary (analysis v2 fields read when present), transcript budget (4000 messages, 120k chars each, ~3 MB, first 20 +
+  newest), secret redaction for tool/system messages, validated single-quoted resume commands, the fingerprint (only
+  the protocol's inputs, never a clock).
+- `outbox.ts` — Dexie v3 tables `dockOutbox` (one coalescing row per thread, `dirtySeq`, lease, backoff 1/5/30/120 min,
+  `local_only` removals every minute), `dockSent` (ledger per peer and epoch: fingerprint, seq, transcript revision,
+  prefs hash, cheap digest), `dockTracked`. `reconcileDock` compares a cheap row digest with the ledger in pages with a
+  persisted cursor (~2 s per tick, skipped within 10 min unless forced); `drainDock` decides each row at send time
+  (privacy re-checked; a `local_only`/`deleted` removal is never downgraded), pushes ≤ 20 threads / ~3.9 MB with one
+  push in flight and 1 s between pushes, honours `busy`, splits on `too_large`, and drops the pairing only after two
+  `not_paired` answers ≥ 60 s apart. Metadata first: a transcript is sent only for a revision Still has not acknowledged
+  or when it answers `needsTranscript`.
+- `query.ts` — search / list / context / related / facets for Still over shareable threads only (filters apply before
+  ranking): lexical + local hashed vectors, the remote query embedding and reranker only when the user allowed
+  `remote_models` and the deadline allows. Transcript text and vectors are cached per thread and `sourceRevision`.
+- `external.ts` — `DockService`: the external handler (sender id + extension-page origin, never a tab; check order
+  sender/pairing → type → size → fields; reads at most 2 in flight and 30 per minute), pairing with a one-time code,
+  `pair.granted` retried every 30 s until Still acknowledges, and the operations behind the internal `DOCK_*` messages.
+
+Hooks: `organizeStoredThread` and each finished analysis job mark the thread dirty (debounced by
+`max(60 s, aiDebounceSeconds)`); `SETTINGS_CHANGED` and `DOCK_SYNC_NOW` (sent by pages after their own writes) run the
+privacy fast path; alarms `tk-dock-drain` (one-shot), `tk-dock-reconcile` (15 min), `tk-dock-daily` (hello, private
+thread sweep with `chats.status`) and `tk-dock-pair` (30 s, only while a grant waits for Still). The consent page
+`connect.html` is not web-accessible; `DOCK_DECIDE` is accepted only from it as a top-level page, and `DOCK_UNPAIR`,
+`DOCK_SET_OPTIONS`, `DOCK_UNBLOCK` never from a frame inside a website.
+
+Manager UI (`src/entrypoints/manager/dock.ts`, `SidebarDock.tsx`): a page client for the `DOCK_*` messages (never
+throws; the overlay adds its handshake token for `DOCK_SEND`), `useDockState` (refreshed on `DOCK_CHANGED`), the
+Settings → Sidebar Dock panel, the Send to Still target picker (`DOCK_COLLECTIONS`, else Still's default placement, or a
+new collection name) used by the detail row, the bulk bar, search results and Ask, and the "In Still" badge
+(`DOCK_STATUS_FOR`, cached two minutes per thread, invalidated on `DOCK_CHANGED` and after a send). Page writes send
+`DOCK_SYNC_NOW` with the changed thread keys; writes that can make a thread private or delete it (local-only, project
+moves, deletes, organize, undo) set `privacy: true` so the worker takes copies back from Still at once.
+
+## Opt-in AI products and any AI site (capture workstream)
+
+1. **Registry fields.** Every provider in `providers.ts` now has a `category` (`chat`, `coding_agent`, `agent`, `builder`, `search`, `companion`; shared with Sidebar Dock), a `hostAccess` (`required` = install-time host permission and static content script, the v0.4 set, unchanged; `optional` = asked for from the Settings toggle; `custom` = only on sites the user adds; `none` = imports), a `captureMode` (`passive` or `explicit`), `defaultEnabled`, `idParams` (query parameters kept in canonical URLs) and a `selectorConfidence`. Path routing still lives in `providerForPage` (chatgpt.com/dots → `chatgpt_dots`, claude.ai/duet → `claude_duet`, x.com/i/chat → `grok_bot`, huggingface.co/chat, github.com/copilot and pull-request agent sessions, cursor.com/agents, lovable.dev/projects, replit.com/@user/app) and per-provider id rules in `extractConversationIdFromUrl` (which also fixes copilot.com/chat/conversation and HuggingChat ids the generic `/chat/` rule misread).
+2. **Host permissions do not grow at install.** `host_permissions` is exactly the v0.4 list (an update that adds hosts disables the extension until the user re-approves). New hosts, `www.kimi.ai`, and `https://*/*` / `http://*/*` are `optional_host_permissions`. Turning a product on requests its origins inside the click; `custom-sites.ts` then registers `content.js` for it with `chrome.scripting.registerContentScripts` (`persistAcrossSessions`, top frame, `document_idle`). The service worker reconciles registrations against settings, added sites and `chrome.permissions.contains` on install, startup, `permissions.onAdded/onRemoved`, `SETTINGS_CHANGED` and `CAPTURE_SITES_CHANGED`, and injects into tabs already open on a newly granted site. The overlay stays limited to install-time hosts (only they are web accessible); elsewhere the toolbar opens the side panel or the full library.
+3. **Any AI site.** Added origins live in `chrome.storage.local` (`tk.captureSites.v1`, ≤ 50, exact origin with port; http only for loopback and private-network hosts; known providers are refused with a pointer to their toggle). The content script on a page no provider owns asks the worker `GET_CAPTURE_SITE`; only a yes (decided from `sender.url`, never from the page) enables reading. The page is then read as Open WebUI, LibreChat, LobeChat or AnythingLLM when their markup is present, else as `custom_web` with the generic and heuristic readers. Conversation ids are namespaced by host and port (`localhost-3000~<id>`); a page with no id in its address is named by a hash of its opening message. `data-tk-*` attributes and the `tk_provider` hint are ignored there.
+4. **Capture gate.** `capture-gate.ts` decides every `PASSIVE_DOM_CAPTURE`: the sender must be a top frame http(s) page whose `origin` agrees with its URL (`messaging.ts captureSenderUrl`); a provider capture must come from that provider's own pages (`isProviderAllowedOnUrl`), and an added-site capture from that exact origin with its own id prefix; a canonical URL pointing elsewhere is replaced by the sender page. A content script's `explicitInvoke` no longer bypasses a turned-off provider: only a token the worker handed to that tab within 60 s does (`overlay` when Threadkeeper is opened on the page, `capture` for Settings → Capture → Capture this tab).
+5. **Explicit-only Grok Bot.** X Chat carries human DMs, so `grok_bot` (off by default) is read only when it is on **and** the capture carries a `capture` token. The content script never observes X Chat; it reads the chat's open shadow root only for that request. Roles are inferred from alignment classes (low confidence).
+6. **Settling.** Pages without a dependable streaming signal (generic or heuristic readers, added sites, adapters marked `stabilize`) are sent only when two reads in a row see the same text; adapters with a page-wide stop button (`docStreaming`) skip the newest reply while it is shown. Character.AI's newest-first list is reversed and keyed by content hashes.
+7. **Not built:** network readers (MAIN world) and Catch up for the new products, Pi export import, and live verification. Every new adapter is tested against synthetic fixtures modelled on public exporters and the sites' own code (`tests/unit/providers-*.test.ts`); the README table lists each product's selector confidence.
+
+## Paperclip sync (2026-11-03)
+
+`src/core/paperclip/`. Paperclip (github.com/paperclipai/paperclip, read at commit `4d31588`, server 0.3.1) is a self-hosted server that runs companies of AI agents. Threadkeeper reads it over its REST API from the service worker (Paperclip sends no CORS headers, so content scripts cannot), with host access requested from the Settings click (`http://localhost/*` and `http://127.0.0.1/*` are optional host permissions; other hosts need a broader optional grant).
+
+- **Model:** one thread per issue (`provider: 'paperclip'`, category `agent`, `sourceConversationId = issue.id`, the bound `paperclip` account). Messages: the description (`issue:<id>:description`, role user), comments (`comment:<id>`; user → user, agent → assistant, system/system notices → system, deleted skipped), and per run a block: a system header whose id `run:<runId>:h:<status>:<logBytes>[:s:<sessionId>]` records what makes the stored transcript reusable and the CLI session it resumed, then `run:<runId>:<n>` messages. Transcripts come from the run log (stdout JSON lines of Claude Code stream-json, `codex exec --json`, OpenCode, Grok Build, Gemini/Cursor) or, for native runs, from `/events?view=conversation` (`paperclip.prp.event.v1` items). Thinking, progress and stderr are dropped; tool calls are condensed like `cli-sessions.ts`. Bounds: 30 runs with transcripts per issue, 4 MiB of log per run, 400 messages per run, 4000 per thread.
+- **New optional fields:** `ConversationRecord.agentLabel` ("Engineer · Claude Code") and `linkedThreadKeys` (Claude Code / Codex threads whose session id equals a run's `sessionIdAfter`; the expected key is stored before that session is imported). `upsertThread` keeps them across re-imports. The manager shows the agent in the meta strip and a "Linked session" / "Run by Paperclip" row.
+- **Sync** (`sync.ts`, background alarm `tk-paperclip-sync` every 5 min while enabled, `PAPERCLIP_SYNC_NOW` from Settings): per company, the newest 100 runs mark changed runs' issues dirty (runs do not always bump their issue), then `issues?updatedSince=<cursor − 2 s>&sortField=updated&sortDir=asc` is paged; issues already stored at the cursor are skipped. Each changed issue is fetched in full; a finished run with an unchanged log size reuses its stored messages. State (cursors, run marks, last result/error, backoff) lives in `chrome.storage.local` `tk.paperclip.sync.v1`. Budgets: 50 s / 150 issues per alarm (a partial sync re-arms itself in 30 s), 240 s / 1000 issues for Sync now. 429 is retried in place up to 30 s, else the sync stops with backoff; failures back off 5 → 60 min. Stored threads go through `processThreadLocally` (analysis, filing by `providerProjectName` = project → goal → company, AI queue), then the issue status is applied unless the user set the status by hand.
+- **Auth** (`auth.ts`): none for `local_trusted`; otherwise the CLI approval flow (`POST /api/cli-auth/challenges`, open `approvalUrl`, poll, verify with `/api/cli-auth/me`) or a pasted `pcp_board_…` key, kept in `settings.paperclip.apiKey` like other keys. Requests never send cookies.
+- **Live hint** (`live.ts`): on a `local_trusted` server the worker opens `/api/companies/:id/events/ws` and schedules a sync 8 s after an issue or run event. Board keys are refused by that socket, so authenticated servers are polled only.
+- **Read-only:** the only non-GET calls are the sign-in challenge and revoking Threadkeeper's own key on sign-out.
+
+Not verified against a live Paperclip server (none was run): the shapes follow the server source and are exercised against an in-memory fake (`tests/unit/paperclip-fake-server.ts`).
+
 ## v0.4 changes (2026-11-03)
 
 1. **Complete capture on ChatGPT and Claude.** A MAIN-world script (`site-data-main.ts`, `document_start`) clones the response to each site's own conversation request (ChatGPT `GET /backend-api/conversation/<id>`, Claude `GET /api/organizations/<org>/chat_conversations/<id>`) and posts it to the isolated content script, like the Grok on X hook. It never alters a request or response and makes no request of its own. The content script validates the sender, parses the JSON (`site-api.ts`: active branch from `current_node` / `current_leaf_message_uuid`, hidden memory turns, reasoning and tool turns, and citation widgets dropped) and sends a `network_observer` capture with coverage `full` for the conversation that is open. The background accepts only `dom_observer` or `network_observer` from a content script and never lets a DOM capture claim `full`.
@@ -95,3 +198,13 @@ Consequences the UI must honour: a DOM-captured thread never shows `full` covera
 ## Non-goals and authority boundaries
 
 No terminal/CLI session control (sessions are imported read-only; resuming is the user's own command), public sharing links, private competitor APIs beyond the user-started, read-only Catch up described above, source bulk deletion, provider account switching, arbitrary website permissions, graph launch feature, telemetry, payment/upsell code, or competitor assets. Additional chat and cloud-task products require separate adapters and capability evidence. A cloud agent claiming completion is not proof of completed work. Browsing history disappearing does not authorize deleting captured records.
+
+## Analysis v2: in-depth summaries (2026-11)
+
+`ANALYSIS_VERSION = 2` (`schema.ts`). The Claude schema (`ai/claude.ts`) asks for a gist (≤ 22 words, subject + result), a 2–4 paragraph `overview`, `keyPoints`, `produced` (label, kind, one-line description), decisions with a `rationale`, and `whereYouLeftOff` split into a past-tense `text` and an imperative `nextStep`. The legacy `summary` and `artifacts` fields are no longer requested; `analysisToInsight` derives them (`summary = overview` joined and clamped, `artifacts` from `produced`) so search, embeddings, Ask and Catch up keep reading them unchanged. The prompt tells Claude to write about the work rather than the conversation, ignore process turns ("continue", permission requests) and never start with "The user"/"The assistant". Requests run at `max(aiEffort, medium)`, with a 160k-character transcript budget (first up to 6 messages, capped at a third of the budget, plus the newest that fit; the gap is marked with its message range) and `max_tokens` 24k.
+
+Storage needs no Dexie migration: `ThreadInsight` gains optional `overview`, `produced` and `analysisVersion`; `ExtensionSummaryOutput` gains optional `keyPoints` (grounded and verified like decisions) and `nextStep` (checked for instruction-like text); `ExtractedItem` gains an optional `rationale` (not evidence; dropped by the sanitizer if it reads like an instruction). Readers treat missing fields as older records. The on-device analyzer writes a one-paragraph `overview`.
+
+Older AI analyses are never upgraded automatically (that would bill every thread on its next capture). `needsRemoteWork` is unchanged; an explicit request upgrades them: `analyzeThreadRemotely(…, { ignoreDailyLimit })` from the detail view ("Improve summary"), or `queueAnalysis` / `queueOlderAnalysisUpgrades` (`pipeline.ts`), which enqueue jobs flagged `requested`. Requested jobs run even when automatic analysis is off, count against the daily limit, and re-analyze a current insight whose `analysisVersion < 2`. `queueAnalysis` reports skipped threads as `fresh`, `local_only`, `no_ai` or `missing` with a list-price estimate, for Settings and for Still's `threads.analyze`.
+
+`summary-markdown.ts` builds a thread's summary as Markdown from stored records (never from DOM text): "Copy summary", the body of the Markdown handoff (`exportThreadToMarkdown`), and any other consumer. It emits only headings, paragraphs, lists, task items, bold labels and inline code, escapes untrusted text (`mdInline`), and renders message references as `(m3)`. In the manager, overview paragraphs, key points, decisions (with rationale), produced items and topic chips are real lists, and every evidence marker and reference carries visually hidden separators, so copied text and screen readers read "Decision text (source m3)" instead of run-together fragments.

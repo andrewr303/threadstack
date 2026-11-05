@@ -2,6 +2,7 @@ import { containsPromptInjectionAttempt } from '../../shared/cloud.js';
 import {
   CAPTURE_PROVIDER_IDS,
   PROVIDER_IDS,
+  PROVIDERS,
   isProviderId,
   type CaptureProviderId,
   type ProviderId,
@@ -146,6 +147,16 @@ export interface ConversationRecord {
   projectReason?: string | null;
   /** Whether workflowState was set by the user or inferred automatically. */
   workflowStateSource?: 'auto' | 'manual';
+  /**
+   * Who did the work in an agent thread: the agent's name and the runner it uses,
+   * e.g. "CEO · Grok Bot" or "Engineer · Claude Code" (Paperclip issues).
+   */
+  agentLabel?: string | null;
+  /**
+   * Other threads that hold the same work, e.g. the Claude Code or Codex sessions a
+   * Paperclip agent ran for this issue (their keys, whether or not they are imported yet).
+   */
+  linkedThreadKeys?: string[];
 }
 
 export type ProjectSource =
@@ -205,6 +216,8 @@ export interface ExtractedItem {
   evidenceQuote: string;
   provenance?: 'explicit' | 'inferred';
   speaker: 'user_committed' | 'assistant_suggested';
+  /** Why (decisions from analysis v2 only); null or absent otherwise. Not part of the grounding check. */
+  rationale?: string | null;
 }
 
 export interface ExtensionSummaryOutput {
@@ -221,6 +234,13 @@ export interface ExtensionSummaryOutput {
   suggestedProject: string | null;
   suggestedTags: string[];
   confidence: number;
+  /**
+   * Analysis v2: substantive facts or conclusions from the content, each grounded in a quote like
+   * decisions. Absent on older records (read as `?? []`).
+   */
+  keyPoints?: ExtractedItem[];
+  /** Analysis v2: the single next action for the user (imperative), or null. Absent on older records. */
+  nextStep?: string | null;
 }
 
 export interface StructuredSummaryRecord extends ExtensionSummaryOutput {
@@ -262,7 +282,8 @@ export function verifyExtensionSummaryEvidence(
 
   if (
     containsPromptInjectionAttempt(summary.whereYouLeftOff) ||
-    containsPromptInjectionAttempt(summary.currentStatus)
+    containsPromptInjectionAttempt(summary.currentStatus) ||
+    (typeof summary.nextStep === 'string' && containsPromptInjectionAttempt(summary.nextStep))
   ) {
     errors.push('Summary text contains untrusted prompt injection directive.');
   }
@@ -273,7 +294,10 @@ export function verifyExtensionSummaryEvidence(
         errors.push(`${section} item "${item.text}" has no messageIndexes.`);
         continue;
       }
-      if (containsPromptInjectionAttempt(item.text)) {
+      if (
+        containsPromptInjectionAttempt(item.text) ||
+        (typeof item.rationale === 'string' && containsPromptInjectionAttempt(item.rationale))
+      ) {
         errors.push(`${section} item "${item.text}" contains prompt injection directive.`);
       }
       let quoteMatched = false;
@@ -306,6 +330,7 @@ export function verifyExtensionSummaryEvidence(
   checkItems(summary.openQuestions, 'openQuestion');
   checkItems(summary.actionItems, 'actionItem');
   checkItems(summary.constraints, 'constraint');
+  checkItems(summary.keyPoints ?? [], 'keyPoint');
 
   return {
     valid: errors.length === 0,
@@ -369,6 +394,12 @@ export interface JobRecord {
   notBefore?: string;
   /** Lease expiry for a claimed job so the service worker and manager never double-process. */
   leaseUntil?: string | null;
+  /**
+   * analyze_thread only: the user explicitly asked for this analysis ("Upgrade older summaries", Still's
+   * threads.analyze). It runs even when automatic analysis is off, and re-analyzes an AI insight that
+   * matches the current revision when it was written by an older analysis format.
+   */
+  requested?: boolean;
 }
 
 export const THREAD_KINDS = [
@@ -405,6 +436,19 @@ export const THREAD_KIND_LABELS: Record<ThreadKind, string> = {
 
 export type ArtifactKind = 'code' | 'document' | 'design' | 'data' | 'link' | 'other';
 
+/** Current AI analysis format. 1 (or absent) = gist + one-paragraph summary; 2 = overview, key points, produced, next step. */
+export const ANALYSIS_VERSION = 2;
+
+/** Something the thread produced (analysis v2): a file, document, design, dataset or link, with its state. */
+export interface ProducedItem {
+  label: string;
+  kind: ArtifactKind;
+  /** One line: what it is and its state ('' when unknown). */
+  description: string;
+  /** 0-based message ordinal where it appears, or null. */
+  messageIndex: number | null;
+}
+
 /**
  * What a thread is about, beyond its title. `local` insights are computed
  * instantly on-device; `ai` insights come from Claude and win when current.
@@ -438,6 +482,15 @@ export interface ThreadInsight {
   } | null;
   userTurns: number;
   hasCode: boolean;
+  /**
+   * In-depth narrative, one string per paragraph (AI v2: 2-4; on-device: 1). Absent on older
+   * records: fall back to `summary`. `summary` always holds the paragraphs joined for legacy readers.
+   */
+  overview?: string[];
+  /** What the thread produced, with descriptions (AI v2). `artifacts` mirrors it for older readers. */
+  produced?: ProducedItem[];
+  /** AI insights: the analysis format that wrote this record (absent = 1). See ANALYSIS_VERSION. */
+  analysisVersion?: number;
 }
 
 export function insightKeyFor(source: ThreadInsight['source'], threadKey: string): string {
@@ -557,6 +610,160 @@ export interface AutoOrganizeSettings {
   dailyAiAnalysisLimit: number;
 }
 
+/** What Still asked to sync (protocol SyncPrefs), as Threadkeeper last received it. */
+export interface DockSyncPrefs {
+  scope: 'all' | 'projects' | 'manual';
+  projects: string[];
+  providers: string[];
+  transcripts: boolean;
+  autoUpdate: boolean;
+}
+
+/**
+ * The Sidebar Dock (Still) link. Written only through `patchDockSettings` (src/core/dock/state.ts),
+ * which merges inside a transaction so the service worker and the manager never overwrite each other.
+ */
+export interface SidebarDockSettings {
+  /** Extension id of the paired Still ('' = not paired). */
+  pairedId: string;
+  /** The name Still declared when it asked to pair (sanitized, one line). */
+  pairedName: string;
+  pairedAt: string;
+  /** "Let Still search my threads" (capabilities search + context). */
+  allowSearch: boolean;
+  /** "Share full transcripts" (capability transcripts). */
+  shareTranscripts: boolean;
+  /** "Let Still's searches use my embedding and rerank providers" (capability remote_models). */
+  allowRemoteModels: boolean;
+  /** Whether Still has sent sync.configure since pairing; nothing syncs before. */
+  configured: boolean;
+  prefs: DockSyncPrefs;
+  /** Still's epoch the sent ledger belongs to. */
+  peerEpoch: string;
+  /** Extension ids the user denied; refused until unblocked in Settings. */
+  blockedIds: string[];
+  lastPushAt: string;
+  lastError: string;
+  lastErrorAt: string;
+}
+
+export const DEFAULT_DOCK_PREFS: DockSyncPrefs = {
+  scope: 'manual',
+  projects: [],
+  providers: [],
+  transcripts: true,
+  autoUpdate: true,
+};
+
+export const DEFAULT_SIDEBAR_DOCK: SidebarDockSettings = {
+  pairedId: '',
+  pairedName: '',
+  pairedAt: '',
+  allowSearch: true,
+  shareTranscripts: true,
+  allowRemoteModels: false,
+  configured: false,
+  prefs: { ...DEFAULT_DOCK_PREFS },
+  peerEpoch: '',
+  blockedIds: [],
+  lastPushAt: '',
+  lastError: '',
+  lastErrorAt: '',
+};
+
+/** Coerce a stored (possibly older or partial) Sidebar Dock record; unknown values fall back to defaults. */
+export function normalizeSidebarDock(raw: unknown): SidebarDockSettings {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof SidebarDockSettings, unknown>>;
+  const str = (v: unknown, max = 400) => (typeof v === 'string' ? v.slice(0, max) : '');
+  const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+  const strList = (v: unknown, maxItems: number, maxLen: number) =>
+    Array.isArray(v)
+      ? Array.from(new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim().slice(0, maxLen)))).slice(0, maxItems)
+      : [];
+  const p = (r.prefs && typeof r.prefs === 'object' ? r.prefs : {}) as Partial<Record<keyof DockSyncPrefs, unknown>>;
+  const scope = p.scope === 'all' || p.scope === 'projects' || p.scope === 'manual' ? p.scope : DEFAULT_DOCK_PREFS.scope;
+  const pairedId = typeof r.pairedId === 'string' && /^[a-p]{32}$/.test(r.pairedId) ? r.pairedId : '';
+  return {
+    pairedId,
+    pairedName: pairedId ? str(r.pairedName, 40) : '',
+    pairedAt: pairedId ? str(r.pairedAt, 40) : '',
+    allowSearch: bool(r.allowSearch, DEFAULT_SIDEBAR_DOCK.allowSearch),
+    shareTranscripts: bool(r.shareTranscripts, DEFAULT_SIDEBAR_DOCK.shareTranscripts),
+    allowRemoteModels: bool(r.allowRemoteModels, DEFAULT_SIDEBAR_DOCK.allowRemoteModels),
+    configured: pairedId ? bool(r.configured, false) : false,
+    prefs: {
+      scope,
+      projects: strList(p.projects, 200, 200),
+      providers: strList(p.providers, 100, 40),
+      transcripts: bool(p.transcripts, DEFAULT_DOCK_PREFS.transcripts),
+      autoUpdate: bool(p.autoUpdate, DEFAULT_DOCK_PREFS.autoUpdate),
+    },
+    peerEpoch: pairedId ? str(r.peerEpoch, 100) : '',
+    blockedIds: strList(r.blockedIds, 50, 32).filter((id) => /^[a-p]{32}$/.test(id)),
+    lastPushAt: str(r.lastPushAt, 40),
+    lastError: str(r.lastError, 300),
+    lastErrorAt: str(r.lastErrorAt, 40),
+  };
+}
+
+export interface PaperclipSettings {
+  /** Sync is on: issues are pulled every few minutes and on "Sync now". */
+  enabled: boolean;
+  /** Server origin, e.g. http://localhost:3100 (the API lives under /api). */
+  serverUrl: string;
+  /** How requests authenticate: none on a local_trusted instance, else a board API key. */
+  auth: 'none' | 'board_key';
+  /** Board API key (pcp_board_…), from the approval flow or pasted. */
+  apiKey: string;
+  /** When the board key stops working ('' = unknown). */
+  apiKeyExpiresAt: string;
+  /** Who the key signs in as, shown in Settings. */
+  accountLabel: string;
+  /** Deployment mode reported by /api/health at the last check. */
+  deploymentMode: '' | 'local_trusted' | 'authenticated';
+  /** Every company the user can see, or only the chosen ones. */
+  companyScope: 'all' | 'selected';
+  companyIds: string[];
+  /** Listen to the server's live events (local_trusted only) to sync sooner. */
+  liveUpdates: boolean;
+}
+
+export const DEFAULT_PAPERCLIP_URL = 'http://localhost:3100';
+
+export const DEFAULT_PAPERCLIP_SETTINGS: PaperclipSettings = {
+  enabled: false,
+  serverUrl: DEFAULT_PAPERCLIP_URL,
+  auth: 'none',
+  apiKey: '',
+  apiKeyExpiresAt: '',
+  accountLabel: '',
+  deploymentMode: '',
+  companyScope: 'all',
+  companyIds: [],
+  liveUpdates: true,
+};
+
+/** Coerce a stored (possibly partial or older) Paperclip settings object. */
+export function normalizePaperclipSettings(raw: Partial<PaperclipSettings> | null | undefined): PaperclipSettings {
+  const base = { ...DEFAULT_PAPERCLIP_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  const text = (v: unknown, fallback = '') => (typeof v === 'string' ? v.trim() : fallback);
+  return {
+    enabled: base.enabled === true,
+    serverUrl: text(base.serverUrl, DEFAULT_PAPERCLIP_URL) || DEFAULT_PAPERCLIP_URL,
+    auth: base.auth === 'board_key' ? 'board_key' : 'none',
+    apiKey: text(base.apiKey),
+    apiKeyExpiresAt: text(base.apiKeyExpiresAt),
+    accountLabel: text(base.accountLabel).slice(0, 200),
+    deploymentMode:
+      base.deploymentMode === 'local_trusted' || base.deploymentMode === 'authenticated' ? base.deploymentMode : '',
+    companyScope: base.companyScope === 'selected' ? 'selected' : 'all',
+    companyIds: Array.isArray(base.companyIds)
+      ? Array.from(new Set(base.companyIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '').map((id) => id.trim()))).slice(0, 200)
+      : [],
+    liveUpdates: base.liveUpdates !== false,
+  };
+}
+
 export interface SettingsRecord {
   id: 'default';
   settingsVersion?: number;
@@ -626,6 +833,10 @@ export interface SettingsRecord {
   rerankInSearch: boolean;
   rerankInAsk: boolean;
   autoOrganize: AutoOrganizeSettings;
+  /** Link with the Still (Sidebar Dock) extension. */
+  sidebarDock: SidebarDockSettings;
+  /** Paperclip server sync (issues, comments and agent runs as threads). */
+  paperclip: PaperclipSettings;
   /** Last background AI failure, surfaced in the manager so silent failures are visible. */
   lastAiError?: string | null;
   lastAiErrorAt?: string | null;
@@ -645,7 +856,40 @@ const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
   mistral: 'acct_mistral_primary',
   copilot: 'acct_copilot_primary',
   kimi: 'acct_kimi_primary',
+  paperclip: 'acct_paperclip_primary',
   imported: 'acct_imported_primary',
+  chatgpt_dots: 'acct_chatgpt_dots_primary',
+  claude_duet: 'acct_claude_duet_primary',
+  grok_bot: 'acct_grok_bot_primary',
+  muse: 'acct_muse_primary',
+  meta_ai: 'acct_meta_ai_primary',
+  poe: 'acct_poe_primary',
+  huggingchat: 'acct_huggingchat_primary',
+  qwen: 'acct_qwen_primary',
+  doubao: 'acct_doubao_primary',
+  zai: 'acct_zai_primary',
+  manus: 'acct_manus_primary',
+  genspark: 'acct_genspark_primary',
+  minimax_agent: 'acct_minimax_agent_primary',
+  character_ai: 'acct_character_ai_primary',
+  duck_ai: 'acct_duck_ai_primary',
+  lumo: 'acct_lumo_primary',
+  arena: 'acct_arena_primary',
+  t3_chat: 'acct_t3_chat_primary',
+  gemini_notebook: 'acct_gemini_notebook_primary',
+  github_copilot: 'acct_github_copilot_primary',
+  cursor_agents: 'acct_cursor_agents_primary',
+  devin: 'acct_devin_primary',
+  jules: 'acct_jules_primary',
+  lovable: 'acct_lovable_primary',
+  bolt: 'acct_bolt_primary',
+  v0: 'acct_v0_primary',
+  replit: 'acct_replit_primary',
+  lobechat: 'acct_lobechat_primary',
+  custom_web: 'acct_custom_web_primary',
+  open_webui: 'acct_open_webui_primary',
+  librechat: 'acct_librechat_primary',
+  anythingllm: 'acct_anythingllm_primary',
 };
 
 export const DEFAULT_AUTO_ORGANIZE: AutoOrganizeSettings = {
@@ -662,8 +906,10 @@ export const DEFAULT_AUTO_ORGANIZE: AutoOrganizeSettings = {
 export const DEFAULT_SETTINGS: SettingsRecord = {
   id: 'default',
   settingsVersion: 2,
+  // Providers on hosts Threadkeeper holds from install start on; the rest wait for the user to
+  // turn them on (and grant host access) in Settings → Capture. Grok Bot is explicit-only.
   authorizedHosts: Object.fromEntries(
-    CAPTURE_PROVIDER_IDS.map((id) => [id, true])
+    CAPTURE_PROVIDER_IDS.map((id) => [id, PROVIDERS[id].defaultEnabled])
   ) as Record<CaptureProviderId, boolean>,
   boundAccounts: Object.fromEntries(
     PROVIDER_IDS.map((id) => [
@@ -725,6 +971,8 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   rerankInSearch: true,
   rerankInAsk: true,
   autoOrganize: { ...DEFAULT_AUTO_ORGANIZE },
+  sidebarDock: { ...DEFAULT_SIDEBAR_DOCK, prefs: { ...DEFAULT_DOCK_PREFS }, blockedIds: [] },
+  paperclip: { ...DEFAULT_PAPERCLIP_SETTINGS },
 };
 
 /**
@@ -753,6 +1001,8 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
       ...DEFAULT_AWS_SETTINGS,
       ...(base.aws ?? {}),
     },
+    sidebarDock: normalizeSidebarDock(base.sidebarDock),
+    paperclip: normalizePaperclipSettings(base.paperclip),
   };
 }
 

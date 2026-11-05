@@ -358,8 +358,8 @@ export function parseClaudeCodeSession(
     gitBranch,
     modelSlug: model,
     resumeCommand: cwd
-      ? `cd ${shellQuote(cwd)} && claude --resume ${sessionId}`
-      : `claude --resume ${sessionId}`,
+      ? `cd ${shellQuote(cwd)} && claude --resume ${shellQuote(sessionId)}`
+      : `claude --resume ${shellQuote(sessionId)}`,
   };
 }
 
@@ -554,7 +554,7 @@ export function parseCodexRollout(text: string, options: CliParseOptions): Codex
       workspacePath: cwd,
       gitBranch,
       modelSlug: model,
-      resumeCommand: cwd ? `cd ${shellQuote(cwd)} && codex resume ${sessionId}` : `codex resume ${sessionId}`,
+      resumeCommand: cwd ? `cd ${shellQuote(cwd)} && codex resume ${shellQuote(sessionId)}` : `codex resume ${shellQuote(sessionId)}`,
     },
     threadId: sessionId,
     forkedFromId: isFork ? forkedFromId : null,

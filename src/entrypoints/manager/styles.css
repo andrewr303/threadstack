@@ -575,6 +575,18 @@ body,
   margin: 0;
 }
 
+.tk-focal-next-step {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.tk-focal-next-label {
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* Signature: The Evidence Margin */
 .tk-claim-row {
   display: grid;
@@ -593,6 +605,26 @@ body,
   font-size: 14px;
   color: var(--ink);
   line-height: 1.45;
+}
+
+/* Claims render as a list (decisions, key points, action items, open questions). */
+.tk-claim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Each row sits alone in its <li>, so restore the divider that .tk-claim-row:last-child removes. */
+.tk-claim-list > li > .tk-claim-row {
+  border-bottom: 1px solid var(--rule);
+}
+
+.tk-claim-list > li:last-child > .tk-claim-row {
+  border-bottom: 0;
+}
+
+.tk-claim-rationale {
+  color: var(--ink-2);
 }
 
 .tk-evidence-marker {
@@ -905,6 +937,14 @@ body,
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  /* Also used as a <ul> (overview topics): no bullets or indent. */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tk-chip-row > li {
+  display: inline-flex;
 }
 
 .tk-chip {
@@ -1113,8 +1153,63 @@ body,
 .tk-overview-summary {
   margin: 0;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--ink-2);
+  max-width: 72ch;
+}
+
+.tk-overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tk-overview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tk-overview-h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tk-produced-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tk-produced-item {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.tk-produced-item .tk-artifact {
+  margin: 0;
+}
+
+.tk-produced-desc {
+  color: var(--ink-2);
+}
+
+/* A small "m3" message reference after a line of text; copies as "(m3)". */
+.tk-ref {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 
 .tk-overview-dl {
@@ -1382,6 +1477,22 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-folder-list code {
   font-family: var(--font-mono);
   font-size: 11px;
+}
+
+/* Inline confirmation step (e.g. "Upgrade older summaries"). */
+.tk-settings-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper-2);
+}
+
+.tk-settings-confirm .tk-settings-note {
+  margin: 0;
 }
 
 .tk-settings-result {
@@ -2023,4 +2134,189 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-workbench[data-surface="sidepanel"] .tk-bulk-bar {
   padding: 8px 10px;
+}
+
+/* ---- Still (Sidebar Dock) link: Settings panel, Send to Still, In Still badge ---- */
+.tk-dock-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tk-dock-status[data-tone="danger"] {
+  color: var(--warn);
+}
+
+.tk-dock-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--ink-4);
+  background: transparent;
+}
+
+.tk-dock-dot[data-on="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.tk-dock-request {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule-strong);
+  border-left: 2px solid var(--warn);
+  border-radius: 6px;
+  background: var(--paper-2);
+}
+
+.tk-dock-facts {
+  margin-top: 4px;
+}
+
+.tk-dock-error {
+  color: var(--danger);
+}
+
+.tk-dock-framed {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--paper-2);
+}
+
+.tk-dock-id-row {
+  align-items: center;
+}
+
+.tk-dock-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.tk-dock-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tk-dock-blocked {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tk-dock-blocked li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tk-dock-blocked code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tk-in-still {
+  border-color: var(--accent);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.tk-in-still[data-trashed="true"] {
+  border-color: var(--rule-strong);
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
+.tk-send-results {
+  font-size: 12px;
+}
+
+.tk-ask-send {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.tk-send-still-target {
+  margin: 12px 0;
+}
+
+.tk-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Settings → Capture (CaptureSettings.tsx) */
+.tk-capture-group {
+  margin: 0 0 12px;
+}
+
+.tk-capture-legend {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.tk-capture-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.tk-capture-badge {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.tk-capture-allow {
+  margin-left: 24px;
+}
+
+.tk-capture-sites {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.tk-capture-site {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tk-capture-site-origin {
+  flex: 1 1 200px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }

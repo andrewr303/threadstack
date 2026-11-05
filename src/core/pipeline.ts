@@ -1,11 +1,13 @@
 import { isRemoteAllowed } from './privacy.js';
 import {
+  ANALYSIS_VERSION,
   insightKeyFor,
   type ConversationRecord,
   type ExtensionSummaryOutput,
   type ExtractedItem,
   type JobRecord,
   type MessageRecord,
+  type ProducedItem,
   type SettingsRecord,
   type ThreadInsight,
 } from './schema.js';
@@ -38,6 +40,7 @@ import {
 import {
   ClaudeCallError,
   analyzeThreadWithClaude,
+  estimateAnalysisCostUsd,
   hasClaudeKey,
   type ThreadAnalysis,
 } from './ai/claude.js';
@@ -83,6 +86,16 @@ export async function isRemoteProcessingAllowed(
   return !collection?.cloudExcluded;
 }
 
+/** Whether an AI insight was written by an older analysis format (see ANALYSIS_VERSION). */
+export function isOlderAnalysis(insight: Pick<ThreadInsight, 'source' | 'analysisVersion'> | null | undefined): boolean {
+  return Boolean(insight && insight.source === 'ai' && (insight.analysisVersion ?? 1) < ANALYSIS_VERSION);
+}
+
+/**
+ * Automatic work only: a new or changed thread. Older-format analyses are deliberately not upgraded here
+ * (that would bill every existing thread on its next capture); the user upgrades them on demand
+ * (queueAnalysis, "Upgrade older summaries", or "Improve summary" on one thread).
+ */
 function needsRemoteWork(
   settings: SettingsRecord,
   conv: ConversationRecord,
@@ -101,7 +114,8 @@ function needsRemoteWork(
 export async function enqueueAnalysis(
   db: ThreadkeeperDB,
   conv: Pick<ConversationRecord, 'threadKey' | 'sourceRevision'>,
-  delaySeconds: number
+  delaySeconds: number,
+  options: { requested?: boolean } = {}
 ): Promise<JobRecord> {
   const now = Date.now();
   const jobId = analyzeJobId(conv.threadKey);
@@ -123,6 +137,10 @@ export async function enqueueAnalysis(
       // While a chat is still active each capture pushes the job further out.
       notBefore,
       leaseUntil: existing?.status === 'running' ? existing.leaseUntil ?? null : null,
+      // An open request survives re-queues (e.g. a capture while it waits); a finished job's flag does not.
+      requested:
+        Boolean(options.requested) ||
+        (Boolean(existing?.requested) && (existing?.status === 'pending' || existing?.status === 'running')),
     };
     await db.jobs.put(record);
     return record;
@@ -265,6 +283,27 @@ function toOrdinal(messageNumber: number | null | undefined, messages: MessageRe
   return messages.some((m) => m.ordinal === ordinal) ? ordinal : null;
 }
 
+const ARTIFACT_KINDS = new Set<ProducedItem['kind']>(['code', 'document', 'design', 'data', 'link', 'other']);
+
+/** Collapse whitespace inside one line of model text and clamp it. */
+function cleanLine(s: string | null | undefined, max: number): string {
+  const t = (s ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
+/**
+ * Overview paragraphs: each array entry is a paragraph, and a model that packed several paragraphs into
+ * one string (blank lines) gets them split. Whitespace inside a paragraph collapses; at most 4 paragraphs.
+ */
+export function cleanOverview(paragraphs: string[] | null | undefined, gist = ''): string[] {
+  const gistNorm = gist.replace(/\s+/g, ' ').trim().toLowerCase();
+  return (paragraphs ?? [])
+    .flatMap((p) => (typeof p === 'string' ? p.split(/\n\s*\n/) : []))
+    .map((p) => cleanLine(p, 900))
+    .filter((p) => p.length > 0 && p.toLowerCase() !== gistNorm)
+    .slice(0, 4);
+}
+
 export function analysisToInsight(
   conv: ConversationRecord,
   analysis: ThreadAnalysis,
@@ -272,8 +311,7 @@ export function analysisToInsight(
   model: string,
   local: ThreadInsight | undefined
 ): ThreadInsight {
-  const clean = (s: string | null | undefined, max: number) =>
-    (s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const clean = cleanLine;
   const topics = Array.from(
     new Set(
       analysis.topics
@@ -281,6 +319,23 @@ export function analysisToInsight(
         .filter((t) => t.length >= 2 && t.length <= 40)
     )
   ).slice(0, 8);
+  const gist = clean(analysis.gist, 220);
+  const overview = cleanOverview(analysis.overview, gist);
+  const seenProduced = new Set<string>();
+  const produced: ProducedItem[] = [];
+  for (const p of analysis.produced ?? []) {
+    const label = clean(p.label, 120);
+    const key = label.toLowerCase();
+    if (!label || seenProduced.has(key)) continue;
+    seenProduced.add(key);
+    produced.push({
+      label,
+      kind: ARTIFACT_KINDS.has(p.kind) ? p.kind : 'other',
+      description: clean(p.description, 240),
+      messageIndex: toOrdinal(p.messageNumber, messages),
+    });
+    if (produced.length >= 12) break;
+  }
   return {
     insightKey: insightKeyFor('ai', conv.threadKey),
     threadKey: conv.threadKey,
@@ -290,19 +345,18 @@ export function analysisToInsight(
     contentHash: conv.contentHash,
     generatedAt: new Date().toISOString(),
     title: clean(analysis.title, 120) || conv.title,
-    gist: clean(analysis.gist, 220),
-    summary: clean(analysis.summary, 1200),
+    gist,
+    // Legacy readers (search, embeddings, catch-up, ask) read one paragraph.
+    summary: clean(overview.join(' '), 1200) || gist,
+    overview,
     userGoal: clean(analysis.userGoal, 400) || null,
     outcome: clean(analysis.outcome, 400) || null,
     kind: analysis.kind,
     topics,
-    entities: analysis.entities.map((e) => clean(e, 60)).filter(Boolean).slice(0, 10),
+    entities: Array.from(new Set(analysis.entities.map((e) => clean(e, 60)).filter(Boolean))).slice(0, 10),
     languages: local?.languages ?? [],
-    artifacts: analysis.artifacts.slice(0, 12).map((a) => ({
-      label: clean(a.label, 120),
-      kind: a.kind,
-      messageIndex: toOrdinal(a.messageNumber, messages),
-    })),
+    artifacts: produced.map(({ label, kind, messageIndex }) => ({ label, kind, messageIndex })),
+    produced,
     lastUserAsk: local?.lastUserAsk ?? null,
     suggestedStatus: analysis.status,
     statusReason: clean(analysis.statusReason, 200) || null,
@@ -316,6 +370,7 @@ export function analysisToInsight(
       : null,
     userTurns: messages.filter((m) => m.role === 'user').length,
     hasCode: local?.hasCode ?? messages.some((m) => m.hasCode),
+    analysisVersion: ANALYSIS_VERSION,
   };
 }
 
@@ -324,29 +379,36 @@ export function analysisToSummary(
   messages: MessageRecord[]
 ): ExtensionSummaryOutput {
   const lastOrdinal = messages.length ? messages[messages.length - 1].ordinal : 0;
-  const toItem = (it: ThreadAnalysis['decisions'][number]): ExtractedItem => {
+  const toItem = (it: ThreadAnalysis['decisions'][number], withRationale = false): ExtractedItem => {
     const ord = toOrdinal(it.messageNumber, messages) ?? lastOrdinal;
+    const rationale = withRationale ? cleanLine(it.rationale, 240) : '';
     return {
-      text: it.text.trim().slice(0, 300),
+      text: cleanLine(it.text, 300),
       messageIndexes: [ord],
       evidenceQuote: it.quote.trim(),
       provenance: 'explicit',
       speaker: it.by === 'user' ? 'user_committed' : 'assistant_suggested',
+      ...(withRationale ? { rationale: rationale || null } : {}),
     };
   };
+  const decision = (it: ThreadAnalysis['decisions'][number]) => toItem(it, true);
+  const plain = (it: ThreadAnalysis['decisions'][number]) => toItem(it);
   const leftOffOrdinal = toOrdinal(analysis.whereYouLeftOff.messageNumber, messages) ?? lastOrdinal;
+  const nextStep = cleanLine(analysis.whereYouLeftOff.nextStep, 300);
   return sanitizeSummaryForGrounding(
     {
-      whereYouLeftOff: analysis.whereYouLeftOff.text.trim(),
+      whereYouLeftOff: cleanLine(analysis.whereYouLeftOff.text, 600),
       whereYouLeftOffMessageIndexes: [leftOffOrdinal],
       currentStatus: analysis.statusReason.trim() || analysis.gist.trim(),
       currentStatusMessageIndexes: [lastOrdinal],
-      decisions: analysis.decisions.map(toItem),
-      openQuestions: analysis.openQuestions.map(toItem),
-      actionItems: analysis.actionItems.map(toItem),
+      decisions: analysis.decisions.slice(0, 10).map(decision),
+      openQuestions: analysis.openQuestions.slice(0, 10).map(plain),
+      actionItems: analysis.actionItems.slice(0, 10).map(plain),
       constraints: [],
+      keyPoints: analysis.keyPoints.slice(0, 8).map(plain),
+      nextStep: nextStep || null,
       entities: analysis.entities,
-      artifactReferences: analysis.artifacts.map((a) => a.label),
+      artifactReferences: (analysis.produced ?? []).map((a) => a.label),
       suggestedProject: analysis.project?.name ?? null,
       suggestedTags: analysis.topics,
       confidence: analysis.project?.confidence ?? 0.8,
@@ -385,7 +447,18 @@ export interface AiThreadResult {
 export async function analyzeThreadRemotely(
   db: ThreadkeeperDB,
   threadKey: string,
-  options: { settings?: SettingsRecord; ctx?: OrganizeContext; fetchImpl?: typeof fetch; ignoreDailyLimit?: boolean } = {}
+  options: {
+    settings?: SettingsRecord;
+    ctx?: OrganizeContext;
+    fetchImpl?: typeof fetch;
+    /** An explicit request for this one thread (manager "Analyze"/"Improve summary"); also upgrades older formats. */
+    ignoreDailyLimit?: boolean;
+    /**
+     * The user asked for this analysis (queued with queueAnalysis): run even when automatic analysis is
+     * off, and re-analyze an up-to-date AI insight written by an older analysis format.
+     */
+    requested?: boolean;
+  } = {}
 ): Promise<AiThreadResult> {
   const settings = options.settings ?? (await ensureStarterCollectionsAndSettings(db));
   const conv = await db.conversations.get(threadKey);
@@ -398,9 +471,13 @@ export async function analyzeThreadRemotely(
   let aiInsight = await db.insights.get(insightKeyFor('ai', threadKey));
   let didAnalyze = false;
 
+  const explicit = Boolean(options.requested || options.ignoreDailyLimit);
+  const upgrade = explicit && isOlderAnalysis(aiInsight);
   const wantsAi =
-    settings.autoOrganize.aiAnalysis || options.ignoreDailyLimit
-      ? hasClaudeKey(settings) && messages.length > 0 && (!aiInsight || aiInsight.sourceRevision !== conv.sourceRevision)
+    settings.autoOrganize.aiAnalysis || explicit
+      ? hasClaudeKey(settings) &&
+        messages.length > 0 &&
+        (!aiInsight || aiInsight.sourceRevision !== conv.sourceRevision || upgrade)
       : false;
 
   if (wantsAi) {
@@ -529,6 +606,8 @@ export async function runAnalysisJobs(
     signal?: AbortSignal;
     fetchImpl?: typeof fetch;
     onProgress?: (summary: RunJobsSummary, current: string | null) => void;
+    /** Called after each job that finished (analyzed, embedded or skipped) — the Still link's dirty hook. */
+    onJobDone?: (threadKey: string, status: AiThreadResult['status']) => void;
   } = {}
 ): Promise<RunJobsSummary> {
   const started = Date.now();
@@ -551,7 +630,12 @@ export async function runAnalysisJobs(
     summary.processed++;
     options.onProgress?.(summary, job.threadKey);
     try {
-      const res = await analyzeThreadRemotely(db, job.threadKey, { settings, ctx, fetchImpl: options.fetchImpl });
+      const res = await analyzeThreadRemotely(db, job.threadKey, {
+        settings,
+        ctx,
+        fetchImpl: options.fetchImpl,
+        requested: Boolean(job.requested),
+      });
       if (res.status === 'analyzed') summary.analyzed++;
       const conv = await db.conversations.get(job.threadKey);
       const newer = conv && conv.sourceRevision > job.targetRevision;
@@ -559,11 +643,17 @@ export async function runAnalysisJobs(
         ...job,
         status: newer ? 'pending' : 'completed',
         targetRevision: conv?.sourceRevision ?? job.targetRevision,
+        requested: newer ? job.requested : false,
         attempts: newer ? 0 : job.attempts,
         leaseUntil: null,
         lastError: res.status === 'skipped' ? res.reason ?? null : null,
         updatedAt: new Date().toISOString(),
       });
+      try {
+        options.onJobDone?.(job.threadKey, res.status);
+      } catch {
+        // a hook must never stop the queue
+      }
       if (settings.lastAiError) {
         settings.lastAiError = null;
         await saveSettingsPatch(db, { lastAiError: null, lastAiErrorAt: null });
@@ -644,4 +734,85 @@ export async function enqueueLibraryAnalysis(
     count++;
   }
   return count;
+}
+
+// ---------------------------------------------------------------------------
+// On-demand analysis (Settings → "Upgrade older summaries", Still's threads.analyze)
+// ---------------------------------------------------------------------------
+
+export type AnalysisSkipReason = 'no_ai' | 'local_only' | 'fresh' | 'missing';
+
+export interface QueueAnalysisResult {
+  queued: number;
+  /** Threads queued only to bring an older AI analysis up to the current format. */
+  upgrades: number;
+  skipped: Array<{ threadKey: string; reason: AnalysisSkipReason }>;
+  /** List-price estimate for the queued analyses with the selected model. */
+  estimateUsd: number;
+}
+
+/**
+ * Queue Claude analysis the user asked for: threads without a current AI analysis, and (with `upgrade`,
+ * the default) threads whose AI analysis is in an older format. Jobs run at the next drain (manager
+ * runner or the service worker's RUN_ANALYSIS_NOW), also when automatic analysis is off, and count
+ * against the daily limit.
+ */
+export async function queueAnalysis(
+  db: ThreadkeeperDB,
+  threadKeys: string[],
+  options: { settings?: SettingsRecord; upgrade?: boolean } = {}
+): Promise<QueueAnalysisResult> {
+  const settings = options.settings ?? (await ensureStarterCollectionsAndSettings(db));
+  const upgradeOlder = options.upgrade !== false;
+  const result: QueueAnalysisResult = { queued: 0, upgrades: 0, skipped: [], estimateUsd: 0 };
+  const keys = Array.from(new Set(threadKeys));
+  const ready = hasClaudeKey(settings);
+  for (const threadKey of keys) {
+    const conv = await db.conversations.get(threadKey);
+    if (!conv || conv.isSyntheticBenchmark || conv.messageCount === 0) {
+      result.skipped.push({ threadKey, reason: 'missing' });
+      continue;
+    }
+    if (!(await isRemoteProcessingAllowed(db, conv, settings))) {
+      result.skipped.push({ threadKey, reason: 'local_only' });
+      continue;
+    }
+    if (!ready) {
+      result.skipped.push({ threadKey, reason: 'no_ai' });
+      continue;
+    }
+    const ai = await db.insights.get(insightKeyFor('ai', threadKey));
+    const current = ai && ai.sourceRevision === conv.sourceRevision;
+    const older = isOlderAnalysis(ai);
+    if (current && !(older && upgradeOlder)) {
+      result.skipped.push({ threadKey, reason: 'fresh' });
+      continue;
+    }
+    await enqueueAnalysis(db, conv, 0, { requested: true });
+    result.queued++;
+    if (current && older) result.upgrades++;
+  }
+  result.estimateUsd = estimateAnalysisCostUsd(settings.aiModel, result.queued);
+  return result;
+}
+
+/** Threads whose current AI analysis predates ANALYSIS_VERSION and may be sent to Claude. */
+export async function listOlderAnalyses(db: ThreadkeeperDB, settings?: SettingsRecord): Promise<string[]> {
+  const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
+  const aiInsights = await db.insights.where('source').equals('ai').toArray();
+  const keys: string[] = [];
+  for (const insight of aiInsights) {
+    if (!isOlderAnalysis(insight)) continue;
+    const conv = await db.conversations.get(insight.threadKey);
+    if (!conv || conv.isSyntheticBenchmark || conv.messageCount === 0) continue;
+    if (!(await isRemoteProcessingAllowed(db, conv, s))) continue;
+    keys.push(insight.threadKey);
+  }
+  return keys;
+}
+
+/** Queue every older-format AI analysis for an upgrade ("Upgrade older summaries"). */
+export async function queueOlderAnalysisUpgrades(db: ThreadkeeperDB): Promise<QueueAnalysisResult> {
+  const settings = await ensureStarterCollectionsAndSettings(db);
+  return queueAnalysis(db, await listOlderAnalyses(db, settings), { settings, upgrade: true });
 }

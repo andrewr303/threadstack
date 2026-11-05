@@ -15,10 +15,18 @@ import type {
   RerankProviderId,
 } from '../../core/schema.js';
 import { UNFILED_PROJECT } from '../../core/db.js';
-import { sharedDb } from './shared.js';
+import { notifyBackground, sharedDb } from './shared.js';
+import { listOlderAnalyses, queueOlderAnalysisUpgrades } from '../../core/pipeline.js';
 import { CAPABILITY_MATRIX } from '../../core/adapters.js';
 import { CAPTURE_PROVIDER_IDS, PROVIDERS } from '../../core/providers.js';
-import { MODEL_OPTIONS, estimateAnalysisCostUsd, testClaudeConnection } from '../../core/ai/claude.js';
+import {
+  ANALYSIS_AVG_INPUT_TOKENS,
+  ANALYSIS_AVG_OUTPUT_TOKENS,
+  MODEL_OPTIONS,
+  estimateAnalysisCostUsd,
+  testClaudeConnection,
+} from '../../core/ai/claude.js';
+import { CaptureSettings } from './CaptureSettings.js';
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
@@ -43,6 +51,10 @@ import {
 import { rerankHostOrigins, rerankProblem, testReranker } from '../../core/rerank.js';
 import { detectBrowser, extensionsPageUrl, reloadWouldHelp } from '../../core/diagnostics.js';
 import { DiagnosticsPanel, useDiagnostics } from './Diagnostics.js';
+import { SidebarDockPanel } from './SidebarDock.js';
+import { dockStatusSummary, dockSyncNow, type DockStateView } from './dock.js';
+import { PaperclipSettings, paperclipSectionStatus, usePaperclipSyncState } from './PaperclipSettings.js';
+import type { PaperclipSyncState } from '../../core/paperclip/sync.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -54,6 +66,10 @@ interface Props {
   onPatch: (patch: Partial<SettingsRecord>) => Promise<void>;
   onRebuildVectors: () => void;
   onClosed: () => void;
+  /** Still (Sidebar Dock) link state, owned by App (useDockState). */
+  dock?: { state: DockStateView | null; loaded: boolean; refresh: () => Promise<void> };
+  /** Open the dialog on this section (e.g. from "Connect Still first"). */
+  initialSection?: SectionId | null;
 }
 
 function Section({ title, children, note }: { title: string; note?: React.ReactNode; children: React.ReactNode }) {
@@ -105,7 +121,11 @@ function ProjectRow({
     setKeywords((col.keywords ?? []).join(', '));
   }, [col.name, col.description, (col.keywords ?? []).join(',')]);
   const save = (patch: Partial<CollectionRecord>) =>
-    void sharedDb.collections.put({ ...col, ...patch }).then(onChanged);
+    void sharedDb.collections.put({ ...col, ...patch }).then(() => {
+      // A project turning local-only must leave Still at once.
+      if ('cloudExcluded' in patch) dockSyncNow([], { privacy: true });
+      onChanged();
+    });
   return (
     <div className="tk-project-row">
       <div className="tk-project-row-head">
@@ -152,16 +172,28 @@ function ProjectRow({
   );
 }
 
-type SectionId = 'general' | 'capture' | 'ai' | 'aws' | 'search' | 'organize' | 'privacy' | 'diagnostics';
+export type SectionId =
+  | 'general'
+  | 'capture'
+  | 'paperclip'
+  | 'ai'
+  | 'aws'
+  | 'search'
+  | 'organize'
+  | 'privacy'
+  | 'sidebarDock'
+  | 'diagnostics';
 
 const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'capture', label: 'Capture' },
+  { id: 'paperclip', label: 'Paperclip' },
   { id: 'ai', label: 'AI models' },
   { id: 'aws', label: 'Amazon Web Services' },
   { id: 'search', label: 'Search & embeddings' },
   { id: 'organize', label: 'Organization' },
   { id: 'privacy', label: 'Privacy & limits' },
+  { id: 'sidebarDock', label: 'Sidebar Dock' },
   { id: 'diagnostics', label: 'Diagnostics' },
 ];
 
@@ -255,18 +287,24 @@ function dataDestinations(settings: SettingsRecord): Array<{ what: string; where
   if (settings.cloudEnabled && settings.workerEndpointUrl.trim()) {
     out.push({ what: 'Worker enrichment', where: settings.workerEndpointUrl });
   }
+  if (settings.sidebarDock?.pairedId) {
+    out.push({ what: 'Threads Still syncs, is sent or searches', where: `${settings.sidebarDock.pairedName || 'Still'} (another extension in this browser)` });
+  }
   return out;
 }
 
 function sectionStatus(
   id: SectionId,
   settings: SettingsRecord,
-  extra: { projectCount: number; reloadNeeded: boolean }
+  extra: { projectCount: number; reloadNeeded: boolean; dock?: DockStateView | null; paperclip?: PaperclipSyncState | null }
 ): { text: string; tone?: 'danger' } | null {
   switch (id) {
+    case 'paperclip':
+      return paperclipSectionStatus(settings.paperclip, extra.paperclip ?? null);
     case 'capture': {
-      const on = CAPTURE_PROVIDER_IDS.filter((p) => settings.authorizedHosts[p]).length;
-      return { text: `${on} of ${CAPTURE_PROVIDER_IDS.length}` };
+      const listed = CAPTURE_PROVIDER_IDS.filter((p) => PROVIDERS[p].hostAccess !== 'custom');
+      const on = listed.filter((p) => settings.authorizedHosts[p]).length;
+      return { text: `${on} of ${listed.length}` };
     }
     case 'ai':
       return aiCredentialsReady(settings)
@@ -281,6 +319,11 @@ function sectionStatus(
     }
     case 'organize':
       return { text: String(extra.projectCount) };
+    case 'sidebarDock': {
+      if (extra.dock === undefined) return settings.sidebarDock.pairedId ? { text: 'Connected' } : { text: 'Off' };
+      const s = dockStatusSummary(extra.dock);
+      return { text: s.short, tone: s.tone };
+    }
     case 'diagnostics':
       return extra.reloadNeeded ? { text: 'Reload', tone: 'danger' } : { text: 'OK' };
     default:
@@ -336,6 +379,94 @@ function Result({ state }: { state: { message: string | null; ok?: boolean } }) 
 type TestState = { busy: boolean; message: string | null; ok?: boolean };
 const IDLE: TestState = { busy: false, message: null };
 
+function formatUsd(usd: number): string {
+  return usd < 1 ? usd.toFixed(2) : usd < 100 ? usd.toFixed(1) : usd.toFixed(0);
+}
+
+/**
+ * Settings → AI models → "Older summaries": re-analyze AI summaries written before the current format
+ * (overview, key points, what was produced, next step). Never automatic: count + estimate + confirm.
+ */
+function UpgradeOlderSummaries({ settings, active }: { settings: SettingsRecord; active: boolean }) {
+  const [count, setCount] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [state, setState] = useState<TestState>(IDLE);
+  const refresh = useCallback(() => {
+    void listOlderAnalyses(sharedDb)
+      .then((keys) => setCount(keys.length))
+      .catch(() => setCount(null));
+  }, []);
+  useEffect(() => {
+    if (active) refresh();
+  }, [active, refresh]);
+
+  const ready = aiCredentialsReady(settings);
+  const model = MODEL_OPTIONS.find((m) => m.id === settings.aiModel) ?? MODEL_OPTIONS[0];
+  const estimate = estimateAnalysisCostUsd(settings.aiModel, count ?? 0);
+  const limit = settings.autoOrganize.dailyAiAnalysisLimit;
+
+  const upgrade = async () => {
+    setState({ busy: true, message: 'Queuing…' });
+    try {
+      const r = await queueOlderAnalysisUpgrades(sharedDb);
+      notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+      setConfirming(false);
+      setState({
+        busy: false,
+        ok: true,
+        message:
+          r.queued === 0
+            ? 'Nothing to upgrade.'
+            : `Queued ${r.queued} thread${r.queued === 1 ? '' : 's'}. Threadkeeper rewrites them in the background${
+                limit > 0 && r.queued > limit ? `, up to ${limit} a day (your daily limit)` : ''
+              }.`,
+      });
+      refresh();
+    } catch (err) {
+      setState({ busy: false, ok: false, message: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  if (count === 0 && !state.message) {
+    return <p className="tk-settings-note">Every Claude summary already uses the current format.</p>;
+  }
+  return (
+    <>
+      <p className="tk-settings-note">
+        {count === null
+          ? 'Counting older summaries…'
+          : `${count} thread${count === 1 ? ' has' : 's have'} a Claude summary in the older, shorter format. Upgrading re-analyzes them once with ${model.label} for an in-depth overview, key points, what was produced and a clear next step. Threads that change are re-analyzed anyway.`}
+      </p>
+      {count !== null && count > 0 && !confirming && (
+        <div className="tk-field-row">
+          <button type="button" className="tk-btn" disabled={!ready || state.busy} onClick={() => setConfirming(true)}>
+            Upgrade older summaries…
+          </button>
+          {!ready && <span className="tk-muted">Set up Claude above first.</span>}
+        </div>
+      )}
+      {confirming && count !== null && count > 0 && (
+        <div className="tk-settings-confirm" role="group" aria-label="Confirm summary upgrade">
+          <p className="tk-settings-note">
+            Re-analyze {count} thread{count === 1 ? '' : 's'} with {model.label}? This costs about ${formatUsd(estimate)} at
+            Anthropic's list price{settings.aiBackend === 'anthropic' ? '' : ' (AWS bills at its own rates)'}
+            {limit > 0 ? ` and counts toward your daily limit of ${limit} analyses` : ''}. Local-only threads are never sent.
+          </p>
+          <div className="tk-field-row">
+            <button type="button" className="tk-btn tk-btn-primary" disabled={state.busy} onClick={() => void upgrade()}>
+              Upgrade {count} summar{count === 1 ? 'y' : 'ies'}
+            </button>
+            <button type="button" className="tk-btn" disabled={state.busy} onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      <Result state={state} />
+    </>
+  );
+}
+
 export function SettingsDialog({
   dialogRef,
   settings,
@@ -346,8 +477,13 @@ export function SettingsDialog({
   onPatch,
   onRebuildVectors,
   onClosed,
+  dock,
+  initialSection,
 }: Props) {
   const [section, setSection] = useState<SectionId>('general');
+  useEffect(() => {
+    if (initialSection) setSection(initialSection);
+  }, [initialSection]);
   const [aiTest, setAiTest] = useState<TestState>(IDLE);
   const [embedTest, setEmbedTest] = useState<TestState>(IDLE);
   const [rerankTest, setRerankTest] = useState<TestState>(IDLE);
@@ -355,6 +491,7 @@ export function SettingsDialog({
   const [candidatesDraft, setCandidatesDraft] = useState<string | null>(null);
   const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
   const diagnostics = useDiagnostics();
+  const paperclipState = usePaperclipSyncState();
 
   const patchAuto = (patch: Partial<AutoOrganizeSettings>) =>
     settings ? onPatch({ autoOrganize: { ...settings.autoOrganize, ...patch } }) : Promise.resolve();
@@ -499,27 +636,9 @@ export function SettingsDialog({
       </>
     ),
 
-    capture: (
-      <Section
-        title="Sites captured automatically"
-        note="Conversations you open on these sites are captured as you read them and stay in this browser. Turning a site off stops new captures; threads already saved stay in the library."
-      >
-        <div className="tk-capture-grid">
-          {CAPTURE_PROVIDER_IDS.map((id) => (
-            <Toggle
-              key={id}
-              checked={settings.authorizedHosts[id]}
-              onChange={(v) => void onPatch({ authorizedHosts: { ...settings.authorizedHosts, [id]: v } })}
-              label={PROVIDERS[id].label}
-              hint={PROVIDERS[id].captureNote}
-            />
-          ))}
-        </div>
-        <p className="tk-settings-note">
-          Claude Code and Codex sessions on your computer, and ChatGPT or Claude data exports, come in through Import / Export.
-        </p>
-      </Section>
-    ),
+    capture: <CaptureSettings settings={settings} onPatch={onPatch} />,
+
+    paperclip: <PaperclipSettings settings={settings} onPatch={onPatch} />,
 
     ai: (
       <>
@@ -639,11 +758,16 @@ export function SettingsDialog({
           <p className="tk-settings-note">
             Analyzing all {threadCount} threads once with {model.label} costs about $
             {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)} at Anthropic's list price (${model.inputPerMTok} / $
-            {model.outputPerMTok} per million input / output tokens), assuming about 9k input and 1.8k output tokens per
-            thread. This is an estimate: long threads and the model's thinking cost more
+            {model.outputPerMTok} per million input / output tokens), assuming about{' '}
+            {Math.round(ANALYSIS_AVG_INPUT_TOKENS / 1000)}k input and {(ANALYSIS_AVG_OUTPUT_TOKENS / 1000).toFixed(1)}k output
+            tokens per thread. This is an estimate: long threads and the model's thinking cost more
             {settings.aiBackend === 'anthropic' ? '' : ', and AWS bills at its own rates'}. Only new or changed threads are
-            analyzed again.
+            analyzed again. Thread analysis always runs at Medium effort or higher, whatever the setting.
           </p>
+        </Section>
+
+        <Section title="Older summaries">
+          <UpgradeOlderSummaries settings={settings} active={section === 'ai'} />
         </Section>
 
         <Section title="Automatic analysis">
@@ -1306,6 +1430,14 @@ export function SettingsDialog({
       </>
     ),
 
+    sidebarDock: (
+      <SidebarDockPanel
+        state={dock?.state ?? null}
+        loaded={dock ? dock.loaded : true}
+        onRefresh={() => dock?.refresh()}
+      />
+    ),
+
     diagnostics: (
       <>
         <Section
@@ -1360,7 +1492,12 @@ export function SettingsDialog({
         <nav className="tk-settings-nav" aria-label="Settings sections">
           <div className="tk-nav-list">
             {SECTION_LABELS.map((s) => {
-              const status = sectionStatus(s.id, settings, { projectCount, reloadNeeded });
+              const status = sectionStatus(s.id, settings, {
+                projectCount,
+                reloadNeeded,
+                dock: dock ? dock.state : undefined,
+                paperclip: paperclipState,
+              });
               return (
                 <button
                   key={s.id}

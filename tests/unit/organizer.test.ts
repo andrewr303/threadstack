@@ -597,8 +597,11 @@ describe('Automatic organization', () => {
 describe('Claude analysis pipeline (mocked Anthropic API)', () => {
   const analysis = {
     title: 'Stripe webhook idempotency for the orders service',
-    gist: 'Made the Stripe webhook handler idempotent; tests still to be written.',
-    summary: 'Duplicate charges came from webhook retries. Added an idempotency key table. Tests remain.',
+    gist: 'Stripe webhook handler made idempotent with an event-id table; replay test still to write.',
+    overview: [
+      'Duplicate order charges came from Stripe retrying the same webhook event.',
+      'You chose to store processed event ids in a table and skip duplicates.\n\nThe replay test is still to be written.',
+    ],
     userGoal: 'Stop duplicate order charges',
     outcome: null,
     kind: 'debugging',
@@ -607,11 +610,28 @@ describe('Claude analysis pipeline (mocked Anthropic API)', () => {
     project: { name: 'Payments', isNew: true, confidence: 0.86, reason: 'Ongoing payments workstream' },
     status: 'active',
     statusReason: 'Tests still to write',
-    whereYouLeftOff: { text: 'Write the duplicate-delivery test next.', messageNumber: 4, quote: 'write a test that replays the same event' },
-    decisions: [{ text: 'Use an idempotency table keyed by event id', messageNumber: 3, quote: 'store processed event ids in a table', by: 'user' }],
-    actionItems: [{ text: 'Write the replay test', messageNumber: 4, quote: 'write a test that replays the same event', by: 'assistant' }],
-    openQuestions: [{ text: 'Hallucinated question', messageNumber: 2, quote: 'this quote does not exist anywhere', by: 'user' }],
-    artifacts: [{ label: 'webhooks.ts', kind: 'code', messageNumber: 2 }],
+    keyPoints: [
+      { text: 'Stripe retries resend the same event id', messageNumber: 2, quote: 'Retries resend the same event', by: 'assistant', rationale: null },
+      { text: 'Invented key point', messageNumber: 1, quote: 'not in any message at all', by: 'user', rationale: null },
+    ],
+    whereYouLeftOff: {
+      text: 'The dedupe table was agreed and the handler updated.',
+      nextStep: 'Write the duplicate-delivery replay test.',
+      messageNumber: 4,
+      quote: 'write a test that replays the same event',
+    },
+    decisions: [
+      {
+        text: 'Use an idempotency table keyed by event id',
+        messageNumber: 3,
+        quote: 'store processed event ids in a table',
+        by: 'user',
+        rationale: 'so a retried event is skipped instead of charged again',
+      },
+    ],
+    actionItems: [{ text: 'Write the replay test', messageNumber: 4, quote: 'write a test that replays the same event', by: 'assistant', rationale: 'ignored outside decisions' }],
+    openQuestions: [{ text: 'Hallucinated question', messageNumber: 2, quote: 'this quote does not exist anywhere', by: 'user', rationale: null }],
+    produced: [{ label: 'webhooks.ts', kind: 'code', description: 'Webhook handler that skips processed event ids', messageNumber: 2 }],
   };
 
   async function seed(db: ThreadkeeperDB, key = 'sk-ant-test') {
@@ -664,7 +684,7 @@ describe('Claude analysis pipeline (mocked Anthropic API)', () => {
     expect(req.body.model).toBe('claude-opus-5-5');
     expect(req.body.fallbacks).toBe('default');
     expect(req.body.thinking).toBeUndefined();
-    expect(req.body.output_config.effort).toBe('low');
+    expect(req.body.output_config.effort).toBe('medium'); // analysis runs at Medium at least (aiEffort is 'low')
     expect(req.body.output_config.format.type).toBe('json_schema');
     expect(req.body.system[1].cache_control).toEqual({ type: 'ephemeral' });
     expect(req.body.messages[0].content).toContain('[m3 · user]');
