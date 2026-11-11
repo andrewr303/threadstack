@@ -12,7 +12,9 @@
     "check": "npm run typecheck && npm run build && npm test",
     "test:e2e": "node scripts/run-organizer-e2e.mjs",
     "test:edge": "node scripts/run-edge-smoke.mjs",
-    "test:catchup": "node scripts/run-catchup-e2e.mjs"
+    "test:catchup": "node scripts/run-catchup-e2e.mjs",
+    "test:workspace": "node scripts/run-workspace-e2e.mjs",
+    "preview": "node scripts/preview-server.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

@@ -23,6 +23,10 @@ export const MAX_CUSTOM_SITES = 50;
 const SITE_SCRIPT_PREFIX = 'tk-site-';
 const PROVIDER_SCRIPT_PREFIX = 'tk-provider-';
 export const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
+/** Workspace embedding: cookie bridge and frame reporting (isolated world, document_start). */
+export const EMBED_BRIDGE_FILE = 'content-scripts/embed-bridge.js';
+/** Workspace embedding: page-world side of the cookie bridge (MAIN world, document_start). */
+export const EMBED_COOKIE_MAIN_FILE = 'content-scripts/embed-cookie-main.js';
 
 export interface CustomSite {
   /** Exact origin, e.g. https://chat.example.com or http://localhost:3000. */
@@ -196,9 +200,21 @@ export interface CaptureScript {
   id: string;
   matches: string[];
   js: string[];
-  runAt: 'document_idle';
-  allFrames: false;
+  runAt: 'document_idle' | 'document_start';
+  /** Every frame: the same pages also load inside Threadkeeper's workspace tab. */
+  allFrames: true;
   persistAcrossSessions: true;
+  world?: 'MAIN';
+}
+
+/** What chrome.scripting.getRegisteredContentScripts reports, as far as the plan compares it. */
+export interface RegisteredScript {
+  id: string;
+  matches?: string[];
+  js?: string[];
+  runAt?: string;
+  allFrames?: boolean;
+  world?: string;
 }
 
 export interface CaptureScriptPlan {
@@ -208,8 +224,32 @@ export interface CaptureScriptPlan {
   update: CaptureScript[];
 }
 
-function script(id: string, matches: string[]): CaptureScript {
-  return { id, matches, js: [CONTENT_SCRIPT_FILE], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true };
+/** Suffixes of the embedding scripts registered next to each content.js (whose id has none). */
+const BRIDGE_SUFFIX = '~bridge';
+const COOKIE_MAIN_SUFFIX = '~cookie-main';
+
+/**
+ * The scripts for one provider or site: content.js under the id it always had, plus the two
+ * embedding scripts under the same id with a suffix. All run in every frame.
+ */
+function scriptsFor(id: string, matches: string[]): CaptureScript[] {
+  const base = { matches, allFrames: true as const, persistAcrossSessions: true as const };
+  return [
+    { id, ...base, js: [CONTENT_SCRIPT_FILE], runAt: 'document_idle' },
+    { id: `${id}${BRIDGE_SUFFIX}`, ...base, js: [EMBED_BRIDGE_FILE], runAt: 'document_start' },
+    { id: `${id}${COOKIE_MAIN_SUFFIX}`, ...base, js: [EMBED_COOKIE_MAIN_FILE], runAt: 'document_start', world: 'MAIN' },
+  ];
+}
+
+/** Everything that decides what a registered script does; a difference means re-register. */
+function scriptSignature(s: RegisteredScript | CaptureScript): string {
+  return JSON.stringify([
+    [...(s.matches ?? [])].sort(),
+    s.js ?? [],
+    s.runAt ?? 'document_idle',
+    s.allFrames === true,
+    s.world === 'MAIN' ? 'MAIN' : 'ISOLATED',
+  ]);
 }
 
 /**
@@ -221,33 +261,37 @@ export function planCaptureScripts(input: {
   authorizedHosts: Partial<Record<CaptureProviderId, boolean>>;
   sites: CustomSite[];
   granted: (origins: string[]) => boolean;
-  registered: Array<{ id: string; matches?: string[] }>;
+  registered: RegisteredScript[];
 }): CaptureScriptPlan {
   const wanted = new Map<string, CaptureScript>();
+  const want = (id: string, matches: string[]) => {
+    for (const s of scriptsFor(id, matches)) wanted.set(s.id, s);
+  };
   for (const id of CAPTURE_PROVIDER_IDS) {
     const patterns = runtimeMatchPatterns(id);
     if (patterns.length === 0 || !input.authorizedHosts[id]) continue;
     if (!input.granted(toOriginMatchPatterns(patterns))) continue;
-    wanted.set(providerScriptId(id), script(providerScriptId(id), patterns));
+    want(providerScriptId(id), patterns);
   }
+  const sitePatterns = new Set<string>();
   for (const site of input.sites) {
     if (!site.enabled) continue;
     const pattern = originMatchPattern(site.origin);
     if (!input.granted([pattern])) continue;
-    const id = siteScriptId(site.origin);
-    // Two ports of one host share a pattern; one script covers both.
-    const existing = Array.from(wanted.values()).find((s) => s.id.startsWith(SITE_SCRIPT_PREFIX) && s.matches[0] === pattern);
-    if (!existing) wanted.set(id, script(id, [pattern]));
+    // Two ports of one host share a pattern; one set of scripts covers both.
+    if (sitePatterns.has(pattern)) continue;
+    sitePatterns.add(pattern);
+    want(siteScriptId(site.origin), [pattern]);
   }
   const plan: CaptureScriptPlan = { register: [], unregister: [], update: [] };
   const have = new Map(input.registered.filter((r) => isManagedScriptId(r.id)).map((r) => [r.id, r]));
-  for (const [id, row] of have) {
+  for (const [id] of have) {
     if (!wanted.has(id)) plan.unregister.push(id);
   }
-  for (const [id, want] of wanted) {
+  for (const [id, script] of wanted) {
     const row = have.get(id);
-    if (!row) plan.register.push(want);
-    else if ([...(row.matches ?? [])].sort().join('\n') !== [...want.matches].sort().join('\n')) plan.update.push(want);
+    if (!row) plan.register.push(script);
+    else if (scriptSignature(row) !== scriptSignature(script)) plan.update.push(script);
   }
   return plan;
 }
@@ -273,7 +317,7 @@ export async function writeCustomSites(storage: StorageLike, state: CustomSitesS
 }
 
 export interface CaptureScriptEnv {
-  getRegistered(): Promise<Array<{ id: string; matches?: string[] }>>;
+  getRegistered(): Promise<RegisteredScript[]>;
   register(scripts: CaptureScript[]): Promise<void>;
   unregister(ids: string[]): Promise<void>;
   contains(origins: string[]): Promise<boolean>;
@@ -315,8 +359,16 @@ export async function reconcileCaptureScripts(
 export function chromeCaptureScriptEnv(): CaptureScriptEnv | null {
   if (typeof chrome === 'undefined' || !chrome.scripting?.registerContentScripts || !chrome.permissions?.contains) return null;
   return {
-    getRegistered: async () => (await chrome.scripting.getRegisteredContentScripts()).map((s) => ({ id: s.id, matches: s.matches })),
-    register: (scripts) => chrome.scripting.registerContentScripts(scripts),
+    getRegistered: async () =>
+      (await chrome.scripting.getRegisteredContentScripts()).map((s) => ({
+        id: s.id,
+        matches: s.matches,
+        js: s.js,
+        runAt: s.runAt,
+        allFrames: s.allFrames,
+        world: s.world,
+      })),
+    register: (scripts) => chrome.scripting.registerContentScripts(scripts as chrome.scripting.RegisteredContentScript[]),
     unregister: (ids) => chrome.scripting.unregisterContentScripts({ ids }),
     contains: (origins) => chrome.permissions.contains({ origins }),
   };

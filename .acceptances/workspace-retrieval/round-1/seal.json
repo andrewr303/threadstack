@@ -1,0 +1,19 @@
+{
+  "files": {
+    "assets/browse.png": "1ed0c978dcfaf7c6ef18a07de5b8b258243c44ca024d9e7fa3ee7fdee881af74",
+    "assets/browser-execution-final.json": "386531a012d6004660fc9523f5bf2345d31a82d0bf0a33093bf7599488f21dff",
+    "assets/dashboard.png": "e99d7d4497eceed5d38188def07f258f76348e5022e34f3a43e34da3476117a5",
+    "assets/endpoint.png": "aa04207db5b38680c1232717891b346553609b7bf2287829bf24c339ae7c6660",
+    "assets/escape-failure.png": "7f009cdfd6d05a1318314e429ccfac2240ea6fc6b65bec05ba32da4b6867d2e3",
+    "assets/filters.png": "a053c5a4e19a1ef46582f8d942bcbc50339d1c69eef1e5114acefd29d4b44a66",
+    "assets/narrow-drawer.png": "c7f40d18d5109f69a3c66290b8e96348e1aac0ea98ed9ece65a3e5b940301f78",
+    "assets/narrow-fixed.png": "44d5d0964d2aab9dc92a40c103c9616704603cda2705e17a1ab450a6b80c566d",
+    "assets/narrow-settings.png": "7f64e0d8a90d1eaaf8de37d9e5eae6c85588da7e1d18ea357e1cee77b0feb79f",
+    "report.md": "06cbc495575ec1d806c270af31291127f8c3d4d023ca288f7acfe3c2bdf1a40a",
+    "result.json": "5b7b0b8d649312a7153e2f216e8e68554927ddd2ecc86f07bba09c4046a600b9"
+  },
+  "missingFiles": [],
+  "schemaVersion": 1,
+  "sealedAt": "2026-11-11T00:40:42.422052+00:00",
+  "verdictAtSeal": "blocked"
+}

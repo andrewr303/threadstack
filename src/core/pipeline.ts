@@ -2,6 +2,7 @@ import { isRemoteAllowed } from './privacy.js';
 import {
   ANALYSIS_VERSION,
   insightKeyFor,
+  type AgentRunFacts,
   type ConversationRecord,
   type ExtensionSummaryOutput,
   type ExtractedItem,
@@ -44,7 +45,10 @@ import {
   hasClaudeKey,
   type ThreadAnalysis,
 } from './ai/claude.js';
-import { providerLabel } from './providers.js';
+import { providerCategory, providerLabel } from './providers.js';
+import { normalizePullRequestUrl, normalizeRepository } from './repository.js';
+import { realmForProvider } from './workspace/realms.js';
+import { AGENT_STATE_LABELS } from './workspace/types.js';
 import { computeDeterministicHash, normalizeSettings } from './schema.js';
 import { currentUtcDateKey } from './cloud-client.js';
 
@@ -89,6 +93,45 @@ export async function isRemoteProcessingAllowed(
 /** Whether an AI insight was written by an older analysis format (see ANALYSIS_VERSION). */
 export function isOlderAnalysis(insight: Pick<ThreadInsight, 'source' | 'analysisVersion'> | null | undefined): boolean {
   return Boolean(insight && insight.source === 'ai' && (insight.analysisVersion ?? 1) < ANALYSIS_VERSION);
+}
+
+/**
+ * A coding-agent thread whose current AI analysis predates the agent facts (agentRun is absent, not
+ * null: null means Claude read it and found no agent run). Only an explicit request upgrades it.
+ */
+export function needsAgentRunUpgrade(
+  conv: Pick<ConversationRecord, 'provider'>,
+  insight: Pick<ThreadInsight, 'source' | 'agentRun'> | null | undefined
+): boolean {
+  return Boolean(insight && insight.source === 'ai' && insight.agentRun === undefined && providerCategory(conv.provider) === 'coding_agent');
+}
+
+/**
+ * The label of the account a thread was captured under, for the analysis header. Label only: never the
+ * account id, the signed-in identity, an email or a cookie. Null when there is no such account.
+ */
+export async function accountLabelForThread(
+  db: ThreadkeeperDB,
+  conv: Pick<ConversationRecord, 'provider' | 'accountId'>,
+  settings: Pick<SettingsRecord, 'boundAccounts'>
+): Promise<string | null> {
+  try {
+    let account = await db.accounts.get(conv.accountId);
+    // Threads captured before accounts existed carry the legacy bound id; it stands for the primary account.
+    if (!account && settings.boundAccounts?.[conv.provider]?.accountId === conv.accountId) {
+      const realm = realmForProvider(conv.provider);
+      if (realm) account = (await db.accounts.where('realm').equals(realm.id).toArray()).find((a) => a.primary);
+    }
+    if (!account) return null;
+    const label = cleanLine(account.label, 60);
+    // A default label is replaced by the signed-in identity (usually an email address), and that must
+    // not leave the device: send a label only when the user's own wording carries no identity.
+    const identity = account.identity?.display?.trim().toLowerCase();
+    if (!label || (identity && label.toLowerCase() === identity) || /[^\s@]+@[^\s@]+\.[^\s@]+/.test(label)) return null;
+    return label;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -304,6 +347,61 @@ export function cleanOverview(paragraphs: string[] | null | undefined, gist = ''
     .slice(0, 4);
 }
 
+const PR_STATES = new Set<AgentRunFacts['pullRequests'][number]['state']>(['open', 'merged', 'closed', 'unknown']);
+const BLOCKED_ON = new Set<AgentRunFacts['blockedOn']>(['none', 'permission', 'input', 'ci', 'external']);
+const RUN_STATES = new Set<AgentRunFacts['runState']>(['running', 'finished', 'errored', 'awaiting_user', 'unknown']);
+
+/**
+ * Claude's reading of an agent run, clamped, with the facts the capture recorded filling the fields
+ * Claude left empty (they do not depend on the transcript being complete). Null stays null: Claude
+ * judged the thread not to be an agent run.
+ */
+function toAgentRunFacts(conv: ConversationRecord, run: ThreadAnalysis['agentRun']): AgentRunFacts | null {
+  if (!run) return null;
+  const pullRequests: AgentRunFacts['pullRequests'] = [];
+  const addPullRequest = (raw: string | null | undefined, state: AgentRunFacts['pullRequests'][number]['state']) => {
+    const url = normalizePullRequestUrl((raw ?? '').replace('/-/merge_requests/', '/merge_requests/'));
+    if (!url || pullRequests.length >= 5) return;
+    const seen = pullRequests.find((p) => p.url === url);
+    if (seen) {
+      if (seen.state === 'unknown') seen.state = state;
+      return;
+    }
+    pullRequests.push({ url, state });
+  };
+  for (const p of run.pullRequests ?? []) addPullRequest(p.url, PR_STATES.has(p.state) ? p.state : 'unknown');
+  addPullRequest(conv.pullRequestUrl, 'unknown');
+
+  const files = Array.from(new Set((run.filesChanged ?? []).map((f) => cleanLine(f, 200)).filter(Boolean))).slice(0, 15);
+  const commands = (run.commandsRun ?? [])
+    .map((c) => ({ command: cleanLine(c.command, 160), outcome: c.outcome }))
+    .filter((c) => c.command)
+    .slice(-8);
+  const testsStatus = ['passing', 'failing', 'not_run', 'unknown'].includes(run.tests?.status) ? run.tests.status : 'unknown';
+  const observed = conv.agentState;
+  const observedRunState: AgentRunFacts['runState'] | null =
+    observed === 'running'
+      ? 'running'
+      : observed === 'waiting_permission' || observed === 'waiting_answer'
+        ? 'awaiting_user'
+        : observed === 'failed'
+          ? 'errored'
+          : observed === 'turn_complete'
+            ? 'finished'
+            : null;
+  const claudeRunState = RUN_STATES.has(run.runState) ? run.runState : 'unknown';
+  return {
+    repository: normalizeRepository(conv.repository ?? null) ?? normalizeRepository(run.repository),
+    branch: cleanLine(conv.gitBranch, 120) || cleanLine(run.branch, 120) || null,
+    pullRequests,
+    filesChanged: files,
+    commandsRun: commands,
+    tests: { status: testsStatus, detail: cleanLine(run.tests?.detail, 160) || null },
+    blockedOn: BLOCKED_ON.has(run.blockedOn) ? run.blockedOn : 'none',
+    runState: claudeRunState === 'unknown' && observedRunState ? observedRunState : claudeRunState,
+  };
+}
+
 export function analysisToInsight(
   conv: ConversationRecord,
   analysis: ThreadAnalysis,
@@ -371,6 +469,7 @@ export function analysisToInsight(
     userTurns: messages.filter((m) => m.role === 'user').length,
     hasCode: local?.hasCode ?? messages.some((m) => m.hasCode),
     analysisVersion: ANALYSIS_VERSION,
+    agentRun: toAgentRunFacts(conv, analysis.agentRun),
   };
 }
 
@@ -472,7 +571,7 @@ export async function analyzeThreadRemotely(
   let didAnalyze = false;
 
   const explicit = Boolean(options.requested || options.ignoreDailyLimit);
-  const upgrade = explicit && isOlderAnalysis(aiInsight);
+  const upgrade = explicit && (isOlderAnalysis(aiInsight) || needsAgentRunUpgrade(conv, aiInsight));
   const wantsAi =
     settings.autoOrganize.aiAnalysis || explicit
       ? hasClaudeKey(settings) &&
@@ -512,6 +611,14 @@ export async function analyzeThreadRemotely(
             .filter((c) => c.name !== UNFILED_PROJECT)
             .map((c) => ({ name: c.name, description: c.description })),
           knownTags,
+          repository: normalizeRepository(conv.repository ?? null) ?? local?.agentRun?.repository ?? null,
+          branch: conv.gitBranch ?? null,
+          pullRequestUrl: normalizePullRequestUrl(conv.pullRequestUrl ?? null),
+          accountLabel: await accountLabelForThread(db, conv, settings),
+          model: conv.modelSlug ?? null,
+          agentLabel: conv.agentLabel ?? null,
+          observedRunState:
+            conv.agentState && conv.agentState !== 'unknown' ? AGENT_STATE_LABELS[conv.agentState] : null,
         },
         options.fetchImpl
       );
@@ -783,7 +890,8 @@ export async function queueAnalysis(
     }
     const ai = await db.insights.get(insightKeyFor('ai', threadKey));
     const current = ai && ai.sourceRevision === conv.sourceRevision;
-    const older = isOlderAnalysis(ai);
+    // An explicit request also fills in the agent facts a coding-agent analysis predates.
+    const older = isOlderAnalysis(ai) || needsAgentRunUpgrade(conv, ai);
     if (current && !(older && upgradeOlder)) {
       result.skipped.push({ threadKey, reason: 'fresh' });
       continue;

@@ -1,0 +1,23 @@
+
+ RUN  v3.2.7 /Users/andrew/.synara/worktrees/0e09/synara
+
+ ✓ tests/unit/search-retrieval.test.ts (5 tests) 86ms
+ ✓ tests/unit/rerank.test.ts (26 tests) 110ms
+ ✓ tests/unit/thread-search.test.tsx (6 tests) 97ms
+stdout | tests/unit/retrieval-eval.test.ts > offline retrieval evaluation (synthetic fixtures, on-device path) > reports the labelled query set before and after
+variant | recall@5 | recall@10 | MRR | nDCG@10 | no-answer results
+manager first stage, baseline | 0.885 | 0.935 | 0.87 | 0.871 | 0.5
+manager lexical only | 0.885 | 0.935 | 0.83 | 0.835 | 0.5
+manager first stage, current | 0.885 | 0.935 | 0.87 | 0.871 | 0.5
+Still search (dock), current | 0.831 | 0.863 | 0.783 | 0.804 | 0
+(per-query detail: /var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-retrieval-eval.json)
+
+ ✓ tests/unit/retrieval-eval.test.ts (1 test) 222ms
+ ✓ tests/unit/core.test.ts (17 tests) 244ms
+ ✓ tests/unit/threads-view.test.tsx (26 tests) 219ms
+
+ Test Files  6 passed (6)
+      Tests  81 passed (81)
+   Start at  17:33:43
+   Duration  1.20s (transform 642ms, setup 0ms, collect 2.13s, tests 978ms, environment 1.73s, prepare 370ms)
+

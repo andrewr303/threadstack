@@ -10,6 +10,7 @@ import {
   type ProviderId,
   type CoverageState,
   type WorkflowState,
+  type ThreadVectorRecord,
 } from './schema.js';
 import type { ThreadkeeperDB } from './db.js';
 import {
@@ -18,6 +19,8 @@ import {
   fuseRerankScores,
   remoteRerankAllowedKeys,
 } from './rerank.js';
+import { providerCategory } from './providers.js';
+import { normalizeRepository, threadRepository } from './repository.js';
 
 export interface SearchScopeFilter {
   accountId?: string;
@@ -27,6 +30,8 @@ export interface SearchScopeFilter {
   workflowState?: WorkflowState | 'all';
   coverage?: CoverageState | 'all';
   tag?: string | null;
+  /** Exact match on the thread's normalized repository ("owner/name", or a bare name). */
+  repository?: string | null;
   hasCode?: boolean;
   hasOpenQuestions?: boolean;
   includeSyntheticBenchmark?: boolean;
@@ -142,6 +147,50 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+/** Empty, zero and non-finite vectors cannot describe a comparable embedding. */
+export function isUsableSearchVector(vector: number[]): boolean {
+  return vector.length > 0 && vector.every(Number.isFinite) && vector.some((n) => n !== 0);
+}
+
+/** Fuse one vector space with lexical ranks. Only current, scoped thread vectors participate. */
+export function fuseThreadVectors(params: {
+  lexical: SearchHit[];
+  scoped: SearchHit[];
+  vectors: ThreadVectorRecord[];
+  space: string;
+  queryEmbedding: number[];
+  threshold?: number;
+  gists?: ReadonlyMap<string, string>;
+}): SearchHit[] {
+  const { lexical, scoped, vectors, space, queryEmbedding, threshold = 0.18, gists } = params;
+  if (!isUsableSearchVector(queryEmbedding)) return lexical;
+  const byKey = new Map(scoped.map((h) => [h.conversation.threadKey, h]));
+  const semantic = new Map<string, number>();
+  for (const row of vectors) {
+    const base = byKey.get(row.threadKey);
+    if (!base || row.space !== space || row.sourceRevision !== base.conversation.sourceRevision ||
+      row.embedding.length !== queryEmbedding.length || !isUsableSearchVector(row.embedding)) continue;
+    const sim = cosineSimilarity(queryEmbedding, row.embedding);
+    if (sim >= threshold) semantic.set(row.threadKey, Math.max(sim, semantic.get(row.threadKey) ?? -1));
+  }
+  const fused = new Map<string, SearchHit>();
+  lexical.forEach((h, rank) => fused.set(h.conversation.threadKey, { ...h, score: 1 / (60 + rank + 1) }));
+  [...semantic].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 100).forEach(([key, sim], rank) => {
+    const existing = fused.get(key);
+    const rrf = 1 / (60 + rank + 1);
+    if (existing) {
+      existing.score += rrf;
+      existing.vectorScore = sim;
+      existing.matchReasons = [...existing.matchReasons, 'Semantic vector similarity'];
+    } else {
+      const base = byKey.get(key)!;
+      fused.set(key, { ...base, score: rrf * 0.8, lexicalScore: 0, vectorScore: sim,
+        matchReasons: ['Semantic vector similarity'], supportingExcerpt: gists?.get(key) ?? base.supportingExcerpt });
+    }
+  });
+  return [...fused.values()].sort((a, b) => b.score - a.score || a.conversation.threadKey.localeCompare(b.conversation.threadKey));
+}
+
 export function computeContextGroupHash(chunks: ChunkRecord[]): string {
   const ordered = [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
   return computeDeterministicHash(
@@ -155,6 +204,9 @@ export function validateVectorCompatibility(params: {
   dimensions: number;
   embeddingLength: number;
 }): { valid: boolean; reason?: string } {
+  if (!['standard', 'contextual'].includes(params.indexType) || ![256, 512, 1024, 2048].includes(params.dimensions)) {
+    return { valid: false, reason: 'Unsupported vector index type or dimensions' };
+  }
   if (params.indexType === 'standard') {
     if (params.model !== 'voyage-4' && params.model !== 'voyage-4-large') {
       return {
@@ -201,9 +253,17 @@ export async function storeVectorEntries(
     params.indexType === 'contextual' ? computeContextGroupHash(chunks) : null;
 
   const entries: VectorIndexEntry[] = [];
+  const chunkByKey = new Map(chunks.map((c) => [c.chunkKey, c]));
+  const seen = new Set<string>();
   const now = new Date().toISOString();
 
   for (const item of params.embeddingsByChunkKey) {
+    const chunk = chunkByKey.get(item.chunkKey);
+    if (!chunk || chunk.sourceRevision !== conv.sourceRevision || seen.has(item.chunkKey)) {
+      return { stored: 0, rejectedReason: 'Vector chunk is missing, duplicated or stale' };
+    }
+    seen.add(item.chunkKey);
+    if (!isUsableSearchVector(item.embedding)) return { stored: 0, rejectedReason: 'Invalid embedding values' };
     const check = validateVectorCompatibility({
       indexType: params.indexType,
       model: params.model,
@@ -233,6 +293,8 @@ export async function storeVectorEntries(
   await db.vectors.bulkPut(entries);
   return { stored: entries.length };
 }
+
+const isCodingProvider = (provider: string): boolean => providerCategory(provider) === 'coding_agent';
 
 export function matchesScopeFilter(
   conv: ConversationRecord,
@@ -275,6 +337,12 @@ export function matchesScopeFilter(
     conv.coverage !== scope.coverage
   ) {
     return false;
+  }
+  if (scope.repository) {
+    const wanted = normalizeRepository(scope.repository);
+    if (!wanted || threadRepository(conv, isCodingProvider) !== wanted) {
+      return false;
+    }
   }
   if (scope.tag) {
     const lowerTag = scope.tag.toLowerCase();
@@ -388,7 +456,7 @@ export class MemorySearchIndex {
       this.titleTrigramsByThread.set(c.threadKey, computeTrigrams(display));
       this.lowerMetaByThread.set(
         c.threadKey,
-        `${c.project} ${c.tags.join(' ')} ${c.manualNotes} ${c.latestDecisionText ?? ''} ${c.nextStepText ?? ''} ${c.providerProjectName ?? ''} ${params.extraMetaByThread?.get(c.threadKey) ?? ''}`.toLowerCase()
+        `${c.project} ${c.tags.join(' ')} ${c.manualNotes} ${c.latestDecisionText ?? ''} ${c.nextStepText ?? ''} ${c.providerProjectName ?? ''} ${c.repository ?? ''} ${c.gitBranch ?? ''} ${params.extraMetaByThread?.get(c.threadKey) ?? ''}`.toLowerCase()
       );
     }
   }
@@ -646,6 +714,7 @@ export async function runHybridSearch(
 
   const localRes = memIndex.searchLocal(options.query, options.scope, 200);
   const convByKey = new Map(conversations.map((c) => [c.threadKey, c]));
+  const codeThreads = new Set(messages.filter((m) => m.hasCode).map((m) => m.threadKey));
   const chunksByThread = new Map<string, ChunkRecord[]>();
 
   let vectorRejectedReason: string | null = null;
@@ -664,7 +733,9 @@ export async function runHybridSearch(
       embeddingLength: vq.embedding.length,
     });
 
-    if (!compat.valid) {
+    if (!isUsableSearchVector(vq.embedding)) {
+      vectorRejectedReason = 'Invalid query embedding values';
+    } else if (!compat.valid) {
       vectorRejectedReason = compat.reason ?? 'Invalid vector query parameters';
     } else {
       const allChunks = await db.chunks.toArray();
@@ -691,16 +762,19 @@ export async function runHybridSearch(
             conv,
             options.scope,
             summaryMap.get(conv.threadKey),
-            false
+            codeThreads.has(conv.threadKey) || conv.tags.includes('code')
           )
         ) {
           continue;
         }
 
-        // Reject stale sourceRevision or mismatched dimension
+        const matchedChunk = (chunksByThread.get(conv.threadKey) ?? []).find((c) => c.chunkKey === vec.chunkKey);
+        // Reject stale or foreign vectors before scoring, including deleted source chunks.
         if (
           vec.sourceRevision !== conv.sourceRevision ||
-          vec.embedding.length !== vq.dimensions
+          vec.embedding.length !== vq.dimensions || !isUsableSearchVector(vec.embedding) ||
+          vec.accountId !== conv.accountId || vec.workspaceId !== conv.workspaceId || vec.provider !== conv.provider ||
+          !matchedChunk || matchedChunk.sourceRevision !== conv.sourceRevision
         ) {
           staleVectorsSkipped += 1;
           continue;
@@ -720,9 +794,6 @@ export async function runHybridSearch(
         if (sim > 0.25) {
           const prev = vectorScoresByThread.get(conv.threadKey);
           if (!prev || sim > prev.score) {
-            const matchedChunk = (chunksByThread.get(conv.threadKey) ?? []).find(
-              (c) => c.chunkKey === vec.chunkKey
-            );
             vectorScoresByThread.set(conv.threadKey, {
               score: sim,
               chunkText: matchedChunk?.text ?? getDisplayTitle(conv),
@@ -782,7 +853,8 @@ export async function runHybridSearch(
 
   let rerankFallbackUsed = false;
   if (options.reranker && mergedHits.length > 1 && options.query.trim().length > 0) {
-    const shortlist = mergedHits.slice(0, Math.max(2, options.rerankCandidates ?? 40));
+    const count = Number.isFinite(options.rerankCandidates) ? Math.trunc(options.rerankCandidates!) : 40;
+    const shortlist = mergedHits.slice(0, Math.max(2, Math.min(100, count)));
     // Local-only threads are never sent; they keep their first-stage slot.
     const settings = normalizeSettings(await db.settings.get('default'));
     const allowed = await remoteRerankAllowedKeys(
@@ -819,9 +891,10 @@ export async function runHybridSearch(
         );
         if (
           !Array.isArray(reranked) ||
-          reranked.length === 0 ||
+          reranked.length !== sendable.length || new Set(reranked.map((r) => r?.index)).size !== sendable.length ||
           reranked.some(
             (r) =>
+              !r ||
               typeof r.index !== 'number' ||
               !Number.isInteger(r.index) ||
               r.index < 0 ||

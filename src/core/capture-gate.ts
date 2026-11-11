@@ -1,8 +1,9 @@
 // The background's decision on a capture sent by a content script. A content script runs inside
 // a website, so nothing it says is trusted on its own: the page it came from (sender.url, top
-// frame only) must be one of the claimed provider's pages, or an enabled site the user added;
-// capture must be on for that provider; and "the user asked for this tab" counts only with a
-// token the background itself handed to that tab moments ago.
+// frame only, or a page embedded in Threadkeeper's own workspace tab) must be one of the claimed
+// provider's pages, or an enabled site the user added; capture must be on for that provider; and
+// "the user asked for this tab" counts only with a token the background itself handed to that
+// tab moments ago.
 
 import {
   CUSTOM_SITE_PROVIDER_IDS,
@@ -12,8 +13,10 @@ import {
   type CaptureProviderId,
 } from './providers.js';
 import { matchCustomSite, siteConversationKey, type CustomSite, type CustomSitesState } from './custom-sites.js';
-import { captureSenderUrl, type RuntimeSender } from './messaging.js';
+import { captureSenderPage, type EmbedSenderContext, type RuntimeSender } from './messaging.js';
 import { canonicalizeConversationUrl } from './dom-capture.js';
+import { normalizePullRequestUrl, normalizeRepository } from './repository.js';
+import { isAgentState, type AgentState } from './workspace/types.js';
 
 /** A one-time-ish permission for one tab: the overlay was opened there, or the user chose "Capture this tab". */
 export interface ExplicitGrant {
@@ -33,6 +36,8 @@ export type CaptureDecision =
       canonicalUrl: string;
       explicit: boolean;
       site: CustomSite | null;
+      /** The capture came from a page embedded in a workspace tab. */
+      embedded: boolean;
     }
   | { ok: false; skipped?: string; error?: string };
 
@@ -46,9 +51,13 @@ export function decideCapture(input: {
   sites: CustomSitesState;
   grant: ExplicitGrant | null | undefined;
   now: number;
+  /** Lets pages embedded in the workspace through the sender check; without it every frame is refused. */
+  embed?: EmbedSenderContext | null;
 }): CaptureDecision {
-  const pageUrl = captureSenderUrl(input.sender);
-  if (!pageUrl) return { ok: false, error: 'Captures are accepted only from the top frame of a web page.' };
+  const page = captureSenderPage(input.sender, input.embed);
+  if (!page) return { ok: false, error: 'Captures are accepted only from the top frame of a web page or a page open in the Threadkeeper workspace.' };
+  const pageUrl = page.url;
+  const embedded = page.embedded;
   const raw = input.payload?.provider;
   if (!isCaptureProviderId(raw)) return { ok: false, error: 'Unknown capture provider' };
   const provider: CaptureProviderId = raw;
@@ -57,7 +66,9 @@ export function decideCapture(input: {
     return { ok: false, error: 'Missing conversation id' };
   }
 
-  const grant = input.grant;
+  // Grants belong to the tab the person invoked Threadkeeper on; a workspace tab never gets one,
+  // and a page embedded there never borrows one. Explicit-only capture stays explicit.
+  const grant = embedded ? null : input.grant;
   const grantValid = Boolean(
     grant && typeof input.explicitToken === 'string' && input.explicitToken === grant.token && grant.expiresAt > input.now
   );
@@ -77,7 +88,7 @@ export function decideCapture(input: {
     if (!conv.startsWith(`${siteConversationKey(site.origin)}~`)) return { ok: false, error: 'Conversation id does not belong to this site' };
     const claimed = typeof input.payload?.canonicalUrl === 'string' ? input.payload.canonicalUrl : '';
     const canonicalUrl = sameOrigin(claimed, site.origin) ? claimed : canonicalizeConversationUrl(pageUrl, provider);
-    return { ok: true, provider, sourceConversationId: conv, canonicalUrl, explicit: grantValid, site };
+    return { ok: true, provider, sourceConversationId: conv, canonicalUrl, explicit: grantValid, site, embedded };
   }
 
   if (!isProviderAllowedOnUrl(provider, pageUrl)) {
@@ -92,7 +103,42 @@ export function decideCapture(input: {
   }
   const claimed = typeof input.payload?.canonicalUrl === 'string' ? input.payload.canonicalUrl : '';
   const canonicalUrl = /^https:\/\//i.test(claimed) && isProviderAllowedOnUrl(provider, claimed) ? claimed : canonicalizeConversationUrl(pageUrl);
-  return { ok: true, provider, sourceConversationId: conv, canonicalUrl, explicit: grantValid, site: null };
+  return { ok: true, provider, sourceConversationId: conv, canonicalUrl, explicit: grantValid, site: null, embedded };
+}
+
+/** Coding-session fields a capture may carry, after validation. */
+export interface CodingFields {
+  repository?: string;
+  pullRequestUrl?: string;
+  gitBranch?: string;
+  agentState?: AgentState;
+}
+
+const BRANCH_MAX = 250;
+// eslint-disable-next-line no-control-regex
+const BRANCH_BAD = /[\u0000-\u0020\u007f~^:?*[\\]/;
+
+/**
+ * The repository, pull request, branch and agent state a content script reported, each checked
+ * on its own; anything invalid is dropped rather than stored.
+ */
+export function sanitizeCodingFields(payload: Record<string, unknown> | null | undefined): CodingFields {
+  const out: CodingFields = {};
+  if (!payload) return out;
+  if (typeof payload.repository === 'string' && payload.repository.length <= 400) {
+    const repository = normalizeRepository(payload.repository);
+    if (repository) out.repository = repository;
+  }
+  if (typeof payload.pullRequestUrl === 'string' && payload.pullRequestUrl.length <= 2048) {
+    const pr = normalizePullRequestUrl(payload.pullRequestUrl);
+    if (pr) out.pullRequestUrl = pr;
+  }
+  if (typeof payload.gitBranch === 'string') {
+    const branch = payload.gitBranch.trim();
+    if (branch.length > 0 && branch.length <= BRANCH_MAX && !BRANCH_BAD.test(branch)) out.gitBranch = branch;
+  }
+  if (isAgentState(payload.agentState)) out.agentState = payload.agentState;
+  return out;
 }
 
 function sameOrigin(url: string, origin: string): boolean {

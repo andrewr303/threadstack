@@ -6,8 +6,10 @@ import {
   extractConversationIdFromUrl,
   isProviderId,
   parseChatGptProjectRoute,
+  providerCategory,
   type ProviderId,
 } from './providers.js';
+import { normalizePullRequestUrl, normalizeRepository, repositoryName } from './repository.js';
 import { fnv1a32Hex, siteConversationKey } from './custom-sites.js';
 import type { UpsertThreadInput } from './db.js';
 import type { GrokXMessage } from './grok-x.js';
@@ -1046,6 +1048,15 @@ const githubCopilotAdapter = roleAdapter({
   },
 });
 
+/** Cursor background agents: title only; the repository name is the project, like Claude Code and Codex. */
+const cursorAgentsAdapter: DomAdapter = {
+  ...titleOnlyAdapter(/Cursor(?:\s*Agents?)?/),
+  project(doc, url) {
+    const repository = extractRepositoryInfo(doc, url).repository;
+    return repository ? repositoryName(repository) : null;
+  },
+};
+
 /** Lovable (lovable-chat-exporter, 2026-10), medium: user message ids start with umsg_. */
 const lovableAdapter = roleAdapter({
   turns: '[data-message-id]',
@@ -1216,7 +1227,7 @@ const ADAPTERS: Record<ProviderId, DomAdapter> = {
   t3_chat: t3Adapter,
   gemini_notebook: notebookAdapter,
   github_copilot: githubCopilotAdapter,
-  cursor_agents: titleOnlyAdapter(/Cursor(?:\s*Agents?)?/),
+  cursor_agents: cursorAgentsAdapter,
   devin: titleOnlyAdapter(/Devin/),
   jules: titleOnlyAdapter(/Jules/),
   lovable: lovableAdapter,
@@ -1420,6 +1431,106 @@ export function extractVisibleDomConversation(
     method,
     stabilize: Boolean(site) || method !== 'adapter' || Boolean(adapter.stabilize),
   };
+}
+
+/** Repository facts a coding-agent page shows about its session. */
+export interface RepositoryInfo {
+  /** Normalized "owner/name" (core/repository.ts), or null. */
+  repository: string | null;
+  /** Canonical pull request address, or null. */
+  pullRequestUrl: string | null;
+  gitBranch: string | null;
+}
+
+// github.com paths whose first segment is a site section, not an owner ("github.com/settings/profile").
+const GITHUB_RESERVED_OWNERS = new Set([
+  'about', 'apps', 'codespaces', 'collections', 'copilot', 'enterprise', 'events', 'explore', 'features',
+  'issues', 'login', 'marketplace', 'new', 'notifications', 'orgs', 'pricing', 'pulls', 'search', 'security',
+  'settings', 'signup', 'sponsors', 'topics', 'trending', 'users',
+]);
+
+// Message bodies can link to any repository; only the session's own chrome names its repository.
+const REPOSITORY_LINK_EXCLUDED =
+  'nav, aside, [data-message-author-role], [data-testid*="message"], .markdown-body, .prose, .markdown';
+
+function repositoryFromHref(href: string, base: string): string | null {
+  let resolved: URL;
+  try {
+    resolved = new URL(href, base);
+  } catch {
+    return null;
+  }
+  const repository = normalizeRepository(resolved.href);
+  if (!repository || !repository.includes('/')) return null;
+  if (/^(?:www\.)?github\.com$/i.test(resolved.hostname) && GITHUB_RESERVED_OWNERS.has(repository.split('/')[0])) return null;
+  return repository;
+}
+
+function branchFromElement(el: Element): string | null {
+  const label = (el.getAttribute('aria-label') ?? el.getAttribute('title') ?? '').trim();
+  const labelled = label.match(/^(?:git\s+)?branch\s*[:\-]\s*(.+)$/i);
+  let value: string | null = labelled ? labelled[1] : null;
+  if (!value && (/^(?:git\s+)?branch$/i.test(label) || /branch/i.test(el.getAttribute('data-testid') ?? ''))) {
+    value = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }
+  if (!value) {
+    const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (el.children.length === 0 && text.length < 120) value = text.match(/^branch\s*:\s*(\S+)$/i)?.[1] ?? null;
+  }
+  // A branch name has no spaces; "Create branch" or a sentence is a button or prose, not a name.
+  return value && /^[\w./@+#-]{1,200}$/.test(value) ? value : null;
+}
+
+/**
+ * Read the repository, branch and pull request a coding-agent page shows for its session
+ * (Claude Code, Codex, Cursor agents, GitHub Copilot agent sessions, Jules, Devin).
+ * The selectors are unverified against the live sites: they look for what any of these pages
+ * has to show, a link to the repository or pull request and a labelled branch, and return null
+ * rather than guess. Other pages return all nulls.
+ */
+export function extractRepositoryInfo(doc: Document, url: string): RepositoryInfo {
+  const none: RepositoryInfo = { repository: null, pullRequestUrl: null, gitBranch: null };
+  const provider = detectProviderFromUrl(url);
+  if (!provider || providerCategory(provider) !== 'coding_agent') return none;
+
+  let repository: string | null = null;
+  let pullRequestUrl: string | null = null;
+  if (provider === 'github_copilot') {
+    const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/agent-sessions\//);
+    if (m) {
+      repository = normalizeRepository(`${m[1]}/${m[2]}`);
+      pullRequestUrl = normalizePullRequestUrl(`https://github.com/${m[1]}/${m[2]}/pull/${m[3]}`);
+    }
+  }
+
+  const roots = Array.from(doc.querySelectorAll('header, main, [role="main"]'));
+  if (roots.length === 0 && doc.body) roots.push(doc.body);
+  const links = roots
+    .flatMap((root) => Array.from(root.querySelectorAll('a[href]')))
+    .filter((a) => !a.closest(REPOSITORY_LINK_EXCLUDED));
+  for (const a of links) {
+    const href = a.getAttribute('href') ?? '';
+    if (!repository) repository = repositoryFromHref(href, url);
+    if (!pullRequestUrl) {
+      try {
+        pullRequestUrl = normalizePullRequestUrl(new URL(href, url).href);
+      } catch {
+        // not an address
+      }
+    }
+    if (repository && pullRequestUrl) break;
+  }
+
+  let gitBranch: string | null = null;
+  for (const root of roots) {
+    for (const el of Array.from(root.querySelectorAll('*'))) {
+      if (el.closest('[data-message-author-role], [data-testid*="message"], .markdown-body, .prose, .markdown')) continue;
+      gitBranch = branchFromElement(el);
+      if (gitBranch) break;
+    }
+    if (gitBranch) break;
+  }
+  return { repository, pullRequestUrl, gitBranch };
 }
 
 /** The provider's own project (ChatGPT/Claude Project, coding-agent repository) shown on this page. */

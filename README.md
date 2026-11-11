@@ -4,6 +4,10 @@ Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conve
 
 Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key or AWS account (Amazon Bedrock or Claude Platform on AWS).
 
+The full-page workspace combines **Browse** (embedded provider tabs), **Threads** (summaries, related threads, and grouping by repository or account) and **Dashboard** (pinned sessions in up to four panes). Sessions save through automatic capture. The rail groups coding agents, chats and bots; each thread can show its summary, live page, or both.
+
+Use **Add account** to save another provider sign-in. Switching changes that provider's active cookies throughout the browser profile, including ordinary tabs. One account per sign-in realm is active at a time; its other sessions pause. Other site storage is shared, and signed-in compatibility still needs checking on each real provider. For simultaneous accounts, the optional [Mac helper](docs/mac-helper.md) opens separate profile windows. Session Control backups can be imported through Import / Export.
+
 ---
 
 ## What it does
@@ -115,6 +119,10 @@ On-device vectors (feature-hashed, 384 dims) are always maintained and need no k
 | Ollama (local) | any embedding model, e.g. `nomic-embed-text` | start Ollama with `OLLAMA_ORIGINS=chrome-extension://*` |
 
 Vectors are only compared within one model space, so switching provider never mixes incompatible vectors. Atlas and direct Voyage are separate spaces even for the same model name. Cohere's newest models (Embed v5.0, Rerank v5.0) are only on Cohere's own API; Amazon Bedrock offers Cohere Embed v4 and v3 and Rerank 3.5.
+
+The Voyage endpoint setting applies to both embeddings and reranking. Existing saved Voyage keys without an endpoint keep using `api.voyageai.com`; choose MongoDB explicitly when replacing one with an Atlas model API key. For a US/EU key, choose the separate **MongoDB Atlas (Voyage)** provider and the matching geography. Keys are never retried against another host. MongoDB documents this key/endpoint requirement in its [API overview](https://www.mongodb.com/docs/voyageai/api-reference/overview/).
+
+Typing searches locally. Press **Enter** to add the configured hosted query embedding and reranker to the currently filtered candidates. Remote search uses compatible, current vectors; rebuilding vectors in Settings fills the selected provider's space. A failed or timed-out model request keeps local results available. Local-only threads and projects stay out of remote reranking and remote vector retrieval. These model calls are optional; generation settings remain independent.
 
 ### Reranking
 

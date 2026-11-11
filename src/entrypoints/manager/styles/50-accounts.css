@@ -1,0 +1,284 @@
+/* Accounts: the account menu, the Add account dialog, the Settings panel for accounts and the
+   Mac helper, and the Session Control import. Class names start with tk-acct-. Colours, radii,
+   type sizes and motion come from the tokens; nothing here is hard-coded. */
+
+/* ---------- Colour dots ---------- */
+.tk-acct-swatch {
+  --c: var(--text-3);
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--c);
+  justify-self: center;
+}
+.tk-acct-swatch[data-color="teal"] { --c: var(--ac-teal); }
+.tk-acct-swatch[data-color="peach"] { --c: var(--ac-peach); }
+.tk-acct-swatch[data-color="violet"] { --c: var(--ac-violet); }
+.tk-acct-swatch[data-color="sage"] { --c: var(--ac-sage); }
+.tk-acct-swatch[data-color="blue"] { --c: var(--ac-blue); }
+.tk-acct-swatch[data-color="gold"] { --c: var(--ac-gold); }
+
+/* ---------- The button (toolbar and rail) ---------- */
+.tk-acct-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--row-h);
+  max-width: 100%;
+  white-space: nowrap;
+}
+.tk-acct-menu-btn[data-variant="toolbar"] { padding: 0 8px 0 10px; flex: none; }
+.tk-acct-menu-btn[data-variant="rail"] {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  width: 100%;
+  padding: 0 8px;
+  text-align: left;
+}
+.tk-acct-menu-btn[data-variant="rail"] .tk-acct { justify-self: end; min-width: 0; }
+.tk-acct-realm { color: var(--text-3); font-weight: 500; font-size: var(--fs-13); }
+.tk-acct-menu-btn .tk-acct-name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.tk-acct-fixed { color: var(--text-2); font-size: var(--fs-12); overflow: hidden; text-overflow: ellipsis; }
+.tk-acct-menu-btn .tk-acct-chev { color: var(--text-3); flex: none; }
+.tk-acct-menu-btn[aria-expanded="true"] { background: var(--ctl-press); }
+.tk-acct-menu-btn[data-busy="true"] .tk-acct-chev { opacity: .5; }
+
+/* ---------- The menu ---------- */
+.tk-acct-menu {
+  position: fixed;
+  z-index: 100;
+  width: min(var(--acct-menu-w, 340px), calc(100vw - 16px));
+  min-width: 280px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--r-panel);
+  color: var(--text);
+  transform-origin: top left;
+  animation: tk-acct-pop var(--t-small) var(--ease-out) both;
+}
+.tk-acct-menu:focus-visible { outline-offset: -2px; }
+@keyframes tk-acct-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.tk-acct-menu-head { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 6px; }
+.tk-acct-menu-head strong { font-size: var(--fs-13); font-weight: 600; }
+.tk-acct-menu-head span { font-size: var(--fs-12); color: var(--text-2); }
+.tk-acct-menu-group { padding: 8px 10px 2px; font-size: var(--fs-12); font-weight: 600; color: var(--text-3); }
+.tk-acct-menu-sep { height: 1px; margin: 6px 4px; background: var(--line-2); }
+.tk-acct-menu-error {
+  margin: 4px 4px 2px;
+  padding: 8px 10px;
+  border-radius: var(--r-row);
+  border: 1px solid var(--danger);
+  font-size: var(--fs-12);
+  color: var(--text);
+}
+
+.tk-acct-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  transition: transform var(--t-small) var(--ease-out);
+}
+.tk-acct-item-short { min-height: 36px; }
+.tk-acct-item:hover, .tk-acct-item:focus-visible { background: var(--ctl-hover); }
+.tk-acct-item:active { background: var(--ctl-press); }
+.tk-acct-item[aria-checked="true"] { background: var(--accent-tint); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.tk-acct-item[aria-disabled="true"] { cursor: progress; }
+.tk-acct-item[aria-disabled="true"]:not([data-busy]) { color: var(--text-disabled); }
+.tk-acct-item-text { display: block; min-width: 0; }
+.tk-acct-item-name { display: block; font-size: var(--fs-13); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-acct-item-short .tk-acct-item-name { font-weight: 500; }
+.tk-acct-item-sub { display: block; font-size: var(--fs-12); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-acct-item-right { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-12); color: var(--text-2); white-space: nowrap; }
+.tk-acct-item[aria-checked="true"] .tk-acct-item-right svg { color: var(--accent); }
+.tk-acct-item[data-busy="true"] .tk-acct-item-right { color: var(--text); }
+
+/* ---------- Add account dialog ---------- */
+.tk-acct-dialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-chrome);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--pop-shadow);
+  overflow: hidden;
+}
+.tk-acct-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: tk-acct-dlg-in var(--t-panel) var(--ease-out) both;
+}
+.tk-acct-dialog::backdrop { background: var(--scrim); }
+@keyframes tk-acct-dlg-in {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.tk-acct-dialog form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.tk-acct-dialog-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 14px 6px 22px; }
+.tk-acct-dialog-head > div { flex: 1; min-width: 0; }
+.tk-acct-dialog-title { margin: 0; font-family: var(--font-serif); font-size: var(--fs-20); font-weight: 600; }
+.tk-acct-dialog-lead { margin: 2px 0 0; font-size: var(--fs-13); color: var(--text-2); }
+.tk-acct-dialog-body { display: flex; flex-direction: column; gap: 18px; padding: 10px 22px 6px; overflow-y: auto; min-height: 0; }
+.tk-acct-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px 18px 22px;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.tk-acct-submit { min-height: 44px; padding: 0 18px; font-size: var(--fs-14); }
+.tk-acct-field { display: flex; flex-direction: column; min-width: 0; }
+.tk-acct-field .tk-input, .tk-acct-field .tk-select { width: 100%; min-height: 36px; }
+.tk-acct-flabel { display: block; margin-bottom: 8px; font-size: var(--fs-13); font-weight: 600; color: var(--text); }
+.tk-acct-help { margin: 6px 0 0; font-size: var(--fs-12); color: var(--text-2); }
+.tk-acct-field-error { margin: 6px 0 0; font-size: var(--fs-12); font-weight: 500; color: var(--danger); }
+.tk-acct-field [aria-invalid="true"] { border-color: var(--danger); }
+
+/* Selectable cards with a real radio input inside: the input is the control, the card is its look. */
+.tk-acct-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.tk-acct-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.tk-acct-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-row);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.tk-acct-opt:hover { background: var(--surface-2); }
+.tk-acct-opt:active { background: var(--surface-3); }
+.tk-acct-opt:has(input:checked) { border-color: var(--accent-line); background: var(--accent-tint); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.tk-acct-opt:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; box-shadow: 0 0 0 2px var(--ring-inner); }
+.tk-acct-opt-swatch { min-height: 36px; padding: 0 12px 0 10px; }
+.tk-acct-opt-card { align-items: flex-start; padding: 12px 14px; }
+.tk-acct-opt-title { display: block; font-size: var(--fs-13); font-weight: 600; }
+.tk-acct-opt-swatch .tk-acct-opt-title { font-weight: 500; }
+.tk-acct-opt-sub { display: block; margin-top: 2px; font-size: var(--fs-12); line-height: 1.4; color: var(--text-2); }
+.tk-acct-radio {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin-top: 2px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--field-border);
+}
+.tk-acct-opt:has(input:checked) .tk-acct-radio { box-shadow: inset 0 0 0 5px var(--accent); }
+
+.tk-acct-explain {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-row);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  color: var(--text);
+}
+.tk-acct-failure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-row);
+  border: 1px solid var(--danger);
+  background: var(--surface);
+}
+.tk-acct-failure-text { margin: 0; font-size: var(--fs-13); font-weight: 600; color: var(--text); }
+.tk-acct-failure-help { margin: 0; font-size: var(--fs-13); color: var(--text-2); }
+
+/* ---------- Settings: accounts ---------- */
+.tk-acct-realm-group + .tk-acct-realm-group { margin-top: 12px; }
+.tk-acct-subhead { margin: 0 0 6px; font-size: var(--fs-12); font-weight: 600; color: var(--text-3); }
+.tk-acct-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tk-acct-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-row);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+}
+.tk-acct-row-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tk-acct-rename { display: flex; align-items: center; gap: 8px; flex: 1 1 200px; min-width: 0; }
+.tk-acct-name-input { flex: 1; min-width: 0; min-height: 36px; font-weight: 600; }
+.tk-acct-colorpick .tk-select { min-height: 36px; }
+.tk-acct-facts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin: 0; font-size: var(--fs-13); }
+.tk-acct-facts > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
+.tk-acct-facts dt { color: var(--text-3); }
+.tk-acct-facts dd { margin: 0; min-width: 0; color: var(--text); }
+.tk-acct-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-row);
+  border: 1px solid var(--danger);
+  background: var(--surface-2);
+}
+.tk-acct-confirm p { margin: 0; font-size: var(--fs-13); color: var(--text); }
+.tk-acct-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Mac helper ---------- */
+.tk-acct-helper-check { align-items: center; }
+.tk-acct-helper-result { font-size: var(--fs-13); color: var(--text-2); }
+.tk-acct-helper-result[data-ok="true"] { color: var(--text); font-weight: 600; }
+.tk-acct-helper-result[data-ok="false"] { color: var(--text); }
+.tk-acct-extid { margin: 12px 0; }
+.tk-acct-extid-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tk-acct-extid-code {
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--r-ctl);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.tk-acct-steps { margin: 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-13); line-height: 1.5; }
+
+/* ---------- Session Control import ---------- */
+.tk-acct-preview { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding: 12px 14px; border-radius: var(--r-row); border: 1px solid var(--line-2); background: var(--surface); }
+.tk-acct-preview-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+
+/* ---------- Narrow, reduced motion, forced colours ---------- */
+@media (max-width: 560px) {
+  .tk-acct-modes { grid-template-columns: minmax(0, 1fr); }
+  .tk-acct-facts > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tk-acct-menu, .tk-acct-dialog[open] { animation: none; }
+  .tk-acct-item { transition: none; }
+}
+@media (forced-colors: active) {
+  .tk-acct-swatch { forced-color-adjust: none; }
+  .tk-acct-opt:has(input:checked) { border-color: Highlight; outline: 2px solid Highlight; }
+  .tk-acct-radio { box-shadow: inset 0 0 0 1.5px CanvasText; }
+  .tk-acct-opt:has(input:checked) .tk-acct-radio { box-shadow: inset 0 0 0 5px Highlight; }
+  .tk-acct-item[aria-checked="true"] { outline: 2px solid Highlight; }
+}

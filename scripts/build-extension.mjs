@@ -153,6 +153,27 @@ async function loadManifestMatchPatterns() {
   };
 }
 
+/**
+ * Load the login realms (compiled on the fly, like the registry) so the sign-in hosts accounts
+ * need beyond the providers' own patterns are optional host permissions.
+ */
+async function loadRealmHostPatterns() {
+  const result = await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/core/workspace/realms.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'neutral',
+    write: false,
+  });
+  const source = Buffer.from(result.outputFiles[0].text).toString('base64');
+  const realms = await import(`data:text/javascript;base64,${source}`);
+  const named = realms.allNamedRealms();
+  if (!Array.isArray(named) || named.length === 0) {
+    throw new Error('Realm registry returned no realms');
+  }
+  return Array.from(new Set(named.flatMap((r) => r.extraHostPatterns)));
+}
+
 async function build() {
   const buildInfo = createBuildInfo();
   const define = { __TK_BUILD__: JSON.stringify(buildInfo) };
@@ -209,6 +230,29 @@ async function build() {
     minify: true,
   });
 
+  // 2d. Bundle the workspace embedding scripts: the isolated-world bridge (extension APIs) and its
+  // page-world half (no extension APIs). Both run in every frame from document_start.
+  await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/entrypoints/embed-bridge.ts')],
+    outfile: path.join(outDir, 'content-scripts/embed-bridge.js'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: ['chrome120'],
+    sourcemap: false,
+    define,
+  });
+  await esbuild.build({
+    entryPoints: [path.join(rootDir, 'src/entrypoints/embed-cookie-main.ts')],
+    outfile: path.join(outDir, 'content-scripts/embed-cookie-main.js'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: ['chrome120'],
+    sourcemap: false,
+    minify: true,
+  });
+
   // 3. Bundle manager UI (ESM)
   await esbuild.build({
     entryPoints: [path.join(rootDir, 'src/entrypoints/manager/main.tsx')],
@@ -241,10 +285,20 @@ async function build() {
     },
   });
 
-  // 4. Copy styles.css
-  fs.copyFileSync(
-    path.join(rootDir, 'src/entrypoints/manager/styles.css'),
+  // 4. Styles. The manager stylesheet is plain CSS in several files: styles.css (the library
+  // components) followed by styles/*.css in name order (tokens and shared pieces first, then one
+  // file per view). They are joined as they are; no file may @import another.
+  const managerCssDir = path.join(rootDir, 'src/entrypoints/manager');
+  const viewCssDir = path.join(managerCssDir, 'styles');
+  const cssParts = [path.join(managerCssDir, 'styles.css')];
+  if (fs.existsSync(viewCssDir)) {
+    for (const name of fs.readdirSync(viewCssDir).filter((n) => n.endsWith('.css')).sort()) {
+      cssParts.push(path.join(viewCssDir, name));
+    }
+  }
+  fs.writeFileSync(
     path.join(outDir, 'assets/manager.css'),
+    cssParts.map((file) => `/* ${path.relative(managerCssDir, file)} */\n${fs.readFileSync(file, 'utf8')}`).join('\n')
   );
   fs.copyFileSync(
     path.join(rootDir, 'src/entrypoints/connect/styles.css'),
@@ -290,6 +344,18 @@ async function build() {
   // 6. Write manifest.json
   const patterns = await loadManifestMatchPatterns();
   const capturePatterns = patterns.capture;
+  const realmHostPatterns = await loadRealmHostPatterns();
+  const hostPermissions = [
+    ...capturePatterns,
+    'https://api.anthropic.com/*',
+    'https://api.voyageai.com/*',
+    'https://api.openai.com/*',
+  ];
+  if (realmHostPatterns.some((p) => hostPermissions.includes(p))) {
+    throw new Error('A sign-in host must be optional, never an install-time host permission');
+  }
+  // Workspace embedding scripts load wherever the reader does, Grok on X included.
+  const embedPatterns = Array.from(new Set([...patterns.domCapture, ...patterns.grokX]));
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',
@@ -298,14 +364,24 @@ async function build() {
     description:
       'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
     // activeTab: lets Settings → Capture read the address of the tab the user invoked Threadkeeper
-    // on ("Add this site"); it adds no install warning.
-    permissions: ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel', 'activeTab'],
-    host_permissions: [
-      ...capturePatterns,
-      'https://api.anthropic.com/*',
-      'https://api.voyageai.com/*',
-      'https://api.openai.com/*',
+    // on ("Add this site"); it adds no install warning. cookies: switching accounts and the
+    // embedded pages' cookie bridge. declarativeNetRequestWithHostAccess: the session rule that
+    // lets provider pages load inside the workspace tab. Neither adds an install warning; they
+    // act only on hosts Threadkeeper already has access to.
+    permissions: [
+      'storage',
+      'unlimitedStorage',
+      'alarms',
+      'scripting',
+      'sidePanel',
+      'activeTab',
+      'cookies',
+      'declarativeNetRequestWithHostAccess',
     ],
+    // The Mac helper (isolated accounts in their own Chrome profile), asked for when set up.
+    optional_permissions: ['nativeMessaging'],
+    // Unchanged since v0.4: an update that grows this list disables the extension until approved.
+    host_permissions: hostPermissions,
     // AWS hosts (per region), MongoDB Atlas model hosts (per geography) and Cohere are granted at
     // runtime from Settings → Search & embeddings, never at install. Settings → Capture asks for
     // one origin at a time: a provider the user turns on (patterns.optionalCaptureOrigins) or an AI site
@@ -318,6 +394,8 @@ async function build() {
       'https://eu.ai.mongodb.com/*',
       'https://api.cohere.com/*',
       ...patterns.optionalCaptureOrigins,
+      // Sign-in hosts of login realms (accounts), asked for when an account is added.
+      ...realmHostPatterns,
       'https://*/*',
       'http://*/*',
       // A Paperclip server on this computer (any port), granted from Settings → Paperclip.
@@ -363,22 +441,27 @@ async function build() {
         description: 'Open Threadkeeper full-page library',
       },
     },
+    // all_frames: the same pages also load inside Threadkeeper's workspace tab. The scripts tell
+    // an embedded frame (single ancestor: the extension) from a site's own iframes themselves.
     content_scripts: [
       {
         matches: patterns.domCapture,
         js: ['content-scripts/content.js'],
         run_at: 'document_idle',
+        all_frames: true,
       },
       {
         matches: patterns.grokX,
         js: ['content-scripts/content.js'],
         run_at: 'document_start',
+        all_frames: true,
       },
       {
         matches: patterns.grokX,
         js: ['content-scripts/grok-x-main.js'],
         run_at: 'document_start',
         world: 'MAIN',
+        all_frames: true,
       },
       {
         // Must be in place before the app requests the conversation.
@@ -386,6 +469,20 @@ async function build() {
         js: ['content-scripts/site-data-main.js'],
         run_at: 'document_start',
         world: 'MAIN',
+        all_frames: true,
+      },
+      {
+        matches: embedPatterns,
+        js: ['content-scripts/embed-bridge.js'],
+        run_at: 'document_start',
+        all_frames: true,
+      },
+      {
+        matches: embedPatterns,
+        js: ['content-scripts/embed-cookie-main.js'],
+        run_at: 'document_start',
+        world: 'MAIN',
+        all_frames: true,
       },
     ],
     // No use_dynamic_url: Edge (and older Chrome) resolve chrome.runtime.getURL() to the

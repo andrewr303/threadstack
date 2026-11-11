@@ -9,6 +9,7 @@ import {
   matchSiteConversationRequest,
   parseChatGptConversation,
   parseClaudeConversation,
+  parseIdentityMessage,
   parseSiteDataMessage,
   siteConversationTitle,
   toIso,
@@ -175,6 +176,22 @@ describe('request URLs and times', () => {
 // ---------------------------------------------------------------------------
 // DOM: several messages in one turn
 // ---------------------------------------------------------------------------
+
+describe('identity window message', () => {
+  it('accepts a known source with a text body up to 64 KB, and nothing else', () => {
+    const ok = { source: 'threadkeeper-identity', kind: 'chatgpt_session', body: '{"user":{}}' };
+    expect(parseIdentityMessage(ok)).toEqual(ok);
+    expect(parseIdentityMessage({ ...ok, body: 'x'.repeat(64 * 1024) })).not.toBeNull();
+    expect(parseIdentityMessage({ ...ok, body: 'x'.repeat(64 * 1024 + 1) })).toBeNull();
+    expect(parseIdentityMessage({ ...ok, body: '' })).toBeNull();
+    expect(parseIdentityMessage({ ...ok, body: { user: {} } })).toBeNull();
+    expect(parseIdentityMessage({ ...ok, kind: 'toString' })).toBeNull();
+    expect(parseIdentityMessage({ ...ok, kind: 'gmail' })).toBeNull();
+    expect(parseIdentityMessage({ ...ok, source: 'threadkeeper-site-data' })).toBeNull();
+    expect(parseIdentityMessage('{"source":"threadkeeper-identity"}')).toBeNull();
+    expect(parseIdentityMessage(null)).toBeNull();
+  });
+});
 
 describe('ChatGPT turns that hold several messages', () => {
   const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html');

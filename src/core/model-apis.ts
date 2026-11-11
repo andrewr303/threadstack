@@ -13,8 +13,10 @@ import type {
  * models) and Cohere. Endpoints, model catalogs and the rules that decide a
  * vector space live here so settings, embeddings and reranking agree.
  *
- * Sources (checked 2026-11-03):
+ * Sources (MongoDB checked 2026-11-10; Cohere checked 2026-11-03):
  * - Atlas model API: worker/contracts/mongodb-model-openapi.json (servers, models, request bodies).
+ * - https://www.mongodb.com/docs/voyageai/api-reference/overview/ (geography, keys, input_type).
+ * - https://www.mongodb.com/docs/voyageai/models/lifecycle/ (supported models by endpoint).
  * - Cohere: https://docs.cohere.com/docs/models, /reference/embed and /reference/rerank (v2 API).
  */
 
@@ -22,9 +24,9 @@ import type {
 // MongoDB Atlas (Voyage)
 // ---------------------------------------------------------------------------
 
-/** Atlas is the default for Voyage model keys. Legacy keys need an explicit legacy endpoint. */
+/** New settings select Atlas explicitly; unresolved old records retain their Voyage host. */
 export function voyageBaseUrl(settings: Pick<SettingsRecord, 'voyageEndpoint'>): string {
-  return settings.voyageEndpoint === 'legacy' ? 'https://api.voyageai.com/v1' : 'https://ai.mongodb.com/v1';
+  return settings.voyageEndpoint === 'mongodb' ? 'https://ai.mongodb.com/v1' : 'https://api.voyageai.com/v1';
 }
 
 export function voyageOrigin(settings: Pick<SettingsRecord, 'voyageEndpoint'>): string {

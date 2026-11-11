@@ -203,7 +203,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Read `[{index, <scoreField>}]` from an untrusted response and check every index. */
 function parseScoredList(list: unknown, scoreField: string, count: number, who: string): RerankResult[] {
   if (!Array.isArray(list)) throw new RerankError(`${who} returned no results`);
-  return list.map((item) => {
+  const seen = new Set<number>();
+  const results = list.map((item) => {
     const index = isRecord(item) ? item.index : undefined;
     const score = isRecord(item) ? item[scoreField] : undefined;
     if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= count) {
@@ -212,8 +213,13 @@ function parseScoredList(list: unknown, scoreField: string, count: number, who: 
     if (typeof score !== 'number' || !Number.isFinite(score)) {
       throw new RerankError(`${who} returned a non-numeric relevance score`);
     }
+    if (seen.has(index)) throw new RerankError(`${who} returned a duplicate document index`);
+    seen.add(index);
     return { index, score };
   });
+  // Every call requests all scores. An incomplete response must fall back without caching.
+  if (results.length !== count) throw new RerankError(`${who} returned ${results.length} of ${count} relevance scores`);
+  return results;
 }
 
 function asRerankError(err: unknown): unknown {
@@ -229,13 +235,20 @@ async function rerankWithVoyage(
 ): Promise<RerankResult[]> {
   // top_k = all documents: Voyage bills every document either way, and full
   // scores let the cache serve any later subset.
-  const body = await postJson(
-    fetchImpl,
-    `${voyageBaseUrl(settings)}/rerank`,
-    { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
-    { query, documents, model: settings.rerankModel, top_k: documents.length, truncation: true }
-  );
-  return parseScoredList(isRecord(body) ? body.data : undefined, 'relevance_score', documents.length, 'Voyage');
+  try {
+    const body = await postJson(
+      fetchImpl,
+      `${voyageBaseUrl(settings)}/rerank`,
+      { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
+      { query, documents, model: settings.rerankModel, top_k: documents.length, truncation: true }
+    );
+    return parseScoredList(isRecord(body) ? body.data : undefined, 'relevance_score', documents.length, 'Voyage');
+  } catch (err) {
+    if (settings.voyageEndpoint === 'mongodb' && err instanceof EmbeddingError && (err.status === 401 || err.status === 403)) {
+      throw new EmbeddingError(`${err.message}. ${MONGODB_KEY_HINT}`, err.status);
+    }
+    throw err;
+  }
 }
 
 /** Voyage rerank models on MongoDB Atlas: the Voyage request shape on ai.mongodb.com with an Atlas key. */

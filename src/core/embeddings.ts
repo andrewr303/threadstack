@@ -65,7 +65,7 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
       // Keep existing legacy vectors intact; Atlas uses a distinct space after migration.
       return settings.voyageApiKey.trim()
         ? {
-            id: settings.voyageEndpoint === 'legacy' ? `voyage:${settings.voyageModel}` : `voyage:mongodb:${settings.voyageModel}`,
+            id: settings.voyageEndpoint === 'mongodb' ? `voyage:mongodb:${settings.voyageModel}` : `voyage:${settings.voyageModel}`,
             provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55,
           }
         : null;
@@ -201,6 +201,7 @@ export function buildThreadEmbeddingDocument(
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .sort((a, b) => a.ordinal - b.ordinal);
   const head = dialog.slice(0, 3).map((m) => `${m.role}: ${m.content.slice(0, 900)}`);
+  const agent = insight?.agentRun ?? null;
   const tail = dialog.length > 5 ? dialog.slice(-2).map((m) => `${m.role}: ${m.content.slice(0, 600)}`) : [];
   const parts = [
     `Title: ${getDisplayTitle(conv)}`,
@@ -209,6 +210,12 @@ export function buildThreadEmbeddingDocument(
     insight?.topics.length ? `Topics: ${insight.topics.join(', ')}` : '',
     insight?.entities.length ? `Entities: ${insight.entities.join(', ')}` : '',
     conv.providerProjectName ? `Project: ${conv.providerProjectName}` : '',
+    // Agent runs: where the work happened and what it touched. Adds these lines to the document of
+    // coding-agent threads, so their hash changes and they are embedded once more.
+    agent?.repository || conv.repository ? `Repository: ${agent?.repository ?? conv.repository}` : '',
+    agent?.branch || conv.gitBranch ? `Branch: ${agent?.branch ?? conv.gitBranch}` : '',
+    agent?.pullRequests.length ? `Pull request: ${agent.pullRequests.map((p) => p.url).join(', ')}` : '',
+    agent?.filesChanged.length ? `Files: ${agent.filesChanged.join(', ')}` : '',
     ...head,
     ...tail,
   ].filter(Boolean);
@@ -256,6 +263,29 @@ function isNumberArray(value: unknown): value is number[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Validate every input-to-vector association before any result can enter the index. */
+function parseIndexedEmbeddings(body: unknown, count: number, who: string, dimensions?: number): number[][] {
+  const data = isRecord(body) ? body.data : undefined;
+  if (!Array.isArray(data) || data.length !== count) {
+    throw new EmbeddingError(`${who} returned an unexpected number of vectors`);
+  }
+  const rows = new Array<number[]>(count);
+  let dims = dimensions;
+  for (const item of data) {
+    const index = isRecord(item) ? item.index : undefined;
+    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= count) {
+      throw new EmbeddingError(`${who} returned an out-of-range embedding index`);
+    }
+    if (rows[index] !== undefined) throw new EmbeddingError(`${who} returned a duplicate embedding index`);
+    if (!isRecord(item) || !isNumberArray(item.embedding)) {
+      throw new EmbeddingError(`${who} returned an invalid embedding vector`);
+    }
+    dims ??= item.embedding.length;
+    rows[index] = checkDims(item.embedding, dims, who);
+  }
+  return rows;
 }
 
 /**
@@ -437,17 +467,15 @@ async function embedWithMongoDb(
   const batchSize = 48;
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
-    const data = (await withMongoDbHint(() =>
+    const data = await withMongoDbHint(() =>
       postJson(
         fetchImpl,
         url,
         { Authorization: `Bearer ${settings.mongodbApiKey.trim()}` },
         { input: batch, model: space.model, input_type: inputType, output_dimension: dims, truncation: true }
       )
-    )) as { data?: Array<{ embedding: number[]; index: number }> };
-    const rows = [...(data.data ?? [])].sort((a, b) => a.index - b.index);
-    if (rows.length !== batch.length) throw new EmbeddingError('MongoDB Atlas returned an unexpected number of vectors');
-    out.push(...rows.map((r) => checkDims(r.embedding, dims, space.model)));
+    );
+    out.push(...parseIndexedEmbeddings(data, batch.length, 'MongoDB Atlas', dims));
   }
   return out;
 }
@@ -489,16 +517,61 @@ async function embedWithCohere(
   return out;
 }
 
-/** Embed texts in the given space. Remote providers are batched. */
+export interface EmbeddingOptions {
+  /** Cancel an obsolete search before any more batches are sent. */
+  signal?: AbortSignal;
+  /** Deadline for the complete remote operation, including batches; default 30 s. */
+  timeoutMs?: number;
+}
+
+/** Embed texts in the given space. Remote providers are batched and cancellable. */
 export async function embedTexts(
   settings: SettingsRecord,
   space: EmbeddingSpace,
   texts: string[],
   inputType: 'document' | 'query',
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  options: EmbeddingOptions = {}
 ): Promise<number[][]> {
   if (texts.length === 0) return [];
   if (space.provider === 'local') return texts.map((t) => localHashEmbedding(t));
+  options.signal?.throwIfAborted();
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? 30_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort(options.signal?.reason);
+  options.signal?.addEventListener('abort', onAbort, { once: true });
+  const call: typeof fetch = (input, init) => {
+    controller.signal.throwIfAborted();
+    return fetchImpl(input, { ...init, signal: controller.signal });
+  };
+  try {
+    const rows = await embedRemoteTexts(settings, space, texts, inputType, call);
+    controller.signal.throwIfAborted();
+    // Providers without a configured size still must return one stable vector space.
+    const dims = space.dimensions ?? rows[0]?.length;
+    if (!dims || rows.length !== texts.length || rows.some((row) => !isNumberArray(row))) {
+      throw new EmbeddingError(`${space.model} returned invalid embedding vectors`);
+    }
+    return rows.map((row) => checkDims(row, dims, space.model));
+  } catch (err) {
+    if (controller.signal.aborted && !options.signal?.aborted) {
+      throw new EmbeddingError(`${space.model} did not answer within ${Math.round(timeoutMs / 1000)} s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+async function embedRemoteTexts(
+  settings: SettingsRecord,
+  space: EmbeddingSpace,
+  texts: string[],
+  inputType: 'document' | 'query',
+  fetchImpl: typeof fetch
+): Promise<number[][]> {
   if (space.provider === 'bedrock') return embedWithBedrock(settings, space, texts, inputType, fetchImpl);
   if (space.provider === 'mongodb') return embedWithMongoDb(settings, space, texts, inputType, fetchImpl);
   if (space.provider === 'cohere') return embedWithCohere(settings, space, texts, inputType, fetchImpl);
@@ -509,25 +582,22 @@ export async function embedTexts(
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
     if (space.provider === 'voyage') {
-      const data = (await postJson(
+      const request = () => postJson(
         fetchImpl,
         `${voyageBaseUrl(settings)}/embeddings`,
         { Authorization: `Bearer ${settings.voyageApiKey.trim()}` },
         { input: batch, model: space.model, input_type: inputType, truncation: true }
-      )) as { data?: Array<{ embedding: number[]; index: number }> };
-      const rows = [...(data.data ?? [])].sort((a, b) => a.index - b.index);
-      if (rows.length !== batch.length) throw new EmbeddingError('Voyage returned an unexpected number of vectors');
-      out.push(...rows.map((r) => r.embedding));
+      );
+      const data = settings.voyageEndpoint === 'mongodb' ? await withMongoDbHint(request) : await request();
+      out.push(...parseIndexedEmbeddings(data, batch.length, 'Voyage', out[0]?.length));
     } else if (space.provider === 'openai') {
-      const data = (await postJson(
+      const data = await postJson(
         fetchImpl,
         'https://api.openai.com/v1/embeddings',
         { Authorization: `Bearer ${settings.openaiApiKey.trim()}` },
         { input: batch, model: space.model }
-      )) as { data?: Array<{ embedding: number[]; index: number }> };
-      const rows = [...(data.data ?? [])].sort((a, b) => a.index - b.index);
-      if (rows.length !== batch.length) throw new EmbeddingError('OpenAI returned an unexpected number of vectors');
-      out.push(...rows.map((r) => r.embedding));
+      );
+      out.push(...parseIndexedEmbeddings(data, batch.length, 'OpenAI', out[0]?.length));
     } else if (space.provider === 'ollama') {
       const base = settings.ollamaUrl.replace(/\/+$/, '');
       const data = (await postJson(fetchImpl, `${base}/api/embed`, {}, {

@@ -101,7 +101,7 @@ describe('added sites: list', () => {
 describe('runtime content scripts', () => {
   const sites = addCustomSite(addCustomSite(EMPTY_CUSTOM_SITES, 'http://localhost:3000', NOW), 'http://localhost:8080', NOW).sites;
 
-  it('registers enabled, granted providers and sites; one script per host; removes the rest', () => {
+  it('registers enabled, granted providers and sites; one set of scripts per host; removes the rest', () => {
     const plan = planCaptureScripts({
       authorizedHosts: { poe: true, meta_ai: true, kimi: true, chatgpt: true, muse: false },
       sites,
@@ -114,31 +114,63 @@ describe('runtime content scripts', () => {
     });
     expect(plan.unregister).toEqual(['tk-provider-muse']);
     expect(plan.update.map((s) => s.id)).toEqual(['tk-provider-poe']);
+    const site = siteScriptId('http://localhost:3000');
     expect(plan.register.map((s) => [s.id, s.matches])).toEqual([
       ['tk-provider-kimi', ['https://www.kimi.ai/*']],
-      [siteScriptId('http://localhost:3000'), ['http://localhost/*']],
+      ['tk-provider-kimi~bridge', ['https://www.kimi.ai/*']],
+      ['tk-provider-kimi~cookie-main', ['https://www.kimi.ai/*']],
+      ['tk-provider-poe~bridge', ['https://poe.com/*']],
+      ['tk-provider-poe~cookie-main', ['https://poe.com/*']],
+      [site, ['http://localhost/*']],
+      [`${site}~bridge`, ['http://localhost/*']],
+      [`${site}~cookie-main`, ['http://localhost/*']],
     ]);
-    for (const s of [...plan.register, ...plan.update]) {
-      expect(s).toMatchObject({ js: ['content-scripts/content.js'], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true });
-    }
+    // content.js keeps the id it always had; every script runs in all frames (the workspace embeds these pages).
+    const byId = new Map([...plan.register, ...plan.update].map((s) => [s.id, s]));
+    expect(byId.get('tk-provider-kimi')).toEqual({
+      id: 'tk-provider-kimi',
+      matches: ['https://www.kimi.ai/*'],
+      js: ['content-scripts/content.js'],
+      runAt: 'document_idle',
+      allFrames: true,
+      persistAcrossSessions: true,
+    });
+    expect(byId.get('tk-provider-kimi~bridge')).toMatchObject({ js: ['content-scripts/embed-bridge.js'], runAt: 'document_start', allFrames: true });
+    expect(byId.get('tk-provider-kimi~bridge')?.world).toBeUndefined();
+    expect(byId.get('tk-provider-kimi~cookie-main')).toMatchObject({ js: ['content-scripts/embed-cookie-main.js'], runAt: 'document_start', allFrames: true, world: 'MAIN' });
+    for (const s of [...plan.register, ...plan.update]) expect(s).toMatchObject({ allFrames: true, persistAcrossSessions: true });
+  });
+
+  it('re-registers a script registered top-frame-only by an older version', () => {
+    const scripts = planCaptureScripts({ authorizedHosts: { kimi: true }, sites: [], granted: () => true, registered: [] }).register;
+    const current = scripts.map((s) => ({ ...s }));
+    const old = current.map((s) => (s.id === 'tk-provider-kimi' ? { ...s, allFrames: false } : s));
+    expect(planCaptureScripts({ authorizedHosts: { kimi: true }, sites: [], granted: () => true, registered: current })).toEqual({ register: [], unregister: [], update: [] });
+    const plan = planCaptureScripts({ authorizedHosts: { kimi: true }, sites: [], granted: () => true, registered: old });
+    expect(plan.update.map((s) => s.id)).toEqual(['tk-provider-kimi']);
+    expect(plan.register).toEqual([]);
+    // Chrome reports the isolated world explicitly; that is the same as leaving it out.
+    const reported = current.map((s) => ({ ...s, world: s.world ?? 'ISOLATED' }));
+    expect(planCaptureScripts({ authorizedHosts: { kimi: true }, sites: [], granted: () => true, registered: reported }).update).toEqual([]);
   });
 
   it('reconciles through the chrome APIs and reports failures instead of throwing', async () => {
     const registered: CaptureScript[] = [];
     const env = {
-      getRegistered: vi.fn(async () => registered.map((s) => ({ id: s.id, matches: s.matches }))),
+      getRegistered: vi.fn(async () => registered.map((s) => ({ ...s }))),
       register: vi.fn(async (scripts: CaptureScript[]) => void registered.push(...scripts)),
       unregister: vi.fn(async (ids: string[]) => {
         for (const id of ids) registered.splice(registered.findIndex((s) => s.id === id), 1);
       }),
       contains: vi.fn(async () => true),
     };
+    const poe = providerScriptId('poe');
     const first = await reconcileCaptureScripts(env, { authorizedHosts: { poe: true }, sites: [] });
-    expect(first.registered).toEqual([providerScriptId('poe')]);
+    expect(first.registered).toEqual([poe, `${poe}~bridge`, `${poe}~cookie-main`]);
     const second = await reconcileCaptureScripts(env, { authorizedHosts: { poe: true }, sites: [] });
     expect(second).toEqual({ registered: [], unregistered: [] });
     const third = await reconcileCaptureScripts(env, { authorizedHosts: { poe: false }, sites: [] });
-    expect(third.unregistered).toEqual([providerScriptId('poe')]);
+    expect(third.unregistered).toEqual([poe, `${poe}~bridge`, `${poe}~cookie-main`]);
     env.getRegistered.mockRejectedValueOnce(new Error('scripting unavailable'));
     expect((await reconcileCaptureScripts(env, { authorizedHosts: {}, sites: [] })).error).toBe('scripting unavailable');
   });

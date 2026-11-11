@@ -11,6 +11,7 @@
  */
 import { buildThreadKey, type WorkflowState } from '../schema.js';
 import type { UpsertThreadInput } from '../db.js';
+import { normalizeRepository } from '../repository.js';
 import type { PcAgent, PcComment, PcCompany, PcIssue, PcIssueRun, PcRun, PcRunEvent } from './client.js';
 
 export type Msg = UpsertThreadInput['messages'][number];
@@ -749,6 +750,8 @@ export function buildIssueThread(input: IssueThreadInput): UpsertThreadInput {
     providerProjectName: project || null,
     workspacePath: str(workspace?.cwd) || resumable?.cwd || null,
     gitBranch: str(workspace?.branchName) || null,
+    // Only a remote the issue's workspace names; the project name is not a repository.
+    ...(normalizeRepository(str(workspace?.repoUrl)) ? { repository: normalizeRepository(str(workspace?.repoUrl)) } : {}),
     modelSlug: model,
     // Claude Code finds a session by its working directory, so the command starts there.
     resumeCommand: resumeCommandFor(resumable && { ...resumable, cwd: resumable.cwd ?? (str(workspace?.cwd) || null) }, company.id),

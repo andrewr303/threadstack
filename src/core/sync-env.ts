@@ -4,6 +4,13 @@ import { buildThreadKey, type SettingsRecord } from './schema.js';
 import type { SyncState, SyncProviderId } from './history-sync.js';
 import type { SyncEnv } from './sync-orchestrator.js';
 import type { SiteConversation } from './site-api.js';
+import type { ProviderId } from './providers.js';
+
+/** The account a capture of `provider` is filed under right now (accounts.resolveForCapture). */
+export type CaptureAccountResolver = (
+  provider: ProviderId,
+  bound: { accountId: string; workspaceId: string }
+) => Promise<{ accountId: string; workspaceId: string }>;
 
 /** Where the progress of the latest run is kept, for the library to show (chrome.storage.local). */
 export const HISTORY_SYNC_STATE_KEY = 'tk_history_sync';
@@ -17,13 +24,28 @@ export function createChromeSyncEnv(
     loadSettings: () => Promise<SettingsRecord>;
     /** Store a conversation and organize it like any captured thread. */
     storeConversation: (conversation: SiteConversation) => Promise<'stored' | 'skipped'>;
+    /**
+     * Which account the signed-in session of a provider is. History is read with the browser's
+     * current cookies, so it belongs to the realm's active account, not always the bound one.
+     */
+    resolveAccount?: CaptureAccountResolver;
   }
 ): SyncEnv {
+  const resolveBound = async (settings: SettingsRecord, provider: SyncProviderId) => {
+    const bound = settings.boundAccounts[provider];
+    if (!deps.resolveAccount) return bound;
+    try {
+      return await deps.resolveAccount(provider, bound);
+    } catch {
+      return bound;
+    }
+  };
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
   const ping = async (tabId: number): Promise<boolean> => {
     try {
-      const reply = (await chrome.tabs.sendMessage(tabId, { type: 'TK_PING' })) as { ok?: boolean } | undefined;
+      // Top frame only: content scripts also run in a provider page's own iframes.
+      const reply = (await chrome.tabs.sendMessage(tabId, { type: 'TK_PING' }, { frameId: 0 })) as { ok?: boolean } | undefined;
       return reply?.ok === true;
     } catch {
       return false;
@@ -79,7 +101,7 @@ export function createChromeSyncEnv(
       return ping(tabId);
     },
     async sendToTab(tabId, message) {
-      return chrome.tabs.sendMessage(tabId, message);
+      return chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
     },
     async enabledProviders() {
       const settings = await deps.loadSettings();
@@ -88,7 +110,7 @@ export function createChromeSyncEnv(
     async knownUpdatedAt(provider: SyncProviderId) {
       const known: Record<string, string> = {};
       const settings = await deps.loadSettings();
-      const bound = settings.boundAccounts[provider];
+      const bound = await resolveBound(settings, provider);
       const rows = await db.conversations.where('provider').equals(provider).toArray();
       for (const c of rows) {
         // Only a complete copy from the site itself can stand in for a fresh read.
@@ -102,7 +124,7 @@ export function createChromeSyncEnv(
     storeConversation: deps.storeConversation,
     async hasRecentCapture(provider, sourceConversationId) {
       const settings = await deps.loadSettings();
-      const bound = settings.boundAccounts[provider];
+      const bound = await resolveBound(settings, provider);
       const key = buildThreadKey({ provider, accountId: bound.accountId, workspaceId: bound.workspaceId, sourceConversationId, branchId: 'main' });
       const c = await db.conversations.get(key);
       return Boolean(c && c.messageCount > 0 && Date.now() - Date.parse(c.lastCapturedAt) < RECENT_CAPTURE_MS);

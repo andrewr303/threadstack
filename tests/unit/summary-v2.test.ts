@@ -144,6 +144,7 @@ const DECK_ANALYSIS: ThreadAnalysis = {
     { label: 'Addendum_v2.docx', kind: 'document', description: 'One-page founder credibility addendum; approved', messageNumber: 8 },
     { label: 'Addendum_v2.docx', kind: 'document', description: 'duplicate entry', messageNumber: 8 },
   ],
+  agentRun: null,
 };
 
 function anthropicFetch(output: unknown, calls: Array<{ body: any }>) {

@@ -80,6 +80,22 @@ describe('assessManifest', () => {
     expect(health.issues.map((i) => i.code)).toEqual(['manager_not_web_accessible', 'side_panel_unavailable']);
     expect(reloadWouldHelp(health)).toBe(false);
   });
+
+  it('flags a running manifest without the workspace permissions (rebuilt but not reloaded)', () => {
+    const permissions = ['storage', 'unlimitedStorage', 'alarms', 'scripting', 'sidePanel', 'activeTab'];
+    const old = assessManifest({ ...GOOD, permissions }, BUILD, { browser: 'Google Chrome' });
+    expect(old.ok).toBe(false);
+    expect(old.issues.map((i) => i.code)).toEqual(['missing_permissions']);
+    expect(old.issues[0].message).toContain('cookies and declarativeNetRequestWithHostAccess permissions');
+    // Same advice as a stale manifest: reload.
+    expect(old.issues[0].fix).toBe(assessManifest(EDGE_BLOCKED, BUILD, { browser: 'Google Chrome' }).issues[0].fix);
+    expect(reloadWouldHelp(old)).toBe(true);
+
+    const oneMissing = assessManifest({ ...GOOD, permissions: [...permissions, 'cookies'] }, BUILD);
+    expect(oneMissing.issues[0].message).toContain('declarativeNetRequestWithHostAccess permission ');
+    const current = assessManifest({ ...GOOD, permissions: [...permissions, 'cookies', 'declarativeNetRequestWithHostAccess'] }, BUILD);
+    expect(current).toMatchObject({ ok: true, issues: [] });
+  });
 });
 
 describe('autoHealStaleManifest', () => {
@@ -103,6 +119,14 @@ describe('autoHealStaleManifest', () => {
     expect(reload).toHaveBeenCalledTimes(1);
     const log = storage.data[AUTO_RELOAD_LOG_KEY] as Array<{ outcome: string }>;
     expect(log.map((e) => e.outcome)).toEqual(['reloading', 'skipped_already_attempted']);
+  });
+
+  it('reloads once when the running manifest lacks the workspace permissions', async () => {
+    const storage = memoryStorage();
+    const reload = vi.fn();
+    expect(await autoHealStaleManifest({ manifest: { ...GOOD, permissions: ['storage'] }, storage, reload, build: BUILD })).toBe('reloading');
+    expect(await autoHealStaleManifest({ manifest: { ...GOOD, permissions: ['storage'] }, storage, reload, build: BUILD })).toBe('already_attempted');
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('tries again for a newer build', async () => {

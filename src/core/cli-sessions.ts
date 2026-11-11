@@ -1,5 +1,6 @@
 import { buildThreadKey } from './schema.js';
 import type { UpsertThreadInput } from './db.js';
+import { normalizePullRequestUrl, normalizeRepository } from './repository.js';
 
 /**
  * Parsers for local coding-agent transcripts:
@@ -15,6 +16,8 @@ type Msg = UpsertThreadInput['messages'][number];
 
 const TOOL_RESULT_LIMIT = 700;
 const TOOL_CALL_LIMIT = 240;
+const TOOL_RUN_LIMIT = 2400;
+const CLIP_MARKER = '[…]';
 
 function parseJsonLines(text: string): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
@@ -130,14 +133,60 @@ function toolResultText(content: unknown): string {
   return '';
 }
 
+/**
+ * Keep the start and the end of an over-long run: the end of a run (usually the test result)
+ * is what a reader needs most, so cutting only the tail would drop exactly that.
+ */
+function clipMiddle(text: string, limit: number): string {
+  const clean = text.trim();
+  if (clean.length <= limit) return clean;
+  const room = limit - CLIP_MARKER.length - 2;
+  const head = Math.floor(room * 0.7);
+  return `${clean.slice(0, head).trimEnd()}\n${CLIP_MARKER}\n${clean.slice(clean.length - (room - head)).trimStart()}`;
+}
+
+// The unclipped text of each merged tool run, so a run that keeps growing is re-clipped from
+// its full text instead of clipping an already clipped one (which would pile up markers).
+const toolRunText = new WeakMap<Msg, string>();
+
 /** Append, merging consecutive tool records so long agent loops stay readable. */
 function pushMessage(messages: Msg[], next: Msg): void {
   const prev = messages[messages.length - 1];
   if (prev && next.role === 'tool' && prev.role === 'tool') {
-    prev.content = truncate(`${prev.content}\n${next.content}`, 2400);
+    const full = `${toolRunText.get(prev) ?? prev.content}\n${next.content}`;
+    toolRunText.set(prev, full);
+    prev.content = clipMiddle(full, TOOL_RUN_LIMIT);
     return;
   }
   messages.push(next);
+}
+
+/** The last pull request address a tool result shows, canonical, or null. */
+function pullRequestFromText(text: string): string | null {
+  let found: string | null = null;
+  for (const m of text.matchAll(/https:\/\/[^\s"'<>)\]]+\/(?:pull|pulls|merge_requests|pull-requests)\/\d+/g)) {
+    found = normalizePullRequestUrl(m[0]) ?? found;
+  }
+  return found;
+}
+
+/** Remote URL of `git remote -v` style output ("origin  git@github.com:acme/app.git (fetch)"). */
+function remoteFromText(text: string): string | null {
+  const m = text.match(/^origin\s+(\S+)\s+\(fetch\)/m);
+  return m ? normalizeRepository(m[1]) : null;
+}
+
+/** Claude Code does not log the remote itself; take it from any record field that names one. */
+const CLAUDE_CODE_REMOTE_KEYS = ['gitRemoteUrl', 'remoteUrl', 'repositoryUrl', 'repository_url', 'originUrl', 'remote_url'];
+
+function remoteFromRecord(r: Record<string, unknown>): string | null {
+  for (const holder of [r, asRecord(r.git), asRecord(r.repository)]) {
+    for (const key of CLAUDE_CODE_REMOTE_KEYS) {
+      const repository = normalizeRepository(str(holder[key]));
+      if (repository && repository.includes('/')) return repository;
+    }
+  }
+  return null;
 }
 
 export interface CliParseOptions {
@@ -210,6 +259,8 @@ export function parseClaudeCodeSession(
   let lastTs: string | null = null;
   const messages: Msg[] = [];
   let lastAssistantId: string | null = null;
+  let repository: string | null = null;
+  let pullRequestUrl: string | null = null;
 
   for (const r of mainRecords) {
     const ts = str(r.timestamp) || null;
@@ -245,6 +296,7 @@ export function parseClaudeCodeSession(
     if (typeof r.sessionId === 'string' && !sessionId) sessionId = r.sessionId;
     if (typeof r.cwd === 'string' && r.cwd) cwd = r.cwd;
     if (typeof r.gitBranch === 'string' && r.gitBranch) gitBranch = r.gitBranch;
+    repository = remoteFromRecord(r) ?? repository;
     if (ts) {
       firstTs = firstTs ?? ts;
       lastTs = ts;
@@ -273,6 +325,8 @@ export function parseClaudeCodeSession(
             }
           } else if (block?.type === 'tool_result') {
             const out = toolResultText(block.content);
+            pullRequestUrl = pullRequestFromText(out) ?? pullRequestUrl;
+            repository = remoteFromText(out) ?? repository;
             if (out.trim()) {
               pushMessage(messages, {
                 sourceMessageId: `${uuid}:r`,
@@ -357,6 +411,8 @@ export function parseClaudeCodeSession(
     workspacePath: cwd,
     gitBranch,
     modelSlug: model,
+    ...(repository ? { repository } : {}),
+    ...(pullRequestUrl ? { pullRequestUrl } : {}),
     resumeCommand: cwd
       ? `cd ${shellQuote(cwd)} && claude --resume ${shellQuote(sessionId)}`
       : `claude --resume ${shellQuote(sessionId)}`,
@@ -421,6 +477,7 @@ export function parseCodexRollout(text: string, options: CliParseOptions): Codex
   let cwd: string | null = null;
   let gitBranch: string | null = null;
   let repoUrl: string | null = null;
+  let pullRequestUrl: string | null = null;
   let model: string | null = null;
   let firstTs: string | null = null;
   let lastTs: string | null = null;
@@ -495,6 +552,7 @@ export function parseCodexRollout(text: string, options: CliParseOptions): Codex
       } catch {
         // plain text output
       }
+      pullRequestUrl = pullRequestFromText(out) ?? pullRequestUrl;
       if (out.trim()) {
         pushMessage(messages, {
           sourceMessageId: id,
@@ -515,6 +573,7 @@ export function parseCodexRollout(text: string, options: CliParseOptions): Codex
   if (!messages.some((m) => m.role === 'user' || m.role === 'assistant')) return null;
 
   const project = repoNameFromUrl(repoUrl) ?? basenameOfPath(cwd);
+  const repository = normalizeRepository(repoUrl);
   const forkedFromId = (meta && (str(meta.forked_from_id) || str(meta.parent_thread_id))) || null;
   const isFork = forkedFromId !== null && forkedFromId !== sessionId;
   // A fork is stored as a branch of its root thread, the shape ChatGPT branches
@@ -554,6 +613,8 @@ export function parseCodexRollout(text: string, options: CliParseOptions): Codex
       workspacePath: cwd,
       gitBranch,
       modelSlug: model,
+      ...(repository ? { repository } : {}),
+      ...(pullRequestUrl ? { pullRequestUrl } : {}),
       resumeCommand: cwd ? `cd ${shellQuote(cwd)} && codex resume ${shellQuote(sessionId)}` : `codex resume ${shellQuote(sessionId)}`,
     },
     threadId: sessionId,

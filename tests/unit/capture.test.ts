@@ -12,6 +12,8 @@ import {
 } from '../../src/core/providers.js';
 import {
   canonicalizeConversationUrl,
+  extractProviderProjectName,
+  extractRepositoryInfo,
   extractVisibleDomConversation,
   grokXConversationToExtraction,
 } from '../../src/core/dom-capture.js';
@@ -731,5 +733,62 @@ describe('Manifest match patterns', () => {
     const origins = toOriginMatchPatterns(capture);
     expect(origins).toEqual(capture);
     for (const pattern of origins) expect(pattern).toMatch(/^https:\/\/[^/?#*]+\/\*$/);
+  });
+});
+
+describe('extractRepositoryInfo', () => {
+  const CODEX = 'https://chatgpt.com/codex/tasks/task_e_1';
+
+  it('reads the repository, pull request and branch from the session header', () => {
+    const doc = parse(`<header>
+      <a href="https://github.com/Acme/Billing-App">Acme/Billing-App</a>
+      <span aria-label="Branch: feature/invoice-totals">feature/invoice-totals</span>
+      <a href="https://github.com/Acme/Billing-App/pull/42?diff=split#files">PR #42</a>
+    </header><main><p>hello</p></main>`);
+    expect(extractRepositoryInfo(doc, CODEX)).toEqual({
+      repository: 'acme/billing-app',
+      pullRequestUrl: 'https://github.com/acme/billing-app/pull/42',
+      gitBranch: 'feature/invoice-totals',
+    });
+  });
+
+  it('reads a repository link and a "Branch: x" label in the main area, with gitlab links', () => {
+    const doc = parse(`<main><div><a href="https://gitlab.com/team/api.git">api</a></div>
+      <div><span>Branch: fix-auth</span></div></main>`);
+    const info = extractRepositoryInfo(doc, 'https://claude.ai/code/session_01AbC');
+    expect(info.repository).toBe('team/api');
+    expect(info.gitBranch).toBe('fix-auth');
+    expect(info.pullRequestUrl).toBeNull();
+  });
+
+  it('does not take a branch from a button or sentence, and ignores site sections and message links', () => {
+    const doc = parse(`<header><a href="https://github.com/settings/profile">me</a>
+        <button aria-label="Create branch">Create branch</button></header>
+      <main><div data-message-author-role="assistant"><a href="https://github.com/other/thing">link</a></div></main>`);
+    expect(extractRepositoryInfo(doc, CODEX)).toEqual({ repository: null, pullRequestUrl: null, gitBranch: null });
+  });
+
+  it('reads a GitHub Copilot agent session from its address', () => {
+    const doc = parse('<main><p>working</p></main>');
+    const info = extractRepositoryInfo(doc, 'https://github.com/Acme/App/pull/7/agent-sessions/abc123');
+    expect(info.repository).toBe('acme/app');
+    expect(info.pullRequestUrl).toBe('https://github.com/acme/app/pull/7');
+  });
+
+  it('returns nothing on pages that are not coding agents', () => {
+    const doc = parse('<main><a href="https://github.com/acme/app">acme/app</a></main>');
+    expect(extractRepositoryInfo(doc, 'https://chatgpt.com/c/abc')).toEqual({
+      repository: null,
+      pullRequestUrl: null,
+      gitBranch: null,
+    });
+  });
+
+  it('gives Cursor agents the repository name as their project, and leaves Codex and Claude Code as before', () => {
+    const cursor = parse('<header><a href="https://github.com/acme/web-shop">repo</a></header>');
+    expect(extractProviderProjectName(cursor, 'https://cursor.com/agents/bc-abc123')).toBe('web-shop');
+    expect(extractProviderProjectName(parse('<main></main>'), 'https://cursor.com/agents/bc-abc123')).toBeNull();
+    const codex = parse('<main><a href="https://github.com/Acme/Billing.git">x</a></main>');
+    expect(extractProviderProjectName(codex, CODEX)).toBe('Billing');
   });
 });

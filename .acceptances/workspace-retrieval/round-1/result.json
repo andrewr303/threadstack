@@ -1,0 +1,407 @@
+{
+  "schemaVersion": 1,
+  "title": "Workspace migration and retrieval continuation",
+  "requirement": "Finish interrupted local workspace and MongoDB/Voyage retrieval work, preserving completed operations and reporting real evidence boundaries.",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Continue the integrated workspace UI and compact active filters."
+    },
+    {
+      "id": "R2",
+      "text": "Support MongoDB and Voyage endpoint selection, embedding and reranking with safe search integration."
+    },
+    {
+      "id": "R3",
+      "text": "Verify narrow navigation and keyboard layering."
+    },
+    {
+      "id": "R4",
+      "text": "Use real signed-in provider sites inside the workspace."
+    },
+    {
+      "id": "R5",
+      "text": "Verify authenticated hosted model behavior."
+    }
+  ],
+  "createdAt": "2026-11-11T00:39:29.762Z",
+  "runtime": {
+    "expected": "browseros-neo",
+    "observed": "codex-in-app-browser",
+    "selection": "fallback",
+    "tools": [
+      "mcp__synara__browser_status",
+      "mcp__synara__browser_open",
+      "mcp__synara__browser_run",
+      "mcp__synara__browser_reload",
+      "mcp__synara__browser_resize",
+      "mcp__synara__browser_screenshot",
+      "mcp__synara__browser_logs"
+    ],
+    "fallbacks": [
+      {
+        "runtime": "browseros-neo",
+        "status": "unavailable",
+        "reason": "BrowserOS neo tools are absent from this session's exposed inventory."
+      }
+    ]
+  },
+  "context": {
+    "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+    "revision": "0d82449 + uncommitted worktree",
+    "buildIdentity": "0.5.0 (build 20261111.003759-0d82449)",
+    "buildVerified": true,
+    "role": "Synthetic demo library; HTTP preview with stubbed chrome APIs, no authenticated account",
+    "viewport": "1280x800 initial; 800x800 requested narrow, host settled at 600x754 CSS pixels"
+  },
+  "plan": [
+    {
+      "id": "workspace",
+      "requirements": [
+        "R1"
+      ],
+      "title": "Workspace preview views",
+      "category": "Workspace and retrieval",
+      "verifier": "agent",
+      "method": "Switch Threads, Browse, Dashboard and return to Threads.",
+      "expected": "All three views render, with paused-account explanations and one-to-four-pane dashboard controls.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "filters",
+      "requirements": [
+        "R1"
+      ],
+      "title": "Collapsed active filters",
+      "category": "Workspace and retrieval",
+      "verifier": "agent",
+      "method": "Select Claude Code, collapse Filters, reopen and clear the selection.",
+      "expected": "The panel can collapse with an active count and filtered results remain.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "endpoints",
+      "requirements": [
+        "R2"
+      ],
+      "title": "Endpoint settings persistence",
+      "category": "Workspace and retrieval",
+      "verifier": "agent",
+      "method": "Choose Voyage legacy, reopen Settings; select MongoDB, inspect and change Atlas geography and reopen.",
+      "expected": "Endpoint and geography choices persist without entering credentials.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "narrow",
+      "requirements": [
+        "R3"
+      ],
+      "title": "Narrow navigation and Escape layering",
+      "category": "Workspace and retrieval",
+      "verifier": "agent",
+      "method": "Request 800px resize, inspect actual viewport, open drawer, reach Threads/settings and dismiss with Escape.",
+      "expected": "Controls fit; drawer can close with Escape and leave Threads reachable.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "live-provider",
+      "requirements": [
+        "R4"
+      ],
+      "title": "Real signed-in provider interaction",
+      "category": "Workspace and retrieval",
+      "verifier": "agent",
+      "method": "Sign in to each provider and send/stream/upload/switch real accounts.",
+      "expected": "Provider remains usable inside the extension.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "live-model",
+      "requirements": [
+        "R5"
+      ],
+      "title": "Authenticated embedding and reranking",
+      "category": "Workspace and retrieval",
+      "verifier": "agent",
+      "method": "Use the matching Atlas/Voyage key, grant host and test query/document/rerank requests.",
+      "expected": "Authenticated model calls succeed.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "workspace",
+      "name": "Workspace preview views",
+      "category": "Workspace and retrieval",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Threads, Browse and four-pane Dashboard were rendered and inspected over the synthetic demo library. Provider frame interaction is excluded.",
+      "evidence": [
+        {
+          "path": "assets/filters.png",
+          "type": "screenshot",
+          "description": "Threads with repository grouping and collapsed active filter",
+          "capturedAt": "2026-11-11T00:31:44.270Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/browse.png",
+          "type": "screenshot",
+          "description": "Browse explains why a saved account tab is paused",
+          "capturedAt": "2026-11-11T00:34:57.923Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/dashboard.png",
+          "type": "screenshot",
+          "description": "Four dashboard panes, including paused and empty notices",
+          "capturedAt": "2026-11-11T00:35:10.907Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/browser-execution-final.json",
+          "type": "transcript",
+          "description": "Original structured browser action and observation receipts; includes endpoint persistence, build diagnostics, initial Escape failure and successful repaired readback.",
+          "capturedAt": "2026-11-11T00:39:29.754Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_run",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003759-0d82449)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "filters",
+      "name": "Collapsed active filters",
+      "category": "Workspace and retrieval",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Claude Code left four matching rows. Filters · 1 collapsed with aria-expanded=false and the provider field no longer visible. Reopened and cleared to all.",
+      "evidence": [
+        {
+          "path": "assets/filters.png",
+          "type": "screenshot",
+          "description": "Active provider filter retained while controls are collapsed",
+          "capturedAt": "2026-11-11T00:31:44.270Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/browser-execution-final.json",
+          "type": "transcript",
+          "description": "Original structured browser action and observation receipts; includes endpoint persistence, build diagnostics, initial Escape failure and successful repaired readback.",
+          "capturedAt": "2026-11-11T00:39:29.754Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_run",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003759-0d82449)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "endpoints",
+      "name": "Endpoint settings persistence",
+      "category": "Workspace and retrieval",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Legacy Voyage persisted with Voyage reranker selected. MongoDB alias was selected, then explicit Atlas provider with EU geography persisted after reopening. No Test or Rebuild action was used.",
+      "evidence": [
+        {
+          "path": "assets/endpoint.png",
+          "type": "screenshot",
+          "description": "MongoDB endpoint selected under Voyage",
+          "capturedAt": "2026-11-11T00:33:30.282Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/browser-execution-final.json",
+          "type": "transcript",
+          "description": "Original structured browser action and observation receipts; includes endpoint persistence, build diagnostics, initial Escape failure and successful repaired readback.",
+          "capturedAt": "2026-11-11T00:39:29.754Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_run",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003759-0d82449)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "narrow",
+      "name": "Narrow navigation and Escape layering",
+      "category": "Workspace and retrieval",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Host settled to 600x754 CSS pixels. Initial Escape left the drawer open. After the window-capture handler fix, Escape produced data-drawer-open=false; document overflow was zero. Narrow Settings was visually inspected.",
+      "evidence": [
+        {
+          "path": "assets/narrow-drawer.png",
+          "type": "screenshot",
+          "description": "Original open drawer at observed 600px width",
+          "capturedAt": "2026-11-11T00:35:35.624Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/escape-failure.png",
+          "type": "screenshot",
+          "description": "Preserved failing Escape attempt with drawer still open",
+          "capturedAt": "2026-11-11T00:35:48.406Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/narrow-settings.png",
+          "type": "screenshot",
+          "description": "Narrow Settings dialog with wrapping section navigation",
+          "capturedAt": "2026-11-11T00:36:45.549Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003122-0d82449)"
+          }
+        },
+        {
+          "path": "assets/narrow-fixed.png",
+          "type": "screenshot",
+          "description": "Repaired drawer closes and Threads remains visible",
+          "capturedAt": "2026-11-11T00:38:21.779Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003759-0d82449)"
+          }
+        },
+        {
+          "path": "assets/browser-execution-final.json",
+          "type": "transcript",
+          "description": "Original structured browser action and observation receipts; includes endpoint persistence, build diagnostics, initial Escape failure and successful repaired readback.",
+          "capturedAt": "2026-11-11T00:39:29.754Z",
+          "capturedBy": "codex-in-app-browser",
+          "tool": "mcp__synara__browser_run",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:4317/manager.html?surface=page&seed=1",
+            "revision": "0d82449 + uncommitted worktree",
+            "buildIdentity": "0.5.0 (build 20261111.003759-0d82449)"
+          }
+        }
+      ],
+      "attempts": [
+        {
+          "status": "fail",
+          "observation": "Window-level Escape handling prevented the drawer document listener from receiving the event.",
+          "resolution": "Reproduced in manager integration tests; window handler now preserves menu/dialog priority then yields to the open drawer. Rebuilt and browser recheck observed drawer=false.",
+          "evidencePaths": [
+            "assets/escape-failure.png",
+            "assets/browser-execution-final.json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "live-provider",
+      "name": "Real signed-in provider interaction",
+      "category": "Workspace and retrieval",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Synthetic HTTP preview has no extension cookie access or real provider logins. Existing prior Chromium stand-in evidence is not relabelled as live proof.",
+      "evidence": []
+    },
+    {
+      "id": "live-model",
+      "name": "Authenticated embedding and reranking",
+      "category": "Workspace and retrieval",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "No model key used and no paid request made. API and failure behavior are covered by fixtures and current primary-source documentation.",
+      "evidence": []
+    }
+  ],
+  "coverageGaps": [
+    "Real provider signed-in send/stream/upload/account flows remain blocked.",
+    "Live model API behavior remains blocked.",
+    "Native Mac helper not exercised; existing workspace stand-in browser tests were not repeated in this turn."
+  ]
+}

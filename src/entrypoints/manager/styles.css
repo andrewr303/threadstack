@@ -1,39 +1,184 @@
-:root {
-  --ink: #1B1A17;
-  --ink-2: #4A4741;
-  --ink-3: #6E6A62;
-  --ink-4: #918C83;
-  --rule: rgba(27, 26, 23, 0.10);
-  --rule-strong: rgba(27, 26, 23, 0.18);
-  --paper: #FBFAF7;
-  --paper-2: #F4F2ED;
-  --paper-3: #EDEAE3;
-  --accent: #1F6F6B;
-  --accent-soft: rgba(31, 111, 107, 0.10);
-  --warn: #8A5A12;
-  --danger: #8C3A2E;
-  --font-serif: ui-serif, Georgia, 'Times New Roman', serif;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
-  --row-pad: 12px 16px;
-  --row-gap: 8px;
-  --section-gap: 24px;
-}
+/* Threadkeeper manager: tokens, themes and the library components.
+   Dark is the default theme. Glass (translucent, blurred) is only for floating chrome; everything a
+   person reads or works in is an opaque surface. Shared pieces live in styles/00-foundation.css,
+   the full-page shell in styles/10-shell.css, and each view in its own file after those. */
 
-[data-theme="dark"] {
-  --ink: #EDEAE3;
-  --ink-2: #C3BEB4;
-  --ink-3: #9A958B;
-  --ink-4: #767168;
-  --rule: rgba(237, 234, 227, 0.10);
-  --rule-strong: rgba(237, 234, 227, 0.18);
-  --paper: #16181A;
-  --paper-2: #1C1F21;
-  --paper-3: #23272A;
+:root,
+html[data-theme="dark"] {
+  /* Type */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+
+  /* Radius */
+  --r-ctl: 6px;      /* buttons, fields, markers */
+  --r-row: 10px;     /* rows and cards */
+  --r-panel: 14px;   /* panels and the page slots */
+  --r-chrome: 18px;  /* floating chrome */
+  --r-cap: 999px;    /* tabs and segmented controls only */
+
+  /* Motion: transform and opacity only */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 0.8, 0.25);
+  --t-small: 160ms;
+  --t-mid: 200ms;
+  --t-panel: 260ms;
+
+  /* Layout */
+  --gap: 8px;
+  --nav-w: 264px;    /* the three view labels fit at 13px; 240px clipped "Dashboard" */
+  --row-h: 32px;
+
+  /* Colour, dark: warm charcoal */
+  --canvas: #13110F;
+  /* Light for the glass to bend: large, soft, low-chroma fields that sit behind the rail and the
+     bars. Copper at the top left, a cooler green-grey low on the left and at the bottom right,
+     and a pale band along the top edge. Content panels are opaque, so only chrome shows them. */
+  --canvas-paint:
+    radial-gradient(900px 640px at 2% 2%, rgba(188, 124, 82, 0.34), transparent 68%),
+    radial-gradient(620px 760px at 0% 96%, rgba(86, 132, 122, 0.24), transparent 70%),
+    radial-gradient(1000px 720px at 100% 100%, rgba(104, 128, 118, 0.14), transparent 70%),
+    radial-gradient(1100px 360px at 56% -14%, rgba(236, 216, 188, 0.15), transparent 70%),
+    #13110F;
+  --surface: #1C1A17;
+  --surface-2: #24211E;
+  --surface-3: #2D2A26;
+  --chrome-solid: #1B1916;
+  --border-solid: #3B3631;
+
+  --glass-fill: rgba(26, 23, 20, 0.44);
+  --pop-fill: rgba(23, 21, 18, 0.88);   /* menus float over any page, so they are denser */
+  --glass-filter: blur(18px) saturate(160%);
+  --glass-border: rgba(255, 244, 228, 0.10);
+  --glass-hi: rgba(255, 244, 228, 0.26);
+  --glass-shadow: 0 16px 36px -22px rgba(0, 0, 0, 0.85);
+
+  --line: rgba(237, 232, 223, 0.09);
+  --line-2: rgba(237, 232, 223, 0.15);
+  --field-border: #81796C;
+
+  --text: #EDE8DF;
+  --text-2: #C6BFB3;
+  --text-3: #A39B8F;
+  --text-disabled: #6C655B;
+
   --accent: #5FB8B0;
-  --accent-soft: rgba(95, 184, 176, 0.12);
+  --on-accent: #0E1716;
+  --accent-tint: #25302C;
+  --accent-line: rgba(95, 184, 176, 0.55);
+
   --warn: #D9A441;
   --danger: #D9776A;
+  --st-running: #C6BFB3;
+  --st-finished: #A39B8F;
+
+  --ctl-hover: rgba(255, 244, 228, 0.07);
+  --ctl-press: rgba(255, 244, 228, 0.11);
+  --ctl-fill: rgba(255, 244, 228, 0.05);
+  --seg-track: rgba(10, 9, 8, 0.35);
+  --seg-thumb: #34302B;
+
+  --ring: #5FB8B0;
+  --ring-inner: #13110F;
+  --scrim: rgba(10, 9, 8, 0.55);
+  --pop-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.8);
+
+  --ac-teal: #5FAEA6;
+  --ac-peach: #E3A07F;
+  --ac-violet: #AC9BDB;
+  --ac-sage: #9EB98A;
+  --ac-blue: #86A8D8;
+  --ac-gold: #D6B460;
+
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  /* Colour, light: warm paper */
+  --canvas: #E9E4DB;
+  --canvas-paint:
+    radial-gradient(1100px 780px at 4% 8%, rgba(196, 140, 100, 0.27), transparent 70%),
+    radial-gradient(900px 720px at 98% 100%, rgba(120, 150, 140, 0.16), transparent 70%),
+    radial-gradient(900px 420px at 62% -12%, rgba(255, 252, 245, 0.70), transparent 70%),
+    #E9E4DB;
+  --surface: #FBFAF7;
+  --surface-2: #F3F0EA;
+  --surface-3: #E8E4DC;
+  --chrome-solid: #F4F1EB;
+  --border-solid: #CFC7BB;
+
+  --glass-fill: rgba(251, 249, 245, 0.58);
+  --pop-fill: rgba(251, 249, 245, 0.90);
+  --glass-filter: blur(16px) saturate(150%);
+  --glass-border: rgba(60, 46, 32, 0.10);
+  --glass-hi: rgba(255, 255, 255, 0.90);
+  --glass-shadow: 0 14px 32px -22px rgba(70, 48, 28, 0.38);
+
+  --line: rgba(40, 32, 22, 0.09);
+  --line-2: rgba(40, 32, 22, 0.15);
+  --field-border: #857D71;
+
+  --text: #1C1A17;
+  --text-2: #46423C;
+  --text-3: #625D55;
+  --text-disabled: #A29C92;
+
+  --accent: #1F6F6B;
+  --on-accent: #FBFAF7;
+  --accent-tint: #E5ECE9;
+  --accent-line: rgba(31, 111, 107, 0.55);
+
+  --warn: #8A5D0E;
+  --danger: #B5503F;
+  --st-running: #625D55;
+  --st-finished: #625D55;
+
+  --ctl-hover: rgba(60, 46, 32, 0.06);
+  --ctl-press: rgba(60, 46, 32, 0.10);
+  --ctl-fill: rgba(255, 255, 255, 0.55);
+  --seg-track: rgba(60, 46, 32, 0.06);
+  --seg-thumb: #FFFDF9;
+
+  --ring: #1F6F6B;
+  --ring-inner: #FBFAF7;
+  --scrim: rgba(40, 32, 22, 0.30);
+  --pop-shadow: 0 18px 40px -18px rgba(70, 48, 28, 0.45);
+
+  --ac-teal: #2E7D77;
+  --ac-peach: #B4633F;
+  --ac-violet: #6E58B3;
+  --ac-sage: #557543;
+  --ac-blue: #3D6BA8;
+  --ac-gold: #8F6F12;
+
+  color-scheme: light;
+}
+
+/* Names the library components were written with. They follow the theme through the new tokens,
+   so the existing rules keep rendering without being rewritten one by one. */
+:root {
+  --ink: var(--text);
+  --ink-2: var(--text-2);
+  --ink-3: var(--text-3);
+  --ink-4: var(--text-disabled);
+  --rule: var(--line);
+  --rule-strong: var(--line-2);
+  --paper: var(--surface);
+  --paper-2: var(--surface-2);
+  --paper-3: var(--surface-3);
+  --accent-soft: var(--accent-tint);
+
+  /* Density */
+  --row-pad: 12px 14px;
+  --row-gap: 8px;
+  --section-gap: 24px;
 }
 
 [data-density="compact"] {
@@ -42,10 +187,86 @@
   --section-gap: 16px;
 }
 
+/* Solid surfaces: every translucent surface becomes opaque with a real border. Chosen in Settings,
+   or asked for by the system (reduced transparency, more contrast, forced colours), or needed
+   because the browser cannot blur. */
+html[data-surfaces="solid"] {
+  --glass-fill: var(--chrome-solid);
+  --pop-fill: var(--chrome-solid);
+  --glass-filter: none;
+  --glass-border: var(--border-solid);
+  --glass-hi: transparent;
+  --seg-track: var(--surface-2);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  html[data-theme] {
+    --glass-fill: var(--chrome-solid);
+    --pop-fill: var(--chrome-solid);
+    --glass-filter: none;
+    --glass-border: var(--border-solid);
+    --glass-hi: transparent;
+    --seg-track: var(--surface-2);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  html[data-theme] {
+    --glass-fill: var(--chrome-solid);
+    --pop-fill: var(--chrome-solid);
+    --glass-filter: none;
+    --glass-border: var(--field-border);
+    --glass-hi: transparent;
+    --line: var(--line-2);
+    --seg-track: var(--surface-2);
+  }
+  :root,
+  html[data-theme="dark"] {
+    --text-3: #BDB5A9;
+  }
+  html[data-theme="light"] {
+    --text-3: #4F4A43;
+  }
+}
+
+@media (forced-colors: active) {
+  :root,
+  html[data-theme] {
+    --glass-fill: Canvas;
+    --pop-fill: Canvas;
+    --glass-filter: none;
+    --glass-border: CanvasText;
+    --glass-hi: transparent;
+    --glass-shadow: none;
+    --pop-shadow: none;
+    --seg-track: Canvas;
+    --seg-thumb: Highlight;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root,
+  html[data-theme] {
+    --glass-fill: var(--chrome-solid);
+    --pop-fill: var(--chrome-solid);
+    --glass-filter: none;
+    --glass-border: var(--border-solid);
+    --glass-hi: transparent;
+    --seg-track: var(--surface-2);
+  }
+}
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* The canvas is painted once, on a fixed layer behind everything. */
+html {
+  background: var(--canvas);
 }
 
 html,
@@ -55,13 +276,74 @@ body,
   padding: 0;
   width: 100%;
   height: 100%;
-  background: var(--paper);
-  color: var(--ink);
+  color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.45;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--canvas-paint);
+  background-attachment: fixed;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Focus: a two-tone ring (an inner ring in the canvas tone, then the accent), on every control. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--ring-inner);
+}
+
+/* Controls inside scrolling lists draw the ring inside their own box so the list never clips it. */
+.tk-row-btn:focus-visible,
+.tk-nav-item:focus-visible,
+.tk-card-btn:focus-visible,
+.tk-related-item:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+
+button:not(:disabled),
+summary,
+select:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+label:has(> input[type="checkbox"]:not(:disabled)),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+input[type="checkbox"],
+input[type="radio"],
+progress {
+  accent-color: var(--accent);
+}
+
+::selection {
+  background: var(--accent-tint);
+  color: var(--text);
 }
 
 .tk-skip-link {
@@ -69,15 +351,19 @@ body,
   left: -9999px;
   top: 8px;
   z-index: 200;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
   background: var(--accent);
-  color: #ffffff;
-  padding: 8px 12px;
-  border-radius: 6px;
+  color: var(--on-accent);
+  padding: 8px 14px;
+  border-radius: var(--r-ctl);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.tk-skip-link:focus {
+.tk-skip-link:focus,
+.tk-skip-link:focus-visible {
   left: 12px;
 }
 
@@ -92,14 +378,15 @@ body,
   height: 100vh;
   max-width: 1600px;
   margin: 0 auto;
-  background: var(--paper);
+  background: var(--surface);
+  color: var(--text);
   overflow: hidden;
 }
 
 .tk-workbench[data-surface="overlay"] {
   max-width: none;
-  border-radius: 12px;
-  animation: tk-overlay-enter 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  border-radius: var(--r-panel);
+  animation: tk-overlay-enter var(--t-mid) var(--ease-out);
 }
 
 @keyframes tk-overlay-enter {
@@ -114,6 +401,14 @@ body,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
   .tk-workbench[data-surface="overlay"] {
     animation: none;
   }
@@ -129,16 +424,16 @@ body,
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
 
 .tk-header-left {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -146,51 +441,70 @@ body,
 .tk-h1 {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 28px;
+  font-size: var(--fs-24);
   font-weight: 600;
   line-height: 1.15;
-  color: var(--ink);
+  color: var(--text);
   letter-spacing: -0.015em;
 }
 
 .tk-counts-details {
-  font-size: 12px;
-  color: var(--ink-3);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
   position: relative;
 }
 
 .tk-counts-summary {
-  cursor: pointer;
   list-style: none;
-  padding: 4px 6px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: var(--r-ctl);
+  color: var(--text-2);
+}
+
+.tk-counts-summary::-webkit-details-marker {
+  display: none;
 }
 
 .tk-counts-summary:hover {
-  background: var(--paper-2);
-  color: var(--ink-2);
+  background: var(--ctl-hover);
+  color: var(--text);
 }
 
+.tk-counts-details[open] > .tk-counts-summary {
+  background: var(--ctl-press);
+  color: var(--text);
+}
+
+/* Popovers of the header: menu surfaces (opaque inside chrome, never glass on glass). */
 .tk-counts-popover {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
-  z-index: 40;
+  z-index: 30;
   width: 320px;
-  padding: 10px 12px;
-  background: var(--paper);
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
-  color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.4;
+  padding: 12px 14px;
+  background: var(--chrome-solid);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-panel);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--pop-shadow);
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: 1.45;
+}
+
+.tk-counts-popover strong {
+  color: var(--text);
+  font-size: var(--fs-13);
 }
 
 .tk-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -201,50 +515,67 @@ body,
   justify-content: center;
   gap: 6px;
   min-height: 32px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--rule-strong);
-  background: var(--paper-2);
-  color: var(--ink);
+  padding: 0 12px;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--line-2);
+  background: var(--ctl-fill);
+  color: var(--text);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 500;
-  cursor: pointer;
+  line-height: 1.2;
   white-space: nowrap;
+  text-decoration: none;
+  transition: transform var(--t-small) var(--ease-out);
 }
 
 .tk-btn:hover {
-  background: var(--paper-3);
+  background: var(--ctl-hover);
 }
 
 .tk-btn:active {
+  background: var(--ctl-press);
   transform: scale(0.97);
 }
 
-.tk-btn:focus-visible,
-.tk-input:focus-visible,
-.tk-select:focus-visible,
-.tk-row-btn:focus-visible,
-.tk-nav-item:focus-visible,
-.tk-linklike:focus-visible,
-.tk-evidence-marker:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.tk-btn[aria-pressed="true"],
+.tk-btn[aria-expanded="true"] {
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
+}
+
+.tk-btn:disabled,
+.tk-btn[aria-disabled="true"] {
+  color: var(--text-disabled);
+  background: transparent;
+  border-color: var(--line);
+  transform: none;
 }
 
 .tk-btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
-[data-theme="dark"] .tk-btn-primary {
-  color: #16181A;
-}
-
+/* Hover and press darken or lighten the accent with an inset wash, not opacity. */
 .tk-btn-primary:hover {
-  opacity: 0.92;
   background: var(--accent);
+  box-shadow: inset 0 0 0 999px var(--ctl-press);
+}
+
+.tk-btn-primary:active {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 999px var(--ctl-press), inset 0 0 0 999px var(--ctl-hover);
+}
+
+.tk-btn-primary:disabled,
+.tk-btn-primary[aria-disabled="true"] {
+  background: var(--surface-3);
+  border-color: var(--surface-3);
+  color: var(--text-disabled);
+  box-shadow: none;
 }
 
 .tk-btn-danger {
@@ -252,19 +583,73 @@ body,
   border-color: var(--danger);
 }
 
+.tk-btn-danger:hover {
+  background: var(--ctl-hover);
+  color: var(--danger);
+}
+
 .tk-input,
 .tk-select {
   min-height: 32px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--rule-strong);
-  background: var(--paper-2);
-  color: var(--ink);
+  padding: 0 10px;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--field-border);
+  background: var(--ctl-fill);
+  color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--fs-13);
+  min-width: 0;
 }
 
-/* Main 3-column workbench grid */
+textarea.tk-input {
+  padding: 6px 10px;
+  line-height: 1.45;
+}
+
+.tk-input::placeholder {
+  color: var(--text-3);
+  opacity: 1;
+}
+
+.tk-input:hover,
+.tk-select:hover {
+  background-color: var(--ctl-hover);
+}
+
+.tk-input:disabled,
+.tk-select:disabled {
+  color: var(--text-disabled);
+  border-color: var(--line-2);
+  background-color: transparent;
+}
+
+.tk-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+select.tk-select {
+  padding-right: 28px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 10px) 50%;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
+
+select.tk-select[multiple] {
+  padding-right: 10px;
+  background-image: none;
+}
+
+.tk-select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Main 3-column workbench grid (side panel and overlay; the full page is laid out in 10-shell.css) */
 .tk-columns {
   display: grid;
   grid-template-columns: 232px minmax(320px, 1fr) minmax(380px, 1.1fr);
@@ -278,12 +663,12 @@ body,
   grid-template-columns: 56px minmax(320px, 1fr) minmax(380px, 1.1fr);
 }
 
-/* Left navigation rail */
+/* Left navigation (projects and resurfacing queues) */
 .tk-nav {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--rule);
-  background: var(--paper-2);
+  border-right: 1px solid var(--line);
+  background: var(--surface-2);
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 8px;
@@ -291,11 +676,9 @@ body,
 }
 
 .tk-eyebrow {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text-3);
   padding: 0 8px;
   margin-bottom: 4px;
 }
@@ -312,33 +695,36 @@ body,
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  min-height: 34px;
+  min-height: 32px;
   padding: 6px 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: transparent;
-  color: var(--ink-2);
+  color: var(--text-2);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--fs-13);
   text-align: left;
-  cursor: pointer;
 }
 
 .tk-nav-item:hover {
-  background: var(--paper-3);
-  color: var(--ink);
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+.tk-nav-item:active {
+  background: var(--ctl-press);
 }
 
 .tk-nav-item[aria-current="true"] {
-  background: var(--paper-3);
-  color: var(--ink);
+  background: var(--accent-tint);
+  color: var(--text);
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
 .tk-nav-count {
-  font-size: 12px;
-  color: var(--ink-3);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -346,8 +732,8 @@ body,
 .tk-list-pane {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--rule);
-  background: var(--paper);
+  border-right: 1px solid var(--line);
+  background: var(--surface);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -357,8 +743,8 @@ body,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--rule);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
 
@@ -385,12 +771,20 @@ body,
   overflow-y: auto;
   overflow-x: hidden;
   margin: 0;
-  padding: 0;
+  padding: 6px;
   list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
 }
 
+/* A row is a rounded surface of its own; see "Bulk selection" below for hover, checked and open. */
 .tk-row-item {
-  border-bottom: 1px solid var(--rule);
+  border: 1px solid transparent;
+  border-radius: var(--r-row);
+}
+
+.tk-row-item + .tk-row-item {
+  margin-top: 2px;
 }
 
 .tk-row-btn {
@@ -400,20 +794,20 @@ body,
   width: 100%;
   padding: var(--row-pad);
   border: 0;
-  background: var(--paper);
-  color: var(--ink);
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--text);
   text-align: left;
-  cursor: pointer;
   font-family: var(--font-sans);
 }
 
 .tk-row-btn:hover {
-  background: var(--paper-2);
+  background: var(--surface-2);
 }
 
 .tk-row-btn[aria-selected="true"] {
-  background: var(--paper-3);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
 .tk-row-main {
@@ -424,9 +818,10 @@ body,
 }
 
 .tk-row-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -435,8 +830,8 @@ body,
 }
 
 .tk-row-excerpt {
-  font-size: 13px;
-  color: var(--ink-2);
+  font-size: var(--fs-13);
+  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -445,10 +840,10 @@ body,
 .tk-row-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px 8px;
   flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--ink-3);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 
 .tk-row-right {
@@ -457,8 +852,8 @@ body,
   align-items: flex-end;
   justify-content: space-between;
   gap: 6px;
-  font-size: 12px;
-  color: var(--ink-3);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
@@ -468,8 +863,8 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: var(--ink-3);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 
 .tk-coverage-bars {
@@ -481,7 +876,8 @@ body,
 .tk-coverage-bar {
   width: 2px;
   height: 10px;
-  background: var(--rule-strong);
+  border-radius: 1px;
+  background: var(--line-2);
 }
 
 .tk-coverage-bar[data-filled="true"] {
@@ -492,16 +888,17 @@ body,
 .tk-status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--ink-2);
+  gap: 6px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 
 .tk-status-dot {
   width: 7px;
   height: 7px;
+  flex: none;
   border-radius: 50%;
-  border: 1.5px solid var(--ink-3);
+  border: 1.5px solid var(--text-3);
   background: transparent;
 }
 
@@ -519,30 +916,33 @@ body,
 .tk-detail-pane {
   display: flex;
   flex-direction: column;
-  background: var(--paper);
+  background: var(--surface);
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 24px;
+  padding: 22px 26px 32px;
   gap: var(--section-gap);
   min-width: 0;
   min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
 }
 
 .tk-detail-header {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--line);
   padding-bottom: 16px;
 }
 
 .tk-detail-title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 600;
-  color: var(--ink);
-  line-height: 1.25;
+  color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
@@ -550,36 +950,40 @@ body,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--ink-3);
+  gap: 4px 10px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 
-/* Focal element: Where you left off strip */
+/* Focal element: Where you left off */
 .tk-focal-left-off {
-  padding: 16px 18px;
+  padding: 18px 20px;
   margin: 4px 0;
-  border-left: 2px solid var(--accent);
-  background: var(--paper-2);
-  border-radius: 0 6px 6px 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-row);
+  background: var(--surface-2);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tk-focal-serif-line {
   font-family: var(--font-serif);
-  font-size: 17px;
-  line-height: 1.5;
-  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--text);
   margin: 0;
+  text-wrap: pretty;
 }
 
 .tk-focal-next-step {
   margin: 0;
-  font-size: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-2);
+  font-size: var(--fs-14);
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--text);
 }
 
 .tk-focal-next-label {
@@ -592,9 +996,9 @@ body,
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--rule);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .tk-claim-row:last-child {
@@ -602,9 +1006,9 @@ body,
 }
 
 .tk-claim-text {
-  font-size: 14px;
-  color: var(--ink);
-  line-height: 1.45;
+  font-size: var(--fs-14);
+  color: var(--text);
+  line-height: 1.5;
 }
 
 /* Claims render as a list (decisions, key points, action items, open questions). */
@@ -616,7 +1020,7 @@ body,
 
 /* Each row sits alone in its <li>, so restore the divider that .tk-claim-row:last-child removes. */
 .tk-claim-list > li > .tk-claim-row {
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--line);
 }
 
 .tk-claim-list > li:last-child > .tk-claim-row {
@@ -624,34 +1028,48 @@ body,
 }
 
 .tk-claim-rationale {
-  color: var(--ink-2);
+  color: var(--text-2);
 }
 
+/* The marker: a hairline box with the message ordinal, closed by a 2px accent rule on its right. */
 .tk-evidence-marker {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 7px;
-  border: 0;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px 0 7px;
+  border: 1px solid var(--line-2);
   border-right: 2px solid var(--accent);
-  background: var(--paper-2);
-  color: var(--ink-2);
+  border-radius: var(--r-ctl) 0 0 var(--r-ctl);
+  background: transparent;
+  color: var(--text-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-11);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  border-radius: 4px 0 0 4px;
-  min-height: 26px;
 }
 
 .tk-evidence-marker:hover {
-  background: var(--accent-soft);
-  color: var(--ink);
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+.tk-evidence-marker:active {
+  background: var(--ctl-press);
+}
+
+.tk-evidence-marker[aria-expanded="true"],
+.tk-evidence-marker[aria-pressed="true"] {
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
+  border-right-color: var(--accent);
+  color: var(--text);
 }
 
 .tk-evidence-pip {
   width: 6px;
   height: 6px;
+  flex: none;
   border-radius: 50%;
   border: 1.5px solid var(--accent);
   background: transparent;
@@ -663,12 +1081,13 @@ body,
 
 .tk-evidence-passage-box {
   margin-top: 6px;
-  padding: 10px 12px;
-  background: var(--paper-2);
-  border-left: 2px solid var(--accent);
-  font-size: 13px;
-  color: var(--ink-2);
-  border-radius: 0 4px 4px 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-row);
+  font-size: var(--fs-13);
+  line-height: 1.55;
+  color: var(--text-2);
 }
 
 .tk-section {
@@ -680,45 +1099,86 @@ body,
 .tk-section-h2 {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 19px;
+  font-size: var(--fs-16);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--text);
 }
 
 /* Secondary views: Kanban & Cards */
 .tk-kanban-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 10px;
   overflow-y: auto;
   flex: 1;
+  align-items: start;
 }
 
 .tk-kanban-col {
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-row);
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* Native modal dialogs inside manager */
+/* Native modal dialogs: opaque panels (a dialog is never glass) over a blurred scrim. */
 .tk-modal-dialog {
   width: min(92vw, 680px);
   max-height: 84vh;
   padding: 20px 24px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 10px;
-  background: var(--paper);
-  color: var(--ink);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--pop-shadow);
   overflow-y: auto;
 }
 
+.tk-modal-dialog[open] {
+  animation: tk-dialog-in var(--t-panel) var(--ease-out);
+}
+
 .tk-modal-dialog::backdrop {
-  background: rgba(22, 21, 20, 0.42);
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: tk-fade-in var(--t-mid) var(--ease-out);
+}
+
+html[data-surfaces="solid"] .tk-modal-dialog::backdrop {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .tk-modal-dialog::backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@keyframes tk-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tk-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Responsive breakpoints per design-direction.md */
@@ -729,8 +1189,8 @@ body,
 .tk-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .tk-project-card {
@@ -738,9 +1198,9 @@ body,
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--rule);
-  background: var(--paper-2);
+  border-radius: var(--r-row);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
 }
 
 .tk-project-card-header {
@@ -771,7 +1231,7 @@ body,
     position: absolute;
     inset: 0 0 0 200px;
     z-index: 25;
-    border-left: 1px solid var(--rule-strong);
+    border-left: 1px solid var(--line-2);
   }
   .tk-columns[data-nav-collapsed="true"] .tk-detail-pane {
     inset: 0 0 0 56px;
@@ -795,7 +1255,8 @@ body,
     inset: 0 auto 0 0;
     width: 240px;
     z-index: 35;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    border-right: 1px solid var(--line-2);
+    box-shadow: var(--pop-shadow);
   }
   .tk-detail-pane,
   .tk-columns[data-nav-collapsed="true"] .tk-detail-pane {
@@ -808,11 +1269,15 @@ body,
 /* ------------------------------------------------------------------ */
 
 .tk-visually-hidden {
-  position: absolute;
+  position: absolute !important;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -847,22 +1312,31 @@ body,
   align-items: center;
   gap: 8px;
   max-width: 420px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--rule-strong);
-  background: var(--paper-2);
-  color: var(--ink-2);
-  font: 500 12px var(--font-sans);
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-cap);
+  border: 1px solid var(--line-2);
+  background: var(--ctl-fill);
+  color: var(--text-2);
+  font: 500 var(--fs-12) var(--font-sans);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
+}
+
+button.tk-status-chip:hover {
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+button.tk-status-chip:active {
+  background: var(--ctl-press);
 }
 
 .tk-status-chip[data-tone="busy"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--ink);
+  border-color: var(--accent-line);
+  background: var(--accent-tint);
+  color: var(--text);
   cursor: default;
 }
 
@@ -891,26 +1365,42 @@ body,
   display: none;
 }
 
+.tk-more-menu[open] > summary {
+  background: var(--ctl-press);
+}
+
 .tk-more-popover {
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  min-width: 190px;
-  padding: 8px;
-  background: var(--paper);
-  border: 1px solid var(--rule-strong);
-  border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  gap: 4px;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--pop-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-panel);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--pop-shadow);
+}
+
+.tk-more-popover > .tk-btn {
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+}
+
+.tk-more-popover > .tk-btn:hover {
+  background: var(--ctl-hover);
 }
 
 /* Rows: what each thread is, at a glance */
 .tk-row-gist {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink);
   line-height: 1.4;
   display: -webkit-box;
@@ -924,10 +1414,10 @@ body,
   align-items: center;
   padding: 0 6px;
   min-height: 18px;
-  border-radius: 4px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
+  border-radius: var(--r-ctl);
+  background: var(--accent-tint);
+  color: var(--text);
+  font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -950,17 +1440,18 @@ body,
 .tk-chip {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 1px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--rule-strong);
-  color: var(--ink-2);
-  font-size: 12px;
+  border-radius: var(--r-cap);
+  border: 1px solid var(--line-2);
+  color: var(--text-2);
+  font-size: var(--fs-12);
   line-height: 1.5;
 }
 
 .tk-chip-small {
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 
 .tk-chip-quiet {
@@ -970,16 +1461,14 @@ body,
 
 .tk-ai-mark,
 .tk-auto-mark {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent);
+  font-size: var(--fs-11);
+  font-weight: 500;
+  color: var(--text-3);
 }
 
 .tk-card-btn {
-  border-radius: 6px;
-  border: 1px solid var(--rule);
+  border-radius: var(--r-row);
+  border: 1px solid var(--line);
   padding: 8px 10px;
 }
 
@@ -1003,45 +1492,61 @@ body,
 
 .tk-empty-line {
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .tk-this-tab {
-  padding: 10px 16px 0;
-  border-bottom: 1px solid var(--rule-strong);
-  background: var(--accent-soft);
+  margin: 6px 6px 0;
+  padding: 8px 6px 0;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-row);
+  background: var(--accent-tint);
 }
 
 .tk-this-tab .tk-row-btn {
   background: transparent;
 }
 
-/* Search / Ask toggle */
+/* Search / Ask toggle: a pill track with the chosen side raised on a thumb surface. */
 .tk-segmented {
   display: inline-flex;
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-cap);
+  background: var(--seg-track);
   flex-shrink: 0;
 }
 
 .tk-segmented > button {
   min-height: 32px;
-  padding: 4px 10px;
+  padding: 0 14px;
   border: 0;
-  background: var(--paper-2);
-  color: var(--ink-2);
-  font: 500 13px var(--font-sans);
-  cursor: pointer;
+  border-radius: var(--r-cap);
+  background: transparent;
+  color: var(--text-2);
+  font: 500 var(--fs-13) var(--font-sans);
+}
+
+.tk-segmented > button:hover {
+  color: var(--text);
+  background: var(--ctl-hover);
+}
+
+.tk-segmented > button:active {
+  background: var(--ctl-press);
 }
 
 .tk-segmented > button[aria-selected="true"] {
-  background: var(--accent);
-  color: #ffffff;
+  background: var(--seg-thumb);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--line-2);
 }
 
-[data-theme="dark"] .tk-segmented > button[aria-selected="true"] {
-  color: #16181A;
+.tk-segmented > button:disabled {
+  color: var(--text-disabled);
+  background: transparent;
 }
 
 .tk-ask {
@@ -1066,10 +1571,10 @@ body,
 }
 
 .tk-ask-answer {
-  padding: 14px 16px;
-  border-left: 2px solid var(--accent);
-  background: var(--paper-2);
-  border-radius: 0 6px 6px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  border-radius: var(--r-row);
   font-family: var(--font-serif);
   font-size: 15px;
   line-height: 1.55;
@@ -1092,19 +1597,20 @@ body,
   margin: 0 1px;
   border: 0;
   border-right: 2px solid var(--accent);
-  border-radius: 3px 0 0 3px;
-  background: var(--paper-3);
-  color: var(--ink-2);
-  font: 600 11px var(--font-mono);
+  border-radius: var(--r-ctl) 0 0 var(--r-ctl);
+  background: var(--surface-3);
+  color: var(--text-2);
+  font: 600 var(--fs-11) var(--font-mono);
   vertical-align: 1px;
 }
 
-.tk-cite {
-  cursor: pointer;
+.tk-cite:hover {
+  background: var(--accent-tint);
+  color: var(--text);
 }
 
-.tk-cite:hover {
-  background: var(--accent-soft);
+.tk-cite:active {
+  background: var(--ctl-press);
 }
 
 .tk-ask-sources ol {
@@ -1117,8 +1623,8 @@ body,
 }
 
 .tk-ask-source {
-  border: 1px solid var(--rule);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-row);
 }
 
 /* Detail: overview */
@@ -1138,7 +1644,7 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-3);
 }
 
@@ -1152,7 +1658,7 @@ body,
 
 .tk-overview-summary {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.6;
   color: var(--ink-2);
   max-width: 72ch;
@@ -1172,10 +1678,8 @@ body,
 
 .tk-overview-h4 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--ink-3);
 }
 
@@ -1189,7 +1693,7 @@ body,
 }
 
 .tk-produced-item {
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.5;
   color: var(--ink-2);
 }
@@ -1206,7 +1710,7 @@ body,
 .tk-ref {
   margin-left: 6px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
   white-space: nowrap;
@@ -1217,7 +1721,7 @@ body,
   grid-template-columns: max-content minmax(0, 1fr);
   gap: 4px 12px;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .tk-overview-dl dt {
@@ -1230,7 +1734,7 @@ body,
 }
 
 .tk-overview-line {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink-2);
   line-height: 1.5;
 }
@@ -1239,10 +1743,10 @@ body,
   display: inline-block;
   margin: 2px 6px 2px 0;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--r-ctl);
   background: var(--paper-2);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink);
 }
 
@@ -1252,15 +1756,15 @@ body,
   gap: 6px;
   padding: 10px 12px;
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: var(--paper-2);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .tk-cli-box code,
 .tk-code-line {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
   word-break: break-all;
 }
 
@@ -1278,7 +1782,7 @@ body,
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: var(--paper);
   color: var(--ink);
   text-align: left;
@@ -1292,16 +1796,16 @@ body,
 
 .tk-related-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .tk-related-meta {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-3);
 }
 
 .tk-related-gist {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink-2);
 }
 
@@ -1311,7 +1815,7 @@ body,
   gap: 8px;
   background: var(--paper-2);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   border: 1px solid var(--rule);
 }
 
@@ -1327,7 +1831,7 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-2);
 }
 
@@ -1335,7 +1839,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-2);
   min-width: 0;
 }
@@ -1366,30 +1870,28 @@ body,
   padding: 10px 12px;
   background: var(--paper-2);
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
 }
 
 .tk-message[data-role="user"] {
-  border-left: 2px solid var(--accent);
+  border-color: var(--accent-line);
 }
 
 .tk-message[data-role="tool"] {
-  opacity: 0.8;
+  color: var(--text-2);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 .tk-message-meta {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--ink-3);
   margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .tk-message-body {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--fs-13);
   overflow-wrap: anywhere;
 }
 
@@ -1398,7 +1900,7 @@ body,
   max-height: 46vh;
   overflow-y: auto;
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   padding: 6px;
 }
 
@@ -1408,7 +1910,7 @@ body,
   align-items: flex-start;
   padding: 8px 6px;
   border-bottom: 1px solid var(--rule);
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
 }
 
@@ -1418,7 +1920,7 @@ body,
 
 .tk-proposal[data-excluded="true"] {
   cursor: default;
-  opacity: 0.85;
+  color: var(--text-2);
 }
 
 .tk-proposal-title {
@@ -1429,7 +1931,7 @@ body,
 .tk-proposal-detail {
   display: block;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 /* Dialogs: settings & import */
@@ -1451,7 +1953,7 @@ body,
   margin-bottom: 10px;
   background: var(--paper-2);
   border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: var(--r-row);
 }
 
 .tk-settings-h3 {
@@ -1468,7 +1970,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-settings-note {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-3);
   line-height: 1.5;
 }
@@ -1476,7 +1978,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-settings-note code,
 .tk-folder-list code {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 
 /* Inline confirmation step (e.g. "Upgrade older summaries"). */
@@ -1487,7 +1989,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   padding: 10px 12px;
   margin-bottom: 10px;
   border: 1px solid var(--rule-strong);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: var(--paper-2);
 }
 
@@ -1497,10 +1999,10 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-settings-result {
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   border-left: 2px solid var(--accent);
   background: var(--accent-soft);
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink);
   overflow-wrap: anywhere;
   margin-bottom: 10px;
@@ -1516,7 +2018,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink);
   cursor: pointer;
 }
@@ -1527,7 +2029,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-toggle-hint {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-3);
 }
 
@@ -1540,7 +2042,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-matrix {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-12);
   margin-top: 6px;
 }
 
@@ -1562,7 +2064,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-2);
 }
 
@@ -1583,7 +2085,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-catchup-more > summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-13);
   margin: 4px 0;
 }
 
@@ -1601,10 +2103,10 @@ details.tk-settings-section > summary.tk-settings-h3 {
   grid-template-columns: minmax(96px, 140px) 1fr;
   gap: 2px 10px;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--fs-13);
   padding: 8px 10px;
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
 }
 
 .tk-sync-list li[data-status="error"] .tk-sync-status {
@@ -1632,14 +2134,14 @@ details.tk-settings-section > summary.tk-settings-h3 {
   margin-top: 12px;
   padding: 12px 14px;
   border: 1px solid var(--rule-strong);
-  border-radius: 8px;
+  border-radius: var(--r-row);
   background: var(--paper-2);
 }
 
 .tk-brief-h {
   margin: 0 0 4px;
   font-family: var(--font-serif);
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 600;
   line-height: 1.35;
 }
@@ -1652,29 +2154,27 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-brief-ws-h {
   margin: 0 0 2px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 
 .tk-brief-where {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--ink-2);
   line-height: 1.5;
 }
 
 .tk-brief-label {
   margin: 6px 0 2px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: var(--fs-11);
   color: var(--ink-3);
 }
 
 .tk-brief ul {
   margin: 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.5;
   color: var(--ink);
 }
@@ -1684,7 +2184,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 @media (max-width: 480px) {
@@ -1708,7 +2208,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-workbench[data-surface="sidepanel"] .tk-h1 {
-  font-size: 20px;
+  font-size: var(--fs-20);
 }
 
 .tk-workbench[data-surface="sidepanel"] .tk-search-bar {
@@ -1754,7 +2254,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 /* Stale-build banner and diagnostics */
@@ -1766,7 +2266,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   padding: 10px 14px;
   border: 1px solid var(--rule-strong);
   border-left: 3px solid var(--warn);
-  border-radius: 8px;
+  border-radius: var(--r-row);
   background: var(--paper-2);
 }
 
@@ -1795,7 +2295,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-diag-status {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: var(--accent-soft);
   color: var(--ink);
 }
@@ -1931,7 +2431,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   margin: 0;
   padding-left: 18px;
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 @media (max-width: 640px) {
@@ -1983,18 +2483,27 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-row-item:hover {
-  background: var(--paper-2);
+  background: var(--surface-2);
 }
 
+.tk-row-item:active {
+  background: var(--ctl-press);
+}
+
+/* Checked for a bulk action: a quiet tint; the checkbox carries the state. */
 .tk-row-item[data-checked="true"] {
-  background: var(--accent-soft);
+  background: var(--ctl-press);
+  border-color: var(--line-2);
 }
 
+/* Open in the detail pane: the accent tint inside an accent hairline, never a coloured stripe. */
 .tk-row-item:has(> .tk-row-btn[aria-selected="true"]) {
-  background: var(--paper-3);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
 }
 
+.tk-row-item > .tk-row-btn,
+.tk-row-item > .tk-row-btn:hover,
 .tk-row-item > .tk-row-btn[aria-selected="true"] {
   background: transparent;
   box-shadow: none;
@@ -2030,9 +2539,9 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-card-item {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surface);
 }
 
 .tk-card-item > .tk-card-btn {
@@ -2043,16 +2552,18 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-card-item:hover {
-  background: var(--paper-2);
+  background: var(--surface-3);
+  border-color: var(--line-2);
 }
 
 .tk-card-item[data-checked="true"] {
-  background: var(--accent-soft);
+  background: var(--ctl-press);
+  border-color: var(--line-2);
 }
 
 .tk-card-item:has(> .tk-card-btn[aria-selected="true"]) {
-  background: var(--paper-3);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
 }
 
 .tk-card-item > .tk-card-btn[aria-selected="true"] {
@@ -2077,7 +2588,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--rule);
   flex-shrink: 0;
 }
@@ -2095,7 +2606,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-bulk-count {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   color: var(--ink);
 }
@@ -2123,7 +2634,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-bulk-result {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
@@ -2142,7 +2653,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   align-items: center;
   gap: 8px;
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: var(--ink);
 }
 
@@ -2154,7 +2665,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   width: 8px;
   height: 8px;
   flex: none;
-  border-radius: 999px;
+  border-radius: var(--r-cap);
   border: 1px solid var(--ink-4);
   background: transparent;
 }
@@ -2172,7 +2683,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
   padding: 10px 12px;
   border: 1px solid var(--rule-strong);
   border-left: 2px solid var(--warn);
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: var(--paper-2);
 }
 
@@ -2187,7 +2698,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-dock-framed {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
   background: var(--paper-2);
 }
 
@@ -2197,9 +2708,9 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-dock-id {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--r-ctl);
   background: var(--paper-2);
   border: 1px solid var(--rule);
   user-select: all;
@@ -2231,7 +2742,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 
 .tk-dock-blocked code {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 .tk-in-still {
@@ -2247,12 +2758,12 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-send-results {
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 .tk-ask-send {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .tk-send-still-target {
@@ -2272,10 +2783,8 @@ details.tk-settings-section > summary.tk-settings-h3 {
 }
 
 .tk-capture-legend {
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--ink-3);
   margin-bottom: 6px;
 }
@@ -2316,7 +2825,7 @@ details.tk-settings-section > summary.tk-settings-h3 {
 .tk-capture-site-origin {
   flex: 1 1 200px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--ink);
   overflow-wrap: anywhere;
 }

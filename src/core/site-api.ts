@@ -1,4 +1,5 @@
 import type { UpsertThreadInput } from './db.js';
+import type { IdentitySource } from './accounts/identity.js';
 
 /**
  * Parsers for the conversation data ChatGPT and Claude send to their own web apps.
@@ -356,6 +357,42 @@ export function parseSiteDataMessage(data: unknown): SiteDataMessage | null {
   if ((provider !== 'chatgpt' && provider !== 'claude') || typeof id !== 'string' || !SAFE_ID.test(id)) return null;
   if (rec(m.json) === null) return null;
   return { source: SITE_DATA_MESSAGE_SOURCE, provider, conversationId: id.toLowerCase(), json: m.json };
+}
+
+// ---------------------------------------------------------------------------
+// Page-world → content-script message: who is signed in
+// ---------------------------------------------------------------------------
+
+export const IDENTITY_MESSAGE_SOURCE = 'threadkeeper-identity';
+
+/** Identity responses larger than this are not read: an account or session document is small. */
+export const MAX_IDENTITY_BODY_CHARS = 64 * 1024;
+
+/** Every IdentitySource; a Record so a new source fails the type check until it is listed. */
+const IDENTITY_SOURCES: Record<IdentitySource, true> = {
+  chatgpt_session: true,
+  claude_account: true,
+  cursor_me: true,
+};
+
+export function isIdentitySource(value: unknown): value is IdentitySource {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(IDENTITY_SOURCES, value);
+}
+
+export interface IdentityMessage {
+  source: typeof IDENTITY_MESSAGE_SOURCE;
+  kind: IdentitySource;
+  /** The response body as text, as the page received it. Parsed by the content script. */
+  body: string;
+}
+
+/** Validate a window message from the page-world identity observer. Anything else is ignored. */
+export function parseIdentityMessage(data: unknown): IdentityMessage | null {
+  const m = rec(data);
+  if (!m || m.source !== IDENTITY_MESSAGE_SOURCE) return null;
+  if (!isIdentitySource(m.kind)) return null;
+  if (typeof m.body !== 'string' || m.body.length === 0 || m.body.length > MAX_IDENTITY_BODY_CHARS) return null;
+  return { source: IDENTITY_MESSAGE_SOURCE, kind: m.kind, body: m.body };
 }
 
 // ---------------------------------------------------------------------------

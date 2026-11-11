@@ -10,26 +10,58 @@ import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv } from '../core/sync-env.js
 import { EMPTY_SYNC_STATE, clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
 import { siteConversationTitle, type SiteConversation } from '../core/site-api.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
-import { DOCK_COMMAND_TYPES, captureSenderUrl, validateDockPageSender, validateRuntimeMessageSender } from '../core/messaging.js';
+import {
+  DOCK_COMMAND_TYPES,
+  captureSenderUrl,
+  embeddedFrameUrl,
+  validateDockPageSender,
+  validateRuntimeMessageSender,
+  type EmbedSenderContext,
+} from '../core/messaging.js';
 import { DockService } from '../core/dock/external.js';
 import { requestThreadEnrichment } from '../core/cloud-client.js';
 import {
   PROVIDERS,
   detectProviderFromUrl,
+  extractConversationIdFromUrl,
   isCapturePageUrl,
   isCaptureProviderId,
   isProviderAllowedOnUrl,
   isProviderId,
   type CaptureProviderId,
+  type ProviderId,
 } from '../core/providers.js';
-import { EXPLICIT_GRANT_MS, decideCapture, newGrantToken, type ExplicitGrant } from '../core/capture-gate.js';
+import { EXPLICIT_GRANT_MS, decideCapture, newGrantToken, sanitizeCodingFields, type ExplicitGrant } from '../core/capture-gate.js';
 import {
   CONTENT_SCRIPT_FILE,
   chromeCaptureScriptEnv,
   matchCustomSite,
   readCustomSites,
   reconcileCaptureScripts,
+  type CustomSitesState,
 } from '../core/custom-sites.js';
+import { createAccountService } from '../core/accounts/service.js';
+import { chromeAccountsEnv } from '../core/accounts/chrome-env.js';
+import type { AccountService, CaptureAccount } from '../core/accounts/contract.js';
+import { realmForProvider } from '../core/workspace/realms.js';
+import {
+  EMBED_FRAME_EVENT_TYPES,
+  WORKSPACE_COMMAND_TYPES,
+  isAgentState,
+  threadAccountId,
+  type AgentState,
+  type WorkspaceBroadcast,
+} from '../core/workspace/types.js';
+import {
+  WorkspaceTabs,
+  decideNewTabAdoption,
+  handleWorkspaceCommand,
+  isManagerTabUrl,
+  sanitizeIdentity,
+} from '../core/embed/workspace-tabs.js';
+import type { EmbedRule, SessionRulesApi } from '../core/embed/rules.js';
+import { bridgeGetCookies, bridgeSetCookie, chromeCookiesApi } from '../core/embed/cookie-bridge.js';
+import { chromeHelperEnv, helperOpen, helperPing } from '../core/embed/helper.js';
 import {
   nextDueAnalysisAt,
   processThreadLocally,
@@ -60,6 +92,60 @@ const DOCK_PAIR_ALARM = 'tk-dock-pair';
 
 let organizeCtxCache: { ctx: OrganizeContext; at: number } | null = null;
 let analysisRun: Promise<unknown> | null = null;
+
+// ---- Accounts --------------------------------------------------------------------------------
+
+let accountService: AccountService | null = null;
+let accountServiceWarned = false;
+
+/**
+ * The one account service. Created on first use (not at import, so this module still loads
+ * under tests and in a browser without the cookies API); null when it cannot start.
+ */
+function accounts(): AccountService | null {
+  if (accountService) return accountService;
+  try {
+    accountService = createAccountService(db, chromeAccountsEnv());
+  } catch {
+    if (!accountServiceWarned) console.warn('[threadkeeper] account service unavailable');
+    accountServiceWarned = true;
+    return null;
+  }
+  return accountService;
+}
+
+/**
+ * The account a capture of `provider` is filed under right now: the realm's active account,
+ * which keeps settings.boundAccounts' id while it is the primary one. Providers without a login
+ * realm (imports, Paperclip, added sites) and any failure fall back to `bound`.
+ */
+async function resolveCaptureAccount(provider: ProviderId, bound: { accountId: string; workspaceId: string }): Promise<CaptureAccount> {
+  const fallback: CaptureAccount = { accountId: bound.accountId, workspaceId: bound.workspaceId, account: null };
+  if (!realmForProvider(provider)) return fallback;
+  const svc = accounts();
+  if (!svc) return fallback;
+  try {
+    return await svc.resolveForCapture(provider, bound);
+  } catch {
+    return fallback;
+  }
+}
+
+// A switch interrupted when the worker stopped is finished before anything reads the cookies.
+if (typeof chrome !== 'undefined' && typeof chrome.cookies?.getAll === 'function') {
+  void Promise.resolve()
+    .then(() => accounts()?.recover())
+    .catch(() => console.warn('[threadkeeper] account switch recovery failed'));
+}
+
+/** Tell extension pages (the workspace) about accounts and embedded pages. */
+function broadcastWorkspace(message: WorkspaceBroadcast): void {
+  try {
+    void chrome.runtime.sendMessage(message).catch(() => undefined);
+  } catch {
+    // no listeners open
+  }
+}
 
 async function getOrganizeContext(settings: SettingsRecord): Promise<OrganizeContext> {
   if (organizeCtxCache && Date.now() - organizeCtxCache.at < 60_000) return organizeCtxCache.ctx;
@@ -231,7 +317,8 @@ async function schedulePaperclipAlarm(settings?: SettingsRecord): Promise<void> 
 async function storeSyncedConversation(conv: SiteConversation): Promise<'stored' | 'skipped'> {
   const settings = await ensureStarterCollectionsAndSettings(db);
   if (!settings.authorizedHosts[conv.provider]) return 'skipped';
-  const bound = settings.boundAccounts[conv.provider];
+  // Catch up reads the site with the browser's current sign-in: the realm's active account.
+  const bound = await resolveCaptureAccount(conv.provider, settings.boundAccounts[conv.provider]);
   const threadKey = buildThreadKey({
     provider: conv.provider,
     accountId: bound.accountId,
@@ -264,6 +351,10 @@ const syncOrchestrator = new HistorySyncOrchestrator(
   createChromeSyncEnv(db, {
     loadSettings: () => ensureStarterCollectionsAndSettings(db),
     storeConversation: storeSyncedConversation,
+    resolveAccount: async (provider, bound) => {
+      const resolved = await resolveCaptureAccount(provider, bound);
+      return { accountId: resolved.accountId, workspaceId: resolved.workspaceId };
+    },
   })
 );
 
@@ -294,15 +385,29 @@ async function currentSyncState(): Promise<SyncState> {
   return EMPTY_SYNC_STATE;
 }
 
+async function focusWindow(windowId: number | undefined): Promise<void> {
+  if (typeof windowId !== 'number' || !chrome.windows?.update) return;
+  try {
+    await chrome.windows.update(windowId, { focused: true });
+  } catch {
+    // window closed meanwhile
+  }
+}
+
 async function openManagerTab(query?: Record<string, string>): Promise<number | undefined> {
+  const hasQuery = Boolean(query && Object.keys(query).length > 0);
   const params = new URLSearchParams({ surface: 'page', ...(query ?? {}) });
   const targetUrl = chrome.runtime.getURL(`manager.html?${params.toString()}`);
   const existingTabs = await chrome.tabs.query({ url: `${chrome.runtime.getURL('manager.html')}*` });
-  if (existingTabs.length > 0 && existingTabs[0].id !== undefined) {
-    await chrome.tabs.update(existingTabs[0].id, { active: true, ...(query ? { url: targetUrl } : {}) });
-    return existingTabs[0].id;
+  const existing = existingTabs[0];
+  if (existing && existing.id !== undefined) {
+    // Changing the address reloads the page and with it every embedded site: only for a query.
+    const updated = await chrome.tabs.update(existing.id, { active: true, ...(hasQuery ? { url: targetUrl } : {}) });
+    await focusWindow(updated?.windowId ?? existing.windowId);
+    return existing.id;
   }
   const created = await chrome.tabs.create({ url: targetUrl });
+  await focusWindow(created.windowId);
   return created.id;
 }
 const securityRejectionLog: Array<{ timestamp: string; reason: string }> = [];
@@ -422,7 +527,8 @@ async function injectIntoOpenTabs(patterns: string[]): Promise<void> {
     const tabs = await chrome.tabs.query({ url: patterns });
     for (const tab of tabs) {
       if (typeof tab.id !== 'number') continue;
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] }).catch(() => undefined);
+      // Every frame: the registered scripts run in all frames too (allFrames in custom-sites.ts).
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: [CONTENT_SCRIPT_FILE] }).catch(() => undefined);
     }
   } catch {
     // no access to those tabs yet
@@ -470,7 +576,8 @@ async function captureTabNow(requestedTabId?: number): Promise<CaptureTabResult>
       resolve({ ok: false, error: 'No conversation was found on this tab. Open the chat itself, wait for the reply to finish, then try again.' });
     }, 10_000);
   });
-  const ask = () => chrome.tabs.sendMessage(tabId, { type: 'TK_CAPTURE_NOW', explicitToken: token });
+  // Top frame only: content scripts also run in the page's own iframes.
+  const ask = () => chrome.tabs.sendMessage(tabId, { type: 'TK_CAPTURE_NOW', explicitToken: token }, { frameId: 0 });
   try {
     await ask();
   } catch {
@@ -560,10 +667,234 @@ async function deleteTabHandshake(tabId: number): Promise<void> {
   }
 }
 
+// ---- Workspace: manager tabs that embed provider pages ----------------------------------------
+
+const MANAGER_URL = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('manager.html') : '';
+
+function chromeSessionRules(): SessionRulesApi | null {
+  if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateSessionRules) return null;
+  return {
+    getSessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
+    // The enums in @types/chrome are the same strings EmbedRule spells out.
+    updateSessionRules: (options: { removeRuleIds?: number[]; addRules?: EmbedRule[] }) =>
+      chrome.declarativeNetRequest.updateSessionRules(options as unknown as chrome.declarativeNetRequest.UpdateRuleOptions),
+  };
+}
+
+const workspaceTabs = new WorkspaceTabs({
+  store: typeof chrome !== 'undefined' && chrome.storage?.session ? chrome.storage.session : null,
+  rules: chromeSessionRules(),
+  tabUrl: async (tabId) => {
+    try {
+      return (await chrome.tabs.get(tabId)).url ?? null;
+    } catch {
+      return null;
+    }
+  },
+  managerUrl: MANAGER_URL,
+});
+
+// A restarted worker checks that the tabs it remembers are still workspace pages.
+if (typeof chrome !== 'undefined' && typeof chrome.tabs?.get === 'function') {
+  void workspaceTabs.prune();
+}
+
+/** What the sender checks need to recognise a page embedded in a workspace tab. */
+async function embedContext(): Promise<EmbedSenderContext & { sites: CustomSitesState }> {
+  await workspaceTabs.ready();
+  const sites = await readCustomSites(chrome.storage?.local);
+  return {
+    extensionId: chrome.runtime.id,
+    isWorkspaceTab: (tabId) => workspaceTabs.has(tabId),
+    isAddedSiteUrl: (url) => matchCustomSite(sites, url) !== null,
+    sites,
+  };
+}
+
+// New windows opened by an embedded page: a provider page is taken back into the workspace as a
+// session tab; sign-in popups and everything else are left alone. The address of a new tab
+// arrives after onCreated, so the tab is watched for a few seconds.
+const ADOPTION_WAIT_MS = 5_000;
+const pendingAdoptions = new Map<number, { workspaceTabId: number; timer: ReturnType<typeof setTimeout> }>();
+
+function dropPendingAdoption(tabId: number): { workspaceTabId: number } | null {
+  const pending = pendingAdoptions.get(tabId);
+  if (!pending) return null;
+  clearTimeout(pending.timer);
+  pendingAdoptions.delete(tabId);
+  return pending;
+}
+
+async function considerAdoption(tabId: number, url: string | undefined): Promise<void> {
+  if (!pendingAdoptions.has(tabId)) return;
+  // The window type is not known yet; 'normal' only asks whether the address is worth checking.
+  if (decideNewTabAdoption({ openerIsWorkspace: true, url, windowType: 'normal' }) === 'wait') return;
+  const pending = dropPendingAdoption(tabId);
+  if (!pending || !url) return;
+  let windowType: string | undefined;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    windowType = (await chrome.windows.get(tab.windowId)).type;
+  } catch {
+    return;
+  }
+  if (decideNewTabAdoption({ openerIsWorkspace: true, url, windowType }) !== 'adopt') return;
+  await chrome.tabs.remove(tabId).catch(() => undefined);
+  await chrome.tabs.update(pending.workspaceTabId, { active: true }).catch(() => undefined);
+  broadcastWorkspace({ type: 'EMBED_OPEN_REQUEST', tabId: pending.workspaceTabId, url });
+}
+
+if (typeof chrome !== 'undefined' && chrome.tabs?.onCreated) {
+  chrome.tabs.onCreated.addListener((tab) => {
+    const opener = tab.openerTabId;
+    const tabId = tab.id;
+    if (typeof opener !== 'number' || typeof tabId !== 'number') return;
+    void (async () => {
+      await workspaceTabs.ready();
+      if (!workspaceTabs.has(opener)) return;
+      const timer = setTimeout(() => pendingAdoptions.delete(tabId), ADOPTION_WAIT_MS);
+      pendingAdoptions.set(tabId, { workspaceTabId: opener, timer });
+      // The address may have arrived while the remembered tabs were loading.
+      const current = await chrome.tabs.get(tabId).catch(() => tab);
+      await considerAdoption(tabId, current.url || current.pendingUrl);
+    })();
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.tabs?.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (pendingAdoptions.has(tabId)) void considerAdoption(tabId, tab.url || changeInfo.url);
+    if (changeInfo.url === undefined && changeInfo.status !== 'loading') return;
+    // A workspace tab that navigated away from manager.html loses its header rule at once.
+    void (async () => {
+      await workspaceTabs.ready();
+      if (workspaceTabs.has(tabId) && !isManagerTabUrl(tab.url, MANAGER_URL)) await workspaceTabs.forget(tabId);
+    })();
+  });
+}
+
+// Embedded coding-agent pages report what their controls show. Written at most once per thread
+// per AGENT_STATE_MIN_MS and only when it changed; the newest state inside the window is kept
+// and written when the window ends.
+const AGENT_STATE_MIN_MS = 5_000;
+const agentStateWrites = new Map<string, { at: number; pending?: AgentState; timer?: ReturnType<typeof setTimeout> }>();
+
+async function writeAgentState(threadKey: string, state: AgentState): Promise<void> {
+  const record = await db.conversations.get(threadKey);
+  if (!record || record.agentState === state) return;
+  await db.conversations.update(threadKey, { agentState: state, agentStateAt: new Date().toISOString() });
+  agentStateWrites.delete(threadKey);
+  agentStateWrites.set(threadKey, { at: Date.now() });
+  if (agentStateWrites.size > 500) agentStateWrites.delete(agentStateWrites.keys().next().value as string);
+  broadcastLibraryChanged(threadKey);
+}
+
+async function noteAgentState(frameUrl: string, state: AgentState): Promise<void> {
+  const provider = detectProviderFromUrl(frameUrl);
+  if (!provider || !isCaptureProviderId(provider) || !isProviderAllowedOnUrl(provider, frameUrl)) return;
+  const conversationId = extractConversationIdFromUrl(frameUrl);
+  if (!conversationId) return;
+  const settings = await ensureStarterCollectionsAndSettings(db);
+  const resolved = await resolveCaptureAccount(provider, settings.boundAccounts[provider]);
+  const threadKey = buildThreadKey({
+    provider,
+    accountId: resolved.accountId,
+    workspaceId: resolved.workspaceId,
+    sourceConversationId: conversationId,
+    branchId: 'main',
+  });
+  const last = agentStateWrites.get(threadKey);
+  const elapsed = last ? Date.now() - last.at : Infinity;
+  if (last && elapsed < AGENT_STATE_MIN_MS) {
+    last.pending = state;
+    last.timer ??= setTimeout(() => {
+      const entry = agentStateWrites.get(threadKey);
+      const next = entry?.pending;
+      if (entry) entry.timer = undefined;
+      if (entry && next) {
+        entry.pending = undefined;
+        void writeAgentState(threadKey, next).catch(() => undefined);
+      }
+    }, AGENT_STATE_MIN_MS - elapsed);
+    return;
+  }
+  await writeAgentState(threadKey, state);
+}
+
+/** EMBED_FRAME_EVENT_TYPES, after validateRuntimeMessageSender let the sender through. */
+async function handleEmbedEvent(
+  message: Record<string, unknown> & { type: string },
+  sender: chrome.runtime.MessageSender,
+  ctx: EmbedSenderContext
+): Promise<unknown> {
+  // ACCOUNT_IDENTITY may come from a provider's own tab; it reads no address below.
+  if (message.type === 'ACCOUNT_IDENTITY') {
+    const identity = sanitizeIdentity(message.identity);
+    if (identity === undefined || !isProviderId(message.provider)) return { ok: false, error: 'Identity not recognised.' };
+    const svc = accounts();
+    if (!svc) return { ok: true };
+    try {
+      const outcome = await svc.noteIdentity(message.provider, identity);
+      if (outcome && (outcome.reassigned || outcome.updated)) {
+        broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: outcome.realm, activeAccountId: outcome.activeAccountId, switched: false });
+      }
+    } catch {
+      // the next report tries again
+    }
+    // The page learns nothing about accounts from the answer.
+    return { ok: true };
+  }
+  // The address always comes from chrome's sender object, never from the message.
+  const frameUrl = embeddedFrameUrl(sender, ctx);
+  if (!frameUrl) return { ok: false, error: 'Not a page embedded in Threadkeeper.', code: 'not_allowed' };
+  switch (message.type) {
+    case 'EMBED_HELLO':
+      return { ok: true, frameId: sender.frameId, tabId: sender.tab?.id };
+    case 'EMBED_NAV':
+      // The workspace page receives the same message and reads sender.frameId itself.
+      return { ok: true };
+    case 'EMBED_AGENT_STATE':
+      if (!isAgentState(message.state)) return { ok: false, error: 'Unknown agent state.' };
+      await noteAgentState(frameUrl, message.state).catch(() => undefined);
+      return { ok: true };
+    case 'EMBED_COOKIES_GET':
+      return bridgeGetCookies(chromeCookiesApi(), frameUrl);
+    case 'EMBED_COOKIE_SET':
+      return bridgeSetCookie(chromeCookiesApi(), frameUrl, message.cookie, Date.now());
+    default:
+      return { ok: false, error: `Unknown ${message.type}`, code: 'not_allowed' };
+  }
+}
+
+/**
+ * What the library needs to offer "Switch account" when a thread belongs to another account of
+ * the provider's realm than the one signed in now.
+ */
+async function accountSwitchInfo(
+  provider: ProviderId,
+  bound: { accountId: string; workspaceId: string },
+  active: CaptureAccount,
+  threadAccount: unknown
+): Promise<{ realm: string | null; activeAccountId: string | null; switchToAccountId: string | null }> {
+  const realm = realmForProvider(provider);
+  const svc = accounts();
+  const base = { realm: realm?.id ?? null, activeAccountId: active.account?.id ?? null, switchToAccountId: null };
+  if (!realm || !svc || typeof threadAccount !== 'string') return base;
+  try {
+    const [info] = await svc.list([realm.id]);
+    const owner = info?.accounts.find((a) => threadAccountId(a, bound.accountId) === threadAccount);
+    return { ...base, activeAccountId: info?.activeAccountId ?? base.activeAccountId, switchToAccountId: owner?.id ?? null };
+  } catch {
+    return base;
+  }
+}
+
 if (typeof chrome !== 'undefined' && chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener((tabId) => {
     void deleteTabHandshake(tabId);
     explicitGrants.delete(tabId);
+    void workspaceTabs.forget(tabId);
+    dropPendingAdoption(tabId);
   });
 }
 
@@ -595,11 +926,12 @@ export async function invokeOverlayOnTab(
     // Opening Threadkeeper on a page counts as asking for it (except where capture is explicit-only).
     grantExplicitCapture(tabId, 'overlay', handshakeToken);
     try {
-      const resp = (await chrome.tabs.sendMessage(tabId, {
-        type: 'TOGGLE_THREADKEEPER_OVERLAY',
-        invocationSource,
-        handshakeToken,
-      })) as { state?: 'opened' | 'closed' } | undefined;
+      // Top frame only: content scripts also run in the page's own iframes.
+      const resp = (await chrome.tabs.sendMessage(
+        tabId,
+        { type: 'TOGGLE_THREADKEEPER_OVERLAY', invocationSource, handshakeToken },
+        { frameId: 0 }
+      )) as { state?: 'opened' | 'closed' } | undefined;
       if (resp?.state === 'closed') {
         await deleteTabHandshake(tabId);
       }
@@ -611,11 +943,11 @@ export async function invokeOverlayOnTab(
           target: { tabId },
           files: ['content-scripts/content.js'],
         });
-        const resp = (await chrome.tabs.sendMessage(tabId, {
-          type: 'TOGGLE_THREADKEEPER_OVERLAY',
-          invocationSource,
-          handshakeToken,
-        })) as { state?: 'opened' | 'closed' } | undefined;
+        const resp = (await chrome.tabs.sendMessage(
+          tabId,
+          { type: 'TOGGLE_THREADKEEPER_OVERLAY', invocationSource, handshakeToken },
+          { frameId: 0 }
+        )) as { state?: 'opened' | 'closed' } | undefined;
         if (resp?.state === 'closed') {
           await deleteTabHandshake(tabId);
         }
@@ -767,10 +1099,17 @@ if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void (async () => {
+      const type = typeof message?.type === 'string' ? message.type : '';
+      // Pages embedded in a workspace tab are recognised from the remembered tabs and added sites.
+      const embed =
+        EMBED_FRAME_EVENT_TYPES.has(type) || type === 'PASSIVE_DOM_CAPTURE' || type === 'GET_CAPTURE_SITE'
+          ? await embedContext()
+          : null;
       const validation = validateRuntimeMessageSender(
         message,
         sender,
-        chrome.runtime.id
+        chrome.runtime.id,
+        embed ?? undefined
       );
       if (!validation.allowed) {
         securityRejectionLog.push({
@@ -781,21 +1120,41 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
 
+      // Workspace commands: the sender is Threadkeeper's manager page as a top-level tab.
+      if (WORKSPACE_COMMAND_TYPES.has(type) && typeof sender.tab?.id === 'number') {
+        sendResponse(
+          await handleWorkspaceCommand(message, sender.tab.id, {
+            accounts: accounts(),
+            tabs: workspaceTabs,
+            helperPing: () => helperPing(chromeHelperEnv()),
+            helperOpen: (account, url) => helperOpen(chromeHelperEnv(), account, url),
+            broadcast: broadcastWorkspace,
+          })
+        );
+        return;
+      }
+
+      if (EMBED_FRAME_EVENT_TYPES.has(type) && embed) {
+        sendResponse(await handleEmbedEvent(message, sender, embed));
+        return;
+      }
+
       if (message.type === 'GET_CAPTURE_AUTH_STATE') {
         const settings = await ensureStarterCollectionsAndSettings(db);
         const provider = message.provider as CaptureProviderId;
         const authorized = Boolean(settings.authorizedHosts[provider]);
+        const bound = isProviderId(provider) ? await resolveCaptureAccount(provider, settings.boundAccounts[provider]) : undefined;
         sendResponse({
           ok: true,
           authorized,
-          boundAccount: settings.boundAccounts[provider],
+          boundAccount: bound ? { accountId: bound.accountId, workspaceId: bound.workspaceId } : undefined,
         });
         return;
       }
 
       if (message.type === 'GET_CAPTURE_SITE') {
         // The content script on a page no provider owns asks whether the user added this site.
-        const pageUrl = captureSenderUrl(sender);
+        const pageUrl = captureSenderUrl(sender, embed);
         const site = pageUrl ? matchCustomSite(await readCustomSites(chrome.storage?.local), pageUrl) : null;
         sendResponse(site ? { ok: true, site: { origin: site.origin } } : { ok: false });
         return;
@@ -809,9 +1168,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           explicitToken: message.explicitToken,
           sender,
           authorizedHosts: settings.authorizedHosts,
-          sites: await readCustomSites(chrome.storage?.local),
+          sites: embed?.sites ?? (await readCustomSites(chrome.storage?.local)),
           grant: typeof tabId === 'number' ? explicitGrants.get(tabId) : null,
           now: Date.now(),
+          embed,
         });
         if (!decision.ok) {
           if (decision.error) {
@@ -830,7 +1190,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           return;
         }
         const provider = decision.provider;
-        const bound = settings.boundAccounts[provider];
+        // Filed under the account signed in to the provider's realm right now.
+        const bound = await resolveCaptureAccount(provider, settings.boundAccounts[provider]);
         const threadKey = buildThreadKey({
           provider,
           accountId: bound.accountId,
@@ -841,8 +1202,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         // A content script may only claim the two passive sources; "full" is the site's own
         // conversation data, and a DOM capture is never more than partial.
         const passiveSource = message.payload.captureSource === 'network_observer' ? 'network_observer' : 'dom_observer';
+        // Repository, pull request, branch and agent state reach the library only once validated.
+        const coding = sanitizeCodingFields(message.payload);
         const result = await upsertThread(db, {
           ...message.payload,
+          repository: coding.repository,
+          pullRequestUrl: coding.pullRequestUrl,
+          gitBranch: coding.gitBranch,
+          agentState: coding.agentState,
           sourceConversationId: decision.sourceConversationId,
           canonicalUrl: decision.canonicalUrl,
           captureSource: passiveSource,
@@ -873,7 +1240,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (result.status === 'stored') {
           // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
           await organizeStoredThread(threadKey, settings);
-          if (typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
+          if (!decision.embedded && typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
             syncOrchestrator.noteCapture(sender.tab.id, message.payload.sourceConversationId, message.payload.messages.length);
           }
         }
@@ -951,8 +1318,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         message.type === 'GET_HISTORY_SYNC_STATE'
       ) {
         // Catch up opens tabs and reads signed-in sessions: only the library's own pages may start it,
-        // never an overlay frame inside a website.
-        if (typeof sender.tab?.id === 'number' && !(sender.tab.url ?? '').startsWith('chrome-extension://')) {
+        // never an overlay frame inside a website (nor one inside a page embedded in the workspace).
+        if (
+          typeof sender.tab?.id === 'number' &&
+          (!(sender.tab.url ?? '').startsWith('chrome-extension://') || (typeof sender.frameId === 'number' && sender.frameId !== 0))
+        ) {
           sendResponse({ ok: false, error: 'Open the side panel or the full library to run Catch up.' });
           return;
         }
@@ -1022,9 +1392,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
 
+      // A manager frame inside a website, or inside a page embedded in a workspace tab (whose tab
+      // URL is Threadkeeper's own): either way a page Threadkeeper does not control frames it.
       const isEmbeddedInHostTab =
         typeof sender.tab?.id === 'number' &&
-        !(sender.tab.url ?? '').startsWith('chrome-extension://');
+        (!(sender.tab.url ?? '').startsWith('chrome-extension://') || (typeof sender.frameId === 'number' && sender.frameId !== 0));
 
       const privilegedOverlayTypes = new Set([
         'OPEN_FULL_PAGE_MANAGER',
@@ -1078,20 +1450,26 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         const bound = isProviderId(requestedProvider)
           ? settings.boundAccounts[requestedProvider]
           : undefined;
+        // Compare the thread's account with the one signed in to the realm now, not the bound one.
+        const active = bound && isProviderId(requestedProvider) ? await resolveCaptureAccount(requestedProvider, bound) : undefined;
         if (
           bound &&
-          (bound.accountId !== message.expectedAccountId ||
-            bound.workspaceId !== message.expectedWorkspaceId) &&
+          active &&
+          isProviderId(requestedProvider) &&
+          (active.accountId !== message.expectedAccountId ||
+            active.workspaceId !== message.expectedWorkspaceId) &&
           !message.forceOpen
         ) {
           sendResponse({
             ok: false,
             status: 'account_mismatch',
-            boundAccount: bound,
+            boundAccount: { accountId: active.accountId, workspaceId: active.workspaceId },
             expectedAccount: {
               accountId: message.expectedAccountId,
               workspaceId: message.expectedWorkspaceId,
             },
+            // For "Switch account": the realm, who is signed in, and the account the thread belongs to.
+            ...(await accountSwitchInfo(requestedProvider, bound, active, message.expectedAccountId)),
           });
           return;
         }
@@ -1155,10 +1533,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           return;
         }
         try {
-          const closeResp = (await chrome.tabs.sendMessage(targetTabId, {
-            type: 'CLOSE_THREADKEEPER_OVERLAY',
-            handshakeToken: message.handshakeToken,
-          })) as { ok?: boolean; error?: string } | undefined;
+          const closeResp = (await chrome.tabs.sendMessage(
+            targetTabId,
+            { type: 'CLOSE_THREADKEEPER_OVERLAY', handshakeToken: message.handshakeToken },
+            { frameId: 0 }
+          )) as { ok?: boolean; error?: string } | undefined;
           if (!closeResp?.ok) {
             sendResponse({
               ok: false,

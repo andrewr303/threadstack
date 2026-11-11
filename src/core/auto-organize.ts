@@ -10,6 +10,8 @@ import {
 import { UNFILED_PROJECT, type ThreadkeeperDB } from './db.js';
 import { LOCAL_SPACE, cosine, nearestNeighbors, primarySpace } from './embeddings.js';
 import { normalizeTags } from './organization.js';
+import { providerCategory } from './providers.js';
+import { repositoryName } from './repository.js';
 import { GENERIC_NAME_TOKENS, findMatchingProject, normalizeName } from './project-match.js';
 
 export { findMatchingProject, normalizeName } from './project-match.js';
@@ -157,22 +159,25 @@ export function decideProject(
   const allowCreate = settings.autoOrganize.autoCreateProjects;
 
   // 1. The provider's own organization: ChatGPT/Claude Projects, CLI repository.
-  if (conv.providerProjectName?.trim()) {
-    const match = findMatchingProject(conv.providerProjectName, ctx.collections);
+  // A coding session whose page showed no project name still has the repository it worked in.
+  const providerProject =
+    conv.providerProjectName?.trim() || (conv.repository ? repositoryName(conv.repository) : '');
+  if (providerProject) {
+    const match = findMatchingProject(providerProject, ctx.collections);
     const label =
-      conv.provider === 'claude_code' || conv.provider === 'codex'
-        ? `repository "${conv.providerProjectName}"`
-        : `${conv.provider === 'chatgpt' ? 'ChatGPT' : conv.provider === 'paperclip' ? 'Paperclip' : 'Claude'} project "${conv.providerProjectName}"`;
+      providerCategory(conv.provider) === 'coding_agent'
+        ? `repository "${providerProject}"`
+        : `${conv.provider === 'chatgpt' ? 'ChatGPT' : conv.provider === 'paperclip' ? 'Paperclip' : 'Claude'} project "${providerProject}"`;
     if (match) {
       return { project: match.name, source: 'provider', confidence: 0.95, reason: `Matches ${label}` };
     }
     if (allowCreate) {
       return {
-        project: conv.providerProjectName.trim(),
+        project: providerProject,
         source: 'provider',
         confidence: 0.9,
         reason: `New project from ${label}`,
-        create: newCollection(conv.providerProjectName, 'provider', [], `Threads from ${label}`),
+        create: newCollection(providerProject, 'provider', [], `Threads from ${label}`),
       };
     }
   }

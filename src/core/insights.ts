@@ -1,8 +1,11 @@
-import { providerLabel } from './providers.js';
+import { providerCategory, providerLabel } from './providers.js';
+import { normalizePullRequestUrl, normalizeRepository, hasRepositoryOwner } from './repository.js';
+import { AGENT_STATE_LABELS, agentStateNeedsYou } from './workspace/types.js';
 import {
   THREAD_KINDS,
   getDisplayTitle,
   insightKeyFor,
+  type AgentRunFacts,
   type ArtifactKind,
   type ConversationRecord,
   type ExtensionSummaryOutput,
@@ -14,7 +17,7 @@ import {
 } from './schema.js';
 import { containsPromptInjectionAttempt } from '../../shared/cloud.js';
 
-export const LOCAL_ANALYZER_MODEL = 'local-heuristics-v2';
+export const LOCAL_ANALYZER_MODEL = 'local-heuristics-v3';
 
 const STOPWORDS = new Set(
   `a about above after again against all also am an and any are aren't as at be because been before being below
@@ -439,7 +442,7 @@ export function classifyKind(
   }
   const hasCode = messages.some((m) => m.hasCode && /```/.test(m.content));
   if (hasCode) scores.set('coding', (scores.get('coding') ?? 0) + 5);
-  if (conv.provider === 'claude_code' || conv.provider === 'codex') {
+  if (providerCategory(conv.provider) === 'coding_agent') {
     scores.set('coding', (scores.get('coding') ?? 0) + 8);
   }
   // A coding thread dominated by error talk is a debugging thread.
@@ -554,13 +557,249 @@ function extractOpenQuestions(messages: MessageRecord[]): ExtractedItem[] {
   return found.filter((f) => f.evidenceQuote.length >= 12);
 }
 
+// ---------------------------------------------------------------------------------------------
+// Coding-agent runs
+// ---------------------------------------------------------------------------------------------
+
+const MAX_FILES = 15;
+const MAX_COMMANDS = 8;
+const MAX_PULL_REQUESTS = 5;
+const EDIT_TOOL_RE = /^(?:edit|write|multiedit|notebookedit|apply_patch|applypatch|str_replace_editor|str_replace_based_edit_tool|create_file|edit_file|write_file)$/i;
+const SHELL_TOOL_RE = /^(?:bash|shell|sh|zsh|exec|exec_command|local_shell|run_command|run_terminal_cmd|terminal|powershell)$/i;
+const PATCH_FILE_RE = /^\*{3}\s*(?:Update|Add|Delete) File:\s*(.+?)\s*$/gm;
+const TEST_COMMAND_RE =
+  /\b(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?::\S+)?|vitest|jest|pytest|mocha|rspec|phpunit|go\s+test|cargo\s+(?:nextest|test)|swift\s+test|playwright\s+test|ctest|dotnet\s+test|mvn\s+test|gradle\s+test)\b/i;
+const FAILURE_RE =
+  /(?:\bexit(?:ed)?(?:\s+with)?(?:\s+(?:code|status))?[:\s]+[1-9]\d*|\bcommand not found\b|\bnpm ERR!|Traceback \(most recent call last\)|^fatal:|\bFAILED\b|^\s*FAIL\b|\b[1-9]\d* (?:tests? )?failed\b|\b[1-9]\d* failing\b|✗|✖)/im;
+const PASS_RE = /(?:\b\d+ (?:tests? )?passed\b|\ball tests? pass(?:ed)?\b|\btests? passed\b|\b\d+ passing\b|\bOK\b\s*$|✓)/im;
+const PERMISSION_RE =
+  /(?:permission (?:denied|required|prompt|request)|requires? (?:your )?(?:approval|permission)|waiting (?:for|on) (?:your )?(?:approval|permission)|approval (?:is )?required|needs? your approval|doesn'?t want to proceed|user (?:denied|rejected|declined)|denied by (?:the )?user|request(?:ed)? permission to)/i;
+const CI_WAIT_RE =
+  /(?:waiting (?:for|on) (?:ci|checks|the (?:pipeline|build|checks))|\bchecks? (?:are )?(?:still )?(?:pending|running|in progress)|\bci (?:is )?(?:still )?(?:running|pending))/i;
+const PR_URL_RE =
+  /https:\/\/(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)\/[^\s)>\]"'`]+?\/(?:pull|pulls|merge_requests|pull-requests)\/\d+/g;
+
+type AgentEvent =
+  | { kind: 'call'; name: string; detail: string }
+  | { kind: 'result'; text: string; error: boolean };
+
+/** Split tool messages into calls and results. CLI imports merge consecutive tool records into one message. */
+function toolEvents(content: string): AgentEvent[] {
+  const events: AgentEvent[] = [];
+  for (const line of content.split('\n')) {
+    const call = line.match(/^\[tool\]\s+([^:\s]+)(?::\s?(.*))?$/);
+    const result = line.match(/^\[tool (result|error)\]\s?(.*)$/);
+    if (call) {
+      events.push({ kind: 'call', name: call[1], detail: call[2] ?? '' });
+    } else if (result) {
+      events.push({ kind: 'result', text: result[2], error: result[1] === 'error' });
+    } else {
+      // Continuation of the previous record (patch bodies, multi-line output).
+      const prev = events[events.length - 1];
+      if (!prev) continue;
+      if (prev.kind === 'call') prev.detail += `\n${line}`;
+      else prev.text += `\n${line}`;
+    }
+  }
+  return events;
+}
+
+function clipLine(text: string, max: number): string {
+  const t = normalizeSpace(text);
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
+function cleanPath(raw: string): string | null {
+  const p = raw.trim().replace(/^["'`]|["'`]$/g, '');
+  if (!p || p.length > 200 || /[\n\r]/.test(p) || /\s{2,}/.test(p)) return null;
+  return p;
+}
+
+function pullRequestFromText(raw: string): string | null {
+  // GitLab writes merge requests as /group/project/-/merge_requests/N.
+  return normalizePullRequestUrl(raw.replace('/-/merge_requests/', '/merge_requests/'));
+}
+
+function repositoryFromPullRequest(url: string): string | null {
+  const m = url.match(/^https:\/\/[^/]+\/([^/]+)\/([^/]+)\//);
+  return m ? normalizeRepository(`${m[1]}/${m[2]}`) : null;
+}
+
+/** Open, or merged/closed when the words next to the link say so; never guessed otherwise. */
+function pullRequestState(text: string, at: number, length: number): AgentRunFacts['pullRequests'][number]['state'] {
+  const around = text.slice(Math.max(0, at - 80), at + length + 80);
+  if (/(?:to be|will be|can be|ready to|before|until|not|un|if)\s+(?:merged|closed)/i.test(around)) return 'unknown';
+  const m = around.match(/\b(merged|closed)\b/i);
+  return m ? (m[1].toLowerCase() as 'merged' | 'closed') : 'unknown';
+}
+
+function summarizeTestOutput(text: string, failed: boolean): string | null {
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const counts = /\b\d+ (?:tests? )?(?:passed|passing|failed|failing)\b/i;
+  const pick =
+    lines.find((l) => counts.test(l)) ?? lines.find((l) => (failed ? FAILURE_RE : PASS_RE).test(l)) ?? (failed ? lines[0] : undefined);
+  return pick ? clipLine(pick, 120) : null;
+}
+
+/**
+ * What a coding-agent run did, read from its tool calls ("[tool] Name: detail"), their results
+ * ("[tool result]" / "[tool error]") and the assistant's text. On-device and conservative: a fact
+ * that the transcript does not show stays null, empty or 'unknown'. Null for threads that are not
+ * agent runs (a chat thread with tool messages only counts when it shows real work).
+ */
+export function extractAgentFacts(
+  conv: Pick<ConversationRecord, 'provider'> &
+    Partial<Pick<ConversationRecord, 'repository' | 'gitBranch' | 'agentState' | 'pullRequestUrl'>>,
+  messages: MessageRecord[]
+): AgentRunFacts | null {
+  const sorted = [...messages].sort((a, b) => a.ordinal - b.ordinal);
+  const isAgentProvider = providerCategory(conv.provider) === 'coding_agent';
+  const hasToolMessages = sorted.some((m) => m.role === 'tool');
+  if (!isAgentProvider && !hasToolMessages) return null;
+
+  const files: string[] = [];
+  const addFile = (raw: string) => {
+    const p = cleanPath(raw);
+    if (p && !files.includes(p)) files.push(p);
+  };
+  const commands: Array<{ command: string; outcome: 'ok' | 'failed' | 'unknown'; isTest: boolean; output: string }> = [];
+  const pending: Array<{ command: (typeof commands)[number] | null }> = [];
+  const prs = new Map<string, AgentRunFacts['pullRequests'][number]['state']>();
+  let repository: string | null = null;
+  let remoteRepository: string | null = null;
+  let branch: string | null = null;
+
+  const scanText = (text: string) => {
+    for (const m of text.matchAll(PATCH_FILE_RE)) addFile(m[1]);
+    for (const m of text.matchAll(PR_URL_RE)) {
+      const url = pullRequestFromText(m[0]);
+      if (!url) continue;
+      const state = pullRequestState(text, m.index ?? 0, m[0].length);
+      const prev = prs.get(url);
+      prs.set(url, state !== 'unknown' || prev === undefined ? state : prev);
+    }
+    const clone = text.match(/\bgit\s+clone\s+(?:-\S+\s+)*(\S+)/);
+    const remote = text.match(/\bgit\s+remote\s+(?:add|set-url)\s+\S+\s+(\S+)/) ?? text.match(/^origin\s+(\S+)\s+\((?:fetch|push)\)/m);
+    for (const raw of [clone?.[1], remote?.[1]]) {
+      const repo = raw ? normalizeRepository(raw.replace(/^["']|["']$/g, '')) : null;
+      if (repo && hasRepositoryOwner(repo)) remoteRepository = repo;
+    }
+  };
+
+  for (const m of sorted) {
+    if (m.role === 'user' || m.role === 'system') continue;
+    scanText(m.content);
+    if (m.role !== 'tool') continue;
+    for (const ev of toolEvents(m.content)) {
+      if (ev.kind === 'call') {
+        if (EDIT_TOOL_RE.test(ev.name) && !/^\*{3}/m.test(ev.detail)) addFile(ev.detail.split('\n')[0]);
+        if (SHELL_TOOL_RE.test(ev.name) && ev.detail.trim()) {
+          const command = clipLine(ev.detail.split('\n')[0], 160);
+          const entry = { command, outcome: 'unknown' as const, isTest: TEST_COMMAND_RE.test(command), output: '' };
+          commands.push(entry);
+          pending.push({ command: entry });
+          const created = ev.detail.match(/\bgit\s+(?:checkout\s+-[bB]|switch\s+-[cC])\s+(\S+)/);
+          if (created) branch = created[1].replace(/^["']|["']$/g, '');
+        } else {
+          pending.push({ command: null });
+        }
+        if (pending.length > 12) pending.shift();
+      } else {
+        const target = pending.shift()?.command;
+        if (!target) continue;
+        target.output = ev.text;
+        target.outcome = ev.error || FAILURE_RE.test(ev.text) ? 'failed' : 'ok';
+      }
+    }
+  }
+
+  const prUrls = new Map<string, AgentRunFacts['pullRequests'][number]['state']>();
+  const recorded = normalizePullRequestUrl(conv.pullRequestUrl ?? null);
+  if (recorded) prUrls.set(recorded, prs.get(recorded) ?? 'unknown');
+  for (const [url, state] of prs) if (!prUrls.has(url)) prUrls.set(url, state);
+  const pullRequests = [...prUrls].slice(0, MAX_PULL_REQUESTS).map(([url, state]) => ({ url, state }));
+
+  repository =
+    normalizeRepository(conv.repository ?? null) ??
+    (pullRequests[0] ? repositoryFromPullRequest(pullRequests[0].url) : null) ??
+    remoteRepository;
+
+  const shown = commands.slice(-MAX_COMMANDS).map(({ command, outcome }) => ({ command, outcome }));
+  const lastTest = [...commands].reverse().find((c) => c.isTest);
+  const tests: AgentRunFacts['tests'] = !lastTest
+    ? { status: 'not_run', detail: null }
+    : lastTest.outcome === 'failed'
+      ? { status: 'failing', detail: summarizeTestOutput(lastTest.output, true) }
+      : lastTest.outcome === 'ok'
+        ? { status: 'passing', detail: summarizeTestOutput(lastTest.output, false) }
+        : { status: 'unknown', detail: null };
+
+  // Only what is still open: after the person's latest message, nothing has been answered yet.
+  const lastUserAt = sorted.reduce((at, m, i) => (m.role === 'user' ? i : at), -1);
+  const open = sorted.slice(lastUserAt + 1);
+  const openText = open.map((m) => m.content).join('\n');
+  const lastDialog = [...sorted].reverse().find((m) => m.role === 'user' || m.role === 'assistant');
+  const asksQuestion =
+    lastDialog?.role === 'assistant' && ASSISTANT_QUESTION_RE.test(stripCode(lastDialog.content).slice(-600)) && open.at(-1) === lastDialog;
+  const blockedOn: AgentRunFacts['blockedOn'] = PERMISSION_RE.test(openText)
+    ? 'permission'
+    : asksQuestion
+      ? 'input'
+      : CI_WAIT_RE.test(openText)
+        ? 'ci'
+        : 'none';
+
+  const observed = conv.agentState;
+  let runState: AgentRunFacts['runState'] = 'unknown';
+  if (observed === 'running') runState = 'running';
+  else if (observed === 'waiting_permission' || observed === 'waiting_answer') runState = 'awaiting_user';
+  else if (observed === 'failed') runState = 'errored';
+  else if (observed === 'turn_complete') runState = 'finished';
+  else if (blockedOn === 'permission' || blockedOn === 'input') runState = 'awaiting_user';
+  else if (sorted.at(-1)?.role === 'assistant') runState = 'finished';
+
+  const facts: AgentRunFacts = {
+    repository,
+    branch: conv.gitBranch?.trim() || branch,
+    pullRequests,
+    filesChanged: files.slice(0, MAX_FILES),
+    commandsRun: shown,
+    tests,
+    blockedOn,
+    runState,
+  };
+  if (!isAgentProvider && !facts.repository && !facts.branch && !facts.filesChanged.length && !facts.commandsRun.length && !facts.pullRequests.length) {
+    return null;
+  }
+  return facts;
+}
+
+/** Why the run needs the person, or null. Names what is waiting. */
+function agentNeedsYouReason(conv: Pick<ConversationRecord, 'provider' | 'agentState'>, agent: AgentRunFacts): string | null {
+  const who = providerLabel(conv.provider);
+  if (conv.agentState === 'waiting_permission') return `${who} is waiting for your approval`;
+  if (conv.agentState === 'waiting_answer') return `${who} is waiting on your answer`;
+  if (conv.agentState === 'failed') return `${who} run failed (${AGENT_STATE_LABELS.failed.toLowerCase()})`;
+  if (agentStateNeedsYou(conv.agentState)) return `${who} needs you`;
+  if (agent.blockedOn === 'permission') return `${who} is waiting for your approval`;
+  if (agent.blockedOn === 'input') return `${who} is waiting on your answer`;
+  return null;
+}
+
 function suggestStatus(
   conv: ConversationRecord,
   messages: MessageRecord[],
-  nowMs: number
+  nowMs: number,
+  agent: AgentRunFacts | null = null
 ): { status: WorkflowState | null; reason: string | null } {
   const dialog = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
-  if (dialog.length === 0) return { status: null, reason: null };
+  if (dialog.length === 0) {
+    const reason = agent ? agentNeedsYouReason(conv, agent) : null;
+    return reason ? { status: 'needs_review', reason } : { status: null, reason: null };
+  }
   const last = dialog[dialog.length - 1];
   const lastUser = [...dialog].reverse().find((m) => m.role === 'user');
   const updatedMs = Date.parse(conv.updatedAt ?? conv.lastCapturedAt ?? '');
@@ -575,8 +814,19 @@ function suggestStatus(
   if (ageDays > 30) {
     return { status: 'paused', reason: `No activity for ${Math.round(ageDays)} days` };
   }
+  if (agent) {
+    // A stale observation says nothing about now; the age rule above has already handled long silence.
+    const reason = agentNeedsYouReason(conv, agent);
+    if (reason) return { status: 'needs_review', reason };
+    if (agent.runState === 'finished' && agent.pullRequests.some((p) => p.state === 'open' || p.state === 'unknown')) {
+      return { status: 'needs_review', reason: 'Pull request is open for review' };
+    }
+  }
   if (last.role === 'assistant' && ASSISTANT_QUESTION_RE.test(stripCode(last.content).slice(-600))) {
     return { status: 'needs_review', reason: `${providerLabel(conv.provider)} is waiting on your answer` };
+  }
+  if (agent?.tests.status === 'failing') {
+    return { status: 'active', reason: 'Tests are failing and no later run fixed them' };
   }
   return { status: 'active', reason: last.role === 'user' ? 'Your last message has no reply yet' : 'Recently active' };
 }
@@ -654,7 +904,8 @@ export function analyzeThreadLocally(
     new Set([...tech.slice(0, 4), ...keyTerms.map((t) => t.replace(/\s+/g, '-'))])
   ).slice(0, 8);
   const kind = classifyKind(conv, displayTitle, sorted);
-  const status = suggestStatus(conv, sorted, nowMs);
+  const agentRun = extractAgentFacts(conv, sorted);
+  const status = suggestStatus(conv, sorted, nowMs, agentRun);
   const lastUserAsk = lastUser ? firstSentence(lastUser.content, 180) : null;
 
   const overviewParagraph = localOverview(conv, userMsgs, lastUser, lastAssistant, topics);
@@ -685,6 +936,7 @@ export function analyzeThreadLocally(
     suggestedProject: null,
     userTurns: userMsgs.length,
     hasCode: sorted.some((m) => m.hasCode && /```/.test(m.content)),
+    ...(agentRun ? { agentRun } : {}),
   };
 
   if (dialog.length === 0) {
@@ -790,7 +1042,12 @@ export function resolveInsight(
   local: ThreadInsight | undefined,
   ai: ThreadInsight | undefined
 ): ThreadInsight | null {
-  if (ai && ai.sourceRevision === conv.sourceRevision) return ai;
+  // The AI's reading of the run wins; the on-device facts fill in when it has none (an older
+  // analysis, or Claude judged the thread not to be an agent session).
+  const agentRun = ai?.agentRun ?? local?.agentRun;
+  if (ai && ai.sourceRevision === conv.sourceRevision) {
+    return agentRun && !ai.agentRun ? { ...ai, agentRun } : ai;
+  }
   if (ai && local) {
     return {
       ...ai,
@@ -798,6 +1055,7 @@ export function resolveInsight(
       suggestedStatus: local.suggestedStatus ?? ai.suggestedStatus,
       statusReason: local.statusReason ?? ai.statusReason,
       sourceRevision: local.sourceRevision,
+      ...(agentRun ? { agentRun } : {}),
     };
   }
   return ai ?? local ?? null;
