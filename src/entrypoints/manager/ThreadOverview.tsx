@@ -1,11 +1,28 @@
-import React from 'react';
+import React, { useId } from 'react';
+import type { RelatedReason } from '../../core/related.js';
 import type { ConversationRecord, ExtensionSummaryOutput, ThreadInsight } from '../../core/schema.js';
 import { getSmartTitle } from '../../core/insights.js';
 import { MODEL_OPTIONS } from '../../core/ai/claude.js';
-import { isOlderAnalysis } from '../../core/pipeline.js';
+import { isOlderAnalysis, needsAgentRunUpgrade } from '../../core/pipeline.js';
 import { providerLabel } from '../../core/providers.js';
 import { buildSummaryMarkdown, overviewParagraphs, producedItems } from '../../core/summary-markdown.js';
 import { KindLabel, PROJECT_SOURCE_LABELS, relativeTime } from './shared.js';
+import { AgentRunBlock, hasAgentRunContent } from './threads/AgentRun.js';
+import { useOptionalWorkspaceContext } from './workspace/context.js';
+
+/** The agent run, the related-thread reasons and their wording are for the full page; a component rendered without a workspace around it shows them too. */
+function useFullPage(): boolean {
+  const ws = useOptionalWorkspaceContext();
+  return !ws || ws.surface === 'page';
+}
+
+const RELATED_REASON_WORDS: Record<RelatedReason, string> = {
+  same_conversation: 'Same session, other account',
+  same_pull_request: 'Same pull request',
+  same_branch: 'Same branch',
+  same_repository: 'Same repository',
+  similar: 'Similar',
+};
 
 interface OverviewProps {
   conv: ConversationRecord;
@@ -42,6 +59,11 @@ export function ThreadOverview({ conv, insight, summary = null, canAnalyze, anal
   const produced = producedItems(insight);
   const languages = insight ? insight.languages.filter((l) => !insight.topics.includes(l)) : [];
   const analyzeLabel = analyzing ? 'Analyzing…' : !isAi ? 'Analyze with Claude' : stale ? 'Re-analyze' : 'Improve summary';
+  const fullPage = useFullPage();
+  // A coding session analysed before agent facts existed: only an explicit "Improve summary" adds them.
+  const upgradesRun = fullPage && needsAgentRunUpgrade(conv, insight);
+  const upgradeHintId = useId();
+  const runHeadingId = useId();
   return (
     <div className="tk-section tk-overview" data-evidence-location="overview">
       <div className="tk-overview-head">
@@ -59,16 +81,22 @@ export function ThreadOverview({ conv, insight, summary = null, canAnalyze, anal
           ) : (
             <span>Not analyzed yet</span>
           )}
-          {canAnalyze && conv.messageCount > 0 && (!isAi || stale || older) && (
+          {canAnalyze && conv.messageCount > 0 && (!isAi || stale || older || upgradesRun) && (
             <button
               type="button"
               className="tk-btn"
               disabled={analyzing}
               onClick={onAnalyze}
+              aria-describedby={upgradesRun ? upgradeHintId : undefined}
               title={older && !stale ? 'Re-analyze with the current, more detailed summary format' : undefined}
             >
               {analyzeLabel}
             </button>
+          )}
+          {canAnalyze && conv.messageCount > 0 && upgradesRun && (
+            <span className="tk-muted tk-thr-hint" id={upgradeHintId}>
+              Adds the run details: files changed, commands, tests and pull requests.
+            </span>
           )}
           {(insight || summary) && (
             <button
@@ -159,6 +187,7 @@ export function ThreadOverview({ conv, insight, summary = null, canAnalyze, anal
               <span className="tk-muted">Mentions</span> {insight.entities.join(', ')}
             </div>
           )}
+          {fullPage && hasAgentRunContent(insight.agentRun) && <AgentRunBlock run={insight.agentRun} headingId={runHeadingId} />}
         </>
       ) : (
         <p className="tk-muted">This thread has not been analyzed yet; it will be shortly.</p>
@@ -207,7 +236,10 @@ export function ThreadOverview({ conv, insight, summary = null, canAnalyze, anal
 
 export interface RelatedThread {
   conv: ConversationRecord;
+  /** Cosine similarity, or 0 when the thread is related by structure only. */
   similarity: number;
+  /** Why it is related (core/related.ts); absent means similar meaning. */
+  reason?: RelatedReason;
 }
 
 export function SemanticNeighbors({
@@ -219,20 +251,35 @@ export function SemanticNeighbors({
   insights: Map<string, ThreadInsight>;
   onSelect: (threadKey: string) => void;
 }) {
+  const fullPage = useFullPage();
   if (related.length === 0) return null;
   return (
     <div className="tk-related-list">
       <div className="tk-eyebrow" style={{ padding: 0 }}>
-        Similar threads
+        {fullPage ? 'Related threads' : 'Similar threads'}
       </div>
-      {related.map(({ conv, similarity }) => {
+      {related.map(({ conv, similarity, reason }) => {
         const insight = insights.get(conv.threadKey) ?? null;
+        // Full page: say why it is related first; only a similar thread has a percentage.
+        const word = RELATED_REASON_WORDS[reason ?? 'similar'];
+        const showPercent = !fullPage || !reason || reason === 'similar';
         return (
-          <button key={conv.threadKey} type="button" className="tk-related-item" onClick={() => onSelect(conv.threadKey)}>
+          <button
+            key={conv.threadKey}
+            type="button"
+            className="tk-related-item"
+            data-reason={fullPage ? reason ?? 'similar' : undefined}
+            onClick={() => onSelect(conv.threadKey)}
+          >
             <span className="tk-related-title">{getSmartTitle(conv, insight)}</span>
             <span className="tk-related-meta">
-              {providerLabel(conv.provider)} · {conv.project} · {relativeTime(conv.updatedAt)} ·{' '}
-              {Math.round(similarity * 100)}% similar
+              {fullPage && (
+                <>
+                  <span className="tk-thr-reason">{word}</span> ·{' '}
+                </>
+              )}
+              {providerLabel(conv.provider)} · {conv.project} · {relativeTime(conv.updatedAt)}
+              {showPercent && <> · {Math.round(similarity * 100)}% similar</>}
             </span>
             {insight?.gist && <span className="tk-related-gist">{insight.gist}</span>}
           </button>

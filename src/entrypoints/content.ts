@@ -1,11 +1,13 @@
 import {
   extractProviderProjectName,
+  extractRepositoryInfo,
   extractVisibleDomConversation,
   grokXConversationToExtraction,
   type CaptureSiteContext,
   type DomExtractionResult,
 } from '../core/dom-capture.js';
 import {
+  parseIdentityMessage,
   parseSiteConversation,
   parseSiteDataMessage,
   siteConversationTitle,
@@ -16,9 +18,28 @@ import { validateWindowPostMessage } from '../core/messaging.js';
 import { isSyncProviderId, type SyncEvent } from '../core/history-sync.js';
 import { runApiSync } from '../core/site-history.js';
 import { loadSidebarConversations } from '../core/sidebar-history.js';
-import { detectProviderFromUrl, extractConversationIdFromUrl, isXHostname } from '../core/providers.js';
+import {
+  detectProviderFromUrl,
+  extractConversationIdFromUrl,
+  isXHostname,
+  providerCategory,
+  type ProviderId,
+} from '../core/providers.js';
+import { frameMode, paneName } from '../core/embed/frame.js';
+import { agentStateOf, readAgentPage } from '../core/embed/agent-state.js';
+import { parseIdentity, providerForIdentitySource } from '../core/accounts/identity.js';
+import { realmForProvider, realmOwnsHost, switchableRealms } from '../core/workspace/realms.js';
+import type { AgentState, EmbedFrameEvent } from '../core/workspace/types.js';
 
 const OVERLAY_DIALOG_ID = 'threadkeeper-overlay-root';
+
+/**
+ * Content scripts run in every frame of the hosts they match. This one works in a top-level tab
+ * and in a page embedded directly in Threadkeeper's workspace; in any other frame it registers
+ * nothing (see the guard at the bottom).
+ */
+const FRAME_MODE = frameMode();
+const IN_WORKSPACE = FRAME_MODE === 'workspace';
 
 interface SavedHostState {
   scrollX: number;
@@ -424,6 +445,280 @@ function scheduleSiteDataCapture(): void {
   }, 300);
 }
 
+// ---- Coding-agent sessions: run state and repository ----------------------
+
+/** The run state a coding-agent page shows; null for every other kind of provider. */
+function agentStateFor(provider: ProviderId | null): AgentState | null {
+  if (!provider || providerCategory(provider) !== 'coding_agent') return null;
+  try {
+    return agentStateOf(readAgentPage(document));
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** Run state and repository facts to add to a capture: only the fields the page showed. */
+function sessionFacts(provider: ProviderId): Record<string, string> {
+  const facts: Record<string, string> = {};
+  const state = agentStateFor(provider);
+  if (state && state !== 'unknown') facts.agentState = state;
+  try {
+    const repo = extractRepositoryInfo(document, window.location.href);
+    if (repo.repository) facts.repository = repo.repository;
+    if (repo.pullRequestUrl) facts.pullRequestUrl = repo.pullRequestUrl;
+    if (repo.gitBranch) facts.gitBranch = repo.gitBranch;
+  } catch {
+    // a page the reader does not understand adds nothing
+  }
+  return facts;
+}
+
+// ---- Messages to the extension (best effort) ------------------------------
+
+/** Send without retrying: the worker may be asleep or the extension reloaded. Never throws. */
+function sendToExtension(message: EmbedFrameEvent, done?: (response: unknown) => void): void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  try {
+    chrome.runtime.sendMessage(message, (response: unknown) => {
+      const failed = chrome.runtime.lastError;
+      done?.(failed ? undefined : response);
+    });
+  } catch {
+    // extension context invalidated (reloaded); nothing to send to
+  }
+}
+
+// ---- Who is signed in -----------------------------------------------------
+
+const sentIdentityKeys = new Set<string>();
+
+/**
+ * Identity responses from the MAIN-world observer (site-data-main.ts). Any page script can post
+ * to the window, so the sender must be this window, the payload is fully re-validated, and the
+ * identity must belong to the sign-in this page is part of.
+ */
+function onIdentityWindowMessage(event: MessageEvent): void {
+  if (event.source !== window || event.origin !== window.location.origin) return;
+  const message = parseIdentityMessage(event.data);
+  if (!message) return;
+  const provider = providerForIdentitySource(message.kind);
+  const realm = realmForProvider(provider);
+  if (!realm || !realmOwnsHost(realm, window.location.hostname)) return;
+  let identity: ReturnType<typeof parseIdentity> = null;
+  try {
+    identity = parseIdentity(message.kind, JSON.parse(message.body));
+  } catch {
+    return;
+  }
+  if (!identity || typeof identity.key !== 'string' || !identity.key) return;
+  if (sentIdentityKeys.has(identity.key)) return;
+  sentIdentityKeys.add(identity.key);
+  sendToExtension({ type: 'ACCOUNT_IDENTITY', provider, identity });
+}
+
+/** Sign-in pages of the switchable realms: claude.ai/login, chatgpt.com/auth/login, x.com/i/flow/login. */
+const LOGIN_PATH = /^\/(?:auth\/)?(?:login|log-in|signin|sign-in)\/?$|^\/i\/flow\/login\/?$/i;
+let signedOutSent = false;
+
+/** On a plain sign-in page of a switchable realm, tell the extension nobody is signed in (once). */
+function checkSignedOut(): void {
+  if (signedOutSent || !LOGIN_PATH.test(window.location.pathname)) return;
+  const host = window.location.hostname;
+  const realm = switchableRealms().find((r) => realmOwnsHost(r, host));
+  if (!realm) return;
+  let login = false;
+  try {
+    login = readAgentPage(document).login;
+  } catch {
+    return;
+  }
+  if (!login) return;
+  signedOutSent = true;
+  const onPage = detectProviderFromUrl(window.location.href);
+  const provider = onPage && realm.providers.includes(onPage) ? onPage : realm.providers[0];
+  sendToExtension({ type: 'ACCOUNT_IDENTITY', provider, identity: null });
+}
+
+// ---- Page checks (throttled) ----------------------------------------------
+
+/** Reading controls forces layout, so the page is read at most this often. */
+const PAGE_CHECK_MS = 2000;
+let pageCheckTimer: ReturnType<typeof setTimeout> | null = null;
+let lastPageCheck = 0;
+
+function schedulePageCheck(): void {
+  if (pageCheckTimer) return;
+  const wait = Math.max(0, lastPageCheck + PAGE_CHECK_MS - Date.now());
+  pageCheckTimer = setTimeout(() => {
+    pageCheckTimer = null;
+    lastPageCheck = Date.now();
+    checkSignedOut();
+    if (IN_WORKSPACE) reportAgentState();
+  }, wait);
+}
+
+// ---- Embedded in the workspace --------------------------------------------
+
+/** The SessionTab id the workspace named this frame with, read once per document. */
+const EMBED_PANE = IN_WORKSPACE ? paneName() : null;
+/** This frame's id in the workspace tab, from the worker's answer to EMBED_HELLO. */
+let embedFrameId: number | null = null;
+
+interface NavigationLike extends EventTarget {
+  canGoBack?: boolean;
+  canGoForward?: boolean;
+  back?: () => { committed?: Promise<unknown>; finished?: Promise<unknown> };
+  forward?: () => { committed?: Promise<unknown>; finished?: Promise<unknown> };
+}
+
+function navigationApi(): NavigationLike | null {
+  const nav = (window as unknown as { navigation?: unknown }).navigation;
+  return typeof nav === 'object' && nav !== null ? (nav as NavigationLike) : null;
+}
+
+/**
+ * Commands meant for top-level pages reach every frame of a tab when the worker sends them to
+ * the whole tab. An embedded page acts on one only when the worker addressed this frame and
+ * said so (`frameId` in the message, as learned from EMBED_HELLO).
+ */
+const TOP_FRAME_COMMANDS: ReadonlySet<string> = new Set([
+  'TK_CAPTURE_NOW',
+  'TK_HISTORY_SYNC_RUN',
+  'TK_HISTORY_SYNC_CANCEL',
+  'TK_HISTORY_LIST_SIDEBAR',
+  'TK_CAPTURE_PROBE',
+]);
+
+function addressedToThisFrame(message: { frameId?: unknown }): boolean {
+  return FRAME_MODE === 'top' || (embedFrameId !== null && message.frameId === embedFrameId);
+}
+
+const HELLO_RETRY_MS = [2000, 10_000];
+
+function sendEmbedHello(attempt = 0): void {
+  sendToExtension(
+    { type: 'EMBED_HELLO', pane: EMBED_PANE, url: window.location.href, title: document.title },
+    (response) => {
+      const r = response as { ok?: unknown; frameId?: unknown } | undefined;
+      if (r?.ok === true && typeof r.frameId === 'number' && Number.isInteger(r.frameId) && r.frameId > 0) {
+        embedFrameId = r.frameId;
+        return;
+      }
+      const delay = HELLO_RETRY_MS[attempt];
+      if (delay !== undefined) setTimeout(() => sendEmbedHello(attempt + 1), delay);
+    }
+  );
+}
+
+let lastNavKey = '';
+let navTimer: ReturnType<typeof setTimeout> | null = null;
+
+function reportNav(): void {
+  const nav = navigationApi();
+  const message: EmbedFrameEvent = {
+    type: 'EMBED_NAV',
+    pane: EMBED_PANE,
+    url: window.location.href,
+    title: document.title,
+    canGoBack: nav?.canGoBack === true,
+    canGoForward: nav?.canGoForward === true,
+  };
+  const key = JSON.stringify([message.url, message.title, message.canGoBack, message.canGoForward]);
+  if (key === lastNavKey) return;
+  lastNavKey = key;
+  sendToExtension(message);
+}
+
+function scheduleNavReport(): void {
+  if (navTimer) return;
+  navTimer = setTimeout(() => {
+    navTimer = null;
+    reportNav();
+  }, 150);
+}
+
+let lastAgentState: AgentState = 'unknown';
+let lastAgentUrl = '';
+
+function reportAgentState(): void {
+  const url = window.location.href;
+  const state = agentStateFor(detectProviderFromUrl(url)) ?? 'unknown';
+  // A new address with the same state is news (another session); "still not observed" is not.
+  if (state === lastAgentState && (url === lastAgentUrl || state === 'unknown')) return;
+  lastAgentState = state;
+  lastAgentUrl = url;
+  sendToExtension({ type: 'EMBED_AGENT_STATE', pane: EMBED_PANE, url, state });
+}
+
+/** The title lives in <head>, which a document_start script may not have yet. */
+function observeTitle(): void {
+  const head = document.head;
+  if (!head) {
+    document.addEventListener('DOMContentLoaded', observeTitle, { once: true });
+    return;
+  }
+  new MutationObserver(scheduleNavReport).observe(head, { childList: true, subtree: true, characterData: true });
+}
+
+/** Settle a Navigation API result so a refused traversal does not surface as an unhandled rejection. */
+function settle(result: { committed?: Promise<unknown>; finished?: Promise<unknown> } | undefined): void {
+  result?.committed?.catch(() => undefined);
+  result?.finished?.catch(() => undefined);
+}
+
+/** back, forward, reload and navigate (https only) from the workspace page. */
+function runEmbedCommand(message: Record<string, unknown>): { ok: boolean; error?: string } {
+  const nav = navigationApi();
+  switch (message.command) {
+    case 'back':
+      if (nav && typeof nav.back === 'function') {
+        if (nav.canGoBack !== true) return { ok: false, error: 'no_history' };
+        settle(nav.back());
+      } else {
+        history.back();
+      }
+      return { ok: true };
+    case 'forward':
+      if (nav && typeof nav.forward === 'function') {
+        if (nav.canGoForward !== true) return { ok: false, error: 'no_history' };
+        settle(nav.forward());
+      } else {
+        history.forward();
+      }
+      return { ok: true };
+    case 'reload':
+      // After the answer is on its way: the document is about to go.
+      setTimeout(() => window.location.reload(), 0);
+      return { ok: true };
+    case 'navigate': {
+      if (typeof message.url !== 'string' || message.url.length > 4096) return { ok: false, error: 'bad_url' };
+      let target: URL;
+      try {
+        target = new URL(message.url);
+      } catch {
+        return { ok: false, error: 'bad_url' };
+      }
+      if (target.protocol !== 'https:') return { ok: false, error: 'bad_url' };
+      setTimeout(() => window.location.assign(target.href), 0);
+      return { ok: true };
+    }
+    default:
+      return { ok: false, error: 'unknown_command' };
+  }
+}
+
+function startEmbedBridge(): void {
+  sendEmbedHello();
+  reportNav();
+  observeTitle();
+  const nav = navigationApi();
+  // Same-document navigations (pushState, back) update the history flags without a new load.
+  nav?.addEventListener('currententrychange', scheduleNavReport);
+  window.addEventListener('popstate', scheduleNavReport);
+  window.addEventListener('hashchange', scheduleNavReport);
+  window.addEventListener('pageshow', scheduleNavReport);
+}
+
 // ---- DOM capture ----------------------------------------------------------
 
 /** The longest a burst of page changes may postpone a capture. A streaming reply or a ticking timer never lets the page go quiet. */
@@ -512,7 +807,10 @@ function schedulePassiveDomCapture(
     }
     staleRetries = 0;
 
-    const fingerprint = `${extracted.provider}:${extracted.sourceConversationId}:${extracted.branchId}:${extracted.title}:${extracted.providerProjectName ?? ''}:${extracted.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
+    const facts = sessionFacts(extracted.provider);
+    // A run that changes state, or a repository that appears, is worth a capture even when the
+    // messages did not change.
+    const fingerprint = `${extracted.provider}:${extracted.sourceConversationId}:${extracted.branchId}:${extracted.title}:${extracted.providerProjectName ?? ''}:${JSON.stringify(facts)}:${extracted.messages.map((m) => `${m.sourceMessageId}:${m.content.length}`).join('|')}`;
     if (!useExplicit && fingerprint === lastCapturedFingerprint) {
       noteCapture({ method: 'dom', outcome: 'unchanged', messages: extracted.messages.length });
       return;
@@ -546,6 +844,7 @@ function schedulePassiveDomCapture(
         messages: extracted.messages,
         providerProjectName: extracted.providerProjectName,
         modelSlug: extracted.modelSlug,
+        ...facts,
       },
       useExplicit,
       (resp) => {
@@ -665,26 +964,31 @@ function requestCaptureSite(): void {
 const ISOLATED_WORLD_GUARD = Symbol.for('threadkeeper.contentScriptInitialized');
 const isolatedGlobal = globalThis as unknown as Record<symbol, boolean>;
 
-if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
+// In any frame other than a top-level page or a page embedded directly in the workspace, do
+// nothing at all: no listeners, no observers, no messages.
+if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
   isolatedGlobal[ISOLATED_WORLD_GUARD] = true;
 
-  // Listen for postMessage from the extension iframe (strictly validated by origin + handshakeToken)
-  window.addEventListener('message', (event: MessageEvent) => {
-    if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) return;
-    const extOrigin = new URL(chrome.runtime.getURL('')).origin;
-    const check = validateWindowPostMessage(
-      event,
-      extOrigin,
-      activeHandshakeToken
-    );
-    if (!check.allowed) {
-      return;
-    }
-    const payload = event.data as { action?: string };
-    if (payload.action === 'CLOSE_OVERLAY') {
-      closeOverlayAndRestore();
-    }
-  });
+  // Listen for postMessage from the extension iframe (strictly validated by origin + handshakeToken).
+  // An embedded page never shows the in-page overlay, so it has nothing to listen for.
+  if (!IN_WORKSPACE) {
+    window.addEventListener('message', (event: MessageEvent) => {
+      if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) return;
+      const extOrigin = new URL(chrome.runtime.getURL('')).origin;
+      const check = validateWindowPostMessage(
+        event,
+        extOrigin,
+        activeHandshakeToken
+      );
+      if (!check.allowed) {
+        return;
+      }
+      const payload = event.data as { action?: string };
+      if (payload.action === 'CLOSE_OVERLAY') {
+        closeOverlayAndRestore();
+      }
+    });
+  }
 
   const onX = isXHostname(window.location.hostname);
   if (onX) {
@@ -692,10 +996,27 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
   } else {
     window.addEventListener('message', onSiteDataWindowMessage);
   }
+  window.addEventListener('message', onIdentityWindowMessage);
 
   // Listen for deliberate invocation from background service worker
   if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (IN_WORKSPACE && message && message.type === 'TK_EMBED_COMMAND') {
+        sendResponse(runEmbedCommand(message as Record<string, unknown>));
+        return true;
+      }
+      if (IN_WORKSPACE && message && (message.type === 'TOGGLE_THREADKEEPER_OVERLAY' || message.type === 'CLOSE_THREADKEEPER_OVERLAY')) {
+        // No overlay inside the workspace: the workspace is Threadkeeper already.
+        return false;
+      }
+      if (
+        message &&
+        typeof message.type === 'string' &&
+        TOP_FRAME_COMMANDS.has(message.type) &&
+        !addressedToThisFrame(message as { frameId?: unknown })
+      ) {
+        return false;
+      }
       if (
         message &&
         message.type === 'TOGGLE_THREADKEEPER_OVERLAY' &&
@@ -792,6 +1113,7 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
         return;
       }
       schedulePassiveDomCapture();
+      schedulePageCheck();
     });
     observer.observe(document.documentElement, {
       childList: true,
@@ -804,15 +1126,25 @@ if (!isolatedGlobal[ISOLATED_WORLD_GUARD]) {
     } else {
       schedulePassiveDomCapture();
     }
-
-    // A single-page app can change the conversation without a page load. The mutation observer
-    // usually notices, but a cheap URL check makes sure a switch is never missed.
-    let lastHref = window.location.href;
-    window.setInterval(() => {
-      if (window.location.href === lastHref) return;
-      lastHref = window.location.href;
-      staleRetries = 0;
-      schedulePassiveDomCapture();
-    }, 1500);
   }
+
+  if (IN_WORKSPACE) startEmbedBridge();
+  schedulePageCheck();
+
+  // A single-page app can change the conversation without a page load. The mutation observer
+  // usually notices, but a cheap URL check makes sure a switch is never missed. The same check
+  // keeps an embedded page's address current in the workspace, and looks again at a sign-in page
+  // (X has no DOM observer, and its sign-in form appears after the address).
+  let lastHref = window.location.href;
+  window.setInterval(() => {
+    if (IN_WORKSPACE) scheduleNavReport();
+    if (window.location.href === lastHref) {
+      if (!signedOutSent && LOGIN_PATH.test(window.location.pathname)) schedulePageCheck();
+      return;
+    }
+    lastHref = window.location.href;
+    staleRetries = 0;
+    if (!onX) schedulePassiveDomCapture();
+    schedulePageCheck();
+  }, 1500);
 }

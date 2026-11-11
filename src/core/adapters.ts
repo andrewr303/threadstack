@@ -12,6 +12,7 @@ import { buildSummaryMarkdown } from './summary-markdown.js';
 import type { UpsertThreadInput, ThreadkeeperDB } from './db.js';
 import { upsertThread } from './db.js';
 import { providerLabel } from './providers.js';
+import { normalizePullRequestUrl, normalizeRepository } from './repository.js';
 
 export type CapabilitySupport = 'Y' | 'P' | 'N';
 
@@ -536,6 +537,16 @@ export async function importPortableBundle(
       nextStepText: c.nextStepText,
       nextStepMsgIndex: c.nextStepMsgIndex,
       nextStepSpeaker: c.nextStepSpeaker,
+      providerProjectName: c.providerProjectName,
+      workspacePath: c.workspacePath,
+      gitBranch: c.gitBranch,
+      modelSlug: c.modelSlug,
+      resumeCommand: c.resumeCommand,
+      agentLabel: c.agentLabel,
+      linkedThreadKeys: c.linkedThreadKeys,
+      // A bundle is a file anyone can edit; keep only values that read as a repository or pull request.
+      repository: normalizeRepository(c.repository ?? null),
+      pullRequestUrl: normalizePullRequestUrl(c.pullRequestUrl ?? null),
       messages: entry.messages.map((m) => ({
         sourceMessageId: m.sourceMessageId,
         role: m.role,
@@ -592,6 +603,9 @@ export function exportThreadToMarkdown(
   }
   if (conv.workspacePath) {
     lines.push(`- **Workspace**: ${conv.workspacePath}${conv.gitBranch ? ` (branch ${conv.gitBranch})` : ''}`);
+  }
+  if (conv.repository) {
+    lines.push(`- **Repository**: ${conv.repository}`);
   }
   if (conv.resumeCommand) {
     lines.push(`- **Resume**: \`${conv.resumeCommand}\``);

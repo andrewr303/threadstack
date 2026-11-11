@@ -1,28 +1,28 @@
 :root {
-  --ink: #1B1A17;
-  --ink-2: #4A4741;
-  --ink-3: #6E6A62;
-  --rule: rgba(27, 26, 23, 0.12);
+  --ink: #1C1A17;
+  --ink-2: #46423C;
+  --ink-3: #625D55;
+  --rule: rgba(40, 32, 22, 0.12);
   --paper: #FBFAF7;
-  --paper-2: #F4F2ED;
+  --paper-2: #F3F0EA;
   --accent: #1F6F6B;
-  --accent-ink: #FFFFFF;
-  --warn: #8A5A12;
-  --warn-soft: rgba(138, 90, 18, 0.10);
-  --danger: #8C3A2E;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: ui-serif, Georgia, 'Times New Roman', serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+  --accent-ink: #FBFAF7;
+  --warn: #8A5D0E;
+  --warn-soft: rgba(138, 93, 14, 0.10);
+  --danger: #B5503F;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 [data-theme="dark"] {
-  --ink: #EDEAE3;
-  --ink-2: #C3BEB4;
-  --ink-3: #9A958B;
-  --rule: rgba(237, 234, 227, 0.14);
-  --paper: #16181A;
-  --paper-2: #1C1F21;
+  --ink: #EDE8DF;
+  --ink-2: #C6BFB3;
+  --ink-3: #A39B8F;
+  --rule: rgba(237, 232, 223, 0.14);
+  --paper: #1C1A17;
+  --paper-2: #24211E;
   --accent: #5FB8B0;
-  --accent-ink: #0E1416;
+  --accent-ink: #0E1716;
   --warn: #D9A441;
   --warn-soft: rgba(217, 164, 65, 0.12);
   --danger: #D9776A;

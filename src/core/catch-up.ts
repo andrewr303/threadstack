@@ -3,6 +3,7 @@ import { UNFILED_PROJECT } from './db.js';
 import { getDisplayTitle, type ConversationRecord, type SettingsRecord, type ThreadInsight } from './schema.js';
 import { remoteAllowedKeys } from './privacy.js';
 import { providerLabel } from './providers.js';
+import { accountLabelForThread } from './pipeline.js';
 import { catchUpBriefWithClaude, hasClaudeKey, toClaudeCallError, type CatchUpRow } from './ai/claude.js';
 
 /**
@@ -25,6 +26,14 @@ export interface CatchUpThread {
   openQuestions: string[];
   status: string;
   remoteAllowed: boolean;
+  /** Run facts for coding-agent sessions; labels and states only, never message text. */
+  accountLabel?: string | null;
+  repository?: string | null;
+  branch?: string | null;
+  pullRequestUrl?: string | null;
+  runState?: string | null;
+  testsStatus?: string | null;
+  blockedOn?: string | null;
 }
 
 export interface CatchUpBrief {
@@ -99,9 +108,19 @@ export async function collectCatchUpThreads(
     if (!prev || (prev.source === 'local' && insight.source === 'ai')) insightByThread.set(insight.threadKey, insight);
   }
 
+  // The AI's reading of a run wins; the on-device one fills in.
+  const agentRunByThread = new Map<string, NonNullable<ThreadInsight['agentRun']>>();
+  for (const insight of insightRows) {
+    if (!insight.agentRun) continue;
+    if (insight.source === 'ai' || !agentRunByThread.has(insight.threadKey)) agentRunByThread.set(insight.threadKey, insight.agentRun);
+  }
+  const accountLabels = await Promise.all(live.map((conv) => accountLabelForThread(db, conv, settings)));
+
   return live.map((conv, i) => {
     const insight = insightByThread.get(conv.threadKey);
     const summary = summaries[i];
+    const run = agentRunByThread.get(conv.threadKey);
+    const pullRequestUrl = conv.pullRequestUrl ?? run?.pullRequests[0]?.url ?? null;
     return {
       threadKey: conv.threadKey,
       title: getDisplayTitle(conv),
@@ -115,6 +134,13 @@ export async function collectCatchUpThreads(
       openQuestions: dedupe(texts(summary?.openQuestions)),
       status: conv.workflowState,
       remoteAllowed: allowed.has(conv.threadKey),
+      accountLabel: accountLabels[i],
+      repository: conv.repository ?? run?.repository ?? null,
+      branch: conv.gitBranch ?? run?.branch ?? null,
+      pullRequestUrl,
+      runState: run && run.runState !== 'unknown' ? run.runState : conv.agentState && conv.agentState !== 'unknown' ? conv.agentState : null,
+      testsStatus: run ? run.tests.status : null,
+      blockedOn: run && run.blockedOn !== 'none' ? run.blockedOn : conv.agentState === 'waiting_permission' ? 'permission' : conv.agentState === 'waiting_answer' ? 'input' : (run?.blockedOn ?? null),
     };
   });
 }
@@ -193,6 +219,13 @@ function toRow(t: CatchUpThread): CatchUpRow {
     nextSteps: t.nextSteps.slice(0, 4),
     openQuestions: t.openQuestions.slice(0, 4),
     status: t.status,
+    accountLabel: t.accountLabel ?? null,
+    repository: t.repository ?? null,
+    branch: t.branch ?? null,
+    pullRequestUrl: t.pullRequestUrl ?? null,
+    runState: t.runState ?? null,
+    testsStatus: t.testsStatus ?? null,
+    blockedOn: t.blockedOn ?? null,
   };
 }
 

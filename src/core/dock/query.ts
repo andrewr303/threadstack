@@ -22,6 +22,7 @@ import { buildRerankDocument, rerankReady, rerankThreads } from '../rerank.js';
 import { computeDeterministicHash } from '../schema.js';
 import { remoteModelsAllowed } from './state.js';
 import { buildThreadSummary, redactSecrets } from './payload.js';
+import { findRelatedThreads, type RelatedReason } from '../related.js';
 import {
   threadHash,
   type ContextRequest,
@@ -747,24 +748,38 @@ export async function relatedThreads(env: QueryEnv, threadKey: string, limit: nu
     return null;
   };
   const picked = await pickSpace();
-  if (!picked) return [];
-  const seedVec = picked.vectors.get(threadKey)!;
-  const scored: Array<[CorpusEntry, number]> = [];
-  for (const e of corpus.entries) {
-    if (e.conv.threadKey === threadKey || e.conv.sourceConversationId === seed.conv.sourceConversationId) continue;
-    const v = picked.vectors.get(e.conv.threadKey);
-    if (!v || v.length !== seedVec.length) continue;
-    const sim = cosine(seedVec, v);
-    if (sim >= picked.space.relatedThreshold) scored.push([e, sim]);
+  const byKey = new Map(corpus.entries.map((e) => [e.conv.threadKey, e] as const));
+  const related = findRelatedThreads({
+    selected: seed.conv,
+    conversations: corpus.entries.map((e) => e.conv),
+    vectorOf: (key) => picked?.vectors.get(key),
+    // Without a vector space only structural matches (same session, pull request, repository) can apply.
+    threshold: picked?.space.relatedThreshold ?? Number.POSITIVE_INFINITY,
+    limit,
+    isCodingProvider: (provider) => providerCategory(provider) === 'coding_agent',
+  });
+  const out: ThreadSummary[] = [];
+  for (const r of related) {
+    const e = byKey.get(r.threadKey);
+    if (!e) continue;
+    const similar = r.reason === 'similar' && r.similarity !== null;
+    out.push({
+      ...buildThreadSummary(e.conv, e.insight),
+      score: similar ? Math.round(r.similarity! * 1000) / 1000 : 1,
+      match: similar && r.similarity! < picked!.space.relatedThreshold + 0.1 ? 'weak' : 'strong',
+      matchReasons: [RELATED_REASON_LABELS[r.reason]],
+    });
   }
-  scored.sort((a, b) => b[1] - a[1]);
-  return scored.slice(0, limit).map(([e, sim]) => ({
-    ...buildThreadSummary(e.conv, e.insight),
-    score: Math.round(sim * 1000) / 1000,
-    match: sim >= picked.space.relatedThreshold + 0.1 ? ('strong' as const) : ('weak' as const),
-    matchReasons: ['Similar meaning'],
-  }));
+  return out;
 }
+
+const RELATED_REASON_LABELS: Record<RelatedReason, string> = {
+  same_conversation: 'Same session, other account',
+  same_pull_request: 'Same pull request',
+  same_branch: 'Same branch',
+  same_repository: 'Same repository',
+  similar: 'Similar meaning',
+};
 
 export interface FacetsResponse {
   total: number;

@@ -35,6 +35,7 @@ const ANALYSIS = {
   actionItems: [],
   openQuestions: [],
   produced: [],
+  agentRun: null,
 };
 
 function messagesFetch(calls: Call[], respond?: (call: Call) => Response | null) {

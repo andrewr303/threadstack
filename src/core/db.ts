@@ -31,6 +31,7 @@ import { normalizeTags } from './organization.js';
 import { looksDerivedTitle, mergeCapturedMessages } from './merge.js';
 import type { PortableBundle } from './adapters.js';
 import type { DockMetaRecord, DockOutboxRecord, DockSentRecord, DockTrackedRecord } from './dock/records.js';
+import type { AccountJarRecord, AccountRecord, AgentState, KvRecord } from './workspace/types.js';
 
 export class ThreadkeeperDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
@@ -52,6 +53,12 @@ export class ThreadkeeperDB extends Dexie {
   dockSent!: Table<DockSentRecord, string>;
   dockTracked!: Table<DockTrackedRecord, string>;
   dockMeta!: Table<DockMetaRecord, string>;
+  /** Accounts per login realm (core/accounts). Never part of an export. */
+  accounts!: Table<AccountRecord, string>;
+  /** Encrypted cookie jars of accounts that are not signed in right now. Never read by pages. */
+  accountJars!: Table<AccountJarRecord, string>;
+  /** Small single-writer values (active accounts, workspace layout). See KV_KEYS. */
+  kv!: Table<KvRecord, string>;
 
   constructor(dbName = 'ThreadkeeperDB') {
     super(dbName);
@@ -122,6 +129,14 @@ export class ThreadkeeperDB extends Dexie {
       dockSent: 'threadKey',
       dockTracked: 'threadKey',
       dockMeta: 'key',
+    });
+    // v4: accounts per login realm, their saved cookie jars, and small workspace values.
+    // New tables only. Cookie jars sit in their own table so that listing accounts cannot leak
+    // them, and none of the three is ever exported, sent to Still or shown to a content script.
+    this.version(4).stores({
+      accounts: 'id, realm',
+      accountJars: 'accountId',
+      kv: 'key',
     });
   }
 }
@@ -224,6 +239,9 @@ export interface UpsertThreadInput {
   projectSource?: ProjectSource;
   agentLabel?: string | null;
   linkedThreadKeys?: string[];
+  repository?: string | null;
+  pullRequestUrl?: string | null;
+  agentState?: AgentState | null;
   messages: Array<{
     sourceMessageId: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
@@ -492,6 +510,18 @@ export async function upsertThread(
       if (agentLabel) record.agentLabel = agentLabel;
       const linkedThreadKeys = input.linkedThreadKeys ?? existing?.linkedThreadKeys;
       if (linkedThreadKeys?.length) record.linkedThreadKeys = linkedThreadKeys;
+      const repository = input.repository ?? existing?.repository;
+      if (repository) record.repository = repository;
+      const pullRequestUrl = input.pullRequestUrl ?? existing?.pullRequestUrl;
+      if (pullRequestUrl) record.pullRequestUrl = pullRequestUrl;
+      // A fresh read of the page replaces the last one; a capture that read nothing keeps it.
+      if (input.agentState) {
+        record.agentState = input.agentState;
+        record.agentStateAt = now;
+      } else if (existing?.agentState) {
+        record.agentState = existing.agentState;
+        record.agentStateAt = existing.agentStateAt ?? null;
+      }
 
       await db.conversations.put(record);
       if (contentChanged && !record.isSyntheticBenchmark) {

@@ -1,0 +1,516 @@
+/* Browse: the bar (tab strip and toolbar), the stage, the summary panel and the new tab page.
+   Glass is only the bar. The page slot, the summary panel and the new tab page are opaque.
+   Only transform and opacity animate. */
+
+.tk-browse {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/* ---------- Bar ---------- */
+.tk-browse-bar {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-chrome);
+}
+.tk-browse-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 3px;
+}
+
+/* ---------- Tab strip ---------- */
+.tk-browse-tabs {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tk-browse-tabs::-webkit-scrollbar { display: none; }
+.tk-browse-tabs-empty {
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: var(--fs-13);
+  color: var(--text-3);
+}
+.tk-browse-newtab { flex: none; }
+.tk-browse-newtab[data-open="true"] { background: var(--accent-tint); color: var(--text); }
+
+.tk-browse-tab {
+  position: relative;
+  flex: 0 1 216px;
+  min-width: 132px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-cap);
+  color: var(--text-2);
+}
+.tk-browse-tab:hover { background: var(--ctl-hover); color: var(--text); }
+.tk-browse-tab:active { background: var(--ctl-press); }
+.tk-browse-tab[data-active="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+html[data-theme="light"] .tk-browse-tab[data-active="true"] { background: var(--surface); }
+
+.tk-browse-tab-main {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 6px;
+  border: 0;
+  border-radius: var(--r-cap);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.tk-browse-tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: 500;
+}
+.tk-browse-tab-pause { flex: none; color: var(--text-3); }
+/* Paused: italic, quieter, and the pause icon says so without colour. */
+.tk-browse-tab[data-paused="true"] .tk-browse-tab-title {
+  color: var(--text-3);
+  font-style: italic;
+  font-weight: 400;
+}
+.tk-browse-tab[data-paused="true"] .tk-mark {
+  background: transparent;
+  color: var(--text-3);
+}
+.tk-browse-tab-close {
+  flex: none;
+  width: 28px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-cap);
+  background: transparent;
+  color: var(--text-3);
+}
+.tk-browse-tab-close:hover { background: var(--ctl-press); color: var(--text); }
+.tk-browse-tab-close:active { background: var(--ctl-press); }
+/* The strip clips outlines, so the ring sits inside the control. */
+.tk-browse-tab-main:focus-visible,
+.tk-browse-tab-close:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+.tk-browse-tab-ind {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform-origin: 0 0;
+  transition: transform var(--t-mid) var(--ease-out);
+  pointer-events: none;
+}
+
+/* ---------- Toolbar ---------- */
+.tk-browse-toolbar { flex-wrap: nowrap; }
+.tk-browse-addr {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+  height: 32px;
+  margin: 0;
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-ctl);
+  background: var(--ctl-fill);
+  font-size: var(--fs-13);
+}
+.tk-browse-addr:hover { background: var(--ctl-hover); }
+.tk-browse-addr-lock {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.tk-browse-addr-view {
+  position: absolute;
+  left: 32px;
+  right: 12px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-3);
+  pointer-events: none;
+}
+.tk-browse-addr-host { flex: none; color: var(--text); font-weight: 600; }
+.tk-browse-addr-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tk-browse-addr[data-editing="true"] .tk-browse-addr-view { visibility: hidden; }
+.tk-browse-addr-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0 12px 0 32px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+/* At rest the formatted address above is what is read; the input keeps the caret and the value. */
+.tk-browse-addr[data-editing="false"] .tk-browse-addr-input { color: transparent; caret-color: var(--text); }
+.tk-browse-addr-input::placeholder { color: var(--text-3); opacity: 1; }
+.tk-browse-addr-input:disabled { color: var(--text-disabled); cursor: not-allowed; }
+
+.tk-browse-chrome-btn,
+.tk-browse-summary-btn { flex: none; }
+.tk-browse-summary-btn[aria-pressed="true"] {
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+.tk-browse-summary-btn[aria-pressed="true"] .tk-icon { color: var(--accent); }
+
+/* ---------- Message under the bar ---------- */
+.tk-browse-notice {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-row);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.tk-browse-notice > .tk-icon { flex: none; color: var(--warn); }
+.tk-browse-notice-text { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-13); }
+
+/* ---------- Stage ---------- */
+.tk-browse-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  gap: var(--gap);
+}
+.tk-browse-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.tk-browse-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+}
+
+/* ---------- Summary panel ---------- */
+.tk-browse-summary {
+  flex: none;
+  width: 360px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--paper);
+  animation: tk-browse-slide-in var(--t-panel) var(--ease-out) both;
+}
+@keyframes tk-browse-slide-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+.tk-browse-summary-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.tk-browse-summary-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.tk-browse-summary-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 18px 18px 24px;
+  overflow-y: auto;
+}
+.tk-browse-summary-foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+}
+.tk-browse-summary-foot .tk-btn { min-height: 36px; }
+
+.tk-browse-sum-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-20);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.tk-browse-sum-meta {
+  margin: -12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+.tk-browse-sum-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tk-browse-sum-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.tk-browse-sum-link:hover { color: var(--text); }
+.tk-browse-sum-section { display: flex; flex-direction: column; gap: 8px; }
+.tk-browse-sum-section .tk-eyebrow { margin: 0; }
+.tk-browse-sum-gist {
+  margin: 0;
+  font-size: var(--fs-14);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.tk-browse-leftoff {
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-row);
+  background: var(--paper-2);
+}
+.tk-browse-leftoff-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tk-browse-leftoff-head .tk-eyebrow { margin: 0; color: var(--text-2); }
+.tk-browse-leftoff-time { font-size: var(--fs-12); color: var(--text-3); }
+.tk-browse-leftoff-line {
+  margin: 10px 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-16);
+  line-height: 1.45;
+  color: var(--text);
+  text-wrap: pretty;
+}
+.tk-browse-leftoff-next {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  border-top: 1px dashed var(--line-2);
+  font-size: var(--fs-14);
+  line-height: 1.5;
+}
+.tk-browse-leftoff-line + .tk-browse-leftoff-next { margin-top: 14px; }
+.tk-browse-leftoff-head + .tk-browse-leftoff-next { margin-top: 10px; padding-top: 0; border-top: 0; }
+.tk-browse-leftoff-next b { color: var(--accent); font-weight: 600; }
+
+.tk-browse-run { padding-top: 14px; border-top: 1px solid var(--line); }
+.tk-browse-run-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  font-size: var(--fs-13);
+}
+.tk-browse-run-grid dt { margin-top: 8px; font-size: var(--fs-12); color: var(--text-3); }
+.tk-browse-run-grid dt:first-child { margin-top: 0; }
+.tk-browse-run-grid dd { margin: 0; min-width: 0; color: var(--text); }
+.tk-browse-run-list { margin: 0; padding: 0; list-style: none; }
+.tk-browse-run-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0;
+}
+.tk-browse-run-list .tk-run { flex: none; margin-left: auto; font-size: var(--fs-12); }
+.tk-browse-run-path {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- New tab page ---------- */
+.tk-browse-launch {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+}
+.tk-browse-launch:focus-visible { outline-offset: -2px; }
+.tk-browse-launch-in {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 36px 32px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 40px;
+}
+.tk-browse-launch-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-24);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.tk-browse-launch-sub { margin: 4px 0 0; font-size: var(--fs-14); color: var(--text-2); }
+.tk-browse-launch-group { margin-top: 24px; }
+.tk-browse-launch-group > .tk-eyebrow,
+.tk-browse-launch-side > .tk-eyebrow { margin: 0 0 6px; }
+.tk-browse-launch-side { min-width: 0; padding-top: 6px; }
+.tk-browse-launch-note { margin: 18px 0 0; font-size: var(--fs-12); color: var(--text-3); }
+
+.tk-browse-prov-list { margin: 0; padding: 0; list-style: none; }
+.tk-browse-prov {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.tk-browse-prov:last-child { border-bottom: 0; }
+.tk-browse-prov-name { font-size: var(--fs-14); font-weight: 600; }
+.tk-browse-prov-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.tk-browse-prov-note { font-size: var(--fs-12); font-weight: 400; color: var(--text-3); }
+
+.tk-browse-recent { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.tk-browse-recent-row {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.tk-browse-recent-row:hover { background: var(--surface-2); }
+.tk-browse-recent-row:active { background: var(--surface-3); }
+.tk-browse-recent-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tk-browse-recent-title {
+  font-family: var(--font-serif);
+  font-size: var(--fs-14);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.tk-browse-recent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+/* ---------- Narrow windows ---------- */
+@media (max-width: 1180px) {
+  .tk-browse-btn-label { display: none; }
+  .tk-browse-summary { width: 340px; }
+  .tk-browse-launch-in { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 28px 24px; }
+}
+
+/* ---------- Reduced motion: no movement; the state change stays visible ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .tk-browse-summary { animation: none; }
+  .tk-browse-tab-ind { transition: none; }
+}
+
+/* ---------- Forced colours ---------- */
+@media (forced-colors: active) {
+  .tk-browse-tab[data-active="true"] { border-color: Highlight; }
+  .tk-browse-tab-ind { background: Highlight; }
+  .tk-browse-addr-view { display: none; }
+  .tk-browse-addr[data-editing="false"] .tk-browse-addr-input { color: CanvasText; }
+  .tk-browse-summary,
+  .tk-browse-launch,
+  .tk-browse-stage,
+  .tk-browse-notice { border-color: CanvasText; }
+}

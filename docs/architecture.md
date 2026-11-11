@@ -2,6 +2,137 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
+## Workspace: embedded sessions and accounts (2026-11-10)
+
+Session Control (the separate extension that kept a hand-made list of Claude Code session links per
+account) is merged into Threadkeeper. The full-page manager is now a workspace with three views over
+the same sessions, and sessions are saved by capture; there is no "save a session" form.
+
+**Views** (`src/entrypoints/manager`). `App.tsx` stays the composition root. On the full page it renders
+the rail (`shell/Rail.tsx`) and three always-mounted views: Browse (`browse/`: tab strip, back, forward,
+reload, address, account switcher, a summary panel), Threads (the library, plus grouping by repository
+or account and a Summary / Live / Split switch in the detail pane) and Dashboard (`dashboard/`: pinned
+sessions in 1 to 4 panes). The side panel and the in-page overlay keep the library layout; nothing is
+embedded there. `settings.activeView`, `threadsGroupBy`, `detailMode`, `surfaces` and `maxLiveFrames`
+are plain settings fields.
+
+**One iframe per session, never remounted.** `workspace/FrameStage.tsx` keeps every loaded session tab's
+`<iframe>` in one layer for the life of the page and lays it over whichever `<FrameSlot>` a view renders
+for that tab (position: fixed, measured with ResizeObserver). An iframe reloads when its element is moved
+or recreated, so views never render iframes; switching tabs or views only moves boxes. Frames no view is
+showing are `display: none` (measured: rendering stops and timers drop to 1 Hz; `visibility: hidden` and
+zero size do neither). `workspace/state.ts` holds the rules as pure functions: the tab reducer, and
+`planFrames`, which decides which tabs are loaded (the visible ones first, then the most recently used
+up to `maxLiveFrames`) and why the others are not (`account`, `isolated`, `asleep`).
+
+**Why pages load at all.** Every provider refuses framing (X-Frame-Options, CSP frame-ancestors). When the
+manager page starts it sends `WORKSPACE_HELLO`; the worker remembers the tab and installs one *session*
+declarativeNetRequest rule for it (`core/embed/rules.ts`): `tabIds: [that tab]`, `resourceTypes:
+['sub_frame']`, remove `x-frame-options`, `content-security-policy` and its report-only twin. The rule is
+removed when the tab closes or leaves `manager.html`. Accepted cost: declarativeNetRequest can only drop a
+whole header, so documents embedded in the workspace tab lose their Content-Security-Policy; ordinary tabs
+are never touched. Each iframe is sandboxed without `allow-top-navigation` (measured: without it an
+embedded page can navigate the workspace away). Permissions added: `cookies` and
+`declarativeNetRequestWithHostAccess` (neither adds an install warning); `nativeMessaging` is optional.
+The install-time host list is unchanged.
+
+**Capture inside embedded pages.** Content scripts now run in all frames and decide at the top whether to
+act (`core/embed/frame.ts`): the top frame, or a frame whose single ancestor is this extension's own page.
+Any other frame returns at once. In the worker the capture gate still refuses frames, except an embedded
+one: `embeddedFrameUrl` (`core/messaging.ts`) requires this extension's content script, a remembered
+workspace tab whose top document is `manager.html`, a frame id other than 0, an https address (http only
+on loopback or an added site) and a matching origin; the provider is still checked against the frame's
+own address. Workspace commands (accounts, the helper) are a separate class accepted only from
+`manager.html` as a top-level tab: never the side panel, the overlay, a frame or a website, and no overlay
+handshake token changes that.
+
+**Accounts** (`core/accounts`, `core/workspace/realms.ts`). A *realm* is one sign-in: Claude and Claude
+Code share one, ChatGPT, Codex and dots another. A Chrome profile has one set of cookies per site, and no
+extension API gives a frame its own persistent cookie jar (checked: declarativeNetRequest cannot target a
+frame; credentialless iframes share one throwaway jar the cookies API cannot see). So one account per
+realm is signed in at a time, in Threadkeeper and in every other tab. Switching (`service.ts`) saves the
+outgoing account's cookies as an AES-GCM jar in IndexedDB (`accountJars`; the non-extractable key is a
+separate row), writes a journal, clears the realm's cookies, restores the incoming jar, then deletes that
+jar; a worker stopped mid-switch finishes it on the next start. The jar keeps saved sign-ins out of
+exports and casual reads of the database; it is not protection against code running as this extension or
+a copy of the whole profile. Device cookies (Cloudflare's bot-check clearance) are left in place. Cookies
+are read from the ordinary jar and two named partitions; `partitionKey: {}` is deliberately not used (it
+crashed Chromium 153 when a credentialless frame held cookies). Realms that share their sign-in with a
+whole ecosystem (Google, GitHub, Microsoft) are never switched. Only cookies are swapped: other site data
+is shared between accounts. An account can instead live in its own Chrome profile window through the Mac
+helper (`mac-helper/`, native messaging host `com.threadkeeper.accounts`), which is the only way to have
+two accounts of one realm signed in at the same moment.
+
+**Attribution.** A capture is filed under the realm's active account (`resolveForCapture`). The account
+that was signed in before accounts existed is the *primary* account and keeps the thread-key account id
+those threads already have, so no key changes. When the site reports who is signed in (the page-world
+observer passes on the page's own account request; `accounts/identity.ts` accepts only bodies that name a
+user) the account records it; an identity that belongs to another account makes that account the active
+one, and an unknown one gets a new account, so a thread is not filed under the wrong person. Identity
+reports are ignored for four seconds after a switch (a page loaded before it may still be reporting).
+
+**Cookie bridge.** Inside an embedded frame the browser sends the site's ordinary cookies on requests, but
+page scripts can read and write only `SameSite=None` ones through `document.cookie` (measured). Sites that
+read a token from a cookie would break, so in frames embedded in an extension page a page-world script
+(`embed-cookie-main.ts`) replaces the accessor with a local jar fed by the isolated script
+(`embed-bridge.ts`), which asks the worker for the script-visible cookies of the frame's own address and
+forwards assignments (`core/embed/cookie-bridge.ts`: never HttpOnly, prefix and domain rules enforced, the
+address always taken from the sender). The `cookieStore` API is not bridged.
+
+**Coding sessions.** `ConversationRecord` gains `repository` (normalized `owner/name`,
+`core/repository.ts`), `pullRequestUrl`, and `agentState` with `agentStateAt`: what the page's visible
+controls showed when it was last read (`core/embed/agent-state.ts`), never a claim about work on the
+provider's servers. `ThreadInsight.agentRun` holds what a run did (files, commands with outcome, tests,
+pull requests, what it waits on), filled on-device from tool messages and by Claude through a nullable
+`agentRun` object in the analysis schema; `ANALYSIS_VERSION` is unchanged and existing analyses are not
+re-billed. Related threads (`core/related.ts`) put the same session under another account, the same pull
+request, branch or repository before similarity.
+
+**Verified** in headless Chrome for Testing 153 with the built extension and local stand-ins served on the
+providers' host names (`npm run test:workspace`): framing through the header rule, the cookie bridge,
+capture and attribution from embedded pages, adding an account, switching both ways, the saved jar, no
+capture from a provider page framed by another site, and hand-back of a new tab. **Not verified** (needs a
+signed-in person): each real provider working fully inside a frame (sending, streaming, uploads, sign-in
+steps that redirect to another host), bot challenges inside frames, the identity response shapes of the
+real sites, and whether a provider keeps account state outside cookies.
+
+## Retrieval continuation (2026-11-10)
+
+The manager searches its extension-owned IndexedDB corpus; it does not query an Atlas database.
+Typing uses lexical search and the on-device `local:hash-v1:384` vectors. Explicit Enter submission
+may embed the query with the configured hosted provider, fuse compatible current thread vectors by
+reciprocal rank, then rerank the filtered shortlist. Repository, account and run filters apply before
+that shortlist is built. Superseded queries abort their requests and cannot publish late results.
+Privacy eligibility is checked from the database before remote work and again before publishing hosted
+semantic candidates. Local-only results remain available through local search.
+
+| Stage | Contract |
+| --- | --- |
+| Corpus | Captured/imported conversations, grounded summaries and messages in this browser profile; provider/account/project/workflow/coverage/kind/repository/run filters narrow candidates |
+| Document recipe | `buildThreadEmbeddingDocument`: title, gist, summary, topics, entities, project/repository/branch/PR/files and bounded opening/latest turns |
+| Index identity | `threadVectors`, keyed by space and thread; current `sourceRevision`, finite nonzero vector and matching dimensions required |
+| Hosted identity | Voyage legacy `voyage:<model>`; Voyage Atlas alias `voyage:mongodb:<model>`; explicit Atlas `mongodb:<model>:<dimensions>` |
+| Candidates | Local lexical and vector rank fusion; hosted vectors on Enter only; reranker candidates bounded by settings (default 40) |
+| Rerank/context | Only remote-allowed titles, gists and excerpts; unique complete indexed scores validated before caching; malformed/failed replies preserve first-stage order; Ask retains source references |
+
+Voyage's endpoint selector is shared by embedding and reranking. Existing persisted Voyage keys that
+lack an endpoint retain the legacy host. Atlas keys are selected explicitly; the separate Atlas provider
+supports global/US/EU geography and requested output dimensions. No credential is retried on another
+host. Provider responses are untrusted: embedding rows require unique complete indexes, finite numeric
+vectors and consistent dimensions, and rerank responses require unique complete indexes and finite
+scores. Remote embeddings have a 30-second default deadline and accept cancellation.
+
+Sources verified against the [MongoDB API overview](https://www.mongodb.com/docs/voyageai/api-reference/overview/),
+[embedding API](https://www.mongodb.com/docs/api/doc/atlas-embedding-and-reranking-api/operation/operation-createtextembeddings),
+and [rerank API](https://www.mongodb.com/docs/api/doc/atlas-embedding-and-reranking-api/operation/operation-rerankdocuments).
+The retrieval plugin's offline contract validator was exercised on an illustrative local fixture; its
+Atlas index planner is not used because no database/index deployment is part of this extension.
+
+Rollout: select the endpoint matching the key, grant its host with Test, then rebuild the selected
+vector space. Rollback: select On-device only and turn the reranker Off; captured conversations and
+existing vectors stay local. Switching models/endpoints selects another space, without deleting the
+old one. Paid model quality and signed-in account behavior remain separate live checks.
+
 ## v0.5 changes (2026-11-03)
 
 v0.5 joins four workstreams; each has its own section below (Still link, opt-in AI products and any AI site,
@@ -197,7 +328,7 @@ Consequences the UI must honour: a DOM-captured thread never shows `full` covera
 
 ## Non-goals and authority boundaries
 
-No terminal/CLI session control (sessions are imported read-only; resuming is the user's own command), public sharing links, private competitor APIs beyond the user-started, read-only Catch up described above, source bulk deletion, provider account switching, arbitrary website permissions, graph launch feature, telemetry, payment/upsell code, or competitor assets. Additional chat and cloud-task products require separate adapters and capability evidence. A cloud agent claiming completion is not proof of completed work. Browsing history disappearing does not authorize deleting captured records.
+No terminal/CLI session control (sessions are imported read-only; resuming is the user's own command), public sharing links, private competitor APIs beyond the user-started, read-only Catch up described above, source bulk deletion, arbitrary website permissions, graph launch feature, telemetry, payment/upsell code, or competitor assets. Provider account switching was a non-goal until 2026-11-10; it is now built, within the limits in "Workspace: embedded sessions and accounts": cookies of dedicated AI sign-ins only, never a password, never an ecosystem sign-in (Google, GitHub, Microsoft), and never without the person choosing it. Additional chat and cloud-task products require separate adapters and capability evidence. A cloud agent claiming completion is not proof of completed work. Browsing history disappearing does not authorize deleting captured records.
 
 ## Analysis v2: in-depth summaries (2026-11)
 

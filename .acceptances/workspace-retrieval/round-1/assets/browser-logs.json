@@ -1,0 +1,184 @@
+{
+  "tabId": "9c57aae5-8e57-4291-a7a6-99d04017d46a",
+  "startedAt": "2026-11-11T00:29:07.240Z",
+  "capturedAt": "2026-11-11T00:36:57.610Z",
+  "entries": [
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:30:27.040Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:30:34.675Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:31:29.059Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:31:35.442Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:31:43.743Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:31:54.015Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:32:07.395Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:32:22.380Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:32:42.948Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:33:13.901Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:33:30.097Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:33:39.529Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:33:48.525Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:34:09.922Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:34:16.564Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:34:32.918Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:34:48.059Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:34:58.164Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:35:10.187Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:35:24.889Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:35:34.313Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:35:48.239Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:35:56.427Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:36:23.629Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    },
+    {
+      "kind": "console",
+      "timestamp": "2026-11-11T00:36:38.144Z",
+      "level": "warn",
+      "text": "navigator.modelContext is deprecated. Please use document.modelContext instead.",
+      "lineNumber": 7
+    }
+  ],
+  "droppedCount": 0,
+  "truncated": true
+}

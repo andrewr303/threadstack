@@ -64,12 +64,15 @@ const cohere = (patch: Partial<SettingsRecord> = {}): SettingsRecord => ({
 });
 
 describe('settings migration', () => {
-  it('routes existing Voyage settings to Atlas without losing the key or model', () => {
-    const s = normalizeSettings({ voyageApiKey: 'atlas-key', voyageModel: 'voyage-4', rerankProvider: 'voyage' });
-    expect(s.voyageEndpoint).toBe('mongodb');
-    expect(s.voyageApiKey).toBe('atlas-key');
+  it('keeps existing Voyage keys on their original host without losing the key or model', () => {
+    const s = normalizeSettings({ voyageApiKey: 'old-voyage-key', voyageModel: 'voyage-4', rerankProvider: 'voyage' });
+    expect(s.voyageEndpoint).toBe('legacy');
+    expect(s.voyageApiKey).toBe('old-voyage-key');
     expect(s.voyageModel).toBe('voyage-4');
     expect(normalizeSettings({ ...s, voyageEndpoint: 'legacy' }).voyageEndpoint).toBe('legacy');
+    expect(normalizeSettings({ ...s, voyageEndpoint: 'mongodb' }).voyageEndpoint).toBe('mongodb');
+    expect(normalizeSettings({ ...s, voyageEndpoint: 'invalid' as SettingsRecord['voyageEndpoint'] }).voyageEndpoint).toBe('legacy');
+    expect(normalizeSettings({}).voyageEndpoint).toBe('mongodb');
   });
   it('fills the new provider fields for a record saved before they existed', () => {
     const old = { ...DEFAULT_SETTINGS } as Partial<SettingsRecord>;

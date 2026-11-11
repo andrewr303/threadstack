@@ -27,6 +27,7 @@ import {
   testClaudeConnection,
 } from '../../core/ai/claude.js';
 import { CaptureSettings } from './CaptureSettings.js';
+import { AccountsSettings } from './accounts/AccountsSettings.js';
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
@@ -176,6 +177,7 @@ function ProjectRow({
 export type SectionId =
   | 'general'
   | 'capture'
+  | 'accounts'
   | 'paperclip'
   | 'ai'
   | 'aws'
@@ -188,6 +190,7 @@ export type SectionId =
 const SECTION_LABELS: Array<{ id: SectionId; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'capture', label: 'Capture' },
+  { id: 'accounts', label: 'Accounts' },
   { id: 'paperclip', label: 'Paperclip' },
   { id: 'ai', label: 'AI models' },
   { id: 'aws', label: 'Amazon Web Services' },
@@ -336,7 +339,7 @@ function VoyageEndpoint({ settings, onPatch }: Pick<Props, 'onPatch'> & { settin
   return (
     <label className="tk-field">
       Voyage API endpoint (shared by embeddings and reranking)
-      <select className="tk-select" value={settings.voyageEndpoint}
+      <select className="tk-select" aria-label="Voyage API endpoint" value={settings.voyageEndpoint}
         onChange={(e) => void onPatch({ voyageEndpoint: e.target.value as SettingsRecord['voyageEndpoint'] })}>
         <option value="mongodb">MongoDB Atlas — ai.mongodb.com</option>
         <option value="legacy">Legacy Voyage — api.voyageai.com</option>
@@ -504,6 +507,8 @@ export function SettingsDialog({
   const [rerankTest, setRerankTest] = useState<TestState>(IDLE);
   /** Typed value of "Candidates to rerank"; clamped when the field loses focus. */
   const [candidatesDraft, setCandidatesDraft] = useState<string | null>(null);
+  /** Typed value of "Pages kept loaded"; clamped when the field loses focus. */
+  const [liveFramesDraft, setLiveFramesDraft] = useState<string | null>(null);
   const [awsAccess, setAwsAccess] = useState<boolean | null>(null);
   const diagnostics = useDiagnostics();
   const paperclipState = usePaperclipSyncState();
@@ -641,6 +646,36 @@ export function SettingsDialog({
             </label>
           </div>
         </Section>
+        <Section title="Workspace">
+          <Toggle
+            checked={settings.surfaces === 'solid'}
+            onChange={(v) => void onPatch({ surfaces: v ? 'solid' : 'glass' })}
+            label="Solid surfaces"
+            hint="Replace translucent panels with opaque ones."
+          />
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Pages kept loaded
+              <input
+                type="number"
+                min={2}
+                max={12}
+                className="tk-input"
+                aria-describedby="tk-live-frames-hint"
+                value={liveFramesDraft ?? String(settings.maxLiveFrames)}
+                onChange={(e) => setLiveFramesDraft(e.target.value)}
+                onBlur={() => {
+                  if (liveFramesDraft === null) return;
+                  void onPatch({ maxLiveFrames: Math.min(12, Math.max(2, Math.round(Number(liveFramesDraft)) || settings.maxLiveFrames)) });
+                  setLiveFramesDraft(null);
+                }}
+              />
+            </label>
+          </div>
+          <p id="tk-live-frames-hint" className="tk-settings-note">
+            More pages stay ready in the background; each uses memory.
+          </p>
+        </Section>
         <Section title="Keyboard shortcuts" note="Alt+Shift+L opens the side panel, Alt+Shift+K the overlay on an AI page, and Alt+Shift+M the full-page library.">
           <div className="tk-field-row">
             <button type="button" className="tk-btn" onClick={openShortcuts}>
@@ -652,6 +687,8 @@ export function SettingsDialog({
     ),
 
     capture: <CaptureSettings settings={settings} onPatch={onPatch} />,
+
+    accounts: <AccountsSettings />,
 
     paperclip: <PaperclipSettings settings={settings} onPatch={onPatch} />,
 
@@ -1273,9 +1310,11 @@ export function SettingsDialog({
           )}
           {settings.rerankProvider === 'voyage' && (
             <>
-              <VoyageEndpoint settings={settings} onPatch={onPatch} />
               {settings.embeddingProvider !== 'voyage' && (
-                <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+                <>
+                  <VoyageEndpoint settings={settings} onPatch={onPatch} />
+                  <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+                </>
               )}
               <label className="tk-field">
                 Model

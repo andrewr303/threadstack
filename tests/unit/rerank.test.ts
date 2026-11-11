@@ -186,7 +186,7 @@ describe('Bedrock rerank', () => {
     await expect(rerankDocuments(settings, 'q', ['a', 'b'], 2, fetchImpl)).rejects.toThrow(/needs IAM access keys/);
     expect(calls).toHaveLength(0);
     // With IAM keys the same model goes to the Rerank API.
-    const iam = recordingFetch(() => ({ results: [{ index: 0, relevanceScore: 0.5 }] }));
+    const iam = recordingFetch(() => ({ results: [{ index: 0, relevanceScore: 0.5 }, { index: 1, relevanceScore: 0.2 }] }));
     await rerankDocuments(bedrock({ ...IAM, region: 'us-west-2' }, 'amazon.rerank-v1:0'), 'q', ['a', 'b'], 2, iam.fetchImpl);
     expect((iam.calls[0].body.rerankingConfiguration as { bedrockRerankingConfiguration: { modelConfiguration: { modelArn: string } } })
       .bedrockRerankingConfiguration.modelConfiguration.modelArn).toBe('arn:aws:bedrock:us-west-2::foundation-model/amazon.rerank-v1:0');

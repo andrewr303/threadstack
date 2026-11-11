@@ -5,6 +5,7 @@ import { ensureStarterCollectionsAndSettings, saveSettingsPatch } from '../../sr
 import { processThreadLocally } from '../../src/core/pipeline.js';
 import { clearDockQueryCache, selectPassages, makeCursor, readCursor } from '../../src/core/dock/query.js';
 import { patchDockSettings } from '../../src/core/dock/state.js';
+import { buildThreadKey } from '../../src/core/schema.js';
 import { harness, msg, pairDirect, putInsight, seed, stillSender, thread, type Harness } from './dock-helpers.js';
 
 type Res = Record<string, unknown> & { ok: boolean };
@@ -194,6 +195,27 @@ describe('read requests', () => {
     expect(keys).toContain(twin);
     expect(keys).not.toContain(privateKey);
     expect(await ask(h, 'threads.related', { threadKey: privateKey })).toMatchObject({ ok: false, error: { code: 'not_found' } });
+  });
+
+  it('related threads put structural matches first and name why, without needing vectors', async () => {
+    const acct = (id: string, title: string, extra: Record<string, unknown>) => {
+      const t = thread(id, title, [['user', `zzz ${title}`]], { provider: 'claude_code', accountId: 'acct_two', ...extra });
+      return { ...t, threadKey: buildThreadKey({ provider: 'claude_code', accountId: 'acct_two', workspaceId: 'ws_test', sourceConversationId: id, branchId: 'main' }) };
+    };
+    const a = await seed(h.db, thread('rs1', 'Seed session', [['user', 'qqq seed']], { provider: 'claude_code', repository: 'acme/shop', gitBranch: 'fix-1', pullRequestUrl: 'https://github.com/acme/shop/pull/9' }));
+    const other = await seed(h.db, acct('rs1', 'Seed session again', {}));
+    const pr = await seed(h.db, thread('rs2', 'Same pr', [['user', 'www pr']], { provider: 'codex', repository: 'acme/other', pullRequestUrl: 'https://github.com/acme/shop/pull/9' }));
+    const branch = await seed(h.db, thread('rs3', 'Same branch', [['user', 'eee branch']], { provider: 'codex', repository: 'acme/shop', gitBranch: 'fix-1' }));
+    const repo = await seed(h.db, thread('rs4', 'Same repo', [['user', 'rrr repo']], { provider: 'cursor_agents', repository: 'acme/shop' }));
+    const res = await ask(h, 'threads.related', { threadKey: a });
+    const results = res.results as ThreadSummary[];
+    expect(results.slice(0, 4).map((r) => [r.threadKey, r.matchReasons])).toEqual([
+      [other, ['Same session, other account']],
+      [pr, ['Same pull request']],
+      [branch, ['Same branch']],
+      [repo, ['Same repository']],
+    ]);
+    expect(results.map((r) => r.threadKey)).not.toContain(privateKey);
   });
 
   it('thread.open opens shareable threads only', async () => {

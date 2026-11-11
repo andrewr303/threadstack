@@ -9,6 +9,7 @@ import {
 } from './providers.js';
 
 import { DEFAULT_AWS_SETTINGS, type AwsSettings } from './aws.js';
+import { DEFAULT_MAX_LIVE_FRAMES, WORKSPACE_VIEWS, type AgentState, type WorkspaceView } from './workspace/types.js';
 
 export type { ProviderId, CaptureProviderId } from './providers.js';
 export type { AwsSettings } from './aws.js';
@@ -157,6 +158,20 @@ export interface ConversationRecord {
    * Paperclip agent ran for this issue (their keys, whether or not they are imported yet).
    */
   linkedThreadKeys?: string[];
+  /**
+   * Repository a coding session worked in, normalized by core/repository.ts: lowercase
+   * "owner/name", or just "name" when the owner is not known. Threads from different providers
+   * and accounts on one repository share this value.
+   */
+  repository?: string | null;
+  /** Pull request the session opened or worked on (https URL), when the page or log shows one. */
+  pullRequestUrl?: string | null;
+  /**
+   * What the page last showed about a coding-agent run (a point-in-time read of visible
+   * controls, never a claim about work on the provider's servers) and when it was read.
+   */
+  agentState?: AgentState | null;
+  agentStateAt?: string | null;
 }
 
 export type ProjectSource =
@@ -450,6 +465,24 @@ export interface ProducedItem {
 }
 
 /**
+ * What a coding-agent session did, as far as the transcript shows it. The on-device analyzer
+ * fills what it can read from tool calls; Claude fills the rest. Null for threads that are not
+ * agent sessions.
+ */
+export interface AgentRunFacts {
+  /** "owner/name" when stated, else null. */
+  repository: string | null;
+  branch: string | null;
+  pullRequests: Array<{ url: string; state: 'open' | 'merged' | 'closed' | 'unknown' }>;
+  filesChanged: string[];
+  commandsRun: Array<{ command: string; outcome: 'ok' | 'failed' | 'unknown' }>;
+  tests: { status: 'passing' | 'failing' | 'not_run' | 'unknown'; detail: string | null };
+  /** What the run is waiting on, if anything. */
+  blockedOn: 'none' | 'permission' | 'input' | 'ci' | 'external';
+  runState: 'running' | 'finished' | 'errored' | 'awaiting_user' | 'unknown';
+}
+
+/**
  * What a thread is about, beyond its title. `local` insights are computed
  * instantly on-device; `ai` insights come from Claude and win when current.
  */
@@ -491,6 +524,8 @@ export interface ThreadInsight {
   produced?: ProducedItem[];
   /** AI insights: the analysis format that wrote this record (absent = 1). See ANALYSIS_VERSION. */
   analysisVersion?: number;
+  /** Coding-agent sessions only: what the run did. Absent on older records and other threads. */
+  agentRun?: AgentRunFacts | null;
 }
 
 export function insightKeyFor(source: ThreadInsight['source'], threadKey: string): string {
@@ -792,6 +827,16 @@ export interface SettingsRecord {
   lastActiveQueue: ResurfaceQueue | 'all';
   /** Toolbar button behaviour: side panel (default), in-page overlay, or a full tab. */
   launchSurface: 'side_panel' | 'overlay' | 'tab';
+  /** Workspace view the full page opens on (Browse, Threads or Dashboard). */
+  activeView: WorkspaceView;
+  /** How the Threads list is grouped. */
+  threadsGroupBy: ThreadsGroupBy;
+  /** What the Threads detail pane shows: the summary, the live page, or both side by side. */
+  detailMode: DetailMode;
+  /** `solid` swaps translucent surfaces for opaque ones (comfort, contrast, slower GPUs). */
+  surfaces: 'glass' | 'solid';
+  /** Most embedded pages kept loaded at once (2 to 12). */
+  maxLiveFrames: number;
   /** Where Claude requests go. */
   aiBackend: AiBackend;
   anthropicApiKey: string;
@@ -843,6 +888,11 @@ export interface SettingsRecord {
   lastAiError?: string | null;
   lastAiErrorAt?: string | null;
 }
+
+export const THREADS_GROUP_BY = ['none', 'project', 'repository', 'account'] as const;
+export type ThreadsGroupBy = (typeof THREADS_GROUP_BY)[number];
+export const DETAIL_MODES = ['summary', 'live', 'split'] as const;
+export type DetailMode = (typeof DETAIL_MODES)[number];
 
 const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
   chatgpt: 'acct_chatgpt_primary',
@@ -940,6 +990,11 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   lastActiveArea: 'All threads',
   lastActiveQueue: 'all',
   launchSurface: 'side_panel',
+  activeView: 'threads',
+  threadsGroupBy: 'none',
+  detailMode: 'summary',
+  surfaces: 'glass',
+  maxLiveFrames: DEFAULT_MAX_LIVE_FRAMES,
   aiBackend: 'anthropic',
   anthropicApiKey: '',
   aws: { ...DEFAULT_AWS_SETTINGS },
@@ -988,6 +1043,14 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
     ...DEFAULT_SETTINGS,
     ...base,
     id: 'default',
+    // Records written before endpoint selection used api.voyageai.com. Keep their
+    // keys on that host; Atlas-issued keys require an explicit endpoint choice.
+    voyageEndpoint:
+      base.voyageEndpoint === 'mongodb' || base.voyageEndpoint === 'legacy'
+        ? base.voyageEndpoint
+        : typeof base.voyageApiKey === 'string' && base.voyageApiKey.trim()
+          ? 'legacy'
+          : DEFAULT_SETTINGS.voyageEndpoint,
     authorizedHosts: {
       ...DEFAULT_SETTINGS.authorizedHosts,
       ...(base.authorizedHosts ?? {}),
@@ -1006,28 +1069,24 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
     },
     sidebarDock: normalizeSidebarDock(base.sidebarDock),
     paperclip: normalizePaperclipSettings(base.paperclip),
+    activeView: WORKSPACE_VIEWS.includes(base.activeView as WorkspaceView)
+      ? (base.activeView as WorkspaceView)
+      : DEFAULT_SETTINGS.activeView,
+    threadsGroupBy: THREADS_GROUP_BY.includes(base.threadsGroupBy as ThreadsGroupBy)
+      ? (base.threadsGroupBy as ThreadsGroupBy)
+      : DEFAULT_SETTINGS.threadsGroupBy,
+    detailMode: DETAIL_MODES.includes(base.detailMode as DetailMode)
+      ? (base.detailMode as DetailMode)
+      : DEFAULT_SETTINGS.detailMode,
+    surfaces: base.surfaces === 'solid' ? 'solid' : 'glass',
+    maxLiveFrames:
+      typeof base.maxLiveFrames === 'number' && Number.isFinite(base.maxLiveFrames)
+        ? Math.min(12, Math.max(2, Math.round(base.maxLiveFrames)))
+        : DEFAULT_SETTINGS.maxLiveFrames,
   };
 }
 
-export function computeDeterministicHash(input: string): string {
-  let h1 = 0xdeadbeef ^ input.length;
-  let h2 = 0x41c6ce57 ^ input.length;
-  for (let i = 0, ch; i < input.length; i++) {
-    ch = input.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 =
-    Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
-    Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 =
-    Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
-    Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (
-    (h2 >>> 0).toString(16).padStart(8, '0') +
-    (h1 >>> 0).toString(16).padStart(8, '0')
-  );
-}
+export { computeDeterministicHash } from './hash.js';
 
 export function getDisplayTitle(conv: ConversationRecord): string {
   if (conv.manualTitleOverride && conv.manualTitleOverride.trim().length > 0) {

@@ -92,6 +92,7 @@ function analysisFor(body) {
     actionItems: isPayments ? [{ text: 'Write a replay test for duplicate events', messageNumber: 3, quote: "I'll write the replay test tomorrow", by: 'user', rationale: null }] : [],
     openQuestions: isPayments ? [{ text: 'Should Claude draft the migration?', messageNumber: 4, quote: 'Would you like me to draft the migration', by: 'assistant', rationale: null }] : [],
     produced: isPayments ? [{ label: 'webhooks.ts', kind: 'code', description: 'Stripe webhook handler', messageNumber: 2 }] : [],
+    agentRun: null,
   };
 }
 

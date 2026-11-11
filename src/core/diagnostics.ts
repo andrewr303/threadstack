@@ -17,7 +17,8 @@ export type ManifestIssueCode =
   | 'stale_manifest'
   | 'dynamic_url_war'
   | 'manager_not_web_accessible'
-  | 'side_panel_unavailable';
+  | 'side_panel_unavailable'
+  | 'missing_permissions';
 
 export interface ManifestIssue {
   code: ManifestIssueCode;
@@ -40,7 +41,14 @@ export interface ManifestLike {
   version_name?: string;
   web_accessible_resources?: WarEntry[];
   side_panel?: unknown;
+  permissions?: string[];
 }
+
+/**
+ * Permissions the workspace needs from the manifest (neither adds an install warning). A running
+ * manifest without them is an unpacked build that was rebuilt but not reloaded.
+ */
+export const REQUIRED_WORKSPACE_PERMISSIONS = ['cookies', 'declarativeNetRequestWithHostAccess'] as const;
 
 export type BrowserName = 'Microsoft Edge' | 'Google Chrome' | 'Chromium' | 'Other';
 
@@ -89,6 +97,19 @@ export function assessManifest(
     });
   }
 
+  // Only a manifest that lists its permissions is judged; a partial one (tests, old callers) is not.
+  if (Array.isArray(manifest.permissions)) {
+    const missing = REQUIRED_WORKSPACE_PERMISSIONS.filter((p) => !manifest.permissions!.includes(p));
+    if (missing.length > 0) {
+      issues.push({
+        code: 'missing_permissions',
+        severity: 'error',
+        message: `The running manifest lacks the ${missing.join(' and ')} permission${missing.length > 1 ? 's' : ''} this build needs to open AI sites inside Threadkeeper. The browser reads manifest.json only when the extension is reloaded.`,
+        fix: reloadHint,
+      });
+    }
+  }
+
   const entries = manifest.web_accessible_resources ?? [];
   if (entries.some((e) => typeof e === 'object' && e.use_dynamic_url === true)) {
     issues.push({
@@ -128,7 +149,7 @@ export function assessManifest(
 
 /** Issues that reloading the extension can fix. */
 export function reloadWouldHelp(health: ManifestHealth): boolean {
-  return health.issues.some((i) => i.code === 'stale_manifest' || i.code === 'dynamic_url_war');
+  return health.issues.some((i) => i.code === 'stale_manifest' || i.code === 'dynamic_url_war' || i.code === 'missing_permissions');
 }
 
 export const AUTO_RELOAD_KEY = 'tk_auto_reload_build';

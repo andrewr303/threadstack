@@ -632,6 +632,7 @@ describe('Claude analysis pipeline (mocked Anthropic API)', () => {
     actionItems: [{ text: 'Write the replay test', messageNumber: 4, quote: 'write a test that replays the same event', by: 'assistant', rationale: 'ignored outside decisions' }],
     openQuestions: [{ text: 'Hallucinated question', messageNumber: 2, quote: 'this quote does not exist anywhere', by: 'user', rationale: null }],
     produced: [{ label: 'webhooks.ts', kind: 'code', description: 'Webhook handler that skips processed event ids', messageNumber: 2 }],
+    agentRun: null,
   };
 
   async function seed(db: ThreadkeeperDB, key = 'sk-ant-test') {

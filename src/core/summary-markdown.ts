@@ -43,6 +43,13 @@ export const WORKFLOW_STATE_LABELS: Record<WorkflowState, string> = {
   archived: 'Archived',
 };
 
+const AGENT_WAITING_LABELS = {
+  permission: 'your approval',
+  input: 'your answer',
+  ci: 'CI checks',
+  external: 'something outside the run',
+} as const;
+
 /**
  * One line of untrusted text, safe to embed in Markdown: whitespace collapsed, raw HTML and link syntax
  * neutralized, and a leading block marker (heading, quote, list, table, rule) escaped so the text can
@@ -196,6 +203,35 @@ export function buildSummaryMarkdown(input: SummaryMarkdownInput, options: Summa
           `- **${mdInline(p.label)}** (${p.kind})${p.description ? ` — ${mdInline(p.description)}` : ''}${mdRefs([p.messageIndex])}`
       )
     );
+  }
+
+  const run = insight?.agentRun;
+  if (run) {
+    const lines: string[] = [];
+    const repository = run.repository ?? conv.repository;
+    if (repository) lines.push(`- **Repository:** ${mdCode(repository)}`);
+    if (run.branch) lines.push(`- **Branch:** ${mdCode(run.branch)}`);
+    if (run.pullRequests.length) {
+      const links = run.pullRequests.map((p) => {
+        const url = /^https:\/\//.test(p.url) ? p.url.replace(/[<>\s]/g, '') : '';
+        return url ? `<${url}>${p.state === 'unknown' ? '' : ` (${p.state})`}` : '';
+      });
+      lines.push(`- **Pull requests:** ${links.filter(Boolean).join(', ')}`);
+    }
+    if (run.filesChanged.length) lines.push(`- **Files changed:** ${run.filesChanged.map((f) => mdCode(f)).join(', ')}`);
+    if (run.commandsRun.length) {
+      lines.push('- **Commands:**');
+      for (const c of run.commandsRun) lines.push(`  - ${mdCode(c.command)}${c.outcome === 'unknown' ? '' : ` (${c.outcome})`}`);
+    }
+    if (run.tests.status !== 'unknown') {
+      const status = run.tests.status === 'not_run' ? 'not run' : run.tests.status;
+      lines.push(`- **Tests:** ${status}${run.tests.detail ? ` (${mdInline(run.tests.detail)})` : ''}`);
+    }
+    if (run.blockedOn !== 'none') lines.push(`- **Waiting on:** ${AGENT_WAITING_LABELS[run.blockedOn]}`);
+    if (lines.length) {
+      push(h('Agent run'));
+      push(...lines);
+    }
   }
 
   if (options.context !== false) {

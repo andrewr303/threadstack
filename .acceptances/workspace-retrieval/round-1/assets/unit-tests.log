@@ -1,0 +1,214 @@
+
+> threadkeeper@0.5.0 test
+> vitest run --reporter=dot
+
+
+ RUN  v3.2.7 /Users/andrew/.synara/worktrees/0e09/synara
+
+··········································································································································································································stdout | tests/unit/retrieval-eval.test.ts > offline retrieval evaluation (synthetic fixtures, on-device path) > reports the labelled query set before and after
+variant | recall@5 | recall@10 | MRR | nDCG@10 | no-answer results
+manager first stage, baseline | 0.885 | 0.935 | 0.87 | 0.871 | 0.5
+manager lexical only | 0.885 | 0.935 | 0.83 | 0.835 | 0.5
+manager first stage, current | 0.885 | 0.935 | 0.87 | 0.871 | 0.5
+Still search (dock), current | 0.831 | 0.863 | 0.783 | 0.804 | 0
+(per-query detail: /var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-retrieval-eval.json)
+
+·································································································································································································································································································································stderr | tests/unit/dashboard-view.test.tsx > DashboardView > gives each pane a slot for its thread tab and a name
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+
+········stderr | tests/unit/dashboard-view.test.tsx > DashboardView > focuses a pane from its header
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > unpins and opens in Browse from the pane header
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+
+···········································································stderr | tests/unit/dashboard-view.test.tsx > DashboardView > swaps a session from the menu and closes it with Escape, returning focus
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+
+·······stderr | tests/unit/dashboard-view.test.tsx > DashboardView > offers unplaced pinned sessions in an empty pane, or says all are placed
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > focuses a pane with Alt+number only while the dashboard is showing
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:180:3)
+    at section
+    at DashboardPane (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/dashboard/DashboardView.tsx:27:60)
+    at FrameStage (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/FrameStage.tsx:27:23)
+    at WorkspaceProvider (/Users/andrew/.synara/worktrees/0e09/synara/src/entrypoints/manager/workspace/context.tsx:9:30)
+
+·························································································································································································································································································································································································································································································································································································································
+
+ Test Files  69 passed (69)
+      Tests  1214 passed (1214)
+   Start at  17:38:03
+   Duration  10.50s (transform 2.05s, setup 0ms, collect 11.99s, tests 28.02s, environment 15.83s, prepare 3.26s)
+

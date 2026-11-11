@@ -615,5 +615,82 @@ describe('existing Codex rollouts', () => {
       modelSlug: 'gpt-5.5-codex',
     });
     expect(r.thread.siblingBranchIds).toBeUndefined();
+    expect(r.thread.repository).toBe('acme/orders-api');
+  });
+
+  it('leaves repository unset when the log names no remote, and reads a pull request from a tool result', () => {
+    const fn = (output: string, n: number) => ({
+      timestamp: at(2, n),
+      type: 'response_item',
+      payload: { type: 'function_call_output', output },
+    });
+    const r = rollout(
+      [meta({ id: P }, at(0)), ...parentTurns, fn('Created https://github.com/Acme/Orders-API/pull/12?x=1', 1)],
+      'rollout-x.jsonl'
+    );
+    expect(r.thread.repository).toBeUndefined();
+    expect(r.thread.pullRequestUrl).toBe('https://github.com/acme/orders-api/pull/12');
+  });
+});
+
+describe('Claude Code repository and tool runs', () => {
+  const toolUse = (uuid: string, command: string) => ({
+    type: 'assistant',
+    sessionId: SESSION,
+    uuid,
+    timestamp: nextTs(),
+    message: {
+      id: `msg_${uuid}`,
+      role: 'assistant',
+      model: 'claude-opus-5-5',
+      content: [{ type: 'tool_use', id: `tu_${uuid}`, name: 'Bash', input: { command } }],
+    },
+  });
+  const toolResult = (uuid: string, text: string, isError = false) =>
+    ccUser(uuid, [{ type: 'tool_result', tool_use_id: 'x', content: text, is_error: isError }]);
+
+  it('reads a remote from a record field or git remote output, and a pull request from a result', () => {
+    const t = parseClaudeCodeSession(
+      jsonl([
+        ccUser('u1', 'open a PR'),
+        toolUse('a1', 'git remote -v'),
+        toolResult('r1', 'origin\tgit@github.com:Acme/Webhooks.git (fetch)\norigin\tgit@github.com:Acme/Webhooks.git (push)'),
+        toolUse('a2', 'gh pr create'),
+        toolResult('r2', 'https://github.com/acme/webhooks/pull/5'),
+      ]),
+      ACCOUNT
+    )!;
+    expect(t.repository).toBe('acme/webhooks');
+    expect(t.pullRequestUrl).toBe('https://github.com/acme/webhooks/pull/5');
+    const withField = parseClaudeCodeSession(
+      jsonl([ccUser('u1', 'hi', { gitRemoteUrl: 'https://github.com/acme/api' }), ccAssistant('a1', 'ok')]),
+      ACCOUNT
+    )!;
+    expect(withField.repository).toBe('acme/api');
+    const none = parseClaudeCodeSession(jsonl([ccUser('u1', 'hi'), ccAssistant('a1', 'ok')]), ACCOUNT)!;
+    expect(none.repository).toBeUndefined();
+    expect(none.pullRequestUrl).toBeUndefined();
+  });
+
+  it('keeps short tool runs whole and the end of a long run, with a marker in the middle', () => {
+    const short = parseClaudeCodeSession(
+      jsonl([ccUser('u1', 'run tests'), toolUse('a1', 'npm test -- invoice'), toolResult('r1', '1 failing')]),
+      ACCOUNT
+    )!;
+    expect(short.messages.map((m) => m.role)).toEqual(['user', 'tool']);
+    expect(short.messages[1].content).toBe('[tool] Bash: npm test -- invoice\n[tool result] 1 failing');
+
+    const records: object[] = [ccUser('u1', 'run tests')];
+    for (let i = 0; i < 12; i++) {
+      records.push(toolUse(`a${i}`, `step ${i}`), toolResult(`r${i}`, `output ${i} ${'x'.repeat(300)}`));
+    }
+    records.push(toolUse('az', 'npm test'), toolResult('rz', '3 failing', true), ccAssistant('as', 'Three tests fail.'));
+    const long = parseClaudeCodeSession(jsonl(records), ACCOUNT)!;
+    const run = long.messages[1].content;
+    expect(long.messages.map((m) => m.role)).toEqual(['user', 'tool', 'assistant']);
+    expect(run.length).toBeLessThanOrEqual(2400);
+    expect(run.startsWith('[tool] Bash: step 0')).toBe(true);
+    expect(run.endsWith('[tool error] 3 failing')).toBe(true);
+    expect(run.split('\n').filter((l) => l === '[…]')).toHaveLength(1);
   });
 });

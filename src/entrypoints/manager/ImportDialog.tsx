@@ -7,6 +7,7 @@ import { parseChatGPTExport } from '../../core/adapters.js';
 import { upsertThread } from '../../core/db.js';
 import { sharedDb } from './shared.js';
 import { CatchUpSection } from './CatchUp.js';
+import { SessionControlImportSection } from './accounts/SessionControlImportSection.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -217,6 +218,8 @@ export function ImportDialog({ dialogRef, settings, onImported, onOpenThread, on
           </ul>
         )}
       </section>
+
+      <SessionControlImportSection settings={settings} onImported={onImported} />
 
       {(busy || result) && (
         <div className="tk-settings-result" role="status" aria-live="polite">
