@@ -70,6 +70,7 @@ import {
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
 import { autoHealStaleManifest, readDiskBuildInfo } from '../core/diagnostics.js';
 import { BUILD_INFO } from '../core/build-info.js';
+import { backupNow, backupStatus, chromeBackupEnv, maybeAutoBackup, restoreFromHelper } from '../core/backup-helper.js';
 import {
   PAPERCLIP_SYNC_ALARM,
   PAPERCLIP_SYNC_PERIOD_MINUTES,
@@ -1053,6 +1054,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onStartup) {
 if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'threadkeeper-resumable-jobs') {
+      // Library backup to disk through the Mac helper: only when the library changed and the
+      // last backup is old enough (backup-helper.ts); a quick no-op otherwise.
+      void maybeAutoBackup(db, chromeBackupEnv(BUILD_INFO.version));
       void processResumableJobs(db, async (job) => {
         if (job.jobType === 'enrich_thread') {
           await requestThreadEnrichment(db, job.threadKey);
@@ -1099,6 +1103,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       }
 
       // Workspace commands: the sender is Threadkeeper's manager page as a top-level tab.
+      if (type === 'BACKUP_STATUS' || type === 'BACKUP_NOW' || type === 'BACKUP_RESTORE') {
+        const backupEnv = chromeBackupEnv(BUILD_INFO.version);
+        try {
+          if (type === 'BACKUP_STATUS') sendResponse(await backupStatus(db, backupEnv));
+          else if (type === 'BACKUP_NOW') sendResponse(await backupNow(db, backupEnv));
+          else sendResponse(await restoreFromHelper(db, backupEnv, message.name));
+        } catch {
+          sendResponse({ ok: false, error: 'Threadkeeper could not reach its backups. Try again.' });
+        }
+        return;
+      }
       if (WORKSPACE_COMMAND_TYPES.has(type) && typeof sender.tab?.id === 'number') {
         sendResponse(
           await handleWorkspaceCommand(message, sender.tab.id, {

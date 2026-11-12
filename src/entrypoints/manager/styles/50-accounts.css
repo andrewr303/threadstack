@@ -262,6 +262,25 @@
 }
 .tk-acct-steps { margin: 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-13); line-height: 1.5; }
 
+.tk-acct-backups { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line-2); }
+.tk-acct-backup-offer {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 12px 14px;
+  border-radius: var(--r-row); border: 1px solid var(--line-2); background: var(--surface-2);
+}
+.tk-acct-backup-offer p { margin: 0; flex: 1 1 240px; font-size: var(--fs-13); color: var(--text); }
+.tk-acct-backup-list { margin: 10px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.tk-acct-backup-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; border-radius: var(--r-row); border: 1px solid var(--line-2); background: var(--surface);
+}
+.tk-acct-backup-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tk-acct-backup-when { font-size: var(--fs-13); color: var(--text); font-variant-numeric: tabular-nums; }
+.tk-acct-backup-detail { font-size: var(--fs-12); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.tk-acct-backup-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--fs-12); color: var(--text-2); }
+.tk-acct-backup-action { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 20px; font-size: var(--fs-13); color: var(--text-2); }
+.tk-acct-backup-action [data-state="done"], .tk-acct-backup-action [data-state="failed"] { color: var(--text); font-weight: 600; }
+
 /* ---------- Session Control import ---------- */
 .tk-acct-preview { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding: 12px 14px; border-radius: var(--r-row); border: 1px solid var(--line-2); background: var(--surface); }
 .tk-acct-preview-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }

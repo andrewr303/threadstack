@@ -1,0 +1,5 @@
+{
+  "comment": "Public key that gives Threadkeeper the same extension ID wherever its folder is. Read by scripts/build-extension.mjs and mac-helper/install.cjs. It is not a secret.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApvrGnhmA2vHp2W45gA871tyZk/hmgpBmBwYgcoJFK96pM61H4Ga+/LIxUoWGm5KqYlwZesDvp4gmDQLbUUtr0+v1UE0PXG6wZ1htWmdu8lAulCw0fCThm1LhlQ+Iye6z7W6XQchHcWSqst/hsHoCEDUyO5V5EKuV090MY6OI6Ijlp8s8cP2V3+xhLEyFZPwhcpApOkhIz22x5jHmM7zG0sDeK9oq1hPxnBjcVmn9MtoRsHpr9TWh/KmqrHtQ8oi83HJYpQeTy8T2iNLA/J2bCu/FGYZuHqT6ruCx+OsvCS7Bf/cFYrHqLWgro7c3TreykCFG1tIbUVkWL5YgRL17iQIDAQAB",
+  "extensionId": "mghbljnkgfnplmninoihehfeepmmiidk"
+}

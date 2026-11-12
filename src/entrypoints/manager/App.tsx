@@ -23,6 +23,7 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.js';
 import type { RelatedThread } from './ThreadOverview.js';
 import { StaleBuildBanner, useDiagnostics } from './Diagnostics.js';
+import { RestoreOfferBanner } from './accounts/RestoreOfferBanner.js';
 import { SendToStillDialog, type SendRequest } from './SidebarDock.js';
 import { configureDockClient, dockSyncNow, useDockState } from './dock.js';
 import { isRemoteAllowed } from '../../core/privacy.js';
@@ -1000,6 +1001,7 @@ export function App() {
               </Rail>
               <div className="tk-main">
                 <StaleBuildBanner snapshot={diagnostics.snapshot} />
+                <RestoreOfferBanner threads={counts ? counts.totalThreads : null} />
                 <section className="tk-view tk-view-browse" aria-label="Browse" hidden={view !== 'browse'}>
                   <BrowseView />
                 </section>
