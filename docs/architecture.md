@@ -96,6 +96,35 @@ signed-in person): each real provider working fully inside a frame (sending, str
 steps that redirect to another host), bot challenges inside frames, the identity response shapes of the
 real sites, and whether a provider keeps account state outside cookies.
 
+## Online import: bounded steps, accounts, coding sessions, analysis afterwards (2026-11-12)
+
+"Import from online accounts" (Catch up, `sync-orchestrator.ts`) bounds every wait: each browser,
+database and page step has a ceiling (`STEP_TIMEOUTS`), page requests abort after 30 s
+(`site-history.ts`), and a cancel ends whatever is pending. A stuck site fails with the step it was on
+(no host access, page did not load, sign-in page or bot check, reader did not answer, tab closed,
+three tab-by-tab conversations in a row not captured) and the run moves to the next site. The state is
+saved at every step change with a heartbeat; while a run is going the library asks the worker every
+5 s, and a worker that starts with a saved running state (it was stopped) ends that run as
+interrupted, which the library offers to continue. A page reader whose run the worker no longer
+knows is told to stop.
+
+Before listing, the page asks its own site who is signed in (`/api/auth/session`, `/api/account`,
+parsed by `accounts/identity.ts`); the answer goes through `noteIdentity` like a page's own report,
+then the run settles one account per site and files every thread under it. If the realm's active
+account changes mid-run the site stops, so two accounts never mix; a second account's run adds its
+own threads (the account is in the thread key).
+
+Claude Code (claude.ai/code) and Codex (chatgpt.com/codex) are tab-by-tab sites: their session list is
+read from the page's links in a tab of their own and each session is opened and captured like one the
+person opens (repository, pull request and run state come from the page, as for any capture). No
+endpoint is used for them because none is established; all history reads up to 300 sessions.
+
+Hosted analysis waits for the run: the run holds a database row (`analysis-hold.ts`) that stops job
+leasing in `runAnalysisJobs` (worker and pages alike) and alarm scheduling; on-device organizing still
+runs per thread. When the run ends (finished, cancelled, failed, or found dead after a restart) the
+hold is released, the jobs queued during it are made due at once and the queue is kicked. A hold not
+renewed for 10 minutes stops counting.
+
 ## Retrieval continuation (2026-11-10)
 
 The manager searches its extension-owned IndexedDB corpus; it does not query an Atlas database.

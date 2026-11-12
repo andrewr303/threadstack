@@ -8,8 +8,11 @@ import { validateSiteConversation, type SiteConversation } from './site-api.js';
  * Two ways, chosen per site:
  * - "api": ChatGPT and Claude. The page's own signed-in session lists recent conversations and
  *   loads each one as JSON (complete, with ids, times and model), paced and cancellable.
- * - "sidebar": every other site. The sidebar's links are read and each conversation is opened in
- *   a background tab, where normal capture reads it. Slower, and only as good as the site's DOM.
+ * - "sidebar": every other site, and the coding-agent pages (Claude Code on claude.ai/code, Codex
+ *   on chatgpt.com/codex), whose session lists are not read through any endpoint Threadkeeper
+ *   knows. The list's links are read and each conversation is opened in a background tab, where
+ *   normal capture reads it (for coding sessions that includes the repository, pull request and
+ *   run state the page shows). Slower, and only as good as the site's DOM.
  *
  * Nothing here runs unless the user starts it, and it only ever reads.
  */
@@ -17,6 +20,8 @@ import { validateSiteConversation, type SiteConversation } from './site-api.js';
 export type SyncProviderId =
   | 'chatgpt'
   | 'claude'
+  | 'claude_code'
+  | 'codex'
   | 'grok'
   | 'gemini'
   | 'perplexity'
@@ -35,6 +40,16 @@ export interface SyncProviderInfo {
   hostPatterns: string[];
   /** What the user should expect, shown before they start. */
   note: string;
+  /** Can read the whole history the account lists, not only the recent part. */
+  allHistory: boolean;
+  /**
+   * The list lives on one page of a shared host (claude.ai/code, chatgpt.com/codex): the run
+   * always opens that page in its own background tab instead of borrowing a tab of the host,
+   * which may show something else and is the person's to scroll.
+   */
+  ownListTab?: boolean;
+  /** Which signed-in session the site's own identity request reads (chatgpt.com or claude.ai). */
+  identityHost?: 'chatgpt' | 'claude';
 }
 
 const patterns = (id: CaptureProviderId) => PROVIDERS[id].matchPatterns;
@@ -47,6 +62,8 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://chatgpt.com/',
     hostPatterns: patterns('chatgpt'),
     note: 'Complete history with dates, read through your signed-in session.',
+    allHistory: true,
+    identityHost: 'chatgpt',
   },
   {
     id: 'claude',
@@ -55,6 +72,30 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://claude.ai/new',
     hostPatterns: patterns('claude'),
     note: 'Complete history with dates, read through your signed-in session.',
+    allHistory: true,
+    identityHost: 'claude',
+  },
+  {
+    id: 'claude_code',
+    label: 'Claude Code',
+    strategy: 'sidebar',
+    homeUrl: 'https://claude.ai/code',
+    hostPatterns: patterns('claude_code'),
+    note: 'Opens each Claude Code session from your session list in a background tab, with its repository and pull request when the page shows them.',
+    allHistory: true,
+    ownListTab: true,
+    identityHost: 'claude',
+  },
+  {
+    id: 'codex',
+    label: 'Codex',
+    strategy: 'sidebar',
+    homeUrl: 'https://chatgpt.com/codex',
+    hostPatterns: patterns('codex'),
+    note: 'Opens each Codex task from your task list in a background tab, with its repository and pull request when the page shows them.',
+    allHistory: true,
+    ownListTab: true,
+    identityHost: 'chatgpt',
   },
   {
     id: 'gemini',
@@ -63,6 +104,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://gemini.google.com/app',
     hostPatterns: patterns('gemini'),
     note: 'Opens your most recent chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'grok',
@@ -71,6 +113,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://grok.com/',
     hostPatterns: patterns('grok'),
     note: 'Opens your most recent chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'perplexity',
@@ -79,6 +122,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://www.perplexity.ai/library',
     hostPatterns: patterns('perplexity'),
     note: 'Opens your most recent threads one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'deepseek',
@@ -87,6 +131,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://chat.deepseek.com/',
     hostPatterns: patterns('deepseek'),
     note: 'Opens your most recent chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'kimi',
@@ -95,6 +140,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://www.kimi.com/',
     hostPatterns: patterns('kimi'),
     note: 'Opens your most recent chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'mistral',
@@ -103,6 +149,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://chat.mistral.ai/chat',
     hostPatterns: patterns('mistral'),
     note: 'Opens your most recent chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'copilot',
@@ -111,6 +158,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://copilot.microsoft.com/',
     hostPatterns: patterns('copilot'),
     note: 'Opens your most recent chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
   {
     id: 'ai_studio',
@@ -119,6 +167,7 @@ export const SYNC_PROVIDERS: SyncProviderInfo[] = [
     homeUrl: 'https://aistudio.google.com/library',
     hostPatterns: patterns('ai_studio'),
     note: 'Opens your most recent saved chats one by one. No dates, so it takes the newest ones.',
+    allHistory: false,
   },
 ];
 
@@ -135,6 +184,13 @@ export const SYNC_MAX_DAYS = 31;
 /** Conversations read per site in one run. The sidebar way opens a tab for each, so it is lower. */
 export const SYNC_MAX_API = 300;
 export const SYNC_MAX_SIDEBAR = 30;
+/** Coding sessions read in an all-history run: each one is a tab, so there is still a ceiling. */
+export const SYNC_MAX_SIDEBAR_ALL = 300;
+
+/** How many list entries a tab-by-tab run reads for this site and scope. */
+export function sidebarLimit(info: SyncProviderInfo, scope: 'recent' | 'all'): number {
+  return scope === 'all' && info.allHistory ? SYNC_MAX_SIDEBAR_ALL : SYNC_MAX_SIDEBAR;
+}
 
 export interface SyncRequest {
   providers: SyncProviderId[];
@@ -156,6 +212,20 @@ export function syncCutoffMs(days: number, now: number): number {
 // ---------------------------------------------------------------------------
 
 export type SyncErrorCode = 'needs_login' | 'blocked' | 'rate_limited' | 'unsupported' | 'network' | 'no_conversations' | 'timeout';
+
+/**
+ * Failures the service worker finds itself (never reported by a page): each names what was being
+ * waited for, so a stuck step says which one it was.
+ */
+export type SyncStepErrorCode =
+  | 'no_access'
+  | 'page_timeout'
+  | 'no_reader'
+  | 'tab_closed'
+  | 'account_changed'
+  | 'capture_failed'
+  | 'step_timeout'
+  | 'interrupted';
 
 export type SyncEvent =
   | { kind: 'phase'; runId: string; provider: SyncProviderId; phase: 'listing' | 'fetching'; total: number | null; message: string | null }
@@ -226,7 +296,12 @@ export function validateSyncEvent(value: unknown): SyncEvent | null {
 // State shown in the UI
 // ---------------------------------------------------------------------------
 
-export type SyncProviderStatus = 'queued' | 'opening' | 'listing' | 'fetching' | 'done' | 'error' | 'cancelled';
+export type SyncProviderStatus = 'queued' | 'opening' | 'account' | 'listing' | 'fetching' | 'done' | 'error' | 'cancelled';
+
+/** Statuses a run never leaves: anything else is still in progress. */
+export function isFinishedStatus(status: SyncProviderStatus): boolean {
+  return status === 'done' || status === 'error' || status === 'cancelled';
+}
 
 export interface SyncProviderState {
   provider: SyncProviderId;
@@ -241,6 +316,17 @@ export interface SyncProviderState {
   skipped: number;
   failed: number;
   message: string | null;
+  /** The account this site's threads are filed under in this run (its label), when known. */
+  account?: string | null;
+  /** When the current step began (ISO), so a page can tell a slow step from a stuck one. */
+  stepAt?: string | null;
+}
+
+/** Claude analysis of what the run brought in, which starts only once the run has ended. */
+export interface SyncAnalysisState {
+  /** Threads whose analysis was waiting for the run and was started when it ended. */
+  queued: number;
+  at: string;
 }
 
 export interface SyncState {
@@ -251,6 +337,11 @@ export interface SyncState {
   startedAt: string | null;
   finishedAt: string | null;
   providers: SyncProviderState[];
+  /** Last time the worker running this saved it; a page uses it to notice a run nobody is driving. */
+  heartbeatAt?: string | null;
+  /** The worker stopped mid-run; the unfinished sites can be started again. */
+  interrupted?: boolean;
+  analysis?: SyncAnalysisState | null;
 }
 
 export const EMPTY_SYNC_STATE: SyncState = { runId: null, running: false, days: SYNC_DEFAULT_DAYS, startedAt: null, finishedAt: null, providers: [] };
@@ -266,7 +357,7 @@ export function initialSyncState(runId: string, req: SyncRequest, nowIso: string
     providers: req.providers.flatMap((id) => {
       const info = syncProviderInfo(id);
       return info
-        ? [{ provider: id, label: info.label, strategy: info.strategy, status: 'queued' as const, listed: 0, stored: 0, skipped: 0, failed: 0, message: null }]
+        ? [{ provider: id, label: info.label, strategy: info.strategy, status: 'queued' as const, listed: 0, stored: 0, skipped: 0, failed: 0, message: null, account: null, stepAt: null }]
         : [];
     }),
   };
@@ -280,8 +371,24 @@ export function updateProvider(state: SyncState, provider: SyncProviderId, patch
 }
 
 /** Plain words for what each error means and what to do about it. */
-export function describeSyncError(code: SyncErrorCode, label: string): string {
+export function describeSyncError(code: SyncErrorCode | SyncStepErrorCode, label: string): string {
   switch (code) {
+    case 'no_access':
+      return `Threadkeeper is not allowed to read ${label}. Turn ${label} on under Settings, Capture, allow access when asked, and try again.`;
+    case 'page_timeout':
+      return `${label} did not finish loading in time. Check that ${label} opens in a normal tab, then try again.`;
+    case 'no_reader':
+      return `Threadkeeper could not start reading the ${label} page. Reload any open ${label} tab and try again.`;
+    case 'tab_closed':
+      return `The ${label} tab was closed during the import. What was imported so far is kept.`;
+    case 'account_changed':
+      return `The ${label} account signed in changed during the import, so it stopped to keep each account's threads apart. Run the import again for the account now signed in.`;
+    case 'capture_failed':
+      return `${label} did not show the conversations Threadkeeper opened. Check that you are signed in and that a conversation opens in a normal tab. What was imported so far is kept.`;
+    case 'step_timeout':
+      return `${label} stopped responding, so Threadkeeper moved on. What was imported so far is kept.`;
+    case 'interrupted':
+      return `The browser stopped the extension during the import. What was imported is kept; continue the import to finish ${label}.`;
     case 'needs_login':
       return `Sign in to ${label} in this browser, then run Catch up again.`;
     case 'blocked':

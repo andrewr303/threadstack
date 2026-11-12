@@ -7,6 +7,8 @@ import {
 } from './site-api.js';
 import type { SyncErrorCode, SyncEvent } from './history-sync.js';
 import { describeSyncError } from './history-sync.js';
+import { parseIdentity } from './accounts/identity.js';
+import type { AccountIdentity } from './workspace/types.js';
 
 /**
  * Reads recent conversations from ChatGPT and Claude through the page's own signed-in session.
@@ -38,7 +40,12 @@ export interface ApiSyncParams {
   isCancelled: () => boolean;
   sleep: (ms: number) => Promise<void>;
   random?: () => number;
+  /** A request (headers and body) that takes longer than this is abandoned and counts as a failure. */
+  requestTimeoutMs?: number;
 }
+
+/** A site that holds a request open never ends a run: each one is abandoned after this long. */
+export const REQUEST_TIMEOUT_MS = 30_000;
 
 interface ListedConversation {
   id: string;
@@ -76,24 +83,70 @@ function rec(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
-/** GET JSON with retry on 429 and 5xx; maps auth and challenge answers to a stop. */
+type FetchParams = Pick<ApiSyncParams, 'fetchImpl' | 'requestTimeoutMs'>;
+
+/**
+ * One GET with a deadline covering the headers and the body. The abort reaches the body too, so a
+ * response that starts and then never finishes is abandoned as well. A timeout is a 'network'
+ * failure: retried like one, and never mistaken for a challenge page.
+ */
+async function timedGet(
+  p: FetchParams,
+  url: string,
+  headers: Record<string, string>
+): Promise<{ res: Response; read: () => Promise<unknown>; done: () => void } | null> {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const ms = p.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller?.abort();
+      reject(new SyncFailure('network', 'timed out'));
+    }, ms);
+  });
+  deadline.catch(() => undefined);
+  const done = () => clearTimeout(timer);
+  try {
+    const res = await Promise.race([
+      p.fetchImpl(url, { method: 'GET', credentials: 'include', headers: { Accept: 'application/json', ...headers }, signal: controller?.signal }),
+      deadline,
+    ]);
+    const read = async () => {
+      try {
+        return await Promise.race([res.json(), deadline]);
+      } catch (err) {
+        if (timedOut) throw new SyncFailure('network', 'timed out');
+        // A 200 that is a challenge page or a changed format, not JSON.
+        throw err instanceof SyncFailure ? err : new SyncFailure('blocked', 'not json');
+      } finally {
+        done();
+      }
+    };
+    return { res, read, done };
+  } catch {
+    done();
+    return null;
+  }
+}
+
+/** GET JSON with retry on 429, 5xx and timeouts; maps auth and challenge answers to a stop. */
 async function getJson(p: ApiSyncParams, url: string, headers: Record<string, string>): Promise<unknown> {
   let wait = 4000;
   for (let attempt = 1; ; attempt++) {
-    let res: Response;
-    try {
-      res = await p.fetchImpl(url, { method: 'GET', credentials: 'include', headers: { Accept: 'application/json', ...headers } });
-    } catch {
+    const got = await timedGet(p, url, headers);
+    if (!got) {
+      if (attempt < MAX_ATTEMPTS && !p.isCancelled()) {
+        await p.sleep(wait);
+        wait *= 2;
+        continue;
+      }
       throw new SyncFailure('network', 'network');
     }
-    if (res.ok) {
-      try {
-        return await res.json();
-      } catch {
-        // A 200 that is a challenge page or a changed format, not JSON.
-        throw new SyncFailure('blocked', 'not json');
-      }
-    }
+    const res = got.res;
+    if (res.ok) return got.read();
+    got.done();
     if (res.status === 401) throw new SyncFailure('needs_login', 'unauthorized');
     if (res.status === 403) throw new SyncFailure('blocked', 'forbidden');
     if ((res.status === 429 || res.status >= 500) && attempt < MAX_ATTEMPTS) {
@@ -235,6 +288,48 @@ async function listClaude(p: ApiSyncParams, org: string): Promise<ListedConversa
   }
   found.sort((a, b) => Date.parse(b.updatedAt ?? '') - Date.parse(a.updatedAt ?? ''));
   return found.slice(0, p.max);
+}
+
+// ---------------------------------------------------------------------------
+// Who is signed in
+// ---------------------------------------------------------------------------
+
+export type SignedInResult =
+  | { status: 'signed_in'; identity: Omit<AccountIdentity, 'observedAt'> }
+  | { status: 'signed_out' }
+  | { status: 'unknown' };
+
+/**
+ * Ask the site who is signed in, with the same requests its own pages make for that
+ * (core/accounts/identity.ts lists them and parses the answers strictly). An import files every
+ * thread under the account this names, so it is read before anything is listed. Anything the
+ * parser does not accept is 'unknown', never a guess: the run then files under the account
+ * Threadkeeper already has active, as a normal capture would.
+ */
+export async function readSignedInIdentity(p: FetchParams & { site: 'chatgpt' | 'claude'; origin: string }): Promise<SignedInResult> {
+  const url = p.site === 'chatgpt' ? `${p.origin}/api/auth/session` : `${p.origin}/api/account`;
+  const got = await timedGet(p, url, {});
+  if (!got) return { status: 'unknown' };
+  if (got.res.status === 401) {
+    got.done();
+    return { status: 'signed_out' };
+  }
+  if (!got.res.ok) {
+    got.done();
+    return { status: 'unknown' };
+  }
+  let json: unknown;
+  try {
+    json = await got.read();
+  } catch {
+    return { status: 'unknown' };
+  }
+  const identity = parseIdentity(p.site === 'chatgpt' ? 'chatgpt_session' : 'claude_account', json);
+  if (identity) return { status: 'signed_in', identity };
+  // ChatGPT answers a signed-out visitor with an empty session object.
+  const body = rec(json);
+  if (p.site === 'chatgpt' && body && Object.keys(body).length === 0) return { status: 'signed_out' };
+  return { status: 'unknown' };
 }
 
 // ---------------------------------------------------------------------------

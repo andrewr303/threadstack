@@ -5,13 +5,14 @@ import {
   SYNC_DEFAULT_DAYS,
   SYNC_PROVIDERS,
   type SyncProviderId,
-  type SyncProviderState,
   type SyncState,
 } from '../../core/history-sync.js';
 import { HISTORY_SYNC_STATE_KEY } from '../../core/sync-env.js';
 import { generateCatchUpBrief, loadLastBrief, saveLastBrief, type CatchUpBrief } from '../../core/catch-up.js';
 import { hasClaudeKey } from '../../core/ai/claude.js';
+import { countPendingAnalysis } from '../../core/pipeline.js';
 import { sharedDb } from './shared.js';
+import { ImportProgress } from './ImportProgress.js';
 
 interface Props {
   settings: SettingsRecord | null;
@@ -26,19 +27,31 @@ function hasRuntime(): boolean {
   return typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function' && Boolean(chrome.storage?.local);
 }
 
-/** The latest run's progress: read once, then follow the service worker's updates. */
+/** While a run is going, the page asks the worker for its state this often. */
+const SYNC_POLL_MS = 5000;
+const ANALYSIS_POLL_MS = 4000;
+
+/**
+ * The latest run's progress: read once, then follow the service worker's updates. While a run is
+ * going the page also asks every few seconds. That is what notices a worker the browser stopped
+ * mid-run: the question starts a fresh worker, which ends the lost run as interrupted, so the
+ * page never keeps showing the step the old worker was on.
+ */
 function useSyncState(): SyncState {
   const [state, setState] = useState<SyncState>(EMPTY_SYNC_STATE);
+  const ask = useCallback((alive: () => boolean) => {
+    void chrome.runtime
+      .sendMessage({ type: 'GET_HISTORY_SYNC_STATE' })
+      .then((reply: { ok?: boolean; state?: SyncState } | undefined) => {
+        if (alive() && reply?.ok && reply.state) setState(reply.state);
+      })
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     if (!hasRuntime()) return;
     let alive = true;
     // Asking the service worker also repairs a run it lost when the browser restarted it.
-    void chrome.runtime
-      .sendMessage({ type: 'GET_HISTORY_SYNC_STATE' })
-      .then((reply: { ok?: boolean; state?: SyncState } | undefined) => {
-        if (alive && reply?.ok && reply.state) setState(reply.state);
-      })
-      .catch(() => undefined);
+    ask(() => alive);
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       const next = changes[HISTORY_SYNC_STATE_KEY]?.newValue as SyncState | undefined;
       if (area === 'local' && next && Array.isArray(next.providers)) setState(next);
@@ -48,35 +61,41 @@ function useSyncState(): SyncState {
       alive = false;
       chrome.storage.onChanged.removeListener(onChanged);
     };
-  }, []);
+  }, [ask]);
+  useEffect(() => {
+    if (!hasRuntime() || !state.running) return;
+    let alive = true;
+    const timer = setInterval(() => ask(() => alive), SYNC_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [state.running, ask]);
   return state;
 }
 
-function progressOf(p: SyncProviderState): number {
-  return p.stored + p.skipped + p.failed;
-}
-
-function statusLine(p: SyncProviderState): string {
-  switch (p.status) {
-    case 'queued':
-      return 'Waiting';
-    case 'opening':
-      return 'Opening the site';
-    case 'listing':
-      return p.message ?? 'Finding conversations';
-    case 'fetching':
-      return `Reading ${progressOf(p)} of ${p.listed}`;
-    case 'cancelled':
-      return `Cancelled. ${p.stored} imported so far.`;
-    case 'error':
-      return p.message ?? 'Something went wrong.';
-    case 'done': {
-      const parts = [`${p.stored} imported`];
-      if (p.skipped) parts.push(`${p.skipped} already up to date`);
-      if (p.failed) parts.push(`${p.failed} could not be read`);
-      return `Done: ${parts.join(', ')}.${p.message ? ` ${p.message}` : ''}`;
+/** Threads still waiting for analysis after a run, counted from the queue; null until known. */
+function useAnalysisLeft(state: SyncState): number | null {
+  const [left, setLeft] = useState<number | null>(null);
+  const active = !state.running && Boolean(state.analysis && state.analysis.queued > 0);
+  useEffect(() => {
+    if (!active) {
+      setLeft(null);
+      return;
     }
-  }
+    let alive = true;
+    const read = () =>
+      void countPendingAnalysis(sharedDb)
+        .then((n) => alive && setLeft(n))
+        .catch(() => undefined);
+    read();
+    const timer = setInterval(read, ANALYSIS_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [active, state.analysis?.at]);
+  return left;
 }
 
 function runSummary(state: SyncState): string {
@@ -89,6 +108,7 @@ function runSummary(state: SyncState): string {
 
 export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
   const sync = useSyncState();
+  const analysisLeft = useAnalysisLeft(sync);
   const [days, setDays] = useState(SYNC_DEFAULT_DAYS);
   const [scope, setScope] = useState<'recent' | 'all'>('all');
   const [selected, setSelected] = useState<Set<SyncProviderId>>(new Set(['chatgpt', 'claude']));
@@ -102,7 +122,10 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
   const claude = settings ? hasClaudeKey(settings) : false;
   const available = SYNC_PROVIDERS.filter((p) => settings?.authorizedHosts[p.id] !== false);
   const complete = available.filter((p) => p.strategy === 'api');
-  const slower = available.filter((p) => p.strategy === 'sidebar');
+  const coding = available.filter((p) => p.strategy === 'sidebar' && p.allHistory);
+  const slower = available.filter((p) => p.strategy === 'sidebar' && !p.allHistory);
+  // Sites a stopped run did not finish, for "Continue the import".
+  const unfinished = sync.interrupted ? sync.providers.filter((p) => p.status === 'error').map((p) => p.provider) : [];
 
   // A run that just finished brings new threads in: reload the library and start analysis.
   useEffect(() => {
@@ -142,12 +165,14 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
       return next;
     });
 
-  const start = useCallback(async () => {
+  /** Start a run; `resume` repeats a stopped run's sites, window and scope. */
+  const start = useCallback(async (resume?: { providers: SyncProviderId[]; days: number; scope: 'recent' | 'all' }) => {
     setStartError(null);
     if (!hasRuntime()) return setStartError('Catch up needs the extension running.');
     try {
-      const providers = Array.from(selected).filter((id) => available.some((p) => p.id === id && (scope !== 'all' || p.strategy === 'api')));
-      const reply = (await chrome.runtime.sendMessage({ type: 'START_HISTORY_SYNC', providers, days, scope })) as
+      const runScope = resume?.scope ?? scope;
+      const providers = (resume?.providers ?? Array.from(selected)).filter((id) => available.some((p) => p.id === id && (runScope !== 'all' || p.allHistory)));
+      const reply = (await chrome.runtime.sendMessage({ type: 'START_HISTORY_SYNC', providers, days: resume?.days ?? days, scope: runScope })) as
         | { ok?: boolean; error?: string }
         | undefined;
       if (!reply?.ok) setStartError(reply?.error ?? 'Catch up could not start.');
@@ -227,6 +252,28 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
           </label>
         ))}
       </div>
+      {coding.length > 0 && (
+        <details className="tk-catchup-more">
+          <summary className="tk-muted">Coding sessions: Claude Code and Codex (slower)</summary>
+          <p className="tk-settings-note">
+            Threadkeeper reads your session list on the web and opens each session in a background tab for a few seconds,
+            where it is read like any session you open, including its repository and pull request when the page shows them.
+            Sessions are filed under the account signed in right now; to import a second account, switch to it and run the
+            import again.
+          </p>
+          <div className="tk-catchup-providers">
+            {coding.map((p) => (
+              <label key={p.id} className="tk-toggle">
+                <input type="checkbox" checked={selected.has(p.id)} disabled={sync.running} onChange={(e) => toggle(p.id, e.target.checked)} />
+                <span>
+                  {p.label}
+                  <span className="tk-toggle-hint">{p.note}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
       {scope !== 'all' && slower.length > 0 && (
         <details className="tk-catchup-more">
           <summary className="tk-muted">Other sites (slower)</summary>
@@ -254,9 +301,16 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
             Cancel
           </button>
         ) : (
-          <button type="button" className="tk-btn tk-btn-primary" disabled={selected.size === 0 || !settings} onClick={() => void start()}>
-            {scope === 'all' ? 'Import all online conversations' : 'Catch up'}
-          </button>
+          <>
+            <button type="button" className="tk-btn tk-btn-primary" disabled={selected.size === 0 || !settings} onClick={() => void start()}>
+              {scope === 'all' ? 'Import all online conversations' : 'Catch up'}
+            </button>
+            {unfinished.length > 0 && (
+              <button type="button" className="tk-btn" disabled={!settings} onClick={() => void start({ providers: unfinished, days: sync.days, scope: sync.scope === 'all' ? 'all' : 'recent' })}>
+                Continue the import
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -266,17 +320,10 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
         </div>
       )}
 
-      {sync.providers.length > 0 && (
-        <ul className="tk-sync-list" aria-live="polite" aria-label="Catch up progress">
-          {sync.providers.map((p) => (
-            <li key={p.provider} data-status={p.status}>
-              <span className="tk-sync-name">{p.label}</span>
-              <span className="tk-sync-status">{statusLine(p)}</span>
-              {p.status === 'fetching' && p.listed > 0 && <progress className="tk-sync-bar" max={p.listed} value={progressOf(p)} aria-label={`${p.label} progress`} />}
-            </li>
-          ))}
-        </ul>
+      {sync.running && settings && claude && settings.autoOrganize.aiAnalysis && (
+        <p className="tk-settings-note">Claude analysis waits until the import has finished, then starts on what was imported.</p>
       )}
+      <ImportProgress state={sync} analysisLeft={analysisLeft} />
 
       {!sync.running && sync.runId && sync.scope !== 'all' && sync.providers.length > 0 && (
         <div className="tk-catchup-brief-controls">

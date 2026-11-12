@@ -16,7 +16,7 @@ import {
 import { mergeGrokXMessages, parseGrokXCaptureMessage, type GrokXMessage } from '../core/grok-x.js';
 import { validateWindowPostMessage } from '../core/messaging.js';
 import { isSyncProviderId, type SyncEvent } from '../core/history-sync.js';
-import { runApiSync } from '../core/site-history.js';
+import { readSignedInIdentity, runApiSync } from '../core/site-history.js';
 import { loadSidebarConversations } from '../core/sidebar-history.js';
 import {
   detectProviderFromUrl,
@@ -586,6 +586,7 @@ const TOP_FRAME_COMMANDS: ReadonlySet<string> = new Set([
   'TK_HISTORY_SYNC_RUN',
   'TK_HISTORY_SYNC_CANCEL',
   'TK_HISTORY_LIST_SIDEBAR',
+  'TK_HISTORY_IDENTITY',
   'TK_CAPTURE_PROBE',
 ]);
 
@@ -868,18 +869,20 @@ function schedulePassiveDomCapture(
 // ---- Catch up (history sync) ----------------------------------------------
 
 let syncCancelled = false;
-let syncRunning = false;
+/** The reader running in this page, if any. A newer run replaces it (see startApiSync). */
+let currentSync: { runId: string; cancelled: boolean } | null = null;
 
 const sleepMs = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-async function emitSyncEvent(event: SyncEvent): Promise<void> {
+/** Send one event; false when the worker no longer wants this run (it ended, or the worker restarted). */
+async function emitSyncEvent(event: SyncEvent): Promise<boolean> {
   try {
     // The worker replies after storage completes. Await it before sending done,
     // which may close an owned source tab and end the run.
     const reply = await chrome.runtime.sendMessage({ type: 'HISTORY_SYNC_EVENT', event });
-    if (!reply?.ok) syncCancelled = true;
+    return Boolean(reply?.ok);
   } catch {
-    syncCancelled = true;
+    return false;
   }
 }
 
@@ -894,13 +897,15 @@ function startApiSync(message: Record<string, unknown>): { ok: boolean; error?: 
     || typeof message.max !== 'number' || !Number.isFinite(message.max)) {
     return { ok: false, error: 'bad_request' };
   }
-  if (syncRunning) return { ok: false, error: 'busy' };
+  // A reader still going here belongs to a run the worker has given up on (it stopped, or timed
+  // the page out): the new run replaces it instead of being refused as busy.
+  if (currentSync) currentSync.cancelled = true;
+  const run = { runId: message.runId, cancelled: false };
+  currentSync = run;
   const known: Record<string, string> = {};
   if (typeof message.known === 'object' && message.known !== null) {
     for (const [k, v] of Object.entries(message.known as Record<string, unknown>)) if (typeof v === 'string') known[k.toLowerCase()] = v;
   }
-  syncCancelled = false;
-  syncRunning = true;
   void runApiSync({
     provider,
     runId: message.runId,
@@ -911,13 +916,26 @@ function startApiSync(message: Record<string, unknown>): { ok: boolean; error?: 
     origin: window.location.origin,
     cookies: document.cookie,
     fetchImpl: window.fetch.bind(window),
-    emit: emitSyncEvent,
-    isCancelled: () => syncCancelled,
+    emit: async (event) => {
+      if (run.cancelled) return;
+      if (!(await emitSyncEvent(event))) run.cancelled = true;
+    },
+    isCancelled: () => run.cancelled,
     sleep: sleepMs,
   }).finally(() => {
-    syncRunning = false;
+    if (currentSync === run) currentSync = null;
   });
   return { ok: true };
+}
+
+/** Who this site says is signed in, read with its own request; decided by this page's host only. */
+async function signedInIdentity(): Promise<Record<string, unknown>> {
+  const host = window.location.hostname.toLowerCase();
+  const site = host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com' ? 'chatgpt'
+    : host === 'claude.ai' || host.endsWith('.claude.ai') ? 'claude' : null;
+  if (!site) return { ok: true, status: 'unknown' };
+  const result = await readSignedInIdentity({ site, origin: window.location.origin, fetchImpl: window.fetch.bind(window) });
+  return { ok: true, ...result };
 }
 
 /** What a capture of this tab would see right now, without storing anything. */
@@ -1047,18 +1065,24 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
       }
       if (message && message.type === 'TK_HISTORY_SYNC_CANCEL') {
         syncCancelled = true;
+        if (currentSync) currentSync.cancelled = true;
         sendResponse({ ok: true });
+        return true;
+      }
+      if (message && message.type === 'TK_HISTORY_IDENTITY') {
+        void signedInIdentity().then(sendResponse, () => sendResponse({ ok: true, status: 'unknown' }));
         return true;
       }
       if (message && message.type === 'TK_HISTORY_LIST_SIDEBAR') {
         const provider = message.provider;
-        const limit = typeof message.limit === 'number' ? Math.min(100, Math.max(1, Math.round(message.limit))) : 30;
+        const limit = typeof message.limit === 'number' ? Math.min(500, Math.max(1, Math.round(message.limit))) : 30;
+        const maxScrolls = typeof message.maxScrolls === 'number' ? Math.min(150, Math.max(1, Math.round(message.maxScrolls))) : undefined;
         if (!isSyncProviderId(provider)) {
           sendResponse({ ok: false, items: [] });
           return true;
         }
         syncCancelled = false;
-        void loadSidebarConversations(document, window, provider, { limit, sleep: sleepMs, isCancelled: () => syncCancelled }).then(
+        void loadSidebarConversations(document, window, provider, { limit, maxScrolls, sleep: sleepMs, isCancelled: () => syncCancelled }).then(
           (items) => sendResponse({ ok: true, items }),
           () => sendResponse({ ok: false, items: [] })
         );
