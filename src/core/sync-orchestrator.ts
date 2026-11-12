@@ -1,10 +1,11 @@
 import {
   EMPTY_SYNC_STATE,
   SYNC_MAX_API,
-  SYNC_MAX_SIDEBAR,
   clampSyncDays,
   describeSyncError,
   initialSyncState,
+  isFinishedStatus,
+  sidebarLimit,
   syncCutoffMs,
   syncProviderInfo,
   updateProvider,
@@ -12,11 +13,14 @@ import {
   type SyncEvent,
   type SyncProviderId,
   type SyncProviderInfo,
+  type SyncProviderState,
   type SyncRequest,
   type SyncState,
+  type SyncStepErrorCode,
 } from './history-sync.js';
 import type { SiteConversation } from './site-api.js';
 import type { SidebarConversation } from './sidebar-history.js';
+import type { AccountIdentity } from './workspace/types.js';
 
 /**
  * Runs Catch up from the service worker: for each site, find or open a tab, start the page-side
@@ -24,7 +28,38 @@ import type { SidebarConversation } from './sidebar-history.js';
  *
  * Everything that touches the browser or the database goes through SyncEnv, so a whole run can be
  * driven by a test with fakes.
+ *
+ * Every wait is bounded. A step that does not finish in time fails that site with a reason naming
+ * the step, and the run moves on to the next site; a cancel ends whatever is being waited on at
+ * once. The state is saved at every step change, so a page never shows a step the worker has left.
  */
+
+/** The account a site's threads are filed under for a whole run. */
+export interface SyncAccount {
+  accountId: string;
+  workspaceId: string;
+  /** The account's label, shown next to the site's progress; null when there is none. */
+  label: string | null;
+  /**
+   * The key of the person the account record says it is (accounts/identity.ts), or null when it
+   * has never been told. An import only runs when this equals what the site itself reports.
+   */
+  identityKey?: string | null;
+}
+
+/** How a tab-by-tab capture ended, as the capture path reports it to noteCapture. */
+export type CaptureOutcome = 'stored' | 'deleted';
+
+/** What the page-side identity check found (see site-history.ts readSignedInIdentity). */
+export type SyncIdentityReply =
+  | { status: 'signed_in'; identity: Omit<AccountIdentity, 'observedAt'> }
+  | { status: 'signed_out' }
+  | { status: 'unknown' };
+
+export interface SyncTabInfo {
+  url: string | null;
+  title: string | null;
+}
 
 export interface SyncEnv {
   now(): number;
@@ -42,41 +77,140 @@ export interface SyncEnv {
   sendToTab(tabId: number, message: unknown): Promise<unknown>;
   /** Providers whose capture the user has not switched off. */
   enabledProviders(): Promise<ReadonlySet<string>>;
-  /** Conversations of this provider already stored in full: site id → site updatedAt. */
-  knownUpdatedAt(provider: SyncProviderId): Promise<Record<string, string>>;
-  storeConversation(conversation: SiteConversation): Promise<'stored' | 'skipped'>;
-  /** Captured within the last few hours; the tab-by-tab way skips these. */
-  hasRecentCapture(provider: SyncProviderId, sourceConversationId: string): Promise<boolean>;
+  /** Conversations of this provider already stored in full, in this account: site id → site updatedAt. */
+  knownUpdatedAt(provider: SyncProviderId, account?: SyncAccount | null): Promise<Record<string, string>>;
+  /** Store a conversation under `account` (the run's account); without one, the realm's active account. */
+  storeConversation(conversation: SiteConversation, account?: SyncAccount | null): Promise<'stored' | 'skipped'>;
+  /**
+   * Captured within the last few hours, in this account; the tab-by-tab way skips these. With
+   * `anyAge` (an all-history run) any stored copy with messages counts, so running again continues
+   * past what an earlier run already imported instead of opening the same sessions again.
+   */
+  hasRecentCapture(provider: SyncProviderId, sourceConversationId: string, account?: SyncAccount | null, anyAge?: boolean): Promise<boolean>;
   saveState(state: SyncState): Promise<void>;
+
+  // Optional: a test may leave these out; the service worker provides them all.
+  /** The tab's address and title, or null when it is gone (or cannot be read). */
+  tabInfo?(tabId: number): Promise<SyncTabInfo | null>;
+  /** Whether the extension may read the site at all (optional host permissions). */
+  hasHostAccess?(info: SyncProviderInfo): Promise<boolean>;
+  /** Pass on who the site says is signed in, so the accounts service files under that person. */
+  noteIdentity?(provider: SyncProviderId, identity: Omit<AccountIdentity, 'observedAt'>): Promise<void>;
+  /** The account captures of this provider are filed under right now. */
+  resolveAccount?(provider: SyncProviderId): Promise<SyncAccount>;
+  /** The last saved state, for a worker that has just started. */
+  loadState?(): Promise<SyncState | null>;
+  /** Hold hosted analysis while a run is active (see analysis-hold.ts). */
+  holdAnalysis?(runId: string): Promise<void>;
+  touchAnalysisHold?(runId: string): Promise<void>;
+  /** End the hold and start the analysis that waited for it; returns how many threads that is. */
+  releaseAnalysis?(runId: string | null): Promise<number>;
 }
 
 /** A page that has sent nothing for this long has stalled. */
 export const SYNC_IDLE_TIMEOUT_MS = 120_000;
-const TAB_READY_TIMEOUT_MS = 30_000;
+/** How often a run that waits for the page checks that its tab still exists. */
+export const SYNC_TAB_CHECK_MS = 15_000;
+export const TAB_READY_TIMEOUT_MS = 30_000;
+/** Ceilings for each kind of step; a step that takes longer is abandoned with a plain reason. */
+export const STEP_TIMEOUTS = {
+  /** Browser calls that answer at once unless something is wrong (tabs, permissions, storage). */
+  browser: 10_000,
+  /** Database reads and writes. */
+  database: 30_000,
+  /** Injecting the reader and hearing it answer. */
+  reader: 15_000,
+  /** The site's own "who is signed in" request, made by the page. */
+  identity: 20_000,
+  /** Reading the list of a tab-by-tab site, which scrolls it to load more. */
+  sidebarList: 30_000,
+  sidebarListAll: 240_000,
+} as const;
+/** Conversations held back until the site confirms, again, that the same person is signed in. */
+export const VERIFY_BATCH = 5;
+/** An account record that was not updated yet (a switch settling) gets one more look after this. */
+const IDENTITY_SETTLE_MS = 5_000;
 const SIDEBAR_CAPTURE_TIMEOUT_MS = 25_000;
+/** List entries an all-history run reads from a tab-by-tab site: more than it opens, see runSidebar. */
+export const SIDEBAR_LIST_ALL = 1000;
 const SIDEBAR_PAUSE_MS = 900;
+/** Conversations in a row that open but never get captured: the site is not showing them. */
+const SIDEBAR_MAX_CONSECUTIVE_FAILURES = 3;
 const SAVE_INTERVAL_MS = 400;
+const HOLD_TOUCH_MS = 30_000;
+
+/** Pages a signed-out visitor is sent to, and the titles of bot checks shown instead of the app. */
+const LOGIN_PATH = /\/(?:auth\/)?(?:login|log-in|signin|sign-in|logout)(?:[/?#]|$)/i;
+const CHALLENGE_TITLE = /just a moment|attention required|verify you are human|access denied|checking your browser/i;
+
+/** Whether `hostname` is one of the site's own hosts (its match patterns, `*.` wildcards included). */
+function onSiteHost(info: SyncProviderInfo, hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return info.hostPatterns.some((pattern) => {
+    const m = pattern.match(/^[a-z*]+:\/\/([^/]+)\//i);
+    if (!m) return false;
+    const want = m[1].toLowerCase();
+    if (want === '*') return true;
+    if (want.startsWith('*.')) return host === want.slice(2) || host.endsWith(want.slice(1));
+    return host === want;
+  });
+}
+
+class StepFailure extends Error {
+  constructor(readonly code: SyncErrorCode | SyncStepErrorCode) {
+    super(code);
+  }
+}
+
+class Cancelled extends Error {
+  constructor() {
+    super('cancelled');
+  }
+}
 
 interface ActiveRun {
   runId: string;
   provider: SyncProviderId;
   tabId: number;
   lastEventAt: number;
+  account: SyncAccount | null;
+  /** The person the site reported at the start; every batch is checked against it before storing. */
+  identityKey: string | null;
+  /** Read but not stored yet: stored only once the site confirms the same person is signed in. */
+  pending: SiteConversation[];
+  /** The site stopped for an account reason; later events are refused. */
+  stopped: boolean;
   finish: (outcome: 'done' | 'error') => void;
 }
+
+/** What the site says about who is signed in, compared with the person a run is filed under. */
+type IdentityCheck = 'same' | 'changed' | 'unknown';
+
+interface CaptureWaiter {
+  conversationId: string;
+  resolve: (outcome: CaptureOutcome | 'account_changed' | false) => void;
+  account: SyncAccount | null;
+}
+
+const sameAccount = (a: SyncAccount, b: SyncAccount) => a.accountId === b.accountId && a.workspaceId === b.workspaceId;
 
 export class HistorySyncOrchestrator {
   state: SyncState = EMPTY_SYNC_STATE;
   private cancelled = false;
+  private cancelWaiters = new Set<() => void>();
   private active: ActiveRun | null = null;
   private running: Promise<void> | null = null;
   private lastSavedAt = 0;
-  private captureWaiters = new Map<number, { conversationId: string; resolve: (ok: boolean) => void }>();
+  private lastHoldTouchAt = 0;
+  private captureWaiters = new Map<number, CaptureWaiter>();
+  /** Set from the first moment of start(), before any await, so two starts cannot both begin. */
+  private starting = false;
+  private recovering: Promise<SyncState> | null = null;
 
   constructor(private readonly env: SyncEnv) {}
 
   isRunning(): boolean {
-    return this.running !== null;
+    return this.running !== null || this.starting;
   }
 
   /** Resolves when the current run has finished (tests, and callers that want to wait). */
@@ -86,11 +220,26 @@ export class HistorySyncOrchestrator {
 
   /** Begin a run in the background. Returns at once; progress is in `state`. */
   async start(request: SyncRequest): Promise<{ started: boolean; reason?: string }> {
-    if (this.running) return { started: false, reason: 'Catch up is already running.' };
-    const enabled = await this.env.enabledProviders();
+    if (this.running || this.starting) return { started: false, reason: 'Catch up is already running.' };
+    this.starting = true;
+    try {
+      return await this.begin(request);
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  private async begin(request: SyncRequest): Promise<{ started: boolean; reason?: string }> {
+    // A database that does not answer must not leave a run half-started.
+    let enabled: ReadonlySet<string>;
+    try {
+      enabled = await this.bounded(this.env.enabledProviders(), STEP_TIMEOUTS.database, 'step_timeout', false);
+    } catch {
+      return { started: false, reason: 'Threadkeeper could not read its settings. Try again in a moment.' };
+    }
     const scope = request.scope === 'all' ? 'all' : 'recent';
     const providers = request.providers.filter((id, i, all) => all.indexOf(id) === i && syncProviderInfo(id) && enabled.has(id)
-      && (scope !== 'all' || syncProviderInfo(id)?.strategy === 'api'));
+      && (scope !== 'all' || syncProviderInfo(id)?.allHistory === true));
     if (providers.length === 0) return { started: false, reason: 'No site to catch up on is switched on for capture.' };
     // Sites with a complete history first: they finish fastest and cost the site least.
     providers.sort((a, b) => Number(syncProviderInfo(a)?.strategy !== 'api') - Number(syncProviderInfo(b)?.strategy !== 'api'));
@@ -98,6 +247,12 @@ export class HistorySyncOrchestrator {
     this.cancelled = false;
     const days = clampSyncDays(request.days);
     this.state = initialSyncState(this.env.newRunId(), { providers, days, scope }, new Date(this.env.now()).toISOString());
+    const runId = this.state.runId ?? '';
+    // Hosted analysis waits for the whole run: it would compete with the import for the worker
+    // and bill threads that are still arriving. A hold that cannot be written is skipped: the
+    // import matters more than when analysis starts.
+    await this.bounded(this.env.holdAnalysis?.(runId) ?? Promise.resolve(), STEP_TIMEOUTS.database, 'step_timeout', false).catch(() => undefined);
+    this.lastHoldTouchAt = this.env.now();
     await this.save(true);
     this.running = this.runAll(providers, days).finally(() => {
       this.running = null;
@@ -112,136 +267,487 @@ export class HistorySyncOrchestrator {
       this.active.finish('done');
     }
     for (const w of this.captureWaiters.values()) w.resolve(false);
+    if (this.active) this.active.pending = [];
+    for (const wake of this.cancelWaiters) wake();
+    this.cancelWaiters.clear();
   }
 
-  /** An event from the page-side reader. Anything not from the tab and run in progress is ignored. */
-  async handleEvent(event: SyncEvent, senderTabId: number | undefined): Promise<void> {
+  /**
+   * An event from the page-side reader. Anything not from the tab and run in progress is ignored,
+   * and the answer is false so a reader whose run has ended (a worker restart) stops reading.
+   */
+  async handleEvent(event: SyncEvent, senderTabId: number | undefined): Promise<boolean> {
     const run = this.active;
-    if (!run || event.runId !== run.runId || event.provider !== run.provider || senderTabId !== run.tabId) return;
+    if (!run || event.runId !== run.runId || event.provider !== run.provider || senderTabId !== run.tabId) return false;
+    // After a cancel or an account stop nothing more is stored, and a late "done" does not turn
+    // a cancelled site into a finished one.
+    if (this.cancelled || run.stopped) return false;
     run.lastEventAt = this.env.now();
     switch (event.kind) {
+      case 'heartbeat':
+        return true;
       case 'phase':
+        if (event.phase === 'fetching' && !(await this.flush(run))) return false;
         this.patch(run.provider, (p) => ({
           status: event.phase,
-          listed: event.total ?? p.listed,
+          stepAt: p.status === event.phase ? p.stepAt : this.nowIso(),
+          // Counts only grow: a later, narrower total never makes the bar go back.
+          listed: Math.max(p.listed, event.total ?? 0),
           message: event.message ?? p.message,
         }));
         break;
-      case 'conversation': {
-        const result = await this.env.storeConversation(event.conversation).catch(() => null);
-        this.patch(run.provider, (p) =>
-          result === 'stored' ? { stored: p.stored + 1 } : result === 'skipped' ? { skipped: p.skipped + 1 } : { failed: p.failed + 1 }
-        );
+      case 'conversation':
+        // Held until the site confirms the same person is still signed in (see flush).
+        run.pending.push(event.conversation);
+        if (run.pending.length >= VERIFY_BATCH && !(await this.flush(run))) return false;
         break;
-      }
       case 'skipped':
-        this.patch(run.provider, (p) => ({ skipped: p.skipped + 1 }));
+        this.patch(run.provider, (p) => (event.reason === 'empty' ? { empty: (p.empty ?? 0) + 1 } : { skipped: p.skipped + 1 }));
         break;
       case 'failed':
         this.patch(run.provider, (p) => ({ failed: p.failed + 1 }));
         break;
       case 'done':
-        this.patch(run.provider, (p) => ({ status: 'done', listed: event.listed || p.listed, message: event.message }));
+        if (!(await this.flush(run))) return false;
+        if (this.cancelled) return false;
+        this.patch(run.provider, (p) => ({
+          status: 'done',
+          listed: Math.max(p.listed, event.listed),
+          message: event.message,
+          ...(event.truncated ? { truncated: true } : {}),
+        }));
         run.finish('done');
         break;
       case 'error':
+        // What was read before the error is still the signed-in person's, once confirmed.
+        if (!(await this.flush(run))) return false;
         this.patch(run.provider, { status: 'error', message: event.message });
         run.finish('error');
         break;
     }
-    await this.save(false);
+    await this.save(event.kind === 'phase' || event.kind === 'done' || event.kind === 'error');
+    return true;
   }
 
   /**
-   * Called when a capture from a tab has been stored. Resolves the tab-by-tab wait for that
-   * conversation, but only once the capture holds messages: an early capture of a page still
-   * loading is not the conversation.
+   * Store the conversations held back, but only after the site has confirmed, now, that the person
+   * signed in is the one the run started with. A switch in another tab between two checks therefore
+   * never files the other person's conversations under this account: the held ones are dropped and
+   * the site stops. False when the site was stopped.
    */
-  noteCapture(tabId: number, sourceConversationId: string, messageCount: number): void {
+  private async flush(run: ActiveRun, quiet = false): Promise<boolean> {
+    if (run.pending.length === 0) return true;
+    const check = await this.checkIdentity(run.tabId, run.identityKey, run.provider, run.account).catch((err) => {
+      if (err instanceof Cancelled) return 'cancelled' as const;
+      return 'unknown' as const;
+    });
+    if (check === 'cancelled') {
+      run.pending = [];
+      return false;
+    }
+    if (check !== 'same') {
+      run.pending = [];
+      // Quiet: the site already ended for another reason (timeout, closed tab); keep that reason.
+      if (!quiet) this.stopRun(run, check === 'changed' ? 'account_changed' : 'account_unverified');
+      return false;
+    }
+    const batch = run.pending;
+    run.pending = [];
+    for (const conversation of batch) {
+      const result = await this.bounded(this.env.storeConversation(conversation, run.account), STEP_TIMEOUTS.database, 'step_timeout').catch(() => null);
+      this.patch(run.provider, (p) =>
+        result === 'stored' ? { stored: p.stored + 1 } : result === 'skipped' ? { skipped: p.skipped + 1 } : { failed: p.failed + 1 }
+      );
+    }
+    await this.save(false);
+    return true;
+  }
+
+  /**
+   * Called when a capture from a tab has gone through the capture path. Resolves the tab-by-tab
+   * wait for that conversation, but only once the capture holds messages (an early capture of a
+   * page still loading is not the conversation) or the thread is one the person deleted. The
+   * account the capture was filed under must be the run's; anything else stops the site.
+   */
+  noteCapture(
+    tabId: number,
+    sourceConversationId: string,
+    messageCount: number,
+    filed?: { accountId: string; workspaceId: string } | null,
+    outcome: CaptureOutcome = 'stored'
+  ): void {
     const w = this.captureWaiters.get(tabId);
-    if (w && messageCount > 0 && w.conversationId.toLowerCase() === sourceConversationId.toLowerCase()) w.resolve(true);
+    if (!w || w.conversationId.toLowerCase() !== sourceConversationId.toLowerCase()) return;
+    if (w.account && (!filed || filed.accountId !== w.account.accountId || filed.workspaceId !== w.account.workspaceId)) {
+      w.resolve('account_changed');
+      return;
+    }
+    if (outcome === 'deleted') w.resolve('deleted');
+    else if (messageCount > 0) w.resolve('stored');
+  }
+
+  /**
+   * The state the library shows. A worker that has just started has no run in memory, so a saved
+   * state that still says "running" belongs to a worker that was stopped: it is ended as
+   * interrupted (the unfinished sites can be continued), and the analysis it held back is started.
+   */
+  async currentState(): Promise<SyncState> {
+    if (this.running || this.state.runId) return this.state;
+    return this.recover();
+  }
+
+  /** End a run a stopped worker left behind. Safe to call at every worker start; calls share one pass. */
+  recover(): Promise<SyncState> {
+    if (this.running || this.starting) return Promise.resolve(this.state);
+    this.recovering ??= this.recoverOnce().finally(() => {
+      this.recovering = null;
+    });
+    return this.recovering;
+  }
+
+  /** A run began in this worker meanwhile: its state is the one to show, and nothing is released. */
+  private busy(): boolean {
+    return this.running !== null || this.starting || this.state.runId !== null;
+  }
+
+  private async recoverOnce(): Promise<SyncState> {
+    let stored: SyncState | null = null;
+    try {
+      stored = (await this.bounded(this.env.loadState?.() ?? Promise.resolve(null), STEP_TIMEOUTS.browser, 'step_timeout', false)) ?? null;
+    } catch {
+      stored = null;
+    }
+    if (this.busy()) return this.state;
+    const valid = stored && typeof stored === 'object' && Array.isArray(stored.providers) ? stored : null;
+    if (!valid?.running) {
+      // No run lives in this worker, so no hold should either. One can be left by a worker that
+      // stopped between writing the hold and saving its first state; release it so analysis is
+      // not held back with nothing left to end it.
+      const released = await this.releaseHold(null);
+      if (this.busy()) return this.state;
+      if (released > 0 && valid) {
+        const withAnalysis: SyncState = { ...valid, analysis: { queued: released, at: this.nowIso() } };
+        await this.bounded(this.env.saveState(withAnalysis), STEP_TIMEOUTS.browser, 'step_timeout', false).catch(() => undefined);
+        return withAnalysis;
+      }
+      return valid ?? EMPTY_SYNC_STATE;
+    }
+    const at = this.nowIso();
+    let fixed: SyncState = {
+      ...valid,
+      running: false,
+      interrupted: true,
+      finishedAt: at,
+      providers: valid.providers.map((p) =>
+        isFinishedStatus(p.status) ? p : { ...p, status: 'error' as const, message: describeSyncError('interrupted', p.label), stepAt: at }
+      ),
+    };
+    const queued = await this.releaseHold(valid.runId);
+    if (this.busy()) return this.state;
+    fixed = { ...fixed, analysis: { queued, at } };
+    await this.bounded(this.env.saveState(fixed), STEP_TIMEOUTS.browser, 'step_timeout', false).catch(() => undefined);
+    return fixed;
   }
 
   // ---- run ----------------------------------------------------------------
 
-  private patch(provider: SyncProviderId, change: Parameters<typeof updateProvider>[2]): void {
+  private nowIso(): string {
+    return new Date(this.env.now()).toISOString();
+  }
+
+  private patch(provider: SyncProviderId, change: Partial<SyncProviderState> | ((p: SyncProviderState) => Partial<SyncProviderState>)): void {
     this.state = updateProvider(this.state, provider, change);
+  }
+
+  /** Move a site to a new step and save at once, so no page is left showing the old step. */
+  private async step(provider: SyncProviderId, status: SyncProviderState['status'], extra: Partial<SyncProviderState> = {}): Promise<void> {
+    this.patch(provider, { status, stepAt: this.nowIso(), ...extra });
+    await this.save(true);
   }
 
   private async save(force: boolean): Promise<void> {
     const now = this.env.now();
     if (!force && now - this.lastSavedAt < SAVE_INTERVAL_MS) return;
     this.lastSavedAt = now;
-    await this.env.saveState(this.state).catch(() => undefined);
+    this.state = { ...this.state, heartbeatAt: new Date(now).toISOString() };
+    // Saving is never cut short by a cancel: the cancelled state is what most needs saving.
+    await this.bounded(this.env.saveState(this.state), STEP_TIMEOUTS.browser, 'step_timeout', false).catch(() => undefined);
+    if (this.state.running && this.state.runId && now - this.lastHoldTouchAt >= HOLD_TOUCH_MS) {
+      this.lastHoldTouchAt = now;
+      await this.bounded(this.env.touchAnalysisHold?.(this.state.runId) ?? Promise.resolve(), STEP_TIMEOUTS.database, 'step_timeout', false).catch(() => undefined);
+    }
+  }
+
+  private async releaseHold(runId: string | null): Promise<number> {
+    if (!this.env.releaseAnalysis) return 0;
+    try {
+      return await this.bounded(this.env.releaseAnalysis(runId), STEP_TIMEOUTS.database, 'step_timeout', false);
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Wait for `work`, but no longer than `ms`, and not past a cancel. Whatever `work` does later is
+   * ignored. A timeout throws a StepFailure with `code`; a cancel throws Cancelled.
+   */
+  private bounded<T>(work: Promise<T>, ms: number, code: SyncErrorCode | SyncStepErrorCode, cancellable = true): Promise<T> {
+    if (cancellable && this.cancelled) {
+      work.catch(() => undefined);
+      return Promise.reject(new Cancelled());
+    }
+    const timer = this.env.timeout(ms);
+    let wake: () => void = () => undefined;
+    const cancelled = new Promise<never>((_, reject) => {
+      wake = () => reject(new Cancelled());
+    });
+    cancelled.catch(() => undefined);
+    if (cancellable) this.cancelWaiters.add(wake);
+    return Promise.race([
+      work,
+      timer.promise.then(() => {
+        throw new StepFailure(code);
+      }),
+      cancelled,
+    ]).finally(() => {
+      timer.cancel();
+      this.cancelWaiters.delete(wake);
+    });
   }
 
   private async runAll(providers: SyncProviderId[], days: number): Promise<void> {
     const sinceMs = this.state.scope === 'all' ? 0 : syncCutoffMs(days, this.env.now());
-    for (const id of providers) {
-      if (this.cancelled) {
-        this.patch(id, { status: 'cancelled', message: 'Cancelled' });
-        continue;
+    try {
+      for (const id of providers) {
+        if (this.cancelled) {
+          this.patch(id, { status: 'cancelled', message: 'Cancelled' });
+          continue;
+        }
+        const info = syncProviderInfo(id);
+        if (!info) continue;
+        try {
+          await this.runProvider(info, sinceMs);
+        } catch (err) {
+          if (err instanceof Cancelled || this.cancelled) {
+            this.patch(id, (p) => (isFinishedStatus(p.status) ? {} : { status: 'cancelled', message: 'Cancelled' }));
+          } else {
+            const code = err instanceof StepFailure ? err.code : 'network';
+            this.patch(id, (p) => (p.status === 'done' ? {} : { status: 'error', message: describeSyncError(code, info.label) }));
+          }
+        }
+        // A site that ended without saying how (it never should) is not left looking busy.
+        this.patch(id, (p) => (isFinishedStatus(p.status) ? {} : { status: 'error', message: describeSyncError('step_timeout', info.label) }));
+        await this.save(true);
       }
-      const info = syncProviderInfo(id);
-      if (!info) continue;
-      try {
-        await this.runProvider(info, sinceMs);
-      } catch {
-        this.patch(id, (p) => (p.status === 'done' ? {} : { status: 'error', message: describeSyncError('network', info.label) }));
-      }
+    } finally {
+      const at = this.nowIso();
+      this.state = { ...this.state, running: false, finishedAt: at };
+      await this.save(true);
+      // The analysis that waited for the run starts now, whether the run finished, was cancelled
+      // or failed part-way; the import is reported finished before it.
+      const queued = await this.releaseHold(this.state.runId);
+      this.state = { ...this.state, analysis: { queued, at: this.nowIso() } };
       await this.save(true);
     }
-    this.state = { ...this.state, running: false, finishedAt: new Date(this.env.now()).toISOString() };
-    await this.save(true);
   }
 
-  private fail(info: SyncProviderInfo, code: SyncErrorCode): void {
+  private fail(info: SyncProviderInfo, code: SyncErrorCode | SyncStepErrorCode): void {
     this.patch(info.id, { status: 'error', message: describeSyncError(code, info.label) });
   }
 
+  /** What a tab that loaded is actually showing: the app, a sign-in page, or a bot check. */
+  private async pageProblem(info: SyncProviderInfo, tabId: number): Promise<SyncErrorCode | SyncStepErrorCode | null> {
+    if (!this.env.tabInfo) return null;
+    const tab = await this.bounded(this.env.tabInfo(tabId), STEP_TIMEOUTS.browser, 'step_timeout');
+    if (!tab) return 'tab_closed';
+    if (tab.title && CHALLENGE_TITLE.test(tab.title)) return 'blocked';
+    if (tab.url) {
+      let parsed: URL | null = null;
+      try {
+        parsed = new URL(tab.url);
+      } catch {
+        parsed = null;
+      }
+      // Sent to another host (an identity provider) or to a sign-in path: nobody is signed in.
+      if (parsed && (!onSiteHost(info, parsed.hostname) || LOGIN_PATH.test(parsed.pathname))) return 'needs_login';
+    }
+    return null;
+  }
+
+  private async openOwnTab(info: SyncProviderInfo): Promise<number> {
+    return this.bounded(this.env.openTab(info.homeUrl), STEP_TIMEOUTS.browser, 'step_timeout');
+  }
+
+  /** Wait for the tab to load and the reader to answer; the problem when either does not happen. */
+  private async prepareTab(info: SyncProviderInfo, tabId: number): Promise<SyncErrorCode | SyncStepErrorCode | null> {
+    const ready = await this.bounded(this.env.waitTabReady(tabId, TAB_READY_TIMEOUT_MS), TAB_READY_TIMEOUT_MS + 5_000, 'page_timeout').catch((err) => {
+      if (err instanceof Cancelled) throw err;
+      return false;
+    });
+    const problem = await this.pageProblem(info, tabId);
+    if (problem) return problem;
+    if (!ready) return 'page_timeout';
+    const reader = await this.bounded(this.env.ensureContentScript(tabId), STEP_TIMEOUTS.reader, 'no_reader').catch((err) => {
+      if (err instanceof Cancelled) throw err;
+      return false;
+    });
+    if (reader) return null;
+    // Without the address, a page the reader cannot run on is most often a sign-in redirect.
+    return this.env.tabInfo ? 'no_reader' : 'needs_login';
+  }
+
   private async runProvider(info: SyncProviderInfo, sinceMs: number): Promise<void> {
-    this.patch(info.id, { status: 'opening', message: null });
-    await this.save(true);
-    let tabId = await this.env.findTab(info);
+    await this.step(info.id, 'opening', { message: null });
+    if (this.env.hasHostAccess) {
+      const allowed = await this.bounded(this.env.hasHostAccess(info), STEP_TIMEOUTS.browser, 'step_timeout');
+      if (!allowed) return this.fail(info, 'no_access');
+    }
+    let tabId: number | null = info.ownListTab ? null : await this.bounded(this.env.findTab(info), STEP_TIMEOUTS.browser, 'step_timeout');
     let created = false;
     if (tabId === null) {
-      tabId = await this.env.openTab(info.homeUrl);
+      tabId = await this.openOwnTab(info);
       created = true;
     }
     try {
-      if (!(await this.env.waitTabReady(tabId, TAB_READY_TIMEOUT_MS))) return this.fail(info, 'timeout');
-      // A site that sends a signed-out visitor to a login page never reaches the reader.
-      if (!(await this.env.ensureContentScript(tabId))) return this.fail(info, 'needs_login');
-      if (info.strategy === 'api') await this.runApi(info, tabId, sinceMs);
-      else await this.runSidebar(info, tabId);
+      let problem = await this.prepareTab(info, tabId);
+      // A tab of the person's that does not answer (frozen in the background, or open since
+      // before the extension was updated) is left alone; a fresh tab of our own is tried once.
+      if (problem && !created && problem !== 'needs_login' && problem !== 'blocked') {
+        tabId = await this.openOwnTab(info);
+        created = true;
+        problem = await this.prepareTab(info, tabId);
+      }
+      if (problem) return this.fail(info, problem);
+      if (this.cancelled) return this.patch(info.id, { status: 'cancelled', message: 'Cancelled' });
+
+      const pinned = await this.pinAccount(info, tabId);
+      if (pinned === 'signed_out') return this.fail(info, 'needs_login');
+      if (info.strategy === 'api') await this.runApi(info, tabId, sinceMs, pinned.account, pinned.identityKey);
+      else await this.runSidebar(info, tabId, pinned.account, pinned.identityKey);
     } finally {
-      if (created) await this.env.closeTab(tabId).catch(() => undefined);
+      if (created) await this.bounded(this.env.closeTab(tabId), STEP_TIMEOUTS.browser, 'step_timeout', false).catch(() => undefined);
     }
   }
 
-  private async runApi(info: SyncProviderInfo, tabId: number, sinceMs: number): Promise<void> {
+  /**
+   * Settle which account this site's threads are filed under, for the whole run. The page asks
+   * the site who is signed in (its own request); the answer goes to the accounts service, which
+   * makes that person's account the active one or creates it, exactly as for a page the person
+   * opens. A second account of the same site therefore gets its own threads, never the first's.
+   *
+   * For the sites that can say who is signed in (ChatGPT and Claude, with Codex and Claude Code on
+   * the same sign-ins) nothing is imported unless the site named a person and the account
+   * Threadkeeper will file under is recorded as that same person. Any doubt (no answer, an answer
+   * the parser does not accept, the accounts service not taking it) stops the site instead of
+   * filing under whichever account happened to be active.
+   */
+  private async pinAccount(info: SyncProviderInfo, tabId: number): Promise<{ account: SyncAccount | null; identityKey: string | null } | 'signed_out'> {
+    if (!this.env.resolveAccount) return { account: null, identityKey: null };
+    await this.step(info.id, 'account');
+    if (!info.identityHost) {
+      const account = await this.bounded(this.env.resolveAccount(info.id), STEP_TIMEOUTS.database, 'step_timeout');
+      this.patch(info.id, { account: account.label });
+      return { account, identityKey: null };
+    }
+    const reply = await this.askIdentity(tabId);
+    if (reply.status === 'signed_out') return 'signed_out';
+    if (reply.status !== 'signed_in' || !this.env.noteIdentity) throw new StepFailure('account_unverified');
+    const key = reply.identity.key;
+    for (let attempt = 1; ; attempt++) {
+      await this.bounded(this.env.noteIdentity(info.id, reply.identity), STEP_TIMEOUTS.database, 'account_unverified').catch((err) => {
+        if (err instanceof Cancelled) throw err;
+        throw new StepFailure('account_unverified');
+      });
+      const account = await this.bounded(this.env.resolveAccount(info.id), STEP_TIMEOUTS.database, 'account_unverified');
+      if (account.identityKey === key) {
+        this.patch(info.id, { account: account.label });
+        return { account, identityKey: key };
+      }
+      // The accounts service ignores reports for a few seconds after a switch; look once more.
+      if (attempt >= 2) throw new StepFailure('account_unverified');
+      await this.bounded(this.env.sleep(IDENTITY_SETTLE_MS), IDENTITY_SETTLE_MS + 5_000, 'account_unverified');
+    }
+  }
+
+  /** The site's answer to "who is signed in", asked twice before it counts as unknown. */
+  private async askIdentity(tabId: number): Promise<SyncIdentityReply> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const reply = (await this.bounded(this.env.sendToTab(tabId, { type: 'TK_HISTORY_IDENTITY' }), STEP_TIMEOUTS.identity, 'step_timeout').catch((err) => {
+        if (err instanceof Cancelled) throw err;
+        return null;
+      })) as (SyncIdentityReply & { ok?: boolean }) | null;
+      if (reply?.status === 'signed_out') return { status: 'signed_out' };
+      if (reply?.status === 'signed_in' && reply.identity && typeof reply.identity.key === 'string' && reply.identity.key) {
+        return { status: 'signed_in', identity: reply.identity };
+      }
+    }
+    return { status: 'unknown' };
+  }
+
+  /**
+   * Is the person signed in to the site still the one the run is filed under? Asks the site again
+   * (when the run started with a confirmed person) and the accounts service. Fails closed: no
+   * answer, an error or a timeout is 'unknown', never 'same'.
+   */
+  private async checkIdentity(tabId: number, identityKey: string | null, provider: SyncProviderId, account: SyncAccount | null): Promise<IdentityCheck> {
+    if (identityKey !== null) {
+      const reply = await this.askIdentity(tabId);
+      if (reply.status === 'signed_out') return 'changed';
+      if (reply.status !== 'signed_in') return 'unknown';
+      if (reply.identity.key !== identityKey) return 'changed';
+    }
+    return this.accountCheck(provider, account);
+  }
+
+  /** The account captures go to now, compared with the run's. Fails closed. */
+  private async accountCheck(provider: SyncProviderId, pinned: SyncAccount | null): Promise<IdentityCheck> {
+    if (!pinned || !this.env.resolveAccount) return 'same';
+    try {
+      const now = await this.bounded(this.env.resolveAccount(provider), STEP_TIMEOUTS.database, 'step_timeout');
+      return sameAccount(pinned, now) ? 'same' : 'changed';
+    } catch (err) {
+      if (err instanceof Cancelled) throw err;
+      return 'unknown';
+    }
+  }
+
+  /** Stop the site the page is reading for an account reason: tell the page, and refuse what follows. */
+  private stopRun(run: ActiveRun, code: 'account_changed' | 'account_unverified'): void {
+    run.stopped = true;
+    const info = syncProviderInfo(run.provider);
+    void this.env.sendToTab(run.tabId, { type: 'TK_HISTORY_SYNC_CANCEL' }).catch(() => undefined);
+    if (info) this.fail(info, code);
+    run.finish('error');
+  }
+
+  private async runApi(info: SyncProviderInfo, tabId: number, sinceMs: number, account: SyncAccount | null, identityKey: string | null): Promise<void> {
     const runId = this.state.runId ?? '';
     // Cancelled while the tab was opening: never start the reader.
     if (this.cancelled) return this.patch(info.id, { status: 'cancelled', message: 'Cancelled' });
-    const known = await this.env.knownUpdatedAt(info.id);
+    const known = await this.bounded(this.env.knownUpdatedAt(info.id, account), STEP_TIMEOUTS.database, 'step_timeout');
     let finish: (outcome: 'done' | 'error') => void = () => undefined;
     const outcome = new Promise<'done' | 'error'>((resolve) => {
       finish = resolve;
     });
-    const run: ActiveRun = { runId, provider: info.id, tabId, lastEventAt: this.env.now(), finish };
+    const run: ActiveRun = { runId, provider: info.id, tabId, lastEventAt: this.env.now(), account, identityKey, pending: [], stopped: false, finish };
     this.active = run;
     try {
-      this.patch(info.id, { status: 'listing' });
-      const reply = await this.env.sendToTab(tabId, {
-        type: 'TK_HISTORY_SYNC_RUN', runId, provider: info.id, sinceMs,
-        max: this.state.scope === 'all' ? Number.MAX_SAFE_INTEGER : SYNC_MAX_API,
-        scope: this.state.scope, known,
-      }) as { ok?: boolean } | undefined;
+      await this.step(info.id, 'listing');
+      const reply = (await this.bounded(
+        this.env.sendToTab(tabId, {
+          type: 'TK_HISTORY_SYNC_RUN', runId, provider: info.id, sinceMs,
+          max: this.state.scope === 'all' ? Number.MAX_SAFE_INTEGER : SYNC_MAX_API,
+          scope: this.state.scope, known,
+        }),
+        STEP_TIMEOUTS.reader,
+        'no_reader'
+      )) as { ok?: boolean } | undefined;
       if (!reply?.ok) return this.fail(info, 'unsupported');
-      // Wait for "done" or "error", but not forever: a stalled page ends the run.
+      // Wait for "done" or "error", but not forever: a stalled page ends the run, and a closed tab
+      // is noticed within a few seconds instead of after the whole idle timeout.
       for (;;) {
         if (this.cancelled) break;
-        const timer = this.env.timeout(SYNC_IDLE_TIMEOUT_MS);
+        const timer = this.env.timeout(Math.min(SYNC_TAB_CHECK_MS, SYNC_IDLE_TIMEOUT_MS));
         const result = await Promise.race([outcome, timer.promise.then(() => 'tick' as const)]);
         timer.cancel();
         if (result !== 'tick') break;
@@ -250,23 +756,47 @@ export class HistorySyncOrchestrator {
           this.fail(info, 'timeout');
           break;
         }
+        if (this.env.tabInfo && (await this.bounded(this.env.tabInfo(tabId), STEP_TIMEOUTS.browser, 'step_timeout').catch(() => undefined)) === null) {
+          this.fail(info, 'tab_closed');
+          break;
+        }
       }
-      if (this.cancelled) this.patch(info.id, (p) => (p.status === 'done' || p.status === 'error' ? {} : { status: 'cancelled', message: 'Cancelled' }));
-    } catch {
-      this.fail(info, 'unsupported');
+      if (this.cancelled) this.patch(info.id, (p) => (isFinishedStatus(p.status) ? {} : { status: 'cancelled', message: 'Cancelled' }));
+      // The page went silent or its tab closed with conversations still held back: keep them if
+      // the same person can still be confirmed, else drop them (the next run reads them again).
+      else if (!run.stopped && run.pending.length > 0) await this.flush(run, true).catch(() => false);
+    } catch (err) {
+      if (err instanceof Cancelled) throw err;
+      this.fail(info, err instanceof StepFailure ? err.code : 'unsupported');
     } finally {
+      run.stopped = true;
       this.active = null;
     }
   }
 
-  private async runSidebar(info: SyncProviderInfo, tabId: number): Promise<void> {
+  private async runSidebar(info: SyncProviderInfo, tabId: number, account: SyncAccount | null, identityKey: string | null): Promise<void> {
     if (this.cancelled) return this.patch(info.id, { status: 'cancelled', message: 'Cancelled' });
-    this.patch(info.id, { status: 'listing' });
+    const scope = this.state.scope === 'all' ? 'all' : 'recent';
+    // How many conversations this run opens, and how many list entries it reads to find them. An
+    // all-history run lists further than it opens, so the next run can continue past this one.
+    const limit = sidebarLimit(info, scope);
+    const listLimit = scope === 'all' ? SIDEBAR_LIST_ALL : limit;
+    await this.step(info.id, 'listing');
     let items: SidebarConversation[] = [];
+    let listComplete = true;
     try {
-      const reply = (await this.env.sendToTab(tabId, { type: 'TK_HISTORY_LIST_SIDEBAR', provider: info.id, limit: SYNC_MAX_SIDEBAR })) as
-        | { ok?: boolean; items?: unknown }
-        | undefined;
+      const reply = (await this.bounded(
+        this.env.sendToTab(tabId, {
+          type: 'TK_HISTORY_LIST_SIDEBAR',
+          provider: info.id,
+          limit: listLimit,
+          // Reading a whole list scrolls it many more times than the recent part.
+          maxScrolls: scope === 'all' ? Math.ceil(listLimit / 4) : undefined,
+          patience: scope === 'all' ? 3 : undefined,
+        }),
+        scope === 'all' ? STEP_TIMEOUTS.sidebarListAll : STEP_TIMEOUTS.sidebarList,
+        'step_timeout'
+      )) as { ok?: boolean; items?: unknown; complete?: unknown } | undefined;
       items = Array.isArray(reply?.items)
         ? reply.items.filter(
             (i): i is SidebarConversation =>
@@ -277,51 +807,88 @@ export class HistorySyncOrchestrator {
               /^https:\/\//.test((i as SidebarConversation).url)
           )
         : [];
-    } catch {
-      return this.fail(info, 'unsupported');
+      // A list that stopped growing is complete; one cut off by the limit or the scroll budget is not.
+      listComplete = reply?.complete !== false;
+    } catch (err) {
+      if (err instanceof Cancelled) throw err;
+      return this.fail(info, err instanceof StepFailure ? err.code : 'unsupported');
     }
-    items = items.slice(0, SYNC_MAX_SIDEBAR);
+    items = items.slice(0, listLimit);
     if (items.length === 0) return this.fail(info, 'no_conversations');
-    this.patch(info.id, { status: 'fetching', listed: items.length });
+    await this.step(info.id, 'fetching', { listed: items.length });
 
+    let failuresInRow = 0;
+    let opened = 0;
+    let truncated = scope === 'all' && !listComplete;
     for (const item of items) {
       if (this.cancelled) break;
-      if (await this.env.hasRecentCapture(info.id, item.id)) {
+      // The list tab is still signed in as the same person, and captures still go to their account.
+      const check = await this.checkIdentity(tabId, identityKey, info.id, account);
+      if (check !== 'same') return this.fail(info, check === 'changed' ? 'account_changed' : 'account_unverified');
+      const known = await this.bounded(this.env.hasRecentCapture(info.id, item.id, account, scope === 'all'), STEP_TIMEOUTS.database, 'step_timeout').catch((err) => {
+        if (err instanceof Cancelled) throw err;
+        return false;
+      });
+      if (known) {
         this.patch(info.id, (p) => ({ skipped: p.skipped + 1 }));
+        await this.save(false);
         continue;
       }
-      const captured = await this.captureInTab(item);
-      this.patch(info.id, (p) => (captured ? { stored: p.stored + 1 } : { failed: p.failed + 1 }));
+      if (opened >= limit) {
+        truncated = true;
+        break;
+      }
+      opened += 1;
+      const outcome = await this.captureInTab(item, account);
+      // A cancel while the tab was open is not this conversation's failure.
+      if (this.cancelled) break;
+      if (outcome === 'account_changed') return this.fail(info, 'account_changed');
+      // A thread the person deleted stays deleted: skipped, and not a sign the site is failing.
+      this.patch(info.id, (p) => (outcome === 'stored' ? { stored: p.stored + 1 } : outcome === 'deleted' ? { skipped: p.skipped + 1 } : { failed: p.failed + 1 }));
       await this.save(false);
+      failuresInRow = outcome === false ? failuresInRow + 1 : 0;
+      // Several in a row that never show their conversation: signed out, a bot check, or a
+      // changed page. Each would cost the full wait, so the site stops with a plain reason.
+      if (failuresInRow >= SIDEBAR_MAX_CONSECUTIVE_FAILURES && !this.cancelled) return this.fail(info, 'capture_failed');
       await this.env.sleep(SIDEBAR_PAUSE_MS);
     }
-    this.patch(info.id, (p) => (this.cancelled ? { status: 'cancelled', message: 'Cancelled' } : { status: 'done', message: p.message }));
+    this.patch(info.id, (p) =>
+      this.cancelled ? { status: 'cancelled', message: 'Cancelled' } : { status: 'done', message: p.message, ...(truncated ? { truncated: true } : {}) }
+    );
   }
 
   /** Open one conversation in a background tab and wait until normal capture has stored it. */
-  private async captureInTab(item: SidebarConversation): Promise<boolean> {
+  private async captureInTab(item: SidebarConversation, account: SyncAccount | null): Promise<CaptureOutcome | 'account_changed' | false> {
     let tabId: number | null = null;
     try {
-      tabId = await this.env.openTab(item.url);
-      let resolveWait: (ok: boolean) => void = () => undefined;
-      const stored = new Promise<boolean>((resolve) => {
+      tabId = await this.bounded(this.env.openTab(item.url), STEP_TIMEOUTS.browser, 'step_timeout');
+      let resolveWait: CaptureWaiter['resolve'] = () => undefined;
+      const stored = new Promise<CaptureOutcome | 'account_changed' | false>((resolve) => {
         resolveWait = resolve;
       });
-      this.captureWaiters.set(tabId, { conversationId: item.id, resolve: resolveWait });
+      this.captureWaiters.set(tabId, { conversationId: item.id, resolve: resolveWait, account });
       const timer = this.env.timeout(SIDEBAR_CAPTURE_TIMEOUT_MS);
-      const ready = await this.env.waitTabReady(tabId, TAB_READY_TIMEOUT_MS);
-      if (!ready) return false;
-      // The page captures itself once it settles; this asks for one more in case it already did.
-      void this.env.ensureContentScript(tabId).then((ok) => (ok && tabId !== null ? this.env.sendToTab(tabId, { type: 'TK_CAPTURE_NOW' }) : undefined)).catch(() => undefined);
-      const ok = await Promise.race([stored, timer.promise.then(() => false)]);
-      timer.cancel();
-      return ok;
+      try {
+        const ready = await Promise.race([
+          this.bounded(this.env.waitTabReady(tabId, TAB_READY_TIMEOUT_MS), TAB_READY_TIMEOUT_MS + 5_000, 'page_timeout'),
+          stored.then(() => true),
+        ]);
+        if (!ready) return false;
+        // The page captures itself once it settles; this asks for one more in case it already did.
+        const asked = tabId;
+        void this.bounded(this.env.ensureContentScript(asked), STEP_TIMEOUTS.reader, 'no_reader')
+          .then((ok) => (ok ? this.env.sendToTab(asked, { type: 'TK_CAPTURE_NOW' }) : undefined))
+          .catch(() => undefined);
+        return await Promise.race([stored, timer.promise.then(() => false as const)]);
+      } finally {
+        timer.cancel();
+      }
     } catch {
       return false;
     } finally {
       if (tabId !== null) {
         this.captureWaiters.delete(tabId);
-        await this.env.closeTab(tabId).catch(() => undefined);
+        await this.bounded(this.env.closeTab(tabId), STEP_TIMEOUTS.browser, 'step_timeout', false).catch(() => undefined);
       }
     }
   }

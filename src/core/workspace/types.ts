@@ -252,7 +252,11 @@ export type WorkspaceCommand =
   | { type: 'ACCOUNTS_REMOVE'; accountId: string }
   | { type: 'HELPER_PING' }
   /** Open `url` in an isolated account's own Chrome profile window. */
-  | { type: 'HELPER_OPEN'; accountId: string; url: string };
+  | { type: 'HELPER_OPEN'; accountId: string; url: string }
+  /** Library backups kept on disk by the Mac helper (core/backup-helper.ts). */
+  | { type: 'BACKUP_STATUS' }
+  | { type: 'BACKUP_NOW' }
+  | { type: 'BACKUP_RESTORE'; name: string };
 
 export const WORKSPACE_COMMAND_TYPES: ReadonlySet<string> = new Set<WorkspaceCommand['type']>([
   'WORKSPACE_HELLO',
@@ -263,6 +267,9 @@ export const WORKSPACE_COMMAND_TYPES: ReadonlySet<string> = new Set<WorkspaceCom
   'ACCOUNTS_REMOVE',
   'HELPER_PING',
   'HELPER_OPEN',
+  'BACKUP_STATUS',
+  'BACKUP_NOW',
+  'BACKUP_RESTORE',
 ]);
 
 export type WorkspaceFailure = { ok: false; error: string; code?: WorkspaceErrorCode };

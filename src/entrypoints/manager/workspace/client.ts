@@ -13,6 +13,8 @@ import type {
   WorkspaceHelloResult,
 } from '../../../core/workspace/types.js';
 
+import type { BackupNowResult, BackupRestoreResult, BackupStatus } from '../../../core/backup-helper.js';
+
 type SendFn = (message: WorkspaceCommand) => Promise<unknown>;
 type FrameSendFn = (tabId: number, frameId: number, message: EmbedFrameCommand) => Promise<unknown>;
 
@@ -60,6 +62,9 @@ export const workspaceApi = {
   removeAccount: (accountId: string) => call<AccountsChangeResult>({ type: 'ACCOUNTS_REMOVE', accountId }),
   helperPing: () => call<HelperPingResult>({ type: 'HELPER_PING' }),
   helperOpen: (accountId: string, url: string) => call<{ ok: true }>({ type: 'HELPER_OPEN', accountId, url }),
+  backupStatus: () => call<BackupStatus>({ type: 'BACKUP_STATUS' }),
+  backupNow: () => call<Extract<BackupNowResult, { ok: true }>>({ type: 'BACKUP_NOW' }),
+  backupRestore: (name: string) => call<Extract<BackupRestoreResult, { ok: true }>>({ type: 'BACKUP_RESTORE', name }),
 };
 
 /**

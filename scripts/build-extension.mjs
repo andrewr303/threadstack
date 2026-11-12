@@ -2,12 +2,19 @@ import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const outDir = path.join(rootDir, '.output', 'chrome-mv3');
+// TK_OUT_DIR builds somewhere else, so a test build never replaces the folder a browser has loaded
+// (a loaded Threadkeeper reloads itself when the build in its folder changes).
+const finalDir = process.env.TK_OUT_DIR ? path.resolve(process.env.TK_OUT_DIR) : path.join(rootDir, '.output', 'chrome-mv3');
+// Everything is built here first and then moved into finalDir file by file (publish()), so the
+// folder a browser has loaded is never empty or missing its manifest, not even for a moment.
+const outDir = `${finalDir}.staging`;
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 
 /**
@@ -27,6 +34,128 @@ function createBuildInfo() {
   const stamp = builtAt.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '.');
   const buildId = `${stamp}-${sha}`;
   return { version: pkg.version, versionName: `${pkg.version} (build ${buildId})`, buildId, builtAt: builtAt.toISOString() };
+}
+
+/**
+ * Replace finalDir's contents with the staged build. Each file is put in place with a rename
+ * (atomic), files the new build no longer has are removed afterwards, and manifest.json goes
+ * last, so a browser that starts or reloads in the middle always finds a loadable extension.
+ */
+function publish(stagedDir, targetDir) {
+  const list = (dir, base = '') =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const rel = path.join(base, entry.name);
+      return entry.isDirectory() ? list(path.join(dir, entry.name), rel) : [rel];
+    });
+  // Only ever replace a folder that is empty or already holds a Threadkeeper build: everything in
+  // the target that is not part of the new build is deleted below.
+  if (fs.existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
+    let name = null;
+    try {
+      name = JSON.parse(fs.readFileSync(path.join(targetDir, 'manifest.json'), 'utf8')).name;
+    } catch {
+      // no manifest: not a build folder
+    }
+    if (name !== 'Threadkeeper') {
+      fs.rmSync(stagedDir, { recursive: true, force: true });
+      throw new Error(`${targetDir} is not empty and is not a Threadkeeper build. Choose an empty folder.`);
+    }
+  }
+  const staged = list(stagedDir);
+  // manifest.json and then build-info.json go last: the running extension compares build-info.json
+  // with its manifest and reloads once per build, so it must not see the new build-info early.
+  const last = ['manifest.json', 'build-info.json'];
+  const ordered = [...staged.filter((f) => !last.includes(f)), ...last.filter((f) => staged.includes(f))];
+  for (const rel of ordered) {
+    const to = path.join(targetDir, rel);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    const temp = `${to}.tk-new`;
+    fs.copyFileSync(path.join(stagedDir, rel), temp);
+    fs.renameSync(temp, to);
+  }
+  const keep = new Set(staged);
+  for (const rel of list(targetDir)) {
+    if (!keep.has(rel)) fs.rmSync(path.join(targetDir, rel), { force: true });
+  }
+  fs.rmSync(stagedDir, { recursive: true, force: true });
+}
+
+/** The ID a browser gives an unpacked extension that has no manifest key: a hash of its folder. */
+function pathExtensionId(dir) {
+  // The browser hashes the real path (symlinks resolved).
+  try {
+    dir = fs.realpathSync(dir);
+  } catch {
+    // not built yet: the path as given
+  }
+  const hex = crypto.createHash('sha256').update(dir).digest('hex').slice(0, 32);
+  return [...hex].map((c) => String.fromCharCode(97 + parseInt(c, 16))).join('');
+}
+
+/**
+ * Whether this build carries the fixed manifest key (shared/extension-key.json).
+ *
+ * With the key, Threadkeeper has the same extension ID wherever its folder is, so loading it
+ * from another checkout or moving the folder keeps the library. Without it the ID is a hash of
+ * the folder path. A browser keeps an extension's data under its ID, and changing the ID starts
+ * an empty library, so a folder that a browser on this computer already has loaded under its
+ * path ID keeps building without the key until the person moves on purpose (docs/mac-helper.md,
+ * "The extension ID").
+ * TK_STABLE_ID=1 forces the key, TK_STABLE_ID=0 forces the path ID. A build to another folder
+ * (TK_OUT_DIR) has no key unless forced, so a test build can never open the real library.
+ */
+function decideManifestKey(targetDir) {
+  const fixed = JSON.parse(fs.readFileSync(path.join(rootDir, 'shared', 'extension-key.json'), 'utf8'));
+  if (process.env.TK_STABLE_ID === '1') return { key: fixed.key, id: fixed.extensionId, legacyId: null };
+  if (process.env.TK_STABLE_ID === '0' || process.env.TK_OUT_DIR) return { key: null, id: pathExtensionId(targetDir), legacyId: null };
+  let realTarget = targetDir;
+  try {
+    realTarget = fs.realpathSync(targetDir);
+  } catch {
+    // not built yet
+  }
+  // Any ID other than the fixed one under which a browser has this folder loaded. The ID is taken
+  // from the browser's own record, not recomputed, so it is right on every platform.
+  let loadedUnder = null;
+  const bases = [];
+  if (process.platform === 'darwin') bases.push(path.join(os.homedir(), 'Library', 'Application Support'));
+  else if (process.platform === 'win32') bases.push(process.env.LOCALAPPDATA ?? '');
+  else bases.push(path.join(os.homedir(), '.config'));
+  const browsers = [
+    'Google/Chrome', 'Google/Chrome Beta', 'Google/Chrome Dev', 'Google/Chrome Canary', 'Google/Chrome for Testing',
+    'Chromium', 'Microsoft Edge', 'Microsoft Edge Beta', 'Microsoft Edge Dev', 'Microsoft Edge Canary',
+    'BraveSoftware/Brave-Browser', 'Arc/User Data', 'Vivaldi', 'com.operasoftware.Opera',
+    'google-chrome', 'chromium', 'microsoft-edge', 'Google/Chrome/User Data', 'Microsoft/Edge/User Data',
+    'BraveSoftware/Brave-Browser/User Data',
+  ];
+  for (const base of bases.filter(Boolean)) {
+    for (const browser of browsers) {
+      let profiles = [];
+      try {
+        profiles = fs.readdirSync(path.join(base, browser), { withFileTypes: true }).filter((d) => d.isDirectory() && (d.name === 'Default' || /^Profile \d+$/.test(d.name)));
+      } catch {
+        continue;
+      }
+      for (const profile of profiles) {
+        for (const file of ['Secure Preferences', 'Preferences']) {
+          let settings;
+          try {
+            settings = JSON.parse(fs.readFileSync(path.join(base, browser, profile.name, file), 'utf8'))?.extensions?.settings;
+          } catch {
+            continue;
+          }
+          // Only the list of extensions and the folder each loads from is looked at.
+          for (const [id, entry] of Object.entries(settings ?? {})) {
+            if (!entry || typeof entry.path !== 'string' || ![targetDir, realTarget].includes(path.resolve(entry.path))) continue;
+            if (id !== fixed.extensionId) loadedUnder = id;
+          }
+        }
+      }
+    }
+  }
+  // One profile still on a path ID is enough: adding the key would empty that profile's library.
+  if (loadedUnder) return { key: null, id: loadedUnder, legacyId: loadedUnder };
+  return { key: fixed.key, id: fixed.extensionId, legacyId: null };
 }
 
 function createPngBuffer(size) {
@@ -356,9 +485,12 @@ async function build() {
   }
   // Workspace embedding scripts load wherever the reader does, Grok on X included.
   const embedPatterns = Array.from(new Set([...patterns.domCapture, ...patterns.grokX]));
+  const identity = decideManifestKey(finalDir);
   const manifest = {
     manifest_version: 3,
     name: 'Threadkeeper',
+    // The same extension ID wherever the folder is (see decideManifestKey).
+    ...(identity.key ? { key: identity.key } : {}),
     version: buildInfo.version,
     version_name: buildInfo.versionName,
     description:
@@ -511,7 +643,20 @@ async function build() {
     fs.writeFileSync(path.join(outDir, 'icons', `icon-${size}.png`), createPngBuffer(size));
   }
 
-  console.log(`Built Threadkeeper ${buildInfo.versionName} to ${outDir}`);
+  publish(outDir, finalDir);
+
+  console.log(`Built Threadkeeper ${buildInfo.versionName} to ${finalDir}`);
+  console.log(`Extension ID: ${identity.id}${identity.key ? ' (fixed: the same wherever this folder is)' : ''}`);
+  if (identity.legacyId) {
+    console.log(
+      [
+        '',
+        'A browser on this computer has this folder loaded under an ID that depends on the folder path,',
+        'so this build keeps that ID and the library stays where it is. Do not move or rename the folder.',
+        'To move to the fixed ID without risk, follow "The extension ID" in docs/mac-helper.md.',
+      ].join('\n')
+    );
+  }
   console.log(
     [
       '',
@@ -522,6 +667,13 @@ async function build() {
       'If you forget, the extension reloads itself within a few minutes, and an open library page offers a one-click Reload.',
     ].join('\n')
   );
+}
+
+// `--print-id`: say which extension ID a build of this folder would have, and build nothing.
+if (process.argv.includes('--print-id')) {
+  const identity = decideManifestKey(finalDir);
+  console.log(`${identity.id} ${identity.key ? 'fixed' : 'path'}`);
+  process.exit(0);
 }
 
 build().catch((err) => {

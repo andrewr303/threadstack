@@ -1,4 +1,5 @@
 import { isRemoteAllowed } from './privacy.js';
+import { ANALYSIS_HELD_REASON, activeAnalysisHold } from './analysis-hold.js';
 import {
   ANALYSIS_VERSION,
   insightKeyFor,
@@ -732,6 +733,11 @@ export async function runAnalysisJobs(
       summary.stoppedReason = 'Time budget reached';
       break;
     }
+    // An online import is running: no hosted analysis starts until it ends (analysis-hold.ts).
+    if (await activeAnalysisHold(db, Date.now())) {
+      summary.stoppedReason = ANALYSIS_HELD_REASON;
+      break;
+    }
     const job = await claimNextJob(db, Date.now());
     if (!job) break;
     summary.processed++;
@@ -812,6 +818,8 @@ export async function countPendingAnalysis(db: ThreadkeeperDB): Promise<number> 
 
 /** Earliest pending notBefore, so the service worker can schedule an alarm for it. */
 export async function nextDueAnalysisAt(db: ThreadkeeperDB): Promise<number | null> {
+  // Nothing is due while an import holds analysis; ending the hold starts the queue itself.
+  if (await activeAnalysisHold(db, Date.now())) return null;
   const jobs = await db.jobs.where('jobType').equals(ANALYZE_JOB).toArray();
   const times = jobs
     .filter((j) => j.status === 'pending')

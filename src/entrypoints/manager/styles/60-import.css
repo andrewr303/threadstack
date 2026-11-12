@@ -1,0 +1,97 @@
+/* Online import: progress per site and the analysis that follows it (ImportProgress.tsx).
+   The row layout is .tk-sync-list in styles.css; this file adds the step text and the bar. */
+
+.tk-import-progress {
+  margin-top: 10px;
+}
+
+.tk-import-total {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-sync-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tk-sync-step {
+  color: var(--ink);
+}
+
+.tk-sync-detail,
+.tk-sync-account {
+  font-size: var(--fs-12);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-sync-list li[data-status="error"] .tk-sync-detail {
+  color: var(--danger);
+}
+
+/* The bar: a track and a fill scaled from the left. Only transform changes, never width. */
+.tk-progress {
+  grid-column: 2;
+  position: relative;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--r-cap);
+  background: var(--rule);
+}
+
+.tk-progress-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: var(--accent);
+  transition: transform var(--t-small) var(--ease-out);
+}
+
+.tk-sync-list li[data-status="error"] .tk-progress-fill {
+  background: var(--danger);
+}
+
+/* Total not known yet: a short segment travels along the track. */
+.tk-progress[data-indeterminate="true"] .tk-progress-fill {
+  inset: 0 auto 0 0;
+  width: 30%;
+  transform: translateX(-100%);
+  transition: none;
+  animation: tk-progress-travel 1.4s var(--ease-out) infinite;
+}
+
+@keyframes tk-progress-travel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/* Without motion the unknown total is a steady, dimmer full bar; the text carries the step. */
+@media (prefers-reduced-motion: reduce) {
+  .tk-progress-fill {
+    transition: none;
+  }
+
+  .tk-progress[data-indeterminate="true"] .tk-progress-fill {
+    width: 100%;
+    animation: none;
+    transform: none;
+    opacity: 0.4;
+  }
+}
+
+@media (max-width: 480px) {
+  .tk-progress {
+    grid-column: 1;
+  }
+}

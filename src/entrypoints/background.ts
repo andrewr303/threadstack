@@ -6,9 +6,8 @@ import {
 } from '../core/db.js';
 import { buildThreadKey, type SettingsRecord } from '../core/schema.js';
 import { HistorySyncOrchestrator } from '../core/sync-orchestrator.js';
-import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv } from '../core/sync-env.js';
-import { EMPTY_SYNC_STATE, clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
-import { siteConversationTitle, type SiteConversation } from '../core/site-api.js';
+import { createChromeSyncEnv, createSyncedConversationStore } from '../core/sync-env.js';
+import { clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import {
   DOCK_COMMAND_TYPES,
@@ -70,6 +69,7 @@ import {
 import { loadOrganizeContext, type OrganizeContext } from '../core/auto-organize.js';
 import { autoHealStaleManifest, readDiskBuildInfo } from '../core/diagnostics.js';
 import { BUILD_INFO } from '../core/build-info.js';
+import { backupNow, backupStatus, chromeBackupEnv, maybeAutoBackup, restoreFromHelper } from '../core/backup-helper.js';
 import {
   PAPERCLIP_SYNC_ALARM,
   PAPERCLIP_SYNC_PERIOD_MINUTES,
@@ -313,39 +313,13 @@ async function schedulePaperclipAlarm(settings?: SettingsRecord): Promise<void> 
   }
 }
 
-/** Store a conversation read by Catch up. Deleted threads stay deleted (tombstones), and a site whose capture is off is skipped. */
-async function storeSyncedConversation(conv: SiteConversation): Promise<'stored' | 'skipped'> {
-  const settings = await ensureStarterCollectionsAndSettings(db);
-  if (!settings.authorizedHosts[conv.provider]) return 'skipped';
-  // Catch up reads the site with the browser's current sign-in: the realm's active account.
-  const bound = await resolveCaptureAccount(conv.provider, settings.boundAccounts[conv.provider]);
-  const threadKey = buildThreadKey({
-    provider: conv.provider,
-    accountId: bound.accountId,
-    workspaceId: bound.workspaceId,
-    sourceConversationId: conv.sourceConversationId,
-    branchId: 'main',
-  });
-  const result = await upsertThread(db, {
-    threadKey,
-    provider: conv.provider,
-    accountId: bound.accountId,
-    workspaceId: bound.workspaceId,
-    sourceConversationId: conv.sourceConversationId,
-    branchId: 'main',
-    canonicalUrl: conv.canonicalUrl,
-    title: siteConversationTitle(conv),
-    createdAt: conv.createdAt,
-    updatedAt: conv.updatedAt ?? new Date().toISOString(),
-    coverage: conv.messages.length > 0 ? 'full' : 'title_only',
-    captureSource: 'history_sync',
-    modelSlug: conv.modelSlug,
-    messages: conv.messages,
-  });
-  if (result.status !== 'stored') return 'skipped';
-  await organizeStoredThread(threadKey, settings);
-  return 'stored';
-}
+/** Store a conversation read by Catch up under the run's account (sync-env.ts). */
+const storeSyncedConversation = createSyncedConversationStore({
+  db,
+  loadSettings: () => ensureStarterCollectionsAndSettings(db),
+  resolveAccount: (provider, bound) => resolveCaptureAccount(provider, bound),
+  organize: organizeStoredThread,
+});
 
 const syncOrchestrator = new HistorySyncOrchestrator(
   createChromeSyncEnv(db, {
@@ -353,36 +327,37 @@ const syncOrchestrator = new HistorySyncOrchestrator(
     storeConversation: storeSyncedConversation,
     resolveAccount: async (provider, bound) => {
       const resolved = await resolveCaptureAccount(provider, bound);
-      return { accountId: resolved.accountId, workspaceId: resolved.workspaceId };
+      return {
+        accountId: resolved.accountId,
+        workspaceId: resolved.workspaceId,
+        label: resolved.account?.label ?? null,
+        // Who the account record says it is: an import runs only when the site names the same person.
+        identityKey: resolved.account?.identity?.key ?? null,
+      };
     },
+    // The same path as a page's own ACCOUNT_IDENTITY report.
+    noteIdentity: async (provider, raw) => {
+      const identity = sanitizeIdentity(raw);
+      const svc = accounts();
+      if (!identity || !svc) return;
+      const outcome = await svc.noteIdentity(provider, identity);
+      if (outcome && (outcome.reassigned || outcome.updated)) {
+        broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: outcome.realm, activeAccountId: outcome.activeAccountId, switched: false });
+      }
+    },
+    kickAnalysis: () => void kickAnalysis(),
   })
 );
 
-/** The state the library shows: the live run, else what was last saved. A run the worker lost is marked interrupted. */
+/** The state the library shows: the live run, else what was last saved. A run the worker lost is ended as interrupted. */
 async function currentSyncState(): Promise<SyncState> {
-  if (syncOrchestrator.state.runId) return syncOrchestrator.state;
-  try {
-    const stored = (await chrome.storage.local.get(HISTORY_SYNC_STATE_KEY))[HISTORY_SYNC_STATE_KEY] as SyncState | undefined;
-    if (stored && typeof stored === 'object' && Array.isArray(stored.providers)) {
-      if (stored.running) {
-        const fixed: SyncState = {
-          ...stored,
-          running: false,
-          providers: stored.providers.map((p) =>
-            p.status === 'done' || p.status === 'error' || p.status === 'cancelled'
-              ? p
-              : { ...p, status: 'error' as const, message: 'Stopped when the browser restarted the extension. Run Catch up again; what was imported is kept.' }
-          ),
-        };
-        await chrome.storage.local.set({ [HISTORY_SYNC_STATE_KEY]: fixed });
-        return fixed;
-      }
-      return stored;
-    }
-  } catch {
-    // storage unavailable
-  }
-  return EMPTY_SYNC_STATE;
+  return syncOrchestrator.currentState();
+}
+
+// A run whose worker was stopped ends here, as soon as the worker starts again, so no page shows
+// its last step forever and the analysis it held back is started.
+if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+  void syncOrchestrator.recover().catch(() => undefined);
 }
 
 async function focusWindow(windowId: number | undefined): Promise<void> {
@@ -1075,6 +1050,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onStartup) {
 if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'threadkeeper-resumable-jobs') {
+      // Library backup to disk through the Mac helper: only when the library changed and the
+      // last backup is old enough (backup-helper.ts); a quick no-op otherwise.
+      void maybeAutoBackup(db, chromeBackupEnv(BUILD_INFO.version));
       void processResumableJobs(db, async (job) => {
         if (job.jobType === 'enrich_thread') {
           await requestThreadEnrichment(db, job.threadKey);
@@ -1121,6 +1099,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       }
 
       // Workspace commands: the sender is Threadkeeper's manager page as a top-level tab.
+      if (type === 'BACKUP_STATUS' || type === 'BACKUP_NOW' || type === 'BACKUP_RESTORE') {
+        const backupEnv = chromeBackupEnv(BUILD_INFO.version);
+        try {
+          if (type === 'BACKUP_STATUS') sendResponse(await backupStatus(db, backupEnv));
+          else if (type === 'BACKUP_NOW') sendResponse(await backupNow(db, backupEnv));
+          else sendResponse(await restoreFromHelper(db, backupEnv, message.name));
+        } catch {
+          sendResponse({ ok: false, error: 'Threadkeeper could not reach its backups. Try again.' });
+        }
+        return;
+      }
       if (WORKSPACE_COMMAND_TYPES.has(type) && typeof sender.tab?.id === 'number') {
         sendResponse(
           await handleWorkspaceCommand(message, sender.tab.id, {
@@ -1240,9 +1229,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (result.status === 'stored') {
           // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
           await organizeStoredThread(threadKey, settings);
-          if (!decision.embedded && typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
-            syncOrchestrator.noteCapture(sender.tab.id, message.payload.sourceConversationId, message.payload.messages.length);
-          }
+        }
+        // A tab-by-tab import waits for this capture: tell it which account it was filed under (it
+        // stops if that is not the run's) and that a thread the person deleted stays deleted.
+        if (!decision.embedded && typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
+          syncOrchestrator.noteCapture(
+            sender.tab.id,
+            message.payload.sourceConversationId,
+            message.payload.messages.length,
+            { accountId: bound.accountId, workspaceId: bound.workspaceId },
+            result.status === 'stored' ? 'stored' : 'deleted'
+          );
         }
         return;
       }
@@ -1307,8 +1304,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
       if (message.type === 'HISTORY_SYNC_EVENT') {
         const event = validateSyncEvent(message.event);
-        if (event) await syncOrchestrator.handleEvent(event, sender.tab?.id);
-        sendResponse({ ok: Boolean(event) });
+        // A false answer tells a reader whose run has ended (or never was) to stop reading.
+        const accepted = event ? await syncOrchestrator.handleEvent(event, sender.tab?.id) : false;
+        sendResponse({ ok: accepted });
         return;
       }
 

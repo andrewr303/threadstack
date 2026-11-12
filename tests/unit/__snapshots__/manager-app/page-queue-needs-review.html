@@ -1314,6 +1314,24 @@
             "Claude"
             <span class="tk-toggle-hint">
               "Complete history with dates, read through your signed-in session."
+      <details class="tk-catchup-more"> {open=false}
+        <summary class="tk-muted">
+          "Coding sessions: Claude Code and Codex (slower)"
+        <p class="tk-settings-note">
+          "Threadkeeper reads your session list on the web and opens each session in a background tab for a few seconds, where it is read like any session you open, including its repository and pull request when the page shows them. Sessions are filed under the account signed in right now; to import a second account, switch to it and run the import again."
+        <div class="tk-catchup-providers">
+          <label class="tk-toggle">
+            <input type="checkbox"> {checked=false}
+            <span>
+              "Claude Code"
+              <span class="tk-toggle-hint">
+                "Opens each Claude Code session from your session list in a background tab, with its repository and pull request when the page shows them."
+          <label class="tk-toggle">
+            <input type="checkbox"> {checked=false}
+            <span>
+              "Codex"
+              <span class="tk-toggle-hint">
+                "Opens each Codex task from your task list in a background tab, with its repository and pull request when the page shows them."
       <div class="tk-field-row">
         <button type="button" class="tk-btn tk-btn-primary">
           "Import all online conversations"

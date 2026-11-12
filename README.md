@@ -151,7 +151,7 @@ npm run build
 
 The unpacked extension is written to `.output/chrome-mv3`.
 
-1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. On macOS the `.output` folder is hidden: press **Cmd+Shift+.** in the folder picker to show it. Remove any older Threadkeeper first; a copy loaded from another folder has a different ID and keeps running.
+1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. On macOS the `.output` folder is hidden: press **Cmd+Shift+.** in the folder picker to show it. A browser keeps the library under the extension's ID, and removing a Threadkeeper card deletes that copy's library, so before you remove or replace a copy, make a backup with the [Mac helper](docs/mac-helper.md) (Settings, Accounts, Library backups). New installs have a fixed ID, so the library follows Threadkeeper to any folder; a copy loaded before that keeps its older, folder-based ID until you move it (see "The extension ID" in that guide).
 2. Check that the version on the extensions page matches the `Built Threadkeeper … (build …)` line that `npm run build` printed. After every later `npm run build`, click **Reload** (or let the extension reload itself within a few minutes).
 3. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
 4. Optional: **Settings → AI models** → choose the Anthropic API, Amazon Bedrock or Claude Platform on AWS, add the key → **Test connection**. Then press **Auto-organize** to analyze and file your whole library.

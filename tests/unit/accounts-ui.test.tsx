@@ -572,7 +572,8 @@ describe('Mac helper panel', () => {
     expect(spies.announce).toHaveBeenCalledWith('Extension ID copied.');
     const steps = [...container.querySelectorAll('ol.tk-acct-steps > li')].map((li) => li.textContent ?? '');
     expect(steps).toHaveLength(4);
-    expect(steps[1]).toContain('Install Mac Helper.command');
+    expect(steps[0]).toContain('Install Mac Helper.command');
+    expect(steps[1]).toContain('every browser on this Mac');
   });
 });
 
@@ -776,3 +777,135 @@ describe('SettingsDialog additions', () => {
     expect(onPatch).toHaveBeenCalledWith({ maxLiveFrames: 12 });
   });
 });
+
+describe('Library backups panel', () => {
+  const backup = { name: 'library-20260501-120000.tkbackup', bytes: 3 * 1024 * 1024, threads: 412, messages: 9000, createdAt: '2026-05-01T12:00:00Z', extensionVersion: '0.5.0' };
+  const stub = (answers: Record<string, unknown>) => {
+    vi.stubGlobal('chrome', { permissions: { request: vi.fn(async () => true), contains: vi.fn(async () => true) }, runtime: { id: 'abcdefghijklmnopabcdefghijklmnop' } });
+    const send = vi.fn(async (message: { type: string }) => answers[message.type]);
+    configureWorkspaceClient({ send: send as never });
+    return send;
+  };
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+  };
+
+  it('offers the backup on disk when the library is empty and restores it', async () => {
+    const send = stub({
+      BACKUP_STATUS: { ok: true, helper: true, threads: 0, backups: [backup], last: null },
+      BACKUP_RESTORE: { ok: true, threadsAdded: 412, kept: 0, settingsRestored: true },
+    });
+    const { value } = makeCtx();
+    mount(<AccountsSettings />, value);
+    await settle();
+    const offer = container.querySelector('.tk-acct-backup-offer')!;
+    expect(offer.textContent).toContain('This library is empty');
+    expect(offer.textContent).toContain('412 threads');
+    expect((button('Back up now') as HTMLButtonElement).disabled).toBe(true);
+    await press(button('Restore that backup', offer as HTMLElement));
+    await settle();
+    expect(send).toHaveBeenCalledWith({ type: 'BACKUP_RESTORE', name: backup.name });
+    expect(container.querySelector('.tk-acct-backup-action')!.textContent).toContain('Restored 412 threads and your settings');
+    expect(button('Reload Threadkeeper')).toBeTruthy();
+  });
+
+  it('shows the last backup, backs up on request, and confirms before restoring into a library with threads', async () => {
+    const send = stub({
+      BACKUP_STATUS: { ok: true, helper: true, threads: 500, backups: [backup], last: { fingerprint: 'f', at: '2026-05-01T12:00:00Z', name: backup.name, threads: 412 } },
+      BACKUP_NOW: { ok: true, name: 'library-20260502-120000.tkbackup', threads: 500, bytes: 2048 },
+      BACKUP_RESTORE: { ok: true, threadsAdded: 0, kept: 412, settingsRestored: false },
+    });
+    const { value } = makeCtx();
+    mount(<AccountsSettings />, value);
+    await settle();
+    expect(container.querySelector('.tk-acct-backup-offer')).toBeNull();
+    expect(container.querySelector('.tk-acct-backups')!.textContent).toContain('Last backup:');
+    await press(button('Back up now'));
+    await settle();
+    expect(send).toHaveBeenCalledWith({ type: 'BACKUP_NOW' });
+    expect(container.querySelector('.tk-acct-backup-action')!.textContent).toContain('Backed up 500 threads');
+    const row = container.querySelector('.tk-acct-backup-row') as HTMLElement;
+    await press(row.querySelector('button')!);
+    expect(send).not.toHaveBeenCalledWith({ type: 'BACKUP_RESTORE', name: backup.name });
+    expect(row.textContent).toContain('are left as they are');
+    await press(button('Restore', row));
+    await settle();
+    expect(send).toHaveBeenCalledWith({ type: 'BACKUP_RESTORE', name: backup.name });
+    expect(container.querySelector('.tk-acct-backup-action')!.textContent).toContain('already has every thread');
+  });
+
+  it('says why backups are not being kept', async () => {
+    stub({ BACKUP_STATUS: { ok: true, helper: false, reason: 'The Mac helper is not installed for this browser.', threads: 3, backups: [], last: null } });
+    const { value } = makeCtx();
+    mount(<AccountsSettings />, value);
+    await settle();
+    expect(container.querySelector('.tk-acct-backups')!.textContent).toContain('Backups are not being kept. The Mac helper is not installed for this browser.');
+    expect(container.querySelector('.tk-acct-backup-list')).toBeNull();
+  });
+});
+
+describe('Restore offer on an empty library', () => {
+  const backup = { name: 'library-20260501-120000.tkbackup', bytes: 1024, threads: 412, messages: 9000, createdAt: '2026-05-01T12:00:00Z', extensionVersion: '0.5.0' };
+  const settle = async () => {
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); });
+  };
+  const setup = (held: boolean, answers: Record<string, unknown>) => {
+    localStorage.clear();
+    Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true });
+    const request = vi.fn(async () => true);
+    vi.stubGlobal('chrome', { permissions: { request, contains: vi.fn(async () => held) }, runtime: { id: 'abcdefghijklmnopabcdefghijklmnop' } });
+    const send = vi.fn(async (message: { type: string }) => answers[message.type]);
+    configureWorkspaceClient({ send: send as never });
+    return { send, request };
+  };
+  const banner = () => container.querySelector('[data-testid="restore-offer-banner"]') as HTMLElement | null;
+
+  it('offers the backup at once when the helper is already allowed, and restores it', async () => {
+    const { RestoreOfferBanner } = await import('../../src/entrypoints/manager/accounts/RestoreOfferBanner.js');
+    const { send } = setup(true, {
+      BACKUP_STATUS: { ok: true, helper: true, threads: 0, backups: [backup, { ...backup, name: 'library-20260502-120000.tkbackup', threads: 2 }], last: null },
+      BACKUP_RESTORE: { ok: true, threadsAdded: 412, kept: 0, settingsRestored: true },
+    });
+    mount(<RestoreOfferBanner threads={0} />);
+    await settle();
+    expect(banner()!.textContent).toContain('holds 412 threads');
+    await press(button('Restore', banner()!));
+    await settle();
+    expect(send).toHaveBeenCalledWith({ type: 'BACKUP_RESTORE', name: backup.name });
+    expect(banner()!.textContent).toContain('Restored 412 threads');
+    expect(button('Reload Threadkeeper', banner()!)).toBeTruthy();
+  });
+
+  it('asks before talking to the helper when this copy has no permission yet', async () => {
+    const { RestoreOfferBanner } = await import('../../src/entrypoints/manager/accounts/RestoreOfferBanner.js');
+    const { send, request } = setup(false, { BACKUP_STATUS: { ok: true, helper: false, reason: 'The Mac helper is installed, but not for this copy of Threadkeeper.', threads: 0, backups: [], last: null } });
+    mount(<RestoreOfferBanner threads={0} />);
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    expect(banner()!.textContent).toContain('Used Threadkeeper on this Mac before?');
+    await press(button('Check for backups', banner()!));
+    await settle();
+    expect(request).toHaveBeenCalledWith({ permissions: ['nativeMessaging'] });
+    expect(banner()!.textContent).toContain('not for this copy of Threadkeeper');
+    await press(button('Close', banner()!));
+    expect(banner()).toBeNull();
+    expect(localStorage.getItem('tk.restoreOffer.dismissed')).toBe('1');
+  });
+
+  it('stays out of the way when the library has threads, is still loading, or the offer was dismissed', async () => {
+    const { RestoreOfferBanner } = await import('../../src/entrypoints/manager/accounts/RestoreOfferBanner.js');
+    const { send } = setup(true, { BACKUP_STATUS: { ok: true, helper: true, threads: 0, backups: [backup], last: null } });
+    mount(<RestoreOfferBanner threads={25} />);
+    await settle();
+    expect(banner()).toBeNull();
+    mount(<RestoreOfferBanner threads={null} />);
+    await settle();
+    expect(banner()).toBeNull();
+    localStorage.setItem('tk.restoreOffer.dismissed', '1');
+    mount(<RestoreOfferBanner threads={0} />);
+    await settle();
+    expect(banner()).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
