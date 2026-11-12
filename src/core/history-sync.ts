@@ -225,6 +225,7 @@ export type SyncStepErrorCode =
   | 'account_changed'
   | 'capture_failed'
   | 'step_timeout'
+  | 'account_unverified'
   | 'interrupted';
 
 export type SyncEvent =
@@ -232,7 +233,9 @@ export type SyncEvent =
   | { kind: 'conversation'; runId: string; provider: SyncProviderId; conversation: SiteConversation }
   | { kind: 'skipped'; runId: string; provider: SyncProviderId; id: string; reason: 'up_to_date' | 'too_old' | 'empty' }
   | { kind: 'failed'; runId: string; provider: SyncProviderId; id: string; message: string }
-  | { kind: 'done'; runId: string; provider: SyncProviderId; listed: number; message: string | null }
+  | { kind: 'done'; runId: string; provider: SyncProviderId; listed: number; message: string | null; truncated?: boolean }
+  /** The page is still working (retrying, or waiting for a slow answer); it has nothing to report. */
+  | { kind: 'heartbeat'; runId: string; provider: SyncProviderId }
   | { kind: 'error'; runId: string; provider: SyncProviderId; code: SyncErrorCode; message: string };
 
 const ERROR_CODES = new Set<string>(['needs_login', 'blocked', 'rate_limited', 'unsupported', 'network', 'no_conversations', 'timeout']);
@@ -282,7 +285,10 @@ export function validateSyncEvent(value: unknown): SyncEvent | null {
         provider,
         listed: typeof e.listed === 'number' && Number.isFinite(e.listed) ? Math.max(0, Math.round(e.listed)) : 0,
         message: text(e.message),
+        ...(e.truncated === true ? { truncated: true } : {}),
       };
+    case 'heartbeat':
+      return { kind: 'heartbeat', runId, provider };
     case 'error':
       return typeof e.code === 'string' && ERROR_CODES.has(e.code)
         ? { kind: 'error', runId, provider, code: e.code as SyncErrorCode, message: text(e.message) ?? 'Failed' }
@@ -318,6 +324,10 @@ export interface SyncProviderState {
   message: string | null;
   /** The account this site's threads are filed under in this run (its label), when known. */
   account?: string | null;
+  /** Read but holding no message Threadkeeper could use; not stored, and never called up to date. */
+  empty?: number;
+  /** The site has more than this run read (a cap, or a list that did not finish loading). */
+  truncated?: boolean;
   /** When the current step began (ISO), so a page can tell a slow step from a stuck one. */
   stepAt?: string | null;
 }
@@ -387,6 +397,8 @@ export function describeSyncError(code: SyncErrorCode | SyncStepErrorCode, label
       return `${label} did not show the conversations Threadkeeper opened. Check that you are signed in and that a conversation opens in a normal tab. What was imported so far is kept.`;
     case 'step_timeout':
       return `${label} stopped responding, so Threadkeeper moved on. What was imported so far is kept.`;
+    case 'account_unverified':
+      return `Threadkeeper could not confirm which ${label} account is signed in, so nothing more was imported from ${label}. Open ${label} in a tab, check you are signed in to the account you want, and try again.`;
     case 'interrupted':
       return `The browser stopped the extension during the import. What was imported is kept; continue the import to finish ${label}.`;
     case 'needs_login':

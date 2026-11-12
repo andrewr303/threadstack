@@ -1,5 +1,5 @@
 import type { ThreadkeeperDB, UpsertThreadInput } from './db.js';
-import { isAuthoritativeSource } from './db.js';
+import { isAuthoritativeSource, upsertThread } from './db.js';
 import { buildThreadKey, type SettingsRecord } from './schema.js';
 import type { SyncState, SyncProviderId } from './history-sync.js';
 import type { SyncAccount, SyncEnv } from './sync-orchestrator.js';
@@ -12,7 +12,7 @@ import { activeAnalysisHold, holdAnalysis, releaseAnalysisHold, touchAnalysisHol
 export type CaptureAccountResolver = (
   provider: ProviderId,
   bound: { accountId: string; workspaceId: string }
-) => Promise<{ accountId: string; workspaceId: string; label?: string | null }>;
+) => Promise<{ accountId: string; workspaceId: string; label?: string | null; identityKey?: string | null }>;
 
 /**
  * The thread a conversation read by the import becomes, filed under the run's account. The
@@ -50,6 +50,32 @@ export const HISTORY_SYNC_STATE_KEY = 'tk_history_sync';
 
 const RECENT_CAPTURE_MS = 6 * 3_600_000;
 
+/**
+ * Store a conversation read by the import. Deleted threads stay deleted (tombstones), and a site
+ * whose capture is off is skipped. It is filed under the run's account (settled once, from who the
+ * site said is signed in), so a run never splits one site's threads across accounts; only without
+ * a run account (not an import run) is the realm's active account asked.
+ */
+export function createSyncedConversationStore(deps: {
+  db: ThreadkeeperDB;
+  loadSettings: () => Promise<SettingsRecord>;
+  resolveAccount: CaptureAccountResolver;
+  /** Organize a stored thread like any captured one (on-device pass, analysis queue). */
+  organize: (threadKey: string, settings: SettingsRecord) => Promise<void>;
+  now?: () => number;
+}): (conv: SiteConversation, account?: { accountId: string; workspaceId: string } | null) => Promise<'stored' | 'skipped'> {
+  return async (conv, account) => {
+    const settings = await deps.loadSettings();
+    if (!settings.authorizedHosts[conv.provider]) return 'skipped';
+    const bound = account ?? (await deps.resolveAccount(conv.provider, settings.boundAccounts[conv.provider]));
+    const input = syncedThreadInput(conv, bound, new Date(deps.now?.() ?? Date.now()).toISOString());
+    const result = await upsertThread(deps.db, input);
+    if (result.status !== 'stored') return 'skipped';
+    await deps.organize(input.threadKey, settings);
+    return 'stored';
+  };
+}
+
 /** The orchestrator's view of the browser and the database, for the service worker. */
 export function createChromeSyncEnv(
   db: ThreadkeeperDB,
@@ -70,12 +96,13 @@ export function createChromeSyncEnv(
 ): SyncEnv {
   const resolveBound = async (settings: SettingsRecord, provider: SyncProviderId): Promise<SyncAccount> => {
     const bound = settings.boundAccounts[provider];
-    if (!deps.resolveAccount) return { ...bound, label: null };
+    if (!deps.resolveAccount) return { ...bound, label: null, identityKey: null };
     try {
       const resolved = await deps.resolveAccount(provider, bound);
-      return { accountId: resolved.accountId, workspaceId: resolved.workspaceId, label: resolved.label ?? null };
+      return { accountId: resolved.accountId, workspaceId: resolved.workspaceId, label: resolved.label ?? null, identityKey: resolved.identityKey ?? null };
     } catch {
-      return { ...bound, label: null };
+      // Nobody is confirmed by a fallback: an import that needs a confirmed person stops.
+      return { ...bound, label: null, identityKey: null };
     }
   };
   /** The run's account when it has one, else the account captures go to now. */
@@ -164,11 +191,11 @@ export function createChromeSyncEnv(
       return known;
     },
     storeConversation: deps.storeConversation,
-    async hasRecentCapture(provider, sourceConversationId, account) {
+    async hasRecentCapture(provider, sourceConversationId, account, anyAge) {
       const bound = await accountFor(provider, account);
       const key = buildThreadKey({ provider, accountId: bound.accountId, workspaceId: bound.workspaceId, sourceConversationId, branchId: 'main' });
       const c = await db.conversations.get(key);
-      return Boolean(c && c.messageCount > 0 && Date.now() - Date.parse(c.lastCapturedAt) < RECENT_CAPTURE_MS);
+      return Boolean(c && c.messageCount > 0 && (anyAge || Date.now() - Date.parse(c.lastCapturedAt) < RECENT_CAPTURE_MS));
     },
     async saveState(state: SyncState) {
       await chrome.storage.local.set({ [HISTORY_SYNC_STATE_KEY]: state });

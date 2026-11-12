@@ -34,12 +34,17 @@ export interface ProviderProgress {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function processedOf(p: SyncProviderState): number {
-  return p.stored + p.skipped + p.failed;
+  return p.stored + p.skipped + p.failed + (p.empty ?? 0);
 }
+
+/** Shown when a site has more than the run imported (a cap, or a list that did not finish loading). */
+export const TRUNCATED_NOTE = 'This site has more than were imported. Run the import again to continue.';
 
 function countsText(p: SyncProviderState): string {
   const parts = [`${p.stored} imported`];
   if (p.skipped) parts.push(`${p.skipped} already up to date`);
+  // Read, but with no message Threadkeeper could use: never counted as up to date.
+  if (p.empty) parts.push(`${p.empty} had no messages Threadkeeper could read`);
   if (p.failed) parts.push(`${p.failed} could not be read`);
   return parts.join(', ');
 }
@@ -75,7 +80,7 @@ export function describeProviderProgress(p: SyncProviderState): ProviderProgress
       const total = Math.max(processedOf(p), p.listed, 1);
       return {
         step: 'Done',
-        detail: `${countsText(p)}.${p.message ? ` ${p.message}` : ''}`,
+        detail: `${countsText(p)}.${p.message ? ` ${p.message}` : ''}${p.truncated ? ` ${TRUNCATED_NOTE}` : ''}`,
         value: total,
         max: total,
         valueText: `Done, ${p.stored} imported`,
@@ -117,7 +122,8 @@ export function importTotals(state: SyncState): { found: number; imported: numbe
   for (const p of state.providers) {
     found += p.listed;
     imported += p.stored;
-    read += processedOf(p);
+    // Like each site's bar: never more read than found, once the total is known.
+    read += p.listed > 0 ? Math.min(processedOf(p), p.listed) : processedOf(p);
     if (!isFinishedStatus(p.status) && p.status !== 'fetching') totalKnown = false;
   }
   return { found, imported, read, totalKnown };

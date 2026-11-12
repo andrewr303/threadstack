@@ -9,10 +9,11 @@ import {
   type SyncState,
 } from '../../src/core/history-sync.js';
 import { readSignedInIdentity, runApiSync } from '../../src/core/site-history.js';
-import { readSidebarConversations } from '../../src/core/sidebar-history.js';
+import { loadSidebarList, readSidebarConversations } from '../../src/core/sidebar-history.js';
 import {
   HistorySyncOrchestrator,
   STEP_TIMEOUTS,
+  VERIFY_BATCH,
   type SyncAccount,
   type SyncEnv,
   type SyncIdentityReply,
@@ -20,7 +21,7 @@ import {
 import type { SiteConversation } from '../../src/core/site-api.js';
 import { ThreadkeeperDB, upsertThread } from '../../src/core/db.js';
 import { DEFAULT_SETTINGS } from '../../src/core/schema.js';
-import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv, syncedThreadInput } from '../../src/core/sync-env.js';
+import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv, createSyncedConversationStore, syncedThreadInput } from '../../src/core/sync-env.js';
 import {
   ANALYSIS_HELD_REASON,
   ANALYSIS_HOLD_KEY,
@@ -31,7 +32,7 @@ import {
   touchAnalysisHold,
 } from '../../src/core/analysis-hold.js';
 import { analyzeJobId, enqueueAnalysis, nextDueAnalysisAt, runAnalysisJobs } from '../../src/core/pipeline.js';
-import { describeProviderProgress, importAnnouncement, importTotals } from '../../src/entrypoints/manager/ImportProgress.js';
+import { TRUNCATED_NOTE, describeProviderProgress, importAnnouncement, importTotals } from '../../src/entrypoints/manager/ImportProgress.js';
 
 const NOW = Date.parse('2026-11-12T12:00:00Z');
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -138,6 +139,7 @@ function fake(opts: FakeOptions = {}) {
     calls,
     hooks,
     switchAccount: () => void (accountIndex += 1),
+    tick: (ms: number) => void (clock += ms),
   };
 }
 
@@ -307,7 +309,12 @@ describe('online import never hangs on a step', () => {
   });
 
   it('saves every step change at once, so a page never keeps showing "opening"', async () => {
-    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, accounts: [{ accountId: 'a', workspaceId: 'w', label: 'Work' }] });
+    const f = fake({
+      enabled: ['chatgpt'],
+      tabs: { chatgpt: 7 },
+      identity: { status: 'signed_in', identity: { key: 'chatgpt:k', display: null, detail: null, source: 'network' } },
+      accounts: [{ accountId: 'a', workspaceId: 'w', label: 'Work', identityKey: 'chatgpt:k' }],
+    });
     const orch = new HistorySyncOrchestrator(f.env);
     // The reader starts and then says nothing for a while: the stored state must already say "listing".
     f.hooks.onSend = (tabId, m) => {
@@ -424,6 +431,15 @@ describe('import progress', () => {
     expect(stopped.detail).toBe('Sign in to ChatGPT. 1 imported.');
   });
 
+  it('never calls an unreadable conversation up to date, and says when a site has more to import', () => {
+    const done = describeProviderProgress(p({ status: 'done', listed: 300, stored: 290, skipped: 5, empty: 5, truncated: true }));
+    expect(done.detail).toBe(`290 imported, 5 already up to date, 5 had no messages Threadkeeper could read. ${TRUNCATED_NOTE}`);
+    expect(TRUNCATED_NOTE).toBe('This site has more than were imported. Run the import again to continue.');
+    // The heading never says more were read than found.
+    const over: SyncState = { runId: 'r', running: true, days: 30, startedAt: null, finishedAt: null, providers: [p({ status: 'fetching', listed: 4, stored: 6 })] };
+    expect(importTotals(over).read).toBe(4);
+  });
+
   it('totals across sites, and announces steps and the outcome without counts that change every second', () => {
     const running: SyncState = {
       runId: 'r', running: true, days: 30, startedAt: null, finishedAt: null,
@@ -496,7 +512,7 @@ describe('Claude Code and Codex session lists', () => {
     expect(orch.state.providers.map((p) => p.provider)).toEqual(['claude_code']);
     // Its own list tab, not the person's claude.ai tab 9; the whole list; then each session.
     expect(f.opened).toEqual(['https://claude.ai/code', ...sessions.map((s) => s.url)]);
-    expect(f.sent.find((s) => s.message.type === 'TK_HISTORY_LIST_SIDEBAR')?.message).toMatchObject({ provider: 'claude_code', limit: 300, maxScrolls: 75 });
+    expect(f.sent.find((s) => s.message.type === 'TK_HISTORY_LIST_SIDEBAR')?.message).toMatchObject({ provider: 'claude_code', limit: 1000, maxScrolls: 250, patience: 3 });
     expect(statusOf(orch, 'claude_code')).toMatchObject({ status: 'done', listed: 2, stored: 2 });
   });
 });
@@ -506,8 +522,9 @@ describe('Claude Code and Codex session lists', () => {
 // ---------------------------------------------------------------------------
 
 describe('import attribution with several accounts of one site', () => {
-  const work: SyncAccount = { accountId: 'acct_work', workspaceId: 'personal', label: 'Work' };
-  const home: SyncAccount = { accountId: 'acct_home', workspaceId: 'personal', label: 'Home' };
+  const work: SyncAccount = { accountId: 'acct_work', workspaceId: 'personal', label: 'Work', identityKey: 'chatgpt:abc' };
+  const home: SyncAccount = { accountId: 'acct_home', workspaceId: 'personal', label: 'Home', identityKey: 'chatgpt:def' };
+  const homeSignedIn: SyncIdentityReply = { status: 'signed_in', identity: { key: 'chatgpt:def', display: 'home@example.com', detail: null, source: 'network' } };
   const signedIn: SyncIdentityReply = { status: 'signed_in', identity: { key: 'chatgpt:abc', display: 'me@example.com', detail: null, source: 'network' } };
 
   it('reports who the site says is signed in before settling the account, and files every thread under it', async () => {
@@ -521,24 +538,164 @@ describe('import attribution with several accounts of one site', () => {
     expect(statusOf(orch, 'chatgpt')).toMatchObject({ account: 'Work', stored: 2 });
   });
 
-  it('stops a site whose sign-in changes during the run instead of mixing two accounts', async () => {
-    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [work, home] });
+  it('stores read conversations only after the site confirms the same person, and stops when it names another', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [work] });
     const orch = new HistorySyncOrchestrator(f.env);
+    let siteSays: SyncIdentityReply = signedIn;
     f.hooks.onSend = (tabId, m) => {
+      if (m.type === 'TK_HISTORY_IDENTITY') return { ok: true, ...siteSays };
       if (m.type !== 'TK_HISTORY_SYNC_RUN') return undefined;
       const base = { runId: m.runId as string, provider: 'chatgpt' as const };
       void (async () => {
-        await orch.handleEvent({ kind: 'conversation', ...base, conversation: conv(1) }, tabId);
-        f.switchAccount(); // another tab switched the browser to Home
-        await orch.handleEvent({ kind: 'conversation', ...base, conversation: conv(2) }, tabId);
+        // The first batch is confirmed and stored.
+        for (let n = 1; n <= VERIFY_BATCH; n++) await orch.handleEvent({ kind: 'conversation', ...base, conversation: conv(n) }, tabId);
+        expect(f.stored).toHaveLength(VERIFY_BATCH);
+        // Another tab signs the site in as Home; what the reader fetches now is Home's.
+        siteSays = homeSignedIn;
+        await orch.handleEvent({ kind: 'conversation', ...base, conversation: conv(6) }, tabId);
+        expect(await orch.handleEvent({ kind: 'done', ...base, listed: 6, message: null }, tabId)).toBe(false);
       })();
       return { ok: true };
     };
     await orch.start({ providers: ['chatgpt'], days: 30 });
     await orch.idle();
-    expect(f.stored.map((s) => s.conv.title)).toEqual(['Chat 1']);
-    expect(statusOf(orch, 'chatgpt')).toMatchObject({ status: 'error', message: describeSyncError('account_changed', 'ChatGPT') });
+    expect(f.stored.map((s) => s.conv.title)).toEqual(['Chat 1', 'Chat 2', 'Chat 3', 'Chat 4', 'Chat 5']);
+    expect(f.stored.every((s) => s.account === work)).toBe(true);
+    expect(statusOf(orch, 'chatgpt')).toMatchObject({ status: 'error', stored: 5, message: describeSyncError('account_changed', 'ChatGPT') });
     expect(f.sent.some((s) => s.message.type === 'TK_HISTORY_SYNC_CANCEL')).toBe(true);
+  });
+
+  it('stops when the account Threadkeeper files under changes mid-run, and fails closed when that cannot be read', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [work, home] });
+    const orch = new HistorySyncOrchestrator(f.env);
+    answerRuns(f, orch, 'chatgpt', 2);
+    const original = f.hooks.onSend!;
+    f.hooks.onSend = (tabId, m) => {
+      if (m.type === 'TK_HISTORY_SYNC_RUN') f.switchAccount(); // a switch in Threadkeeper itself
+      return original(tabId, m);
+    };
+    await orch.start({ providers: ['chatgpt'], days: 30 });
+    await orch.idle();
+    expect(f.stored).toHaveLength(0);
+    expect(statusOf(orch, 'chatgpt').message).toBe(describeSyncError('account_changed', 'ChatGPT'));
+
+    const g = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [work] });
+    const o2 = new HistorySyncOrchestrator(g.env);
+    answerRuns(g, o2, 'chatgpt', 2);
+    let calls = 0;
+    const resolve = g.env.resolveAccount!;
+    g.env.resolveAccount = async (p) => {
+      calls += 1;
+      if (calls > 1) throw new Error('database closed');
+      return resolve(p);
+    };
+    await o2.start({ providers: ['chatgpt'], days: 30 });
+    await o2.idle();
+    expect(g.stored).toHaveLength(0);
+    expect(statusOf(o2, 'chatgpt').message).toBe(describeSyncError('account_unverified', 'ChatGPT'));
+  });
+
+  it('imports nothing when the site does not say who is signed in', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: { status: 'unknown' }, accounts: [work] });
+    const orch = new HistorySyncOrchestrator(f.env);
+    answerRuns(f, orch, 'chatgpt', 2);
+    await orch.start({ providers: ['chatgpt'], days: 30 });
+    await orch.idle();
+    expect(statusOf(orch, 'chatgpt')).toMatchObject({ status: 'error', message: describeSyncError('account_unverified', 'ChatGPT') });
+    expect(f.sent.filter((s) => s.message.type === 'TK_HISTORY_IDENTITY')).toHaveLength(2); // asked twice
+    expect(f.sent.some((s) => s.message.type === 'TK_HISTORY_SYNC_RUN')).toBe(false);
+    expect(f.stored).toHaveLength(0);
+  });
+
+  it('imports nothing when the accounts service fails or does not take the identity', async () => {
+    const throwing = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [work] });
+    throwing.env.noteIdentity = async () => {
+      throw new Error('locked');
+    };
+    const o1 = new HistorySyncOrchestrator(throwing.env);
+    answerRuns(throwing, o1, 'chatgpt', 2);
+    await o1.start({ providers: ['chatgpt'], days: 30 });
+    await o1.idle();
+    expect(statusOf(o1, 'chatgpt').message).toBe(describeSyncError('account_unverified', 'ChatGPT'));
+    expect(throwing.stored).toHaveLength(0);
+
+    // The service returns without recording it (a switch settling, a journal pending): the active
+    // account is still someone else, so it is looked at once more and then the site stops.
+    const ignored = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [home] });
+    const o2 = new HistorySyncOrchestrator(ignored.env);
+    answerRuns(ignored, o2, 'chatgpt', 2);
+    await o2.start({ providers: ['chatgpt'], days: 30 });
+    await o2.idle();
+    expect(ignored.calls.filter((c) => c === 'resolve')).toHaveLength(2);
+    expect(statusOf(o2, 'chatgpt').message).toBe(describeSyncError('account_unverified', 'ChatGPT'));
+    expect(ignored.stored).toHaveLength(0);
+    expect(ignored.sent.some((s) => s.message.type === 'TK_HISTORY_SYNC_RUN')).toBe(false);
+  });
+
+  it('cancel during the identity step ends the run at once', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, accounts: [work] });
+    f.hooks.onSend = (_t, m) => (m.type === 'TK_HISTORY_IDENTITY' ? never() : undefined);
+    f.env.timeout = () => ({ promise: never<void>(), cancel: () => undefined });
+    const orch = new HistorySyncOrchestrator(f.env);
+    await orch.start({ providers: ['chatgpt'], days: 30 });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(statusOf(orch, 'chatgpt').status).toBe('account');
+    orch.cancel();
+    await orch.idle();
+    expect(statusOf(orch, 'chatgpt').status).toBe('cancelled');
+    expect(f.calls).not.toContain('resolve');
+  });
+
+  it('Claude Code: each capture must be filed under the run\'s account, and the list tab is re-checked each time', async () => {
+    const claudeKey = 'claude:me';
+    const me: SyncAccount = { accountId: 'acct_me', workspaceId: 'personal', label: 'Me', identityKey: claudeKey };
+    const sessions = [1, 2, 3].map((n) => ({ id: `session_0${n}abcdef`, url: `https://claude.ai/code/session_0${n}abcdef`, title: `S${n}` }));
+    const make = () =>
+      fake({
+        enabled: ['claude_code'],
+        sidebar: { claude_code: sessions },
+        identity: { status: 'signed_in', identity: { key: claudeKey, display: null, detail: null, source: 'network' } },
+        accounts: [me],
+        tabInfo: () => ({ url: 'https://claude.ai/code', title: 'Claude Code' }),
+      });
+
+    // A capture filed under another account (the browser switched in between) stops the site.
+    const f = make();
+    const orch = new HistorySyncOrchestrator(f.env);
+    f.hooks.onSend = (tabId, m) => {
+      if (m.type === 'TK_CAPTURE_NOW') {
+        const s = sessions.find((x) => f.opened.at(-1) === x.url)!;
+        const filed = s === sessions[0] ? me : { accountId: 'acct_other', workspaceId: 'personal' };
+        setTimeout(() => orch.noteCapture(tabId, s.id, 4, filed), 0);
+      }
+      return undefined;
+    };
+    await orch.start({ providers: ['claude_code'], days: 30, scope: 'all' });
+    await orch.idle();
+    expect(statusOf(orch, 'claude_code')).toMatchObject({ status: 'error', stored: 1, message: describeSyncError('account_changed', 'Claude Code') });
+    expect(f.opened).toHaveLength(3); // list tab, then two sessions; the third is never opened
+    // The list tab is asked who is signed in before each session (plus once at the start).
+    expect(f.sent.filter((s) => s.message.type === 'TK_HISTORY_IDENTITY').length).toBeGreaterThanOrEqual(3);
+
+    // The site signs in as someone else between two sessions: stops before opening the next.
+    const g = make();
+    const o2 = new HistorySyncOrchestrator(g.env);
+    let asked = 0;
+    g.hooks.onSend = (tabId, m) => {
+      if (m.type === 'TK_HISTORY_IDENTITY') {
+        asked += 1;
+        const key = asked <= 2 ? claudeKey : 'claude:someone-else';
+        return { ok: true, status: 'signed_in', identity: { key, display: null, detail: null, source: 'network' } };
+      }
+      if (m.type === 'TK_CAPTURE_NOW') {
+        const s = sessions.find((x) => g.opened.at(-1) === x.url)!;
+        setTimeout(() => o2.noteCapture(tabId, s.id, 4, me), 0);
+      }
+      return undefined;
+    };
+    await o2.start({ providers: ['claude_code'], days: 30, scope: 'all' });
+    await o2.idle();
+    expect(statusOf(o2, 'claude_code')).toMatchObject({ status: 'error', stored: 1, message: describeSyncError('account_changed', 'Claude Code') });
   });
 
   it('a signed-out session is reported as such before anything is listed', async () => {
@@ -583,6 +740,12 @@ describe('import attribution with several accounts of one site', () => {
     expect(await readSignedInIdentity({ ...claude, fetchImpl: answer({ error: 'x' }, 401) })).toEqual({ status: 'signed_out' });
     expect(await readSignedInIdentity({ ...claude, fetchImpl: answer({ uuid: 'u-1', email_address: 'c@d.co' }) }))
       .toMatchObject({ status: 'signed_in', identity: { key: expect.stringMatching(/^claude:/) } });
+    // /api/account not naming a person: the bootstrap document is asked next.
+    const byPath = (async (input: RequestInfo | URL) =>
+      String(input).endsWith('/api/bootstrap')
+        ? new Response(JSON.stringify({ account: { uuid: 'u-2', email_address: 'e@f.co' } }))
+        : new Response('{}', { status: 404 })) as typeof fetch;
+    expect(await readSignedInIdentity({ ...claude, fetchImpl: byPath })).toMatchObject({ status: 'signed_in', identity: { display: 'e@f.co' } });
     // An organization (no email) is not a person; a timeout is unknown, never a guess.
     expect(await readSignedInIdentity({ ...claude, fetchImpl: answer({ uuid: 'org-1', name: 'Org' }) })).toEqual({ status: 'unknown' });
     expect(await readSignedInIdentity({ ...claude, requestTimeoutMs: 10, fetchImpl: (() => never<Response>()) as typeof fetch })).toEqual({ status: 'unknown' });
@@ -682,6 +845,337 @@ describe('hosted analysis waits for the online import', () => {
     expect(finishedAt).toBeGreaterThan(-1);
     expect(analysedAt).toBeGreaterThan(finishedAt);
     expect(orch.state.analysis?.queued).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review fixes: list shapes, empty conversations, caps, heartbeats, start and recovery races
+// ---------------------------------------------------------------------------
+
+/** A minimal ChatGPT: `ids` newest first, each updated `i` hours ago; `detail` may change one answer. */
+function chatGpt(ids: number[], opts: { listItems?: (offset: number) => unknown[]; detail?: (n: number, call: number) => Response | null } = {}) {
+  const fetched: number[] = [];
+  const calls = new Map<number, number>();
+  const fetchImpl = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith('/api/auth/session')) return new Response(JSON.stringify({ accessToken: 't' }));
+    const list = url.match(/\/backend-api\/conversations\?offset=(\d+)/);
+    if (list) {
+      if (url.includes('is_archived=true')) return new Response(JSON.stringify({ items: [] }));
+      const offset = Number(list[1]);
+      const items = opts.listItems?.(offset) ?? ids.slice(offset, offset + 28).map((n) => ({
+        id: uuid(n), title: `Chat ${n}`, update_time: new Date(NOW - n * 3_600_000).toISOString(),
+      }));
+      return new Response(JSON.stringify({ items }));
+    }
+    const detail = url.match(/\/backend-api\/conversation\/([0-9a-f-]{36})$/);
+    if (detail) {
+      const n = Number(detail[1].slice(-12));
+      const call = (calls.get(n) ?? 0) + 1;
+      calls.set(n, call);
+      const injected = opts.detail?.(n, call);
+      if (injected) return injected;
+      fetched.push(n);
+      return new Response(JSON.stringify({
+        conversation_id: uuid(n), title: `Chat ${n}`, update_time: (NOW - n * 3_600_000) / 1000, current_node: 'a',
+        mapping: {
+          u: { id: 'u', parent: null, children: ['a'], message: { id: `u${n}`, author: { role: 'user' }, content: { content_type: 'text', parts: [`Q${n}`] } } },
+          a: { id: 'a', parent: 'u', children: [], message: { id: `a${n}`, author: { role: 'assistant' }, recipient: 'all', content: { content_type: 'text', parts: [`A${n}`] } } },
+        },
+      }));
+    }
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+  return { fetchImpl, fetched };
+}
+
+type AnyEvent = { kind: string; code?: string; reason?: string; truncated?: boolean; conversation?: SiteConversation; id?: string };
+
+async function runChatGpt(site: ReturnType<typeof chatGpt>, extra: Partial<Parameters<typeof runApiSync>[0]> = {}) {
+  const events: AnyEvent[] = [];
+  await runApiSync({
+    provider: 'chatgpt', runId: 'run_abcd', sinceMs: NOW - 30 * 86_400_000, max: 300, scope: 'recent', known: {},
+    origin: 'https://chatgpt.com', cookies: '', fetchImpl: site.fetchImpl, isCancelled: () => false,
+    sleep: async () => undefined, requestTimeoutMs: 20, random: () => 0,
+    emit: (e) => void events.push(e as AnyEvent),
+    ...extra,
+  });
+  return events;
+}
+
+describe('the page reader reports what it could not read', () => {
+  it('a list whose entries all lost their ids is a changed format, not an empty history', async () => {
+    const events = await runChatGpt(chatGpt([], { listItems: () => [{ uuid: 'x' }, { name: 'y' }] }));
+    expect(events.at(-1)).toMatchObject({ kind: 'error', code: 'unsupported' });
+  });
+
+  it('counts conversations without readable messages apart, and stops when the first five all are', async () => {
+    const hollow = (n: number) => new Response(JSON.stringify({ conversation_id: uuid(n), mapping: { r: { id: 'r', children: [], message: null } } }));
+    const one = await runChatGpt(chatGpt([1, 2, 3], { detail: (n) => (n === 2 ? hollow(n) : null) }));
+    expect(one.filter((e) => e.kind === 'skipped').map((e) => e.reason)).toEqual(['empty']);
+    expect(one.at(-1)).toMatchObject({ kind: 'done' });
+
+    const all = await runChatGpt(chatGpt([1, 2, 3, 4, 5, 6, 7], { detail: (n) => hollow(n) }));
+    expect(all.filter((e) => e.kind === 'skipped')).toHaveLength(5);
+    expect(all.at(-1)).toMatchObject({ kind: 'error', code: 'unsupported' });
+  });
+
+  it('caps what one run reads, says so, and the next run continues past what is already stored', async () => {
+    const ids = [1, 2, 3, 4, 5];
+    const first = chatGpt(ids);
+    const run1 = await runChatGpt(first, { max: 2 });
+    expect(first.fetched).toEqual([1, 2]);
+    expect(run1.at(-1)).toMatchObject({ kind: 'done', truncated: true });
+    // Run again with what the first run stored known and up to date.
+    const known = Object.fromEntries(run1.filter((e) => e.kind === 'conversation').map((e) => [e.conversation!.sourceConversationId, e.conversation!.updatedAt!]));
+    const second = chatGpt(ids);
+    const run2 = await runChatGpt(second, { max: 2, known });
+    expect(second.fetched).toEqual([3, 4]);
+    expect(run2.filter((e) => e.kind === 'skipped' && e.reason === 'up_to_date')).toHaveLength(2);
+    const third = chatGpt(ids);
+    const run3 = await runChatGpt(third, { max: 2, known: { ...known, ...Object.fromEntries(run2.filter((e) => e.kind === 'conversation').map((e) => [e.conversation!.sourceConversationId, e.conversation!.updatedAt!])) } });
+    expect(third.fetched).toEqual([5]);
+    expect(run3.at(-1)).toMatchObject({ kind: 'done' });
+    expect(run3.at(-1)?.truncated).toBeUndefined();
+  });
+
+  it('sends heartbeats while it retries, and retries a body that stopped arriving', async () => {
+    const stalled = { ok: true, status: 200, headers: new Headers(), json: () => never() } as unknown as Response;
+    const busy = new Response('{}', { status: 503, headers: { 'retry-after': '30' } });
+    const site = chatGpt([1, 2], { detail: (n, call) => (call === 1 ? (n === 1 ? stalled : busy) : null) });
+    const events = await runChatGpt(site);
+    expect(events.filter((e) => e.kind === 'heartbeat').length).toBeGreaterThanOrEqual(4);
+    expect(events.filter((e) => e.kind === 'conversation')).toHaveLength(2);
+  });
+});
+
+describe('orchestrator review fixes', () => {
+  it('a page that keeps sending heartbeats is not timed out, even well past the idle limit', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    const orch = new HistorySyncOrchestrator(f.env);
+    f.hooks.onSend = (tabId, m) => {
+      if (m.type !== 'TK_HISTORY_SYNC_RUN') return undefined;
+      const base = { runId: m.runId as string, provider: 'chatgpt' as const };
+      void (async () => {
+        // About 300 fake seconds of retrying, more than twice the idle limit.
+        for (let i = 0; i < 12; i++) {
+          await new Promise((r) => setTimeout(r, 25));
+          await orch.handleEvent({ kind: 'heartbeat', ...base }, tabId);
+        }
+        await orch.handleEvent({ kind: 'done', ...base, listed: 0, message: null }, tabId);
+      })();
+      return { ok: true };
+    };
+    await orch.start({ providers: ['chatgpt'], days: 30 });
+    await orch.idle();
+    expect(statusOf(orch, 'chatgpt').status).toBe('done');
+  });
+
+  it('a late "done" does not turn a cancelled site into a finished one, and counts never go back', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    const orch = new HistorySyncOrchestrator(f.env);
+    let base: { runId: string; provider: 'chatgpt' } | null = null;
+    f.hooks.onSend = (tabId, m) => {
+      if (m.type !== 'TK_HISTORY_SYNC_RUN') return undefined;
+      base = { runId: m.runId as string, provider: 'chatgpt' };
+      void (async () => {
+        await orch.handleEvent({ kind: 'phase', ...base!, phase: 'listing', total: 10, message: null }, tabId);
+        await orch.handleEvent({ kind: 'phase', ...base!, phase: 'listing', total: 4, message: null }, tabId);
+        expect(statusOf(orch, 'chatgpt').listed).toBe(10);
+        orch.cancel();
+        expect(await orch.handleEvent({ kind: 'done', ...base!, listed: 10, message: null }, tabId)).toBe(false);
+      })();
+      return { ok: true };
+    };
+    await orch.start({ providers: ['chatgpt'], days: 30 });
+    await orch.idle();
+    expect(statusOf(orch, 'chatgpt').status).toBe('cancelled');
+  });
+
+  it('two starts at the same moment begin one run, holding analysis once', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    const orch = new HistorySyncOrchestrator(f.env);
+    answerRuns(f, orch, 'chatgpt');
+    const [a, b] = await Promise.all([orch.start({ providers: ['chatgpt'], days: 30 }), orch.start({ providers: ['chatgpt'], days: 30 })]);
+    expect([a.started, b.started].sort()).toEqual([false, true]);
+    await orch.idle();
+    expect(f.calls.filter((c) => c.startsWith('hold'))).toHaveLength(1);
+  });
+
+  it('a settings read that never answers refuses the start; a hold that never answers is skipped', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    f.env.enabledProviders = () => never<ReadonlySet<string>>();
+    const o1 = new HistorySyncOrchestrator(f.env);
+    expect(await o1.start({ providers: ['chatgpt'], days: 30 })).toMatchObject({ started: false });
+    expect(o1.isRunning()).toBe(false);
+
+    const g = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    g.env.holdAnalysis = () => never<void>();
+    const o2 = new HistorySyncOrchestrator(g.env);
+    answerRuns(g, o2, 'chatgpt');
+    expect(await o2.start({ providers: ['chatgpt'], days: 30 })).toEqual({ started: true });
+    await o2.idle();
+    expect(statusOf(o2, 'chatgpt').status).toBe('done');
+  });
+
+  it('renews the analysis hold while the run is alive', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    const touched: number[] = [];
+    f.env.touchAnalysisHold = async () => void touched.push(f.env.now());
+    const orch = new HistorySyncOrchestrator(f.env);
+    f.hooks.onSend = (tabId, m) => {
+      if (m.type !== 'TK_HISTORY_SYNC_RUN') return undefined;
+      const base = { runId: m.runId as string, provider: 'chatgpt' as const };
+      void (async () => {
+        await orch.handleEvent({ kind: 'phase', ...base, phase: 'listing', total: 1, message: null }, tabId);
+        const before = touched.length;
+        f.tick(31_000);
+        await orch.handleEvent({ kind: 'phase', ...base, phase: 'listing', total: 2, message: null }, tabId);
+        expect(touched.length).toBe(before + 1);
+        await orch.handleEvent({ kind: 'done', ...base, listed: 2, message: null }, tabId);
+      })();
+      return { ok: true };
+    };
+    await orch.start({ providers: ['chatgpt'], days: 30 });
+    await orch.idle();
+    expect(touched.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('recovery: one pass for concurrent calls, bounded reads, and a stray hold is released', async () => {
+    const lost = {
+      runId: 'sync_lost_0002', running: true, days: 30, startedAt: null, finishedAt: null,
+      providers: [{ provider: 'claude', label: 'Claude', strategy: 'api', status: 'listing', listed: 0, stored: 0, skipped: 0, failed: 0, message: null }],
+    } as SyncState;
+    const f = fake();
+    f.env.loadState = async () => lost;
+    const orch = new HistorySyncOrchestrator(f.env);
+    const [a, b] = await Promise.all([orch.recover(), orch.recover()]);
+    expect(f.calls.filter((c) => c.startsWith('release'))).toEqual(['release sync_lost_0002']);
+    expect(a.analysis?.queued).toBe(3);
+    expect(b.analysis?.queued).toBe(3);
+
+    const hung = fake();
+    hung.env.loadState = () => never<SyncState | null>();
+    const started = Date.now();
+    expect(await new HistorySyncOrchestrator(hung.env).recover()).toMatchObject({ runId: null, running: false });
+    expect(Date.now() - started).toBeLessThan(2000);
+
+    // A worker stopped between writing its hold and saving its first state: nothing says
+    // "running", but the hold is released anyway.
+    const stray = fake();
+    stray.env.loadState = async () => ({ ...lost, running: false });
+    const state = await new HistorySyncOrchestrator(stray.env).recover();
+    expect(stray.calls).toEqual(['release null']);
+    expect(state.analysis?.queued).toBe(3);
+  });
+
+  it('recovery started while a run is starting releases nothing', async () => {
+    const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 } });
+    let releaseHoldWrite: () => void = () => undefined;
+    f.env.holdAnalysis = () => new Promise<void>((r) => (releaseHoldWrite = r));
+    f.env.loadState = async () => null;
+    const orch = new HistorySyncOrchestrator(f.env);
+    answerRuns(f, orch, 'chatgpt');
+    const starting = orch.start({ providers: ['chatgpt'], days: 30 });
+    await new Promise((r) => setTimeout(r, 1));
+    await orch.recover();
+    expect(f.calls.filter((c) => c.startsWith('release'))).toEqual([]);
+    releaseHoldWrite();
+    await starting;
+    await orch.idle();
+    expect(f.calls.filter((c) => c.startsWith('release'))).toEqual(['release sync_test_0001']);
+  });
+
+  it('a deleted thread is skipped, not a failure, and a cancel while a tab is open counts nothing', async () => {
+    const items = [1, 2, 3, 4].map((n) => ({ id: `chat${n}0000`, url: `https://gemini.google.com/app/chat${n}0000`, title: `G${n}` }));
+    const f = fake({ enabled: ['gemini'], tabs: { gemini: 3 }, sidebar: { gemini: items } });
+    const orch = new HistorySyncOrchestrator(f.env);
+    f.hooks.onSend = (tabId, m) => {
+      if (m.type === 'TK_CAPTURE_NOW') {
+        const item = items.find((i) => f.opened.at(-1) === i.url)!;
+        setTimeout(() => orch.noteCapture(tabId, item.id, 0, null, 'deleted'), 0);
+      }
+      return undefined;
+    };
+    await orch.start({ providers: ['gemini'], days: 30 });
+    await orch.idle();
+    expect(statusOf(orch, 'gemini')).toMatchObject({ status: 'done', skipped: 4, failed: 0 });
+
+    const g = fake({ enabled: ['gemini'], tabs: { gemini: 3 }, sidebar: { gemini: items } });
+    g.env.waitTabReady = () => never<boolean>();
+    g.env.timeout = () => ({ promise: never<void>(), cancel: () => undefined });
+    const o2 = new HistorySyncOrchestrator(g.env);
+    await o2.start({ providers: ['gemini'], days: 30 });
+    await new Promise((r) => setTimeout(r, 5));
+    o2.cancel();
+    await o2.idle();
+    expect(statusOf(o2, 'gemini')).toMatchObject({ status: 'cancelled', failed: 0 });
+  });
+
+  it('an all-history list that did not load to its end is reported as more to import, and skips what is stored', async () => {
+    const items = [1, 2].map((n) => ({ id: `session_0${n}abcdef`, url: `https://claude.ai/code/session_0${n}abcdef`, title: `S${n}` }));
+    const f = fake({ enabled: ['claude_code'], tabInfo: () => ({ url: 'https://claude.ai/code', title: 'Claude Code' }) });
+    const anyAge: Array<boolean | undefined> = [];
+    f.env.hasRecentCapture = async (_p, _id, _a, all) => {
+      anyAge.push(all);
+      return true; // both already in the library
+    };
+    f.hooks.onSend = (_t, m) => (m.type === 'TK_HISTORY_LIST_SIDEBAR' ? { ok: true, items, complete: false } : undefined);
+    const orch = new HistorySyncOrchestrator(f.env);
+    await orch.start({ providers: ['claude_code'], days: 30, scope: 'all' });
+    await orch.idle();
+    expect(statusOf(orch, 'claude_code')).toMatchObject({ status: 'done', skipped: 2, truncated: true });
+    expect(anyAge).toEqual([true, true]);
+    expect(f.opened).toEqual(['https://claude.ai/code']); // no session opened again
+  });
+});
+
+describe('loading a sidebar list says whether it reached the end', () => {
+  it('complete when nothing more appears, not when cut off by the limit', async () => {
+    const doc = new DOMParser().parseFromString('<div id="s"><a href="/chat/aaaa1111">A</a><a href="/chat/bbbb2222">B</a></div>', 'text/html');
+    const win = { location: { href: 'https://chat.mistral.ai/chat' }, getComputedStyle: () => ({ overflowY: 'auto' }) } as unknown as Window;
+    const scroller = doc.getElementById('s')!;
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: 100 });
+    expect(await loadSidebarList(doc, win, 'mistral', { limit: 30, sleep: async () => undefined })).toMatchObject({ complete: true });
+    expect(await loadSidebarList(doc, win, 'mistral', { limit: 2, sleep: async () => undefined })).toMatchObject({ complete: false });
+  });
+});
+
+describe('storing an imported conversation under the run\'s account', () => {
+  it('files each account\'s copy separately and only asks for the active account without a run account', async () => {
+    const db = new ThreadkeeperDB('online-import-store-two-accounts');
+    try {
+      const organized: string[] = [];
+      const resolved: string[] = [];
+      const store = createSyncedConversationStore({
+        db,
+        loadSettings: async () => DEFAULT_SETTINGS,
+        resolveAccount: async (provider, bound) => {
+          resolved.push(provider);
+          return bound;
+        },
+        organize: async (key) => void organized.push(key),
+        now: () => NOW,
+      });
+      expect(await store(conv(1), { accountId: 'acct_a', workspaceId: 'personal' })).toBe('stored');
+      expect(await store({ ...conv(1), title: 'B copy' }, { accountId: 'acct_b', workspaceId: 'personal' })).toBe('stored');
+      expect(resolved).toEqual([]);
+      const rows = await db.conversations.where('sourceConversationId').equals(uuid(1)).toArray();
+      expect(rows.map((r) => [r.accountId, r.title]).sort()).toEqual([['acct_a', 'Chat 1'], ['acct_b', 'B copy']]);
+      expect(organized).toHaveLength(2);
+      // Not an import run: the active account is asked.
+      expect(await store(conv(2))).toBe('stored');
+      expect(resolved).toEqual(['chatgpt']);
+      // A site whose capture is off stores nothing.
+      const off = createSyncedConversationStore({
+        db, loadSettings: async () => ({ ...DEFAULT_SETTINGS, authorizedHosts: { ...DEFAULT_SETTINGS.authorizedHosts, chatgpt: false } }),
+        resolveAccount: async (_p, b) => b, organize: async () => undefined,
+      });
+      expect(await off(conv(3), { accountId: 'acct_a', workspaceId: 'personal' })).toBe('skipped');
+    } finally {
+      await db.delete();
+    }
   });
 });
 

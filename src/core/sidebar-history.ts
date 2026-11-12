@@ -71,16 +71,39 @@ export async function loadSidebarConversations(
   provider: ProviderId,
   options: LoadSidebarOptions
 ): Promise<SidebarConversation[]> {
+  return (await loadSidebarList(doc, win, provider, options)).items;
+}
+
+/**
+ * The same, saying whether the list was read to its end: `complete` is false when reading stopped
+ * at the limit, the scroll budget or a cancel while the list was still growing, so a run can say the
+ * site has more than it imported instead of reporting a partial list as everything.
+ */
+export async function loadSidebarList(
+  doc: Document,
+  win: Window,
+  provider: ProviderId,
+  options: LoadSidebarOptions
+): Promise<{ items: SidebarConversation[]; complete: boolean }> {
   const patience = options.patience ?? 2;
   const maxScrolls = options.maxScrolls ?? 20;
   let items = readSidebarConversations(doc, win.location.href, provider, options.limit);
   let idle = 0;
   let restore: { el: HTMLElement; top: number } | null = null;
-  for (let i = 0; i < maxScrolls && items.length < options.limit && idle < patience; i++) {
-    if (options.isCancelled?.()) break;
+  // Ended because nothing more appeared (or nothing scrolls): the whole list was read.
+  let complete = false;
+  for (let i = 0; ; i++) {
+    if (idle >= patience) {
+      complete = true;
+      break;
+    }
+    if (i >= maxScrolls || items.length >= options.limit || options.isCancelled?.()) break;
     const lastLink = Array.from(doc.querySelectorAll('a[href]')).filter((a) => items.some((it) => a.getAttribute('href')?.includes(it.id))).pop();
     const scroller = lastLink ? scrollParent(lastLink, win) : null;
-    if (!scroller) break;
+    if (!scroller) {
+      complete = true;
+      break;
+    }
     restore ??= { el: scroller, top: scroller.scrollTop };
     scroller.scrollTop = scroller.scrollHeight;
     await options.sleep(700);
@@ -89,5 +112,5 @@ export async function loadSidebarConversations(
     items = next;
   }
   if (restore) restore.el.scrollTop = restore.top;
-  return items;
+  return { items, complete };
 }

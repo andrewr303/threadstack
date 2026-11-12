@@ -108,16 +108,24 @@ saved at every step change with a heartbeat; while a run is going the library as
 interrupted, which the library offers to continue. A page reader whose run the worker no longer
 knows is told to stop.
 
-Before listing, the page asks its own site who is signed in (`/api/auth/session`, `/api/account`,
-parsed by `accounts/identity.ts`); the answer goes through `noteIdentity` like a page's own report,
-then the run settles one account per site and files every thread under it. If the realm's active
-account changes mid-run the site stops, so two accounts never mix; a second account's run adds its
-own threads (the account is in the thread key).
+Before listing, the page asks its own site who is signed in (`/api/auth/session`; for Claude
+`/api/account`, then `/api/bootstrap`; parsed by `accounts/identity.ts`). The answer goes through
+`noteIdentity` like a page's own report, and the site is imported only if the account Threadkeeper
+will file under is recorded as that same person; no answer, an unparsed one or a service that did not
+take it stops the site ("could not confirm which account"), never a fallback to whichever account was
+active. Conversations the page reads are held in batches of five and stored only after the site
+confirms again that the same person is signed in; a different person (or a change of the active
+account) drops the batch and stops the site. Tab-by-tab captures report the account they were filed
+under, which must be the run's. A second account's run adds its own threads (the account is in the
+thread key).
 
 Claude Code (claude.ai/code) and Codex (chatgpt.com/codex) are tab-by-tab sites: their session list is
 read from the page's links in a tab of their own and each session is opened and captured like one the
 person opens (repository, pull request and run state come from the page, as for any capture). No
-endpoint is used for them because none is established; all history reads up to 300 sessions.
+endpoint is used for them because none is established. An all-history run lists up to 1000 entries,
+opens up to 300 not already in the library, and says when the site has more; running it again skips
+what is stored and continues. A last-N-days ChatGPT or Claude run reads at most 300 conversations
+needing a read (the list itself is not capped), says so, and the next run continues past them.
 
 Hosted analysis waits for the run: the run holds a database row (`analysis-hold.ts`) that stops job
 leasing in `runAnalysisJobs` (worker and pages alike) and alarm scheduling; on-device organizing still

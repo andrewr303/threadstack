@@ -17,7 +17,7 @@ import { mergeGrokXMessages, parseGrokXCaptureMessage, type GrokXMessage } from 
 import { validateWindowPostMessage } from '../core/messaging.js';
 import { isSyncProviderId, type SyncEvent } from '../core/history-sync.js';
 import { readSignedInIdentity, runApiSync } from '../core/site-history.js';
-import { loadSidebarConversations } from '../core/sidebar-history.js';
+import { loadSidebarList } from '../core/sidebar-history.js';
 import {
   detectProviderFromUrl,
   extractConversationIdFromUrl,
@@ -1075,15 +1075,16 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
       }
       if (message && message.type === 'TK_HISTORY_LIST_SIDEBAR') {
         const provider = message.provider;
-        const limit = typeof message.limit === 'number' ? Math.min(500, Math.max(1, Math.round(message.limit))) : 30;
-        const maxScrolls = typeof message.maxScrolls === 'number' ? Math.min(150, Math.max(1, Math.round(message.maxScrolls))) : undefined;
+        const limit = typeof message.limit === 'number' ? Math.min(1000, Math.max(1, Math.round(message.limit))) : 30;
+        const maxScrolls = typeof message.maxScrolls === 'number' ? Math.min(300, Math.max(1, Math.round(message.maxScrolls))) : undefined;
+        const patience = typeof message.patience === 'number' ? Math.min(6, Math.max(1, Math.round(message.patience))) : undefined;
         if (!isSyncProviderId(provider)) {
           sendResponse({ ok: false, items: [] });
           return true;
         }
         syncCancelled = false;
-        void loadSidebarConversations(document, window, provider, { limit, maxScrolls, sleep: sleepMs, isCancelled: () => syncCancelled }).then(
-          (items) => sendResponse({ ok: true, items }),
+        void loadSidebarList(document, window, provider, { limit, maxScrolls, patience, sleep: sleepMs, isCancelled: () => syncCancelled }).then(
+          ({ items, complete }) => sendResponse({ ok: true, items, complete }),
           () => sendResponse({ ok: false, items: [] })
         );
         return true;

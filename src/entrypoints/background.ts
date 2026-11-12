@@ -6,9 +6,8 @@ import {
 } from '../core/db.js';
 import { buildThreadKey, type SettingsRecord } from '../core/schema.js';
 import { HistorySyncOrchestrator } from '../core/sync-orchestrator.js';
-import { createChromeSyncEnv, syncedThreadInput } from '../core/sync-env.js';
+import { createChromeSyncEnv, createSyncedConversationStore } from '../core/sync-env.js';
 import { clampSyncDays, isSyncProviderId, validateSyncEvent, type SyncState } from '../core/history-sync.js';
-import type { SiteConversation } from '../core/site-api.js';
 import { seedSyntheticWorkbenchLibrary } from '../core/synthetic-fixtures.js';
 import {
   DOCK_COMMAND_TYPES,
@@ -314,22 +313,13 @@ async function schedulePaperclipAlarm(settings?: SettingsRecord): Promise<void> 
   }
 }
 
-/**
- * Store a conversation read by Catch up. Deleted threads stay deleted (tombstones), and a site
- * whose capture is off is skipped. It is filed under the run's account (settled once, from who the
- * site said is signed in), so a run never splits one site's threads across accounts.
- */
-async function storeSyncedConversation(conv: SiteConversation, account?: { accountId: string; workspaceId: string } | null): Promise<'stored' | 'skipped'> {
-  const settings = await ensureStarterCollectionsAndSettings(db);
-  if (!settings.authorizedHosts[conv.provider]) return 'skipped';
-  // Without a run account: the browser's current sign-in, the realm's active account.
-  const bound = account ?? (await resolveCaptureAccount(conv.provider, settings.boundAccounts[conv.provider]));
-  const input = syncedThreadInput(conv, bound, new Date().toISOString());
-  const result = await upsertThread(db, input);
-  if (result.status !== 'stored') return 'skipped';
-  await organizeStoredThread(input.threadKey, settings);
-  return 'stored';
-}
+/** Store a conversation read by Catch up under the run's account (sync-env.ts). */
+const storeSyncedConversation = createSyncedConversationStore({
+  db,
+  loadSettings: () => ensureStarterCollectionsAndSettings(db),
+  resolveAccount: (provider, bound) => resolveCaptureAccount(provider, bound),
+  organize: organizeStoredThread,
+});
 
 const syncOrchestrator = new HistorySyncOrchestrator(
   createChromeSyncEnv(db, {
@@ -337,7 +327,13 @@ const syncOrchestrator = new HistorySyncOrchestrator(
     storeConversation: storeSyncedConversation,
     resolveAccount: async (provider, bound) => {
       const resolved = await resolveCaptureAccount(provider, bound);
-      return { accountId: resolved.accountId, workspaceId: resolved.workspaceId, label: resolved.account?.label ?? null };
+      return {
+        accountId: resolved.accountId,
+        workspaceId: resolved.workspaceId,
+        label: resolved.account?.label ?? null,
+        // Who the account record says it is: an import runs only when the site names the same person.
+        identityKey: resolved.account?.identity?.key ?? null,
+      };
     },
     // The same path as a page's own ACCOUNT_IDENTITY report.
     noteIdentity: async (provider, raw) => {
@@ -1233,9 +1229,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (result.status === 'stored') {
           // Organize immediately on-device; Claude analysis is debounced until the chat goes quiet.
           await organizeStoredThread(threadKey, settings);
-          if (!decision.embedded && typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
-            syncOrchestrator.noteCapture(sender.tab.id, message.payload.sourceConversationId, message.payload.messages.length);
-          }
+        }
+        // A tab-by-tab import waits for this capture: tell it which account it was filed under (it
+        // stops if that is not the run's) and that a thread the person deleted stays deleted.
+        if (!decision.embedded && typeof sender.tab?.id === 'number' && Array.isArray(message.payload.messages)) {
+          syncOrchestrator.noteCapture(
+            sender.tab.id,
+            message.payload.sourceConversationId,
+            message.payload.messages.length,
+            { accountId: bound.accountId, workspaceId: bound.workspaceId },
+            result.status === 'stored' ? 'stored' : 'deleted'
+          );
         }
         return;
       }
