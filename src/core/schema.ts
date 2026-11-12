@@ -588,7 +588,10 @@ export type AiModelId =
   | 'claude-opus-5-5'
   | 'claude-sonnet-5-5'
   | 'claude-haiku-5-5'
-  | 'claude-fable-5-1';
+  | 'claude-fable-5-1'
+  // OpenAI models served by Amazon Bedrock (Chat Completions on bedrock-runtime); Bedrock backend only.
+  | 'gpt-6.1-sol'
+  | 'gpt-6.1-terra';
 
 export type EmbeddingProviderId = 'local' | 'voyage' | 'mongodb' | 'cohere' | 'openai' | 'ollama' | 'bedrock';
 

@@ -28,7 +28,7 @@ import {
 } from '../../core/ai/claude.js';
 import { CaptureSettings } from './CaptureSettings.js';
 import { AccountsSettings } from './accounts/AccountsSettings.js';
-import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost } from '../../core/ai/backends.js';
+import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost, resolveModelId } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
   hasHostAccess,
@@ -731,9 +731,10 @@ export function SettingsDialog({
             <>
               {awsSummary}
               <p className="tk-settings-note">
-                Requests go to Claude in Amazon Bedrock ({`bedrock-mantle.${settings.aws.region}.api.aws`}) with
-                Bedrock model IDs such as <code>anthropic.{settings.aiModel}</code>. Enable model access for these models in
-                the Bedrock console first.
+                Requests go to Amazon Bedrock ({`bedrock-runtime.${settings.aws.region}.amazonaws.com`}) with the
+                inference profile <code>{resolveModelId(settings)}</code>: the geographic profile for this region when
+                Bedrock offers one, otherwise the global profile. Enable model access for these models in the Bedrock
+                console first.
               </p>
             </>
           )}
@@ -809,7 +810,8 @@ export function SettingsDialog({
           </div>
           <p className="tk-settings-note">
             Analyzing all {threadCount} threads once with {model.label} costs about $
-            {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)} at Anthropic's list price (${model.inputPerMTok} / $
+            {estimate < 1 ? estimate.toFixed(2) : estimate.toFixed(0)} at{' '}
+            {model.id.startsWith('gpt-') ? "Amazon Bedrock's US rate" : "Anthropic's list price"} (${model.inputPerMTok} / $
             {model.outputPerMTok} per million input / output tokens), assuming about{' '}
             {Math.round(ANALYSIS_AVG_INPUT_TOKENS / 1000)}k input and {(ANALYSIS_AVG_OUTPUT_TOKENS / 1000).toFixed(1)}k output
             tokens per thread. This is an estimate: long threads and the model's thinking cost more
@@ -865,7 +867,7 @@ export function SettingsDialog({
         <Section
           title="AWS account"
           note={`Used by ${[
-            settings.aiBackend === 'bedrock' ? 'Claude in Amazon Bedrock' : '',
+            settings.aiBackend === 'bedrock' ? 'AI models in Amazon Bedrock' : '',
             settings.aiBackend === 'aws_platform' ? 'Claude Platform on AWS' : '',
             settings.embeddingProvider === 'bedrock' ? 'Bedrock embeddings' : '',
             settings.rerankProvider === 'bedrock' ? 'Bedrock reranking' : '',

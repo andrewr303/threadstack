@@ -10,10 +10,12 @@ import {
   backendLabel,
   bedrockFallbackAttached,
   createAiClient,
+  isOpenAiModel,
   markBedrockFallbackUnsupported,
   resolveModelId,
   serverFallbackParams,
 } from './backends.js';
+import { OpenAiBedrockError, openAiParse, openAiText } from './openai-bedrock.js';
 
 /**
  * Claude access straight from the extension (service worker and manager page)
@@ -35,6 +37,9 @@ export const MODEL_OPTIONS: ModelOption[] = [
   { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', inputPerMTok: 2, outputPerMTok: 10, note: 'Fast, strong quality' },
   { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', inputPerMTok: 0.1, outputPerMTok: 0.5, note: 'Cheapest for very large libraries' },
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', inputPerMTok: 10, outputPerMTok: 50, note: 'Most capable, premium price' },
+  // OpenAI on Amazon Bedrock; prices are Bedrock's US cross-Region rates (Global is about 10% lower).
+  { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', inputPerMTok: 2.2, outputPerMTok: 11, note: 'OpenAI, Amazon Bedrock only' },
+  { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', inputPerMTok: 1.1, outputPerMTok: 5.5, note: 'OpenAI, cheaper, Amazon Bedrock only' },
 ];
 
 /** True when the selected backend (Anthropic, Bedrock or Claude Platform on AWS) is configured. */
@@ -94,6 +99,23 @@ export function toClaudeCallError(err: unknown, settings?: SettingsRecord): Clau
       : settings?.aiBackend === 'aws_platform'
         ? 'Claude Platform on AWS credentials (short-term keys expire after 12 hours)'
         : 'API key';
+  if (err instanceof OpenAiBedrockError) {
+    if (err.status === 401 || err.status === 403) {
+      return new ClaudeCallError(`${via} rejected the ${credential}: ${err.message}`, false, 'auth');
+    }
+    if (err.status === 404) return new ClaudeCallError(`Model not available through ${via}: ${err.message}`, false, 'bad_request');
+    if (err.status === 429) return new ClaudeCallError(`Rate limited by ${via}; analysis will resume shortly.`, true, 'rate_limit');
+    if (err.status >= 500) return new ClaudeCallError(`${via} is temporarily unavailable; will retry.`, true, 'server');
+    return new ClaudeCallError(`Request rejected by ${via}: ${err.message}`, false, 'bad_request');
+  }
+  const fetchFailed = err instanceof TypeError || (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'));
+  if (fetchFailed && settings?.aiBackend === 'bedrock' && isOpenAiModel(settings.aiModel)) {
+    return new ClaudeCallError(
+      `Could not reach ${host} (network, timeout or missing host access). If this is the first request, allow access to the AWS host in Settings → AI models.`,
+      true,
+      'network'
+    );
+  }
   if (err instanceof Anthropic.AuthenticationError) {
     return new ClaudeCallError(`${via} rejected the ${credential}. Check it in Settings → AI models.`, false, 'auth');
   }
@@ -423,7 +445,20 @@ export async function analyzeThreadWithClaude(
   const request = buildAnalysisRequest(input);
 
   try {
-    const response = await withClient(settings, fetchImpl, (client) => client.beta.messages.parse({
+    const response = isOpenAiModel(settings.aiModel)
+      ? await openAiParse(
+          settings,
+          {
+            system: `${request.system}\n\n${request.projects}`,
+            user: request.user,
+            maxTokens: 24000,
+            effort: analysisEffort(settings),
+            schema: ThreadAnalysisSchema,
+            schemaName: 'thread_analysis',
+          },
+          fetchImpl
+        )
+      : await withClient(settings, fetchImpl, (client) => client.beta.messages.parse({
       model: resolveModelId(settings),
       max_tokens: 24000,
       ...serverFallbackParams(settings),
@@ -527,7 +562,21 @@ export async function planOrganizationWithClaude(
     )
     .join('\n');
   try {
-    const response = await withClient(settings, fetchImpl, (client) => client.beta.messages.parse({
+    const userText = `Instruction: ${params.instruction}\n\n<threads>\n${rows}\n</threads>`;
+    const response = isOpenAiModel(settings.aiModel)
+      ? await openAiParse(
+          settings,
+          {
+            system: `${ORGANIZE_SYSTEM_PROMPT}\n\n${projectsBlock(params.projects, [])}`,
+            user: userText,
+            maxTokens: 16000,
+            effort: settings.aiEffort,
+            schema: OrganizePlanSchema,
+            schemaName: 'organize_plan',
+          },
+          fetchImpl
+        )
+      : await withClient(settings, fetchImpl, (client) => client.beta.messages.parse({
       model: resolveModelId(settings),
       max_tokens: 16000,
       ...serverFallbackParams(settings),
@@ -538,7 +587,7 @@ export async function planOrganizationWithClaude(
       messages: [
         {
           role: 'user',
-          content: `Instruction: ${params.instruction}\n\n<threads>\n${rows}\n</threads>`,
+          content: userText,
         },
       ],
       output_config: { effort: settings.aiEffort, format: betaZodOutputFormat(OrganizePlanSchema) },
@@ -589,7 +638,20 @@ export async function askLibraryWithClaude(
         `[T${i + 1}] ${t.title} (${t.provider}, ${t.updatedAt?.slice(0, 10) ?? 'date unknown'}, project: ${t.project})\nAbout: ${t.gist}\nSummary: ${t.summary}\n${t.excerpts.map((e) => `> ${e}`).join('\n')}`
     )
     .join('\n\n');
+  const userText = `<threads>\n${context}\n</threads>\n\nQuestion: ${question}`;
   try {
+    if (isOpenAiModel(settings.aiModel)) {
+      const result = await openAiText(
+        settings,
+        { system: ASK_SYSTEM_PROMPT, user: userText, maxTokens: 8000, effort: settings.aiEffort },
+        onText ?? (() => {}),
+        fetchImpl
+      );
+      if (result.stop_reason === 'refusal') {
+        throw new ClaudeCallError('The model declined to answer this question.', false, 'refusal');
+      }
+      return result.text;
+    }
     const stream = client.messages.stream({
       model: resolveModelId(settings),
       max_tokens: 8000,
@@ -597,7 +659,7 @@ export async function askLibraryWithClaude(
       messages: [
         {
           role: 'user',
-          content: `<threads>\n${context}\n</threads>\n\nQuestion: ${question}`,
+          content: userText,
         },
       ],
       output_config: { effort: settings.aiEffort },
@@ -624,6 +686,15 @@ export async function testClaudeConnection(
   const problem = aiCredentialsProblem(settings);
   if (problem) return { ok: false, message: problem };
   try {
+    if (isOpenAiModel(settings.aiModel)) {
+      const result = await openAiText(
+        settings,
+        { system: 'You are a connection test.', user: 'Reply with the single word: ready', maxTokens: 1024, effort: 'low' },
+        undefined,
+        fetchImpl
+      );
+      return { ok: true, message: `Connected to ${result.model} through ${backendLabel(settings)}.` };
+    }
     const client = createClaudeClient(settings, fetchImpl);
     const response = await client.messages.create({
       model: resolveModelId(settings),
@@ -737,7 +808,21 @@ export async function catchUpBriefWithClaude(
     )
     .join('\n\n');
   try {
-    const response = await withClient(settings, fetchImpl, (client) =>
+    const userText = `Period: the last ${params.days} days.\n\n<threads>\n${context}\n</threads>`;
+    const response = isOpenAiModel(settings.aiModel)
+      ? await openAiParse(
+          settings,
+          {
+            system: CATCH_UP_SYSTEM_PROMPT,
+            user: userText,
+            maxTokens: 6000,
+            effort: settings.aiEffort,
+            schema: CatchUpBriefSchema,
+            schemaName: 'catch_up_brief',
+          },
+          fetchImpl
+        )
+      : await withClient(settings, fetchImpl, (client) =>
       client.beta.messages.parse({
         model: resolveModelId(settings),
         max_tokens: 6000,
@@ -746,7 +831,7 @@ export async function catchUpBriefWithClaude(
         messages: [
           {
             role: 'user',
-            content: `Period: the last ${params.days} days.\n\n<threads>\n${context}\n</threads>`,
+            content: userText,
           },
         ],
         output_config: { effort: settings.aiEffort, format: betaZodOutputFormat(CatchUpBriefSchema) },

@@ -19,6 +19,7 @@ import {
   parseSetDetail,
 } from '../core/embed/cookie-shim.js';
 import type { EmbedFrameEvent } from '../core/workspace/types.js';
+import { EMBED_GESTURE_SOURCE } from './manager/workspace/adoption.js';
 
 /** sessionStorage key of the last cookie string, for a synchronous first value after a reload. */
 export const COOKIE_CACHE_KEY = 'threadkeeper.embedCookies';
@@ -168,6 +169,36 @@ export function startCookieBridge(env: CookieBridgeEnv): { stop(): void } {
   return { stop };
 }
 
+/**
+ * Tells the workspace page (this frame's parent) about each real click, so it can tell a tab this
+ * page opens from one the user opens next to the workspace (manager/workspace/adoption.ts). The
+ * message carries nothing but the fact of the click. Capture phase, so it is posted before the
+ * page's own handler opens anything.
+ */
+export function startGestureRelay(
+  win: Pick<Window, 'addEventListener' | 'removeEventListener'>,
+  parent: Pick<Window, 'postMessage'>,
+  parentOrigin: string
+): { stop(): void } {
+  const onClick = (event: Event) => {
+    if (!event.isTrusted) return;
+    try {
+      parent.postMessage({ source: EMBED_GESTURE_SOURCE }, parentOrigin);
+    } catch {
+      // never disturb the page
+    }
+  };
+  // auxclick: a middle click opens a link in a new tab without a click event.
+  win.addEventListener('click', onClick, true);
+  win.addEventListener('auxclick', onClick, true);
+  return {
+    stop() {
+      win.removeEventListener('click', onClick, true);
+      win.removeEventListener('auxclick', onClick, true);
+    },
+  };
+}
+
 function sendToExtension(message: EmbedFrameEvent, done: (response: unknown) => void): boolean {
   try {
     if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
@@ -194,6 +225,10 @@ try {
       // storage blocked for this frame
     }
     startCookieBridge({ doc: document, win: window, storage, send: sendToExtension });
+    // frameMode() checked the parent is this extension's page; its origin is the only target.
+    // Built from the parts, as frame.ts does: URL#origin can be "null" for an unregistered scheme.
+    const own = new URL(chrome.runtime.getURL(''));
+    startGestureRelay(window, window.parent, `${own.protocol}//${own.host}`);
   }
 } catch {
   // never disturb the page

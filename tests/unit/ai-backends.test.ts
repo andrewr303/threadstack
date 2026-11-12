@@ -94,24 +94,24 @@ describe('AI backends', () => {
     expect(calls[0].headers['anthropic-beta']).toContain('server-side-fallback-2026-07-01');
   });
 
-  it('Amazon Bedrock with an API key: Mantle endpoint, bearer key, anthropic.-prefixed model, no server-side fallback', async () => {
+  it('Amazon Bedrock with an API key: bedrock-runtime Messages endpoint, bearer key, US inference profile, no server-side fallback', async () => {
     const calls: Call[] = [];
     const s = settings({
       aiBackend: 'bedrock',
       aws: { ...DEFAULT_AWS_SETTINGS, region: 'us-west-2', bedrockApiKey: 'bedrock-api-key-xyz' },
     });
-    expect(aiHostOrigins(s)).toEqual(['https://bedrock-mantle.us-west-2.api.aws/*']);
+    expect(aiHostOrigins(s)).toEqual(['https://bedrock-runtime.us-west-2.amazonaws.com/*']);
     await analyzeThreadWithClaude(s, INPUT, messagesFetch(calls));
-    expect(calls[0].url).toMatch(/^https:\/\/bedrock-mantle\.us-west-2\.api\.aws\/anthropic\/v1\/messages(\?beta=true)?$/);
-    // Documented path: standard client, Mantle baseURL, Bedrock key as apiKey.
+    expect(calls[0].url).toMatch(/^https:\/\/bedrock-runtime\.us-west-2\.amazonaws\.com\/anthropic\/v1\/messages(\?beta=true)?$/);
+    // Documented path: standard client, bedrock-runtime /anthropic baseURL, Bedrock key as apiKey.
     expect(calls[0].headers.authorization).toBe('Bearer bedrock-api-key-xyz');
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
-    expect(calls[0].body.model).toBe('anthropic.claude-opus-5-5');
+    expect(calls[0].body.model).toBe('us.anthropic.claude-opus-5-5');
     expect(calls[0].body.fallbacks).toBeUndefined();
     expect(calls[0].body.output_config.format.type).toBe('json_schema');
   });
 
-  it('Amazon Bedrock with IAM keys: SigV4 for bedrock-mantle, no API key header', async () => {
+  it('Amazon Bedrock with IAM keys: SigV4 as bedrock, no API key header', async () => {
     const calls: Call[] = [];
     const s = settings({
       aiBackend: 'bedrock',
@@ -120,9 +120,10 @@ describe('AI backends', () => {
     const res = await testClaudeConnection(s, messagesFetch(calls));
     expect(res.ok).toBe(true);
     expect(res.message).toContain('Amazon Bedrock (us-east-1)');
-    expect(calls[0].url).toBe('https://bedrock-mantle.us-east-1.api.aws/anthropic/v1/messages');
+    expect(calls[0].url).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/anthropic/v1/messages');
+    expect(calls[0].body.model).toBe('us.anthropic.claude-opus-5-5');
     expect(calls[0].headers['x-api-key']).toBeUndefined();
-    expect(calls[0].headers.authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/\d{8}\/us-east-1\/bedrock-mantle\/aws4_request/);
+    expect(calls[0].headers.authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/\d{8}\/us-east-1\/bedrock\/aws4_request/);
   });
 
   it('Amazon Bedrock with IAM keys keeps headers and body when the SDK passes a Request (fallback middleware)', async () => {
@@ -135,9 +136,9 @@ describe('AI backends', () => {
     expect(result.analysis.gist).toBe(ANALYSIS.gist);
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
     expect(calls[0].headers['x-api-key']).toBeUndefined();
-    expect(calls[0].headers.authorization).toContain('/eu-central-1/bedrock-mantle/aws4_request');
+    expect(calls[0].headers.authorization).toContain('/eu-central-1/bedrock/aws4_request');
     expect(calls[0].headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
-    expect(calls[0].body.model).toBe('anthropic.claude-opus-5-5');
+    expect(calls[0].body.model).toBe('eu.anthropic.claude-opus-5-5');
   });
 
   it('Bedrock: a 400 on a model without the fallback middleware is not mistaken for a rejected beta header', async () => {
@@ -206,8 +207,8 @@ describe('AI backends', () => {
     const fetchImpl = messagesFetch(calls, () => new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
     const text = await askLibraryWithClaude(s, 'What did I decide?', [], undefined, fetchImpl);
     expect(text).toBe('Use processed_events [T1].');
-    expect(calls[0].url).toBe('https://bedrock-mantle.us-east-1.api.aws/anthropic/v1/messages');
-    expect(calls[0].body.model).toBe('anthropic.claude-opus-5-5');
+    expect(calls[0].url).toBe('https://bedrock-runtime.us-east-1.amazonaws.com/anthropic/v1/messages');
+    expect(calls[0].body.model).toBe('us.anthropic.claude-opus-5-5');
   });
 
   it('reports what is missing per backend and maps model ids', () => {
@@ -215,7 +216,7 @@ describe('AI backends', () => {
     expect(aiCredentialsProblem(settings({ aiBackend: 'bedrock' }))).toBe('Add a Bedrock API key.');
     expect(aiCredentialsProblem(settings({ aiBackend: 'aws_platform', awsPlatformApiKey: 't' }))).toContain('wrkspc_');
     expect(aiCredentialsReady(settings({ aiBackend: 'bedrock', aws: { ...DEFAULT_AWS_SETTINGS, bedrockApiKey: 'k' } }))).toBe(true);
-    expect(resolveModelId(settings({ aiBackend: 'bedrock', aiModel: 'claude-haiku-5-5' }))).toBe('anthropic.claude-haiku-5-5');
+    expect(resolveModelId(settings({ aiBackend: 'bedrock', aiModel: 'claude-haiku-5-5' }))).toBe('us.anthropic.claude-haiku-5-5');
     expect(resolveModelId(settings({ aiBackend: 'aws_platform' }))).toBe('claude-opus-5-5');
     expect(serverFallbackParams(settings({ aiModel: 'claude-haiku-5-5' }))).toEqual({});
   });

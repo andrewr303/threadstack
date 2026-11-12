@@ -3,7 +3,7 @@ import {
   awsCredentialsReady,
   awsHostOrigins,
   awsPlatformBaseUrl,
-  bedrockMantleBaseUrl,
+  bedrockRuntimeAnthropicBaseUrl,
   createAwsFetch,
   isValidAwsRegion,
 } from '../aws.js';
@@ -13,12 +13,15 @@ import type { AiBackend, AiModelId, SettingsRecord } from '../schema.js';
  * One Anthropic SDK client for three ways of reaching Claude:
  *
  * - Anthropic API (api.anthropic.com) with the user's API key.
- * - Claude in Amazon Bedrock, through the Messages API endpoint
- *   https://bedrock-mantle.{region}.api.aws/anthropic. A Bedrock API key is
- *   passed as `apiKey` (sent as x-api-key), the documented path for the
- *   standard client; IAM keys are SigV4-signed (service "bedrock-mantle") by a
- *   custom fetch, because AnthropicBedrockMantle does not bundle for browsers.
- *   Model ids carry the `anthropic.` prefix.
+ * - Claude in Amazon Bedrock, through the Anthropic Messages API on
+ *   https://bedrock-runtime.{region}.amazonaws.com/anthropic. A Bedrock API key
+ *   is passed as `apiKey`, the documented path for the standard client; IAM
+ *   keys are SigV4-signed (service "bedrock") by a custom fetch. Current Claude
+ *   models are only served through cross-Region inference profiles there, so
+ *   model ids look like `us.anthropic.claude-haiku-5-5` or
+ *   `global.anthropic.claude-haiku-5-5` (see bedrockInferenceProfileId). The
+ *   bare `anthropic.` id on bedrock-mantle 404s outside GovCloud.
+ *   OpenAI models (GPT-6.1 Sol / Terra) go through openai-bedrock.ts instead.
  * - Claude Platform on AWS (Anthropic-operated), https://aws-external-anthropic.{region}.api.aws,
  *   with a short-term API key (Authorization: Bearer) or SigV4 (service
  *   "aws-external-anthropic") and the anthropic-workspace-id header.
@@ -49,7 +52,55 @@ export const BACKEND_OPTIONS: BackendOption[] = [
 const FALLBACK_ELIGIBLE = new Set<AiModelId>(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1']);
 const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 /** Client-side fallback target on Bedrock (open access to all Bedrock customers). */
-const BEDROCK_FALLBACK_MODEL = 'anthropic.claude-opus-4-8';
+const BEDROCK_FALLBACK_BASE = 'claude-opus-4-8';
+
+/** OpenAI models offered through Amazon Bedrock only. */
+const OPENAI_MODELS = new Set<AiModelId>(['gpt-6.1-sol', 'gpt-6.1-terra']);
+
+export function isOpenAiModel(model: AiModelId): boolean {
+  return OPENAI_MODELS.has(model);
+}
+
+/**
+ * Geographic cross-Region inference profiles per geography, as listed by
+ * ListInferenceProfiles on 2026-11-12. A model missing from a geography falls
+ * back to the global profile, which every commercial source region offers.
+ */
+const GEO_PROFILES: Record<'us' | 'eu' | 'jp' | 'au', ReadonlySet<string>> = {
+  us: new Set([
+    'claude-opus-5-5',
+    'claude-sonnet-5-5',
+    'claude-haiku-5-5',
+    'claude-fable-5-1',
+    'claude-opus-4-8',
+    'gpt-6.1-sol',
+    'gpt-6.1-terra',
+  ]),
+  eu: new Set(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-4-8']),
+  jp: new Set(['claude-opus-5-5', 'claude-haiku-5-5', 'claude-opus-4-8']),
+  au: new Set(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-4-8']),
+};
+
+function geographyFor(region: string): keyof typeof GEO_PROFILES | null {
+  const r = region.trim();
+  if (/^(us|ca)-(?!gov)/.test(r)) return 'us';
+  if (r.startsWith('eu-')) return 'eu';
+  if (r === 'ap-northeast-1' || r === 'ap-northeast-3') return 'jp';
+  if (r === 'ap-southeast-2' || r === 'ap-southeast-4') return 'au';
+  return null;
+}
+
+/**
+ * Bedrock inference profile id for a model called from `region`: the
+ * geographic profile (keeps data in that geography) when one exists, else the
+ * global one. `base` is the bare model name such as "claude-haiku-5-5".
+ */
+export function bedrockInferenceProfileId(region: string, base: string): string {
+  const vendor = base.startsWith('gpt-') ? 'openai' : 'anthropic';
+  const geo = geographyFor(region);
+  const prefix = geo && GEO_PROFILES[geo].has(base) ? geo : 'global';
+  return `${prefix}.${vendor}.${base}`;
+}
 
 /** Set when Bedrock rejected the fallback-credit beta header; later clients skip the middleware. */
 let bedrockFallbackRejected = false;
@@ -81,7 +132,7 @@ export function backendLabel(settings: SettingsRecord): string {
 export function backendHost(settings: SettingsRecord): string {
   switch (settings.aiBackend) {
     case 'bedrock':
-      return new URL(bedrockMantleBaseUrl(settings.aws.region)).host;
+      return new URL(bedrockRuntimeAnthropicBaseUrl(settings.aws.region)).host;
     case 'aws_platform':
       return new URL(awsPlatformBaseUrl(settings.aws.region)).host;
     default:
@@ -91,6 +142,7 @@ export function backendHost(settings: SettingsRecord): string {
 
 /** True when the selected backend has everything it needs to make a request. */
 export function aiCredentialsReady(settings: SettingsRecord): boolean {
+  if (isOpenAiModel(settings.aiModel) && settings.aiBackend !== 'bedrock') return false;
   switch (settings.aiBackend) {
     case 'bedrock':
       return awsCredentialsReady(settings.aws);
@@ -109,6 +161,9 @@ export function aiCredentialsReady(settings: SettingsRecord): boolean {
 /** What is missing, in words the Settings page can show. Null when ready. */
 export function aiCredentialsProblem(settings: SettingsRecord): string | null {
   if (aiCredentialsReady(settings)) return null;
+  if (isOpenAiModel(settings.aiModel) && settings.aiBackend !== 'bedrock') {
+    return 'GPT-6.1 models are only available through Amazon Bedrock. Choose Amazon Bedrock or a Claude model.';
+  }
   switch (settings.aiBackend) {
     case 'bedrock':
       if (!isValidAwsRegion(settings.aws.region)) return 'Enter an AWS region such as us-east-1.';
@@ -132,7 +187,7 @@ export function aiCredentialsProblem(settings: SettingsRecord): string | null {
 export function aiHostOrigins(settings: SettingsRecord): string[] {
   switch (settings.aiBackend) {
     case 'bedrock':
-      return awsHostOrigins(settings.aws.region, ['mantle']);
+      return awsHostOrigins(settings.aws.region, ['runtime']);
     case 'aws_platform':
       return awsHostOrigins(settings.aws.region, ['platform']);
     default:
@@ -142,7 +197,7 @@ export function aiHostOrigins(settings: SettingsRecord): string[] {
 
 /** The model id the selected backend expects. */
 export function resolveModelId(settings: SettingsRecord, model: AiModelId = settings.aiModel): string {
-  return settings.aiBackend === 'bedrock' ? `anthropic.${model}` : model;
+  return settings.aiBackend === 'bedrock' ? bedrockInferenceProfileId(settings.aws.region, model) : model;
 }
 
 /** Server-side refusal fallback params (Anthropic API and Claude Platform on AWS only). */
@@ -169,10 +224,10 @@ export function createAiClient(settings: SettingsRecord, options: AiClientOption
   const fetchImpl = options.fetchImpl;
 
   if (settings.aiBackend === 'bedrock') {
-    const baseURL = bedrockMantleBaseUrl(settings.aws.region);
+    const baseURL = bedrockRuntimeAnthropicBaseUrl(settings.aws.region);
     const middleware =
       options.withBedrockFallback !== false && bedrockFallbackAttached(settings)
-        ? [betaRefusalFallbackMiddleware([{ model: BEDROCK_FALLBACK_MODEL }])]
+        ? [betaRefusalFallbackMiddleware([{ model: bedrockInferenceProfileId(settings.aws.region, BEDROCK_FALLBACK_BASE) }])]
         : undefined;
     if (settings.aws.auth === 'api_key') {
       return new Anthropic({
@@ -188,7 +243,7 @@ export function createAiClient(settings: SettingsRecord, options: AiClientOption
       baseURL,
       // Placeholder so the SDK does not demand a key; the signing fetch removes it.
       apiKey: 'sigv4',
-      fetch: createAwsFetch(settings.aws, { service: 'bedrock-mantle', stripHeaders: ['x-api-key'], baseFetch: fetchImpl }),
+      fetch: createAwsFetch(settings.aws, { service: 'bedrock', stripHeaders: ['x-api-key'], baseFetch: fetchImpl }),
       ...(middleware ? { middleware } : {}),
     });
   }

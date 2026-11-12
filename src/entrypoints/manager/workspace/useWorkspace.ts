@@ -22,6 +22,7 @@ import {
   type WorkspaceState,
   type WorkspaceView,
 } from '../../../core/workspace/types.js';
+import { createAdoptionGate, isEmbedGestureMessage } from './adoption.js';
 import { sendFrameCommand, workspaceApi } from './client.js';
 import {
   accountForThread,
@@ -162,6 +163,9 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   settingsRef.current = settings;
   const tabIdRef = useRef<number | null>(null);
   tabIdRef.current = tabId;
+  const embeddingRef = useRef(embedding);
+  embeddingRef.current = embedding;
+  const adoptionGate = useMemo(() => createAdoptionGate(), []);
   const runtimesRef = useRef(runtimes);
   runtimesRef.current = runtimes;
   const threadKeys = useMemo(() => new Set(conversations.map((c) => c.threadKey)), [conversations]);
@@ -219,7 +223,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   // ---- what the frames and the service worker tell this page --------------------------------
   useEffect(() => {
     if (!enabled || typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
-    const onMessage = (message: unknown, sender: chrome.runtime.MessageSender) => {
+    const onMessage = (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void) => {
       const msg = message as { type?: string } & Record<string, unknown>;
       if (!msg || typeof msg.type !== 'string') return;
 
@@ -228,8 +232,14 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
         return;
       }
       if (msg.type === 'EMBED_OPEN_REQUEST') {
+        // The worker asks before it closes a tab whose opener is this one; only the answer
+        // `adopted: true` lets it close the tab. Another workspace tab stays silent.
         const req = msg as unknown as Extract<WorkspaceBroadcast, { type: 'EMBED_OPEN_REQUEST' }>;
-        if (req.tabId === tabIdRef.current && typeof req.url === 'string') openUrlRef.current(req.url);
+        if (sender.tab || req.tabId !== tabIdRef.current || typeof req.url !== 'string') return;
+        // A tab the user (or an extension) opened next to this one is left alone: only one that
+        // appeared right after a click inside an embedded page is taken in (adoption.ts).
+        const adopted = embeddingRef.current && adoptionGate.claim() && openUrlRef.current(req.url).ok;
+        sendResponse({ ok: true, adopted });
         return;
       }
 
@@ -277,7 +287,29 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
     };
     chrome.runtime.onMessage.addListener(onMessage);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
-  }, [enabled, refreshAccounts]);
+  }, [enabled, refreshAccounts, adoptionGate]);
+
+  // ---- clicks inside embedded pages, for the adoption check above ----------------------------
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+    const onWindowMessage = (event: MessageEvent) => {
+      if (!isEmbedGestureMessage(event.data) || !event.source) return;
+      // Only from a page embedded directly in this one.
+      const own = Array.from(document.querySelectorAll('iframe')).some(
+        (frame) => frame.name.startsWith(EMBED_FRAME_NAME_PREFIX) && frame.contentWindow === event.source
+      );
+      if (own) adoptionGate.noteGesture();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') adoptionGate.noteHidden();
+    };
+    window.addEventListener('message', onWindowMessage);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('message', onWindowMessage);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [enabled, adoptionGate]);
 
   // ---- which pages are mounted ---------------------------------------------------------------
   const visible = useMemo(() => {

@@ -60,7 +60,21 @@ export function bedrockAgentRuntimeUrl(region: string, path: string): string {
   return `https://bedrock-agent-runtime.${region.trim()}.amazonaws.com${path}`;
 }
 
-/** Claude in Amazon Bedrock (Messages API, "Mantle"): append /v1/messages. */
+/**
+ * Claude in Amazon Bedrock through the Anthropic Messages API on bedrock-runtime
+ * (append /v1/messages). In commercial regions current Claude models are served
+ * here, through cross-Region inference profile IDs, not on bedrock-mantle.
+ */
+export function bedrockRuntimeAnthropicBaseUrl(region: string): string {
+  return bedrockRuntimeUrl(region, '/anthropic');
+}
+
+/** OpenAI models in Amazon Bedrock (Chat Completions on bedrock-runtime): append /chat/completions. */
+export function bedrockRuntimeOpenAiBaseUrl(region: string): string {
+  return bedrockRuntimeUrl(region, '/openai/v1');
+}
+
+/** Bedrock Mantle Messages endpoint (no longer used for Claude; kept for host-origin bookkeeping). */
 export function bedrockMantleBaseUrl(region: string): string {
   return `https://bedrock-mantle.${region.trim()}.api.aws/anthropic`;
 }
