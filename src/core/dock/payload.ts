@@ -198,7 +198,9 @@ export function buildThreadSummary(conv: ConversationRecord, insight: ThreadInsi
 
 function modelLabel(insight: ThreadInsight): string {
   if (insight.source === 'local' || insight.model === LOCAL_ANALYZER_MODEL) return 'On-device analysis';
-  return MODEL_OPTIONS.find((m) => m.id === insight.model)?.label ?? str(insight.model, 80);
+  // Bedrock ids carry a vendor and an inference-profile prefix: us.anthropic.claude-haiku-5-5, global.openai.gpt-6.1-sol.
+  const bare = typeof insight.model === 'string' ? insight.model.replace(/^(?:[a-z]{2,6}\.)?(?:anthropic|openai)\./, '') : '';
+  return MODEL_OPTIONS.find((m) => m.id === bare)?.label ?? str(insight.model, 80);
 }
 
 function evidence(items: ExtractedItem[] | undefined): EvidenceOut[] {

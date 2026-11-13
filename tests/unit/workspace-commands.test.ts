@@ -245,6 +245,7 @@ describe('service worker wiring', () => {
   const updatedTabs: Array<[number, unknown]> = [];
   const tabsById = new Map<number, { id: number; url?: string; windowId: number }>();
   const windowTypes = new Map<number, string>([[1, 'normal'], [2, 'popup']]);
+  let openRequestAnswer: unknown = undefined;
   const cookieJar = [
     { name: 'csrf', value: 't0k', domain: 'chatgpt.com', hostOnly: true, path: '/', secure: true, httpOnly: false, sameSite: 'lax', session: true },
     { name: '__Secure-next-auth.session-token', value: 'secret', domain: '.chatgpt.com', hostOnly: false, path: '/', secure: true, httpOnly: true, sameSite: 'lax', session: false },
@@ -271,7 +272,11 @@ describe('service worker wiring', () => {
         id: EXT,
         getURL: (p: string) => `chrome-extension://${EXT}/${p}`,
         getManifest: () => ({ version: '0.5.0' }),
-        sendMessage: async (m: unknown) => void sent.push(m),
+        sendMessage: async (m: unknown) => {
+          sent.push(m);
+          // The workspace page answers the worker's adoption question.
+          return (m as { type?: string })?.type === 'EMBED_OPEN_REQUEST' ? openRequestAnswer : undefined;
+        },
         onMessage: event('onMessage'),
         onMessageExternal: event('onMessageExternal'),
         onInstalled: event('onInstalled'),
@@ -422,6 +427,7 @@ describe('service worker wiring', () => {
   });
 
   it('takes provider pages opened in a new normal window back into the workspace', async () => {
+    openRequestAnswer = { ok: true, adopted: true };
     tabsById.set(30, { id: 30, url: '', windowId: 1 });
     listeners['tabs.onCreated']({ id: 30, openerTabId: 11, url: '', windowId: 1 });
     await new Promise((r) => setTimeout(r, 10));
@@ -440,6 +446,34 @@ describe('service worker wiring', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(removedTabs).not.toContain(31);
     expect(removedTabs).not.toContain(32);
+    openRequestAnswer = undefined;
+  });
+
+  it('leaves a ChatGPT or Claude tab the user opens next to the full-tab manager open', async () => {
+    // Cmd/Ctrl+T while the manager is the active tab: Chrome names it the opener, and the new tab
+    // page's address is not visible to the extension, so the tab waits for an address.
+    tabsById.set(40, { id: 40, windowId: 1 });
+    listeners['tabs.onCreated']({ id: 40, openerTabId: 11, windowId: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    tabsById.set(40, { id: 40, url: 'https://chatgpt.com/', windowId: 1 });
+    sent.length = 0;
+    updatedTabs.length = 0;
+    // The workspace page saw no click inside an embedded page and does not take it in.
+    openRequestAnswer = { ok: true, adopted: false };
+    listeners['tabs.onUpdated'](40, { url: 'https://chatgpt.com/' }, tabsById.get(40));
+    await vi.waitFor(() => expect(sent).toContainEqual({ type: 'EMBED_OPEN_REQUEST', tabId: 11, url: 'https://chatgpt.com/' }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(removedTabs).not.toContain(40);
+    expect(updatedTabs).toEqual([]);
+
+    // A tab Threadkeeper itself opens (Open original, online import) with no workspace page answering.
+    openRequestAnswer = undefined;
+    tabsById.set(41, { id: 41, url: 'https://claude.ai/chat/abc', windowId: 1 });
+    listeners['tabs.onCreated']({ id: 41, openerTabId: 11, url: 'https://claude.ai/chat/abc', windowId: 1 });
+    await vi.waitFor(() => expect(sent).toContainEqual({ type: 'EMBED_OPEN_REQUEST', tabId: 11, url: 'https://claude.ai/chat/abc' }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(removedTabs).not.toContain(41);
+    expect(updatedTabs).toEqual([]);
   });
 
   it('forgets a workspace tab when it closes', async () => {

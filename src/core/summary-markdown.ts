@@ -82,9 +82,15 @@ export function mdRefs(indexes: Array<number | null | undefined>): string {
   return refs.length ? ` (${refs.join(', ')})` : '';
 }
 
-/** "claude-opus-5-5" / "anthropic.claude-sonnet-5-5-v1" → "Claude Opus 5.5"; other ids pass through. */
+/**
+ * "claude-opus-5-5" / "anthropic.claude-sonnet-5-5-v1" / "us.anthropic.claude-haiku-5-5" → "Claude Opus 5.5";
+ * "us.openai.gpt-6.1-sol" → "GPT-6.1 Sol"; other ids pass through.
+ */
 export function analysisModelLabel(model: string): string {
-  const m = model.replace(/^anthropic\./, '').match(/^claude-([a-z]+)-(\d+)-(\d+)/);
+  const bare = model.replace(/^(?:[a-z]{2,6}\.)?(?:anthropic|openai)\./, '');
+  const gpt = bare.match(/^gpt-(\d+(?:\.\d+)?)-([a-z]+)$/);
+  if (gpt) return `GPT-${gpt[1]} ${gpt[2].charAt(0).toUpperCase()}${gpt[2].slice(1)}`;
+  const m = bare.match(/^claude-([a-z]+)-(\d+)-(\d+)/);
   if (!m) return model;
   return `Claude ${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}`;
 }

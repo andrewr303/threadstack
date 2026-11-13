@@ -36,7 +36,9 @@ interface OverviewProps {
 }
 
 function modelLabel(model: string): string {
-  return MODEL_OPTIONS.find((m) => model.replace(/^anthropic\./, '').startsWith(m.id))?.label ?? model;
+  // Bedrock ids carry a vendor and an inference-profile prefix: us.anthropic.claude-haiku-5-5, global.openai.gpt-6.1-sol.
+  const bare = model.replace(/^(?:[a-z]{2,6}\.)?(?:anthropic|openai)\./, '');
+  return MODEL_OPTIONS.find((m) => bare.startsWith(m.id))?.label ?? model;
 }
 
 /** A message reference that reads as "(m3)" when copied or spoken, while looking like a small "m3". */

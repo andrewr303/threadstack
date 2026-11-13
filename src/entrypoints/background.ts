@@ -714,9 +714,35 @@ async function considerAdoption(tabId: number, url: string | undefined): Promise
     return;
   }
   if (decideNewTabAdoption({ openerIsWorkspace: true, url, windowType }) !== 'adopt') return;
+  // An opener is no proof an embedded page opened the tab: Chrome also names the active tab as
+  // the opener of a tab made with Cmd/Ctrl+T and of every tab chrome.tabs.create opens. Only the
+  // workspace page knows whether one of its pages was just clicked, so the tab is closed only
+  // when that page says it took the address in (manager/workspace/adoption.ts).
+  if (!(await workspaceAdopts(pending.workspaceTabId, url))) return;
   await chrome.tabs.remove(tabId).catch(() => undefined);
   await chrome.tabs.update(pending.workspaceTabId, { active: true }).catch(() => undefined);
-  broadcastWorkspace({ type: 'EMBED_OPEN_REQUEST', tabId: pending.workspaceTabId, url });
+}
+
+/** How long the workspace page has to answer before the new tab is left open. */
+const ADOPTION_ANSWER_MS = 2_000;
+
+async function workspaceAdopts(workspaceTabId: number, url: string): Promise<boolean> {
+  const request: WorkspaceBroadcast = { type: 'EMBED_OPEN_REQUEST', tabId: workspaceTabId, url };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const answer = await Promise.race([
+      chrome.runtime.sendMessage(request) as Promise<unknown>,
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), ADOPTION_ANSWER_MS);
+      }),
+    ]);
+    return (answer as { adopted?: unknown } | undefined)?.adopted === true;
+  } catch {
+    // no workspace page listening
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 if (typeof chrome !== 'undefined' && chrome.tabs?.onCreated) {
