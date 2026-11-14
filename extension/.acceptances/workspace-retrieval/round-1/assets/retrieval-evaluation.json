@@ -1,0 +1,1376 @@
+{
+  "manager first stage, baseline": {
+    "queries": 28,
+    "recall5": 0.885,
+    "recall10": 0.935,
+    "mrr": 0.87,
+    "ndcg10": 0.871,
+    "noAnswerResults": 0.5,
+    "perQuery": {
+      "id-file-idempotency": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.944847956559586,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets",
+          "Move the odds engine onto a job queue"
+        ]
+      },
+      "id-pr-412": {
+        "recall5": 0.5,
+        "recall10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg10": 0.5249810332008934,
+        "top": [
+          "Signup page with a magic link",
+          "Backfill odds snapshots for settled markets",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "id-pr-418": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0.07692307692307693,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan",
+          "Export the Meridian logo grid as SVG",
+          "Pricing page comparison of three sportsbook tools"
+        ]
+      },
+      "id-sprite-script": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Export the Meridian logo grid as SVG",
+          "Logo grid spacing for the Daydock partner page",
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "id-mark-svg": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9639404333166532,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)",
+          "Export the Meridian logo grid as SVG"
+        ]
+      },
+      "id-advisory-fn": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Review the wallet advisory lock change",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "id-settle-test": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "id-magic-link-file": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Signup email subject lines for the magic link",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "id-import-texture": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction"
+        ]
+      },
+      "id-colour": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "repo-branch-webhook": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Review the wallet advisory lock change",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "repo-branch-odds-queue": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Move the odds engine onto a job queue",
+          "Backfill odds snapshots for settled markets",
+          "Odds alert bot: wording for suspended markets"
+        ]
+      },
+      "repo-branch-settlement": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6309297535714574,
+        "top": [
+          "Review the wallet advisory lock change",
+          "Advisory locks around bet settlement",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)"
+        ]
+      },
+      "repo-hypestake": {
+        "recall5": 0.6,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9182162519778517,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "repo-daydock": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Draft the release notes for Daydock 0.9",
+          "Export the Meridian logo grid as SVG"
+        ]
+      },
+      "para-double-credit": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "mrr": 1,
+        "ndcg10": 0.7002755876478819,
+        "top": [
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-settle-race": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9327783893101107,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "para-partner-logos": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Logo grid spacing for the Daydock partner page",
+          "Export the Meridian logo grid as SVG",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-passwordless": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Signup email subject lines for the magic link",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-seat-pricing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing check for the team plan",
+          "Pricing page comparison of three sportsbook tools",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-hidden-prices": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets",
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "para-paused-market": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Odds alert bot: wording for suspended markets",
+          "Review the wallet advisory lock change",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "para-reading-trip": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg10": 0.5,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Move the odds engine onto a job queue",
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "para-odds-bandwidth": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "HypeStake odds engine WebSocket delta compression",
+          "Move the odds engine onto a job queue",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-gpu-frames": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction",
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-friday-notes": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Weekly recap dot",
+          "Draft the release notes for Daydock 0.9",
+          "Signup page with a magic link"
+        ]
+      },
+      "para-wordmark-spacing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock logo wordmark kerning & optical lockup",
+          "Logo grid spacing for the Daydock partner page",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-changelog": {
+        "recall5": 0,
+        "recall10": 0.5,
+        "mrr": 0.125,
+        "ndcg10": 0.26064801430716,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "none-helm": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan"
+        ]
+      },
+      "none-sourdough": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      },
+      "none-tax": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "none-graphql": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      }
+    }
+  },
+  "manager lexical only": {
+    "queries": 28,
+    "recall5": 0.885,
+    "recall10": 0.935,
+    "mrr": 0.83,
+    "ndcg10": 0.835,
+    "noAnswerResults": 0.5,
+    "perQuery": {
+      "id-file-idempotency": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.944847956559586,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets",
+          "Move the odds engine onto a job queue"
+        ]
+      },
+      "id-pr-412": {
+        "recall5": 0.5,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.8315546295836226,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Signup page with a magic link",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "id-pr-418": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0.07692307692307693,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan",
+          "Export the Meridian logo grid as SVG",
+          "Pricing page comparison of three sportsbook tools"
+        ]
+      },
+      "id-sprite-script": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Export the Meridian logo grid as SVG",
+          "Logo grid spacing for the Daydock partner page",
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "id-mark-svg": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid",
+          "Export the Meridian logo grid as SVG",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)"
+        ]
+      },
+      "id-advisory-fn": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Review the wallet advisory lock change",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "id-settle-test": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "id-magic-link-file": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6309297535714574,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Signup page with a magic link",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "id-import-texture": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction"
+        ]
+      },
+      "id-colour": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "repo-branch-webhook": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Review the wallet advisory lock change"
+        ]
+      },
+      "repo-branch-odds-queue": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Move the odds engine onto a job queue",
+          "Backfill odds snapshots for settled markets",
+          "Odds alert bot: wording for suspended markets"
+        ]
+      },
+      "repo-branch-settlement": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6309297535714574,
+        "top": [
+          "Review the wallet advisory lock change",
+          "Advisory locks around bet settlement",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)"
+        ]
+      },
+      "repo-hypestake": {
+        "recall5": 0.6,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9182162519778517,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "repo-daydock": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Export the Meridian logo grid as SVG",
+          "Draft the release notes for Daydock 0.9",
+          "Signup page with a magic link"
+        ]
+      },
+      "para-double-credit": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "mrr": 1,
+        "ndcg10": 0.7002755876478819,
+        "top": [
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-settle-race": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9327783893101107,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "para-partner-logos": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Logo grid spacing for the Daydock partner page",
+          "Export the Meridian logo grid as SVG",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-passwordless": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Signup email subject lines for the magic link",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-seat-pricing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing check for the team plan",
+          "Pricing page comparison of three sportsbook tools",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-hidden-prices": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets",
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "para-paused-market": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Odds alert bot: wording for suspended markets",
+          "Review the wallet advisory lock change",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "para-reading-trip": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg10": 0.5,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Move the odds engine onto a job queue",
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "para-odds-bandwidth": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6309297535714574,
+        "top": [
+          "Move the odds engine onto a job queue",
+          "HypeStake odds engine WebSocket delta compression",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-gpu-frames": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction",
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-friday-notes": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Weekly recap dot",
+          "Draft the release notes for Daydock 0.9",
+          "Pricing page comparison of three sportsbook tools"
+        ]
+      },
+      "para-wordmark-spacing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.2,
+        "ndcg10": 0.38685280723454163,
+        "top": [
+          "Logo grid spacing for the Daydock partner page",
+          "Draft the release notes for Daydock 0.9",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "para-changelog": {
+        "recall5": 0,
+        "recall10": 0.5,
+        "mrr": 0.125,
+        "ndcg10": 0.26064801430716,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "none-helm": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan"
+        ]
+      },
+      "none-sourdough": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      },
+      "none-tax": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "none-graphql": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      }
+    }
+  },
+  "manager first stage, current": {
+    "queries": 28,
+    "recall5": 0.885,
+    "recall10": 0.935,
+    "mrr": 0.87,
+    "ndcg10": 0.871,
+    "noAnswerResults": 0.5,
+    "perQuery": {
+      "id-file-idempotency": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.944847956559586,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets",
+          "Move the odds engine onto a job queue"
+        ]
+      },
+      "id-pr-412": {
+        "recall5": 0.5,
+        "recall10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg10": 0.5249810332008934,
+        "top": [
+          "Signup page with a magic link",
+          "Backfill odds snapshots for settled markets",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "id-pr-418": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0.07692307692307693,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan",
+          "Export the Meridian logo grid as SVG",
+          "Pricing page comparison of three sportsbook tools"
+        ]
+      },
+      "id-sprite-script": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Export the Meridian logo grid as SVG",
+          "Logo grid spacing for the Daydock partner page",
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "id-mark-svg": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9639404333166532,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)",
+          "Export the Meridian logo grid as SVG"
+        ]
+      },
+      "id-advisory-fn": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Review the wallet advisory lock change",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "id-settle-test": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "id-magic-link-file": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Signup email subject lines for the magic link",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "id-import-texture": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction"
+        ]
+      },
+      "id-colour": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "repo-branch-webhook": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Review the wallet advisory lock change",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "repo-branch-odds-queue": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Move the odds engine onto a job queue",
+          "Backfill odds snapshots for settled markets",
+          "Odds alert bot: wording for suspended markets"
+        ]
+      },
+      "repo-branch-settlement": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6309297535714574,
+        "top": [
+          "Review the wallet advisory lock change",
+          "Advisory locks around bet settlement",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)"
+        ]
+      },
+      "repo-hypestake": {
+        "recall5": 0.6,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9182162519778517,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "repo-daydock": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Draft the release notes for Daydock 0.9",
+          "Export the Meridian logo grid as SVG"
+        ]
+      },
+      "para-double-credit": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "mrr": 1,
+        "ndcg10": 0.7002755876478819,
+        "top": [
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-settle-race": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9327783893101107,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "para-partner-logos": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Logo grid spacing for the Daydock partner page",
+          "Export the Meridian logo grid as SVG",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-passwordless": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Signup email subject lines for the magic link",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-seat-pricing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing check for the team plan",
+          "Pricing page comparison of three sportsbook tools",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-hidden-prices": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets",
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "para-paused-market": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Odds alert bot: wording for suspended markets",
+          "Review the wallet advisory lock change",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "para-reading-trip": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg10": 0.5,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Move the odds engine onto a job queue",
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "para-odds-bandwidth": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "HypeStake odds engine WebSocket delta compression",
+          "Move the odds engine onto a job queue",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-gpu-frames": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction",
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-friday-notes": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Weekly recap dot",
+          "Draft the release notes for Daydock 0.9",
+          "Signup page with a magic link"
+        ]
+      },
+      "para-wordmark-spacing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock logo wordmark kerning & optical lockup",
+          "Logo grid spacing for the Daydock partner page",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-changelog": {
+        "recall5": 0,
+        "recall10": 0.5,
+        "mrr": 0.125,
+        "ndcg10": 0.26064801430716,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Backfill odds snapshots for settled markets",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "none-helm": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan"
+        ]
+      },
+      "none-sourdough": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      },
+      "none-tax": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Plan a quiet weekend in the mountains"
+        ]
+      },
+      "none-graphql": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      }
+    }
+  },
+  "Still search (dock), current": {
+    "queries": 28,
+    "recall5": 0.831,
+    "recall10": 0.863,
+    "mrr": 0.783,
+    "ndcg10": 0.804,
+    "noAnswerResults": 0,
+    "perQuery": {
+      "id-file-idempotency": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Make the payments webhook idempotent",
+          "Review the wallet advisory lock change",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "id-pr-412": {
+        "recall5": 0.5,
+        "recall10": 1,
+        "mrr": 0.25,
+        "ndcg10": 0.48247555939075515,
+        "top": [
+          "Signup page with a magic link",
+          "Backfill odds snapshots for settled markets",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "id-pr-418": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0.08333333333333333,
+        "ndcg10": 0,
+        "top": [
+          "Pricing check for the team plan",
+          "Pricing page comparison of three sportsbook tools",
+          "HypeStake odds engine WebSocket delta compression"
+        ]
+      },
+      "id-sprite-script": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Export the Meridian logo grid as SVG",
+          "Logo grid spacing for the Daydock partner page",
+          "Daydock logo wordmark kerning & optical lockup"
+        ]
+      },
+      "id-mark-svg": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9639404333166532,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)",
+          "Export the Meridian logo grid as SVG"
+        ]
+      },
+      "id-advisory-fn": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Review the wallet advisory lock change"
+        ]
+      },
+      "id-settle-test": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Backfill odds snapshots for settled markets",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "id-magic-link-file": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup page with a magic link",
+          "Signup email subject lines for the magic link",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "id-import-texture": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction"
+        ]
+      },
+      "id-colour": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "repo-branch-webhook": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6934264036172708,
+        "top": [
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent",
+          "Review the wallet advisory lock change"
+        ]
+      },
+      "repo-branch-odds-queue": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Move the odds engine onto a job queue",
+          "Backfill odds snapshots for settled markets",
+          "HypeStake odds engine WebSocket delta compression"
+        ]
+      },
+      "repo-branch-settlement": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Review the wallet advisory lock change",
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)"
+        ]
+      },
+      "repo-hypestake": {
+        "recall5": 0.6,
+        "recall10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg10": 0.6807182344492225,
+        "top": [
+          "HypeStake odds engine WebSocket delta compression",
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "repo-daydock": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 0.5,
+        "ndcg10": 0.6797310500037657,
+        "top": [
+          "Daydock / Meridian logo geometry & SVG grid (branch_2)",
+          "Signup page with a magic link",
+          "Daydock / Meridian logo geometry & SVG grid"
+        ]
+      },
+      "para-double-credit": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "mrr": 1,
+        "ndcg10": 0.7002755876478819,
+        "top": [
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent",
+          "Advisory locks around bet settlement"
+        ]
+      },
+      "para-settle-race": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 0.9639404333166532,
+        "top": [
+          "Advisory locks around bet settlement",
+          "Plain wording for HypeStake release notes",
+          "Review the wallet advisory lock change"
+        ]
+      },
+      "para-partner-logos": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Logo grid spacing for the Daydock partner page",
+          "Plain wording for HypeStake release notes",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "para-passwordless": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Signup email subject lines for the magic link",
+          "Signup page with a magic link",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-seat-pricing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing check for the team plan",
+          "Backfill odds snapshots for settled markets",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "para-hidden-prices": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Pricing page comparison of three sportsbook tools",
+          "Make the payments webhook idempotent",
+          "Backfill odds snapshots for settled markets"
+        ]
+      },
+      "para-paused-market": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Odds alert bot: wording for suspended markets",
+          "Review the wallet advisory lock change",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "para-reading-trip": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Daydock logo wordmark kerning & optical lockup",
+          "Move the odds engine onto a job queue",
+          "Make the payments webhook idempotent"
+        ]
+      },
+      "para-odds-bandwidth": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "HypeStake odds engine WebSocket delta compression",
+          "Pricing page comparison of three sportsbook tools",
+          "Move the odds engine onto a job queue"
+        ]
+      },
+      "para-gpu-frames": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Velotic / FrameConcepts WebGPU frame cache eviction",
+          "Backfill odds snapshots for settled markets",
+          "Signup email subject lines for the magic link"
+        ]
+      },
+      "para-friday-notes": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": [
+          "Draft the release notes for Daydock 0.9",
+          "Signup page with a magic link",
+          "Plain wording for HypeStake release notes"
+        ]
+      },
+      "para-wordmark-spacing": {
+        "recall5": 1,
+        "recall10": 1,
+        "mrr": 1,
+        "ndcg10": 1,
+        "top": [
+          "Daydock logo wordmark kerning & optical lockup",
+          "Logo grid spacing for the Daydock partner page",
+          "Draft the release notes for Daydock 0.9"
+        ]
+      },
+      "para-changelog": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "mrr": 0.25,
+        "ndcg10": 0.35583989829307827,
+        "top": [
+          "Backfill odds snapshots for settled markets",
+          "Signup email subject lines for the magic link",
+          "Pricing check for the team plan"
+        ]
+      },
+      "none-helm": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      },
+      "none-sourdough": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      },
+      "none-tax": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      },
+      "none-graphql": {
+        "recall5": 0,
+        "recall10": 0,
+        "mrr": 0,
+        "ndcg10": 0,
+        "top": []
+      }
+    }
+  }
+}

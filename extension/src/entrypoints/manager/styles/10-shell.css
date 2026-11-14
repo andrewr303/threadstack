@@ -1,0 +1,677 @@
+/* The full-page shell: the rail and the main column floating over the canvas, the three views,
+   the Threads view's frame, and the layer the embedded pages live on. The side panel and the
+   in-page overlay keep the library layout in styles.css. */
+
+/* ---------------------------------------------------------------------------------------------
+   Page and grid
+   --------------------------------------------------------------------------------------------- */
+.tk-workbench[data-surface="page"] {
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  /* The canvas painted on the body shows through between the floating pieces. */
+  background: transparent;
+}
+
+.tk-shell {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--gap);
+  padding: var(--gap);
+}
+
+.tk-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.tk-main > .tk-banner {
+  margin: 0;
+  flex: none;
+}
+
+.tk-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.tk-view[hidden] {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The rail: a glass island beside the views
+   --------------------------------------------------------------------------------------------- */
+.tk-shell .tk-rail {
+  width: var(--nav-w);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-chrome);
+}
+
+.tk-shell .tk-rail[data-collapsed="true"] {
+  width: 64px;
+}
+
+.tk-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 8px 6px 12px;
+  flex: none;
+}
+
+.tk-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tk-rail-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-ctl);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 var(--fs-12) / 1 var(--font-serif);
+}
+
+.tk-rail-wordmark {
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-16);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-rail-toggle .tk-icon {
+  transition: transform var(--t-small) var(--ease-out);
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-toggle .tk-icon {
+  transform: scaleX(-1);
+}
+
+/* View switch: icon over label, so "Dashboard" fits at 13px in three equal columns. */
+.tk-rail-views {
+  flex: none;
+  padding: 0 8px 8px;
+}
+
+.tk-rail-seg {
+  display: grid;
+  width: 100%;
+  border-radius: var(--r-panel);
+}
+
+.tk-rail-seg .tk-seg-thumb {
+  border-radius: var(--r-row);
+}
+
+.tk-rail-seg .tk-seg-item {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  padding: 4px;
+  border-radius: var(--r-row);
+  font-size: var(--fs-13);
+  line-height: 18px;
+}
+
+.tk-rail-seg .tk-seg-item:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+
+.tk-rail-viewlist {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.tk-rail-viewlist .tk-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-row);
+}
+
+/* Embedded pages unavailable */
+.tk-rail-notice {
+  display: flex;
+  gap: 8px;
+  margin: 0 8px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-row);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  flex: none;
+}
+
+.tk-rail-notice .tk-icon {
+  margin-top: 1px;
+  color: var(--warn);
+}
+
+.tk-rail-notice strong {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tk-rail-notice-detail {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-notice {
+  justify-content: center;
+  margin: 0 8px 8px;
+  padding: 8px 0;
+}
+
+/* The scrolling middle: sessions, then the Threads navigation */
+.tk-rail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+.tk-rail-label {
+  margin: 0;
+  padding: 4px 8px 2px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+.tk-rail-group + .tk-rail-group {
+  margin-top: 2px;
+}
+
+.tk-rail-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-align: left;
+}
+
+.tk-rail-group-head:hover {
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+.tk-rail-group-head:active {
+  background: var(--ctl-press);
+}
+
+.tk-rail-group-head:focus-visible,
+.tk-rail-row:focus-visible,
+.tk-rail-more:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+
+.tk-rail-group-head .tk-icon {
+  color: var(--text-3);
+  transition: transform var(--t-small) var(--ease-out);
+}
+
+.tk-rail-group-head[aria-expanded="false"] .tk-icon {
+  transform: rotate(-90deg);
+}
+
+.tk-rail-count {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tk-rail-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.tk-rail-row:hover {
+  background: var(--ctl-hover);
+}
+
+.tk-rail-row:active {
+  background: var(--ctl-press);
+}
+
+.tk-rail-row[aria-current="true"] {
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.tk-rail-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tk-rail-row-title {
+  display: block;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-rail-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-12);
+  line-height: 16px;
+  color: var(--text-2);
+}
+
+.tk-rail-row-meta .tk-acct {
+  font-size: var(--fs-12);
+}
+
+.tk-rail-row-open {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-3);
+}
+
+.tk-rail-row[aria-current="true"] .tk-rail-row-open {
+  color: var(--accent);
+}
+
+.tk-rail-more {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px 0 38px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 500;
+  text-align: left;
+}
+
+.tk-rail-more:hover {
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+.tk-rail-more:active {
+  background: var(--ctl-press);
+}
+
+.tk-rail-empty {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+/* The Threads navigation (projects, queues) the app passes in sits in the rail as plain lists. */
+.tk-rail .tk-nav,
+.tk-rail .tk-nav[data-drawer-open] {
+  display: flex;
+  position: static;
+  width: auto;
+  inset: auto;
+  z-index: auto;
+  overflow: visible;
+  padding: 10px 0 0;
+  gap: 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tk-rail .tk-nav .tk-eyebrow {
+  padding: 4px 8px 2px;
+}
+
+/* Footer: who is signed in, then the tools */
+.tk-rail-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 6px 8px;
+  border-top: 1px solid var(--line);
+}
+
+.tk-rail-realms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tk-rail-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.tk-rail-tools .tk-btn {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  color: var(--text-2);
+}
+
+.tk-rail-tools .tk-btn:hover {
+  color: var(--text);
+}
+
+.tk-rail-add {
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--text-2);
+}
+
+/* Collapsed: icons only, every one with a name and a tooltip */
+.tk-rail[data-collapsed="true"] .tk-rail-head {
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 0 8px;
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-brand {
+  flex: none;
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-foot,
+.tk-rail[data-collapsed="true"] .tk-rail-tools,
+.tk-rail[data-collapsed="true"] .tk-rail-realms {
+  align-items: center;
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-tools {
+  flex-direction: column;
+}
+
+/* Each sign-in shrinks to its account dot; the button keeps its own accessible name. */
+.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-name,
+.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-realm,
+.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-fixed,
+.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-chev {
+  display: none;
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-realms button {
+  display: grid;
+  grid-template-columns: auto;
+  place-items: center;
+  width: 40px;
+  min-width: 0;
+  padding: 0;
+}
+
+.tk-rail[data-collapsed="true"] .tk-rail-realms > li {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Small windows: the rail becomes a 64px strip, and opens as a drawer over the page
+   --------------------------------------------------------------------------------------------- */
+.tk-rail-scrim {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .tk-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .tk-shell .tk-rail[data-drawer-open="true"] {
+    position: fixed;
+    top: var(--gap);
+    bottom: var(--gap);
+    left: var(--gap);
+    z-index: 40;
+    width: min(var(--nav-w), calc(100vw - 2 * var(--gap)));
+    /* It floats over embedded pages of any colour, so it uses the denser menu fill. */
+    background: var(--pop-fill);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--pop-shadow);
+    animation: tk-drawer-in var(--t-panel) var(--ease-out);
+  }
+
+  .tk-rail-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: var(--scrim);
+    animation: tk-fade-in var(--t-mid) var(--ease-out);
+  }
+}
+
+@keyframes tk-drawer-in {
+  from {
+    transform: translateX(-16px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Threads view: the header is the view's glass bar, then list | detail as opaque panels
+   --------------------------------------------------------------------------------------------- */
+.tk-header[data-surface="page"] {
+  flex: none;
+  min-height: 48px;
+  padding: 4px 6px 4px 8px;
+  border-radius: var(--r-chrome);
+  gap: 8px;
+}
+
+/* The brand lives in the rail on the full page; the heading stays for assistive tech. */
+.tk-header[data-surface="page"] .tk-h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The rail has its own collapse button. */
+.tk-header[data-surface="page"] [data-page-hidden="true"] {
+  display: none;
+}
+
+.tk-workbench[data-surface="page"] .tk-columns {
+  /* Wide enough that a row's title and its facts (provider, account, run state, repository)
+     each stay on one line at 1440px. */
+  grid-template-columns: minmax(340px, 440px) minmax(0, 1fr);
+  gap: var(--gap);
+  overflow: visible;
+}
+
+.tk-workbench[data-surface="page"] .tk-columns[data-detail-mode="split"],
+.tk-workbench[data-surface="page"] .tk-columns[data-detail-mode="live"] {
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+}
+
+.tk-workbench[data-surface="page"] .tk-list-pane,
+.tk-workbench[data-surface="page"] .tk-detail-pane {
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+}
+
+@media (max-width: 1100px) {
+  .tk-workbench[data-surface="page"] .tk-columns,
+  .tk-workbench[data-surface="page"] .tk-columns[data-detail-mode] {
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  }
+  .tk-workbench[data-surface="page"] .tk-detail-pane {
+    position: static;
+    inset: auto;
+    z-index: auto;
+  }
+  .tk-workbench[data-surface="page"] .tk-detail-pane[data-mobile-hidden="true"] {
+    display: flex;
+  }
+  .tk-workbench[data-surface="page"] .tk-mobile-back-wrap {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .tk-workbench[data-surface="page"] .tk-columns,
+  .tk-workbench[data-surface="page"] .tk-columns[data-detail-mode] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tk-workbench[data-surface="page"] .tk-detail-pane {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+  }
+  .tk-workbench[data-surface="page"] .tk-detail-pane[data-mobile-hidden="true"] {
+    display: none;
+  }
+  .tk-workbench[data-surface="page"] .tk-mobile-back-wrap {
+    display: block;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Embedded pages. The stage is a zero-size layer: every loaded page is one iframe the stage
+   places (position: fixed) over its slot's box, so pages never reload when views change. Nothing
+   between the stage and the viewport may transform, filter or clip.
+   --------------------------------------------------------------------------------------------- */
+.tk-frame-stage {
+  flex: none;
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+iframe.tk-frame {
+  z-index: 5;
+  display: block;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  opacity: 1;
+  transition: opacity var(--t-mid) var(--ease-out);
+}
+
+/* Until it has loaded the page stays out of sight and out of the way; the slot's own content
+   (the loading or resting state) shows underneath. */
+iframe.tk-frame[data-loaded="false"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tk-frame-slot {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-panel);
+  background: var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-shell .tk-rail[data-drawer-open="true"],
+  .tk-rail-scrim {
+    animation: none;
+  }
+  iframe.tk-frame,
+  .tk-rail-group-head .tk-icon,
+  .tk-rail-toggle .tk-icon {
+    transition: none;
+  }
+}

@@ -1,0 +1,576 @@
+/* Shared pieces every workspace view uses. Tokens and themes are at the top of styles.css.
+   Layers, lowest first: embedded pages 5, chrome 10, menus 30, the rail drawer 40, skip link 200.
+   Dialogs use the browser's top layer. */
+
+/* ---------------------------------------------------------------------------------------------
+   Glass: floating chrome only (the rail, the bar at the top of a view, menus). Never on anything
+   a person reads or works in, never inside another glass element, and no ancestor of it may have
+   opacity below 1, a filter, a mask, a clip-path or will-change on those (they blank the blur).
+   --------------------------------------------------------------------------------------------- */
+.tk-glass {
+  position: relative;
+  z-index: 10;
+  isolation: isolate;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border: 1px solid var(--glass-border);
+  /* The top edge catches more light than the sides: an inset highlight above a faint hairline. */
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+}
+
+/* A soft sheen that fades out over the first few rows, so the fill reads as a pane of glass rather
+   than a flat tint. It disappears with solid surfaces (--glass-hi becomes transparent). */
+.tk-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--glass-hi), transparent 72px);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+/* Never glass on glass: a menu that opens inside chrome is solid. */
+.tk-glass .tk-pop,
+.tk-glass .tk-more-popover {
+  background: var(--chrome-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--line-2);
+}
+
+@media (forced-colors: active) {
+  .tk-glass,
+  .tk-pop {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .tk-glass::before {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Menus: .tk-pop is the floating surface, .tk-pop-item one row in it. The owner positions it.
+   --------------------------------------------------------------------------------------------- */
+.tk-pop {
+  z-index: 30;
+  min-width: 240px;
+  max-width: 340px;
+  padding: 6px;
+  border-radius: var(--r-panel);
+  background: var(--pop-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--pop-shadow);
+  color: var(--text);
+  transform-origin: var(--tk-pop-origin, top left);
+  animation: tk-pop-in var(--t-small) var(--ease-out) both;
+}
+
+@keyframes tk-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tk-pop-head {
+  padding: 8px 10px 6px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+.tk-pop-head strong,
+.tk-pop-head b {
+  display: block;
+  font-size: var(--fs-13);
+  color: var(--text);
+}
+
+.tk-pop-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-13);
+  text-align: left;
+  text-decoration: none;
+}
+
+.tk-pop-item:hover,
+.tk-pop-item:focus-visible {
+  background: var(--ctl-hover);
+}
+
+.tk-pop-item:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+
+.tk-pop-item:active {
+  background: var(--ctl-press);
+}
+
+.tk-pop-item[aria-checked="true"],
+.tk-pop-item[aria-current="true"] {
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.tk-pop-item:disabled,
+.tk-pop-item[aria-disabled="true"] {
+  color: var(--text-disabled);
+  background: transparent;
+}
+
+.tk-pop-item > .tk-icon:last-child {
+  color: var(--accent);
+}
+
+.tk-pop-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--line-2);
+}
+
+.tk-pop-note {
+  padding: 4px 10px 8px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Buttons beyond the .tk-btn family in styles.css
+   --------------------------------------------------------------------------------------------- */
+.tk-btn-quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
+.tk-btn-quiet:hover {
+  background: var(--ctl-hover);
+}
+
+.tk-btn-quiet:active {
+  background: var(--ctl-press);
+}
+
+.tk-btn-quiet:disabled,
+.tk-btn-quiet[aria-disabled="true"] {
+  border-color: transparent;
+}
+
+/* A 32px square holding one icon. Always carries an aria-label. */
+.tk-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text-2);
+  transition: transform var(--t-small) var(--ease-out);
+}
+
+.tk-icon-btn:hover {
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+.tk-icon-btn:active {
+  background: var(--ctl-press);
+  transform: scale(0.94);
+}
+
+.tk-icon-btn[aria-pressed="true"],
+.tk-icon-btn[aria-expanded="true"][aria-haspopup],
+.tk-icon-btn[aria-current]:not([aria-current="false"]) {
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+
+.tk-icon-btn:disabled,
+.tk-icon-btn[aria-disabled="true"] {
+  color: var(--text-disabled);
+  background: transparent;
+  border-color: transparent;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Segmented control: equal-width items over a sliding thumb. The component sets --n (items) and
+   --i (the chosen one); the thumb moves with transform only.
+   --------------------------------------------------------------------------------------------- */
+.tk-seg {
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-cap);
+  background: var(--seg-track);
+  flex: none;
+}
+
+.tk-seg-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / var(--n, 1));
+  transform: translateX(calc(var(--i, 0) * 100%));
+  border-radius: var(--r-cap);
+  background: var(--seg-thumb);
+  box-shadow: 0 1px 2px var(--line-2), inset 0 0 0 1px var(--line-2);
+  transition: transform var(--t-mid) var(--ease-out);
+  pointer-events: none;
+}
+
+.tk-seg-item {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-cap);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tk-seg-item:hover {
+  color: var(--text);
+}
+
+.tk-seg-item:active {
+  background: var(--ctl-press);
+}
+
+.tk-seg-item[aria-checked="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tk-seg-item[aria-checked="true"] .tk-icon {
+  color: var(--accent);
+}
+
+.tk-seg-item:disabled {
+  color: var(--text-disabled);
+  background: transparent;
+}
+
+@media (forced-colors: active) {
+  .tk-seg-thumb {
+    background: Highlight;
+  }
+  .tk-seg-item[aria-checked="true"] {
+    color: HighlightText;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Provider mark: a neutral two-letter tile, never a logo.
+   --------------------------------------------------------------------------------------------- */
+.tk-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-ctl);
+  background: var(--surface-3);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  font: 600 var(--fs-11) / 1 var(--font-sans);
+  letter-spacing: -0.02em;
+}
+
+.tk-mark[data-size="sm"] {
+  width: 18px;
+  height: 18px;
+}
+
+.tk-mark[data-size="md"] {
+  width: 20px;
+  height: 20px;
+}
+
+.tk-mark[data-size="lg"] {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-ctl);
+  font-size: var(--fs-12);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Account chip: a colour dot and the account's name. Filled when the account is signed in to its
+   sign-in, a hollow ring when it is not, so the difference never rests on colour alone.
+   --------------------------------------------------------------------------------------------- */
+.tk-acct {
+  --tk-acct-c: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.tk-acct[data-color="teal"] { --tk-acct-c: var(--ac-teal); }
+.tk-acct[data-color="peach"] { --tk-acct-c: var(--ac-peach); }
+.tk-acct[data-color="violet"] { --tk-acct-c: var(--ac-violet); }
+.tk-acct[data-color="sage"] { --tk-acct-c: var(--ac-sage); }
+.tk-acct[data-color="blue"] { --tk-acct-c: var(--ac-blue); }
+.tk-acct[data-color="gold"] { --tk-acct-c: var(--ac-gold); }
+
+.tk-acct-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--tk-acct-c);
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+
+.tk-acct[data-active="false"] .tk-acct-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--tk-acct-c);
+}
+
+.tk-acct-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-acct[data-active="false"] .tk-acct-name {
+  color: var(--text-3);
+}
+
+@media (forced-colors: active) {
+  .tk-acct-dot {
+    background: CanvasText;
+    box-shadow: none;
+  }
+  .tk-acct[data-active="false"] .tk-acct-dot {
+    background: Canvas;
+    box-shadow: inset 0 0 0 1.5px CanvasText;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Run state of a coding session: a dot and a word, as the page showed it when last read. The dot
+   never pulses or glows; the word always says the state.
+   --------------------------------------------------------------------------------------------- */
+.tk-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+}
+
+.tk-run-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--st-running);
+}
+
+.tk-run-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-run[data-state="running"] .tk-run-dot {
+  background: var(--st-running);
+}
+
+.tk-run[data-state="waiting_permission"] .tk-run-dot,
+.tk-run[data-state="waiting_answer"] .tk-run-dot {
+  background: var(--warn);
+}
+
+.tk-run[data-state="failed"] .tk-run-dot {
+  background: var(--danger);
+}
+
+.tk-run[data-state="turn_complete"] .tk-run-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--st-finished);
+}
+
+.tk-run[data-state="idle"] .tk-run-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+
+/* Signed out: a short bar instead of a dot, so it differs by shape too. */
+.tk-run[data-state="signed_out"] .tk-run-dot {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-3);
+}
+
+.tk-run[data-needs-you="true"] .tk-run-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (forced-colors: active) {
+  .tk-run-dot {
+    background: CanvasText;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Notice: what happened, then what to do. A centred block for empty, paused and blocked places.
+   --------------------------------------------------------------------------------------------- */
+.tk-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 460px;
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.tk-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  border-radius: var(--r-row);
+  background: var(--surface-2);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tk-notice[data-tone="warn"] .tk-notice-icon {
+  color: var(--warn);
+}
+
+.tk-notice-title {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.tk-notice-body {
+  font-size: var(--fs-14);
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.tk-notice-body p {
+  margin: 0;
+}
+
+.tk-notice-body p + p {
+  margin-top: 6px;
+}
+
+.tk-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.tk-notice-actions .tk-btn {
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: var(--fs-14);
+}
+
+.tk-notice-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Small things
+   --------------------------------------------------------------------------------------------- */
+.tk-icon {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.tk-kbd {
+  display: inline-flex;
+  align-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 500 var(--fs-11) / 1 var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-pop {
+    animation: none;
+  }
+  .tk-seg-thumb,
+  .tk-icon-btn {
+    transition: none;
+  }
+  .tk-icon-btn:active {
+    transform: none;
+  }
+}

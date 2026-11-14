@@ -1,0 +1,624 @@
+{
+  "generatedAt": "2026-11-03T04:27:25.826Z",
+  "extensionBuildDir": "/home/user/threadkeeper/.output/chrome-mv3",
+  "extensionId": "kajaibhdjhcpncpcmjkklleeoainakje",
+  "environment": {
+    "browser": "Playwright Chromium (headless=new, packaged MV3 extension)",
+    "viewportDefault": "1440x900",
+    "fixtureServer": "http://127.0.0.1:45241"
+  },
+  "verificationSeparation": {
+    "realBrowserPackagedExtensionChecks": "PASS",
+    "localFixtureAndContractSuiteChecks": "PASS",
+    "liveExternalThirdPartyApiSmokeTests": "NOT_VERIFIED — gated per build prompt §14 line 248 (\"Use gated live API smoke tests only with configured, authorized credentials and a small explicit budget. Missing live access is not verified, not a passed integration. Record real-browser checks separately from fixture tests.\")"
+  },
+  "checks": {
+    "QUIET-01": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "liveAuthenticatedProductionHostSessionStatus": "NOT_VERIFIED — gated per build prompt §14 line 248 (live authenticated chatgpt.com/claude.ai sessions were not automated to preserve account safety)",
+      "evidenceType": "packaged_extension_headless_chromium_plus_png_byte_equality",
+      "leakedSecretsInBundle": 0,
+      "unexpectedNetworkRequests": 0,
+      "closedStateExtensionNetworkRequests": 0,
+      "staticIdManagerUrlLoads": true,
+      "windowGlobalPollutedKeys": 0,
+      "manifestFreeOfLocalhost": true,
+      "chatgpt": {
+        "baselineMetrics": {
+          "title": "DayDock mark exploration — optical grid vs geometric",
+          "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "bodyChildCount": 2,
+          "injectedCount": 0,
+          "windowGlobalPollutedKeys": 0,
+          "scrollY": 0,
+          "activeElementId": "",
+          "composerValue": "",
+          "composerRect": {
+            "top": 1197,
+            "left": 357,
+            "width": 726,
+            "height": 76
+          }
+        },
+        "closedMetrics": {
+          "title": "DayDock mark exploration — optical grid vs geometric",
+          "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "bodyChildCount": 2,
+          "injectedCount": 0,
+          "windowGlobalPollutedKeys": 0,
+          "scrollY": 0,
+          "activeElementId": "",
+          "composerValue": "",
+          "composerRect": {
+            "top": 1197,
+            "left": 357,
+            "width": 726,
+            "height": 76
+          }
+        },
+        "exactPngByteEquality": true,
+        "baselineScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-chatgpt-baseline.png",
+        "closedScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-chatgpt-closed.png"
+      },
+      "claude": {
+        "baselineMetrics": {
+          "title": "Velotic WebGPU timeline scrubber frame pacing",
+          "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "bodyChildCount": 2,
+          "injectedCount": 0,
+          "windowGlobalPollutedKeys": 0,
+          "scrollY": 0,
+          "activeElementId": "",
+          "composerValue": "",
+          "composerRect": {
+            "top": 1133,
+            "left": 357,
+            "width": 726,
+            "height": 76
+          }
+        },
+        "closedMetrics": {
+          "title": "Velotic WebGPU timeline scrubber frame pacing",
+          "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "bodyChildCount": 2,
+          "injectedCount": 0,
+          "windowGlobalPollutedKeys": 0,
+          "scrollY": 0,
+          "activeElementId": "",
+          "composerValue": "",
+          "composerRect": {
+            "top": 1133,
+            "left": 357,
+            "width": 726,
+            "height": 76
+          }
+        },
+        "exactPngByteEquality": true,
+        "baselineScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-claude-baseline.png",
+        "closedScreenshot": "/home/user/threadkeeper/evidence/acceptance/quiet-01-claude-closed.png"
+      }
+    },
+    "OPEN-02": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "liveAuthenticatedProductionHostSessionStatus": "NOT_VERIFIED — gated per build prompt §14 line 248 (live authenticated chatgpt.com/claude.ai sessions were not automated to preserve account safety)",
+      "evidenceType": "packaged_extension_service_worker_invoke_and_host_restoration",
+      "invokeResult": {
+        "mode": "overlay",
+        "tabId": 1848252861
+      },
+      "reInvokeResult": {
+        "mode": "overlay",
+        "tabId": 1848252861
+      },
+      "closeButtonHandshakeVerified": true,
+      "missingHandshakeTokenCloseRejected": true,
+      "secondHostIframeTokenReuseBlocked": true,
+      "serviceWorkerEvictionHandshakeSurvived": true,
+      "hostFramedPageSurfaceBlocked": true,
+      "overlayRootCountWhenOpen": 1,
+      "nestedEscapeClosedInnerOnly": true,
+      "preInvokeMetrics": {
+        "title": "DayDock mark exploration — optical grid vs geometric",
+        "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "bodyChildCount": 2,
+        "injectedCount": 0,
+        "windowGlobalPollutedKeys": 0,
+        "scrollY": 372,
+        "activeElementId": "prompt-textarea",
+        "composerValue": "Unsent draft: verify optical grid kerning at 16px",
+        "composerRect": {
+          "top": 825,
+          "left": 357,
+          "width": 726,
+          "height": 76
+        }
+      },
+      "postCloseMetrics": {
+        "title": "DayDock mark exploration — optical grid vs geometric",
+        "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "bodyChildCount": 2,
+        "injectedCount": 0,
+        "windowGlobalPollutedKeys": 0,
+        "scrollY": 372,
+        "activeElementId": "prompt-textarea",
+        "composerValue": "Unsent draft: verify optical grid kerning at 16px",
+        "composerRect": {
+          "top": 825,
+          "left": 357,
+          "width": 726,
+          "height": 76
+        }
+      },
+      "overlaySurfaceMatrix": {
+        "overlay_1440x900_light": {
+          "surface": "overlay",
+          "viewport": "1440x900",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 1354,
+          "clientWidth": 1354,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-light.png"
+        },
+        "overlay_1440x900_dark": {
+          "surface": "overlay",
+          "viewport": "1440x900",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 1354,
+          "clientWidth": 1354,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-dark.png"
+        },
+        "overlay_1280x800_light": {
+          "surface": "overlay",
+          "viewport": "1280x800",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 1203,
+          "clientWidth": 1203,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-light.png"
+        },
+        "overlay_1280x800_dark": {
+          "surface": "overlay",
+          "viewport": "1280x800",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 1203,
+          "clientWidth": 1203,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-dark.png"
+        },
+        "overlay_700x800_light": {
+          "surface": "overlay",
+          "viewport": "700x800",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 658,
+          "clientWidth": 658,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-light.png"
+        },
+        "overlay_700x800_dark": {
+          "surface": "overlay",
+          "viewport": "700x800",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 658,
+          "clientWidth": 658,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-dark.png"
+        }
+      },
+      "overlayScreenshot": "/home/user/threadkeeper/evidence/acceptance/open-02-overlay.png",
+      "restoredScreenshot": "/home/user/threadkeeper/evidence/acceptance/open-02-restored.png"
+    },
+    "PARITY-03": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "evidenceType": "packaged_extension_overlay_and_full_page_workbench",
+      "countLedgerText": "9 threads · 9 filed · 0 unfiled",
+      "countsReconciled": true,
+      "evidenceLocationPresence": {
+        "where-you-left-off": true,
+        "decisions": true,
+        "action-items": true,
+        "open-questions": true,
+        "related-threads": true
+      },
+      "expandedEvidenceText": "Captured evidence · sourceRevision r1 · full coverage[m1 · user]: “We need to lock the Daydock / Meridian mark geometry before exporting the SVG icon set. Let us use a 24x24 optical grid with 1.75px stroke weight.”",
+      "viewModesRendered": {
+        "projectCardsCount": 5,
+        "kanbanColsCount": 5
+      },
+      "keyboardNavigation": {
+        "slashFocusedSearch": true,
+        "rowSteppedWithJK": true,
+        "titleBeforeJ": "Daydock / Meridian logo geometry & SVG grid",
+        "titleAfterJ": "HypeStake odds engine WebSocket delta compression",
+        "titleAfterK": "Daydock / Meridian logo geometry & SVG grid"
+      },
+      "viewports": {
+        "1280x800": {
+          "width": 1280,
+          "height": 800,
+          "scrollWidth": 1280,
+          "clientWidth": 1280,
+          "noHorizontalOverflow": true,
+          "screenshot": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-1280.png"
+        },
+        "700x800": {
+          "width": 700,
+          "height": 800,
+          "scrollWidth": 700,
+          "clientWidth": 700,
+          "noHorizontalOverflow": true,
+          "screenshot": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-700-narrow.png"
+        }
+      },
+      "surfaceMatrix": {
+        "page_1440x900_light": {
+          "surface": "page",
+          "viewport": "1440x900",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1440x900-light.png"
+        },
+        "page_1440x900_dark": {
+          "surface": "page",
+          "viewport": "1440x900",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1440x900-dark.png"
+        },
+        "page_1280x800_light": {
+          "surface": "page",
+          "viewport": "1280x800",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 1280,
+          "clientWidth": 1280,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1280x800-light.png"
+        },
+        "page_1280x800_dark": {
+          "surface": "page",
+          "viewport": "1280x800",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 1280,
+          "clientWidth": 1280,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-1280x800-dark.png"
+        },
+        "page_700x800_light": {
+          "surface": "page",
+          "viewport": "700x800",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 700,
+          "clientWidth": 700,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-700x800-light.png"
+        },
+        "page_700x800_dark": {
+          "surface": "page",
+          "viewport": "700x800",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 700,
+          "clientWidth": 700,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-page-700x800-dark.png"
+        },
+        "overlay_1440x900_light": {
+          "surface": "overlay",
+          "viewport": "1440x900",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 1354,
+          "clientWidth": 1354,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-light.png"
+        },
+        "overlay_1440x900_dark": {
+          "surface": "overlay",
+          "viewport": "1440x900",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 1354,
+          "clientWidth": 1354,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1440x900-dark.png"
+        },
+        "overlay_1280x800_light": {
+          "surface": "overlay",
+          "viewport": "1280x800",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 1203,
+          "clientWidth": 1203,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-light.png"
+        },
+        "overlay_1280x800_dark": {
+          "surface": "overlay",
+          "viewport": "1280x800",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 1203,
+          "clientWidth": 1203,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-1280x800-dark.png"
+        },
+        "overlay_700x800_light": {
+          "surface": "overlay",
+          "viewport": "700x800",
+          "theme": "light",
+          "rendered": true,
+          "scrollWidth": 658,
+          "clientWidth": 658,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#FBFAF7",
+          "themeTokenInk": "#1B1A17",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-light.png"
+        },
+        "overlay_700x800_dark": {
+          "surface": "overlay",
+          "viewport": "700x800",
+          "theme": "dark",
+          "rendered": true,
+          "scrollWidth": 658,
+          "clientWidth": 658,
+          "horizontalOverflowPx": 0,
+          "noHorizontalOverflow": true,
+          "themeTokenBg": "#16181A",
+          "themeTokenInk": "#EDEAE3",
+          "screenshotPath": "/home/user/threadkeeper/evidence/acceptance/parity-03-overlay-700x800-dark.png"
+        }
+      },
+      "sharedPersistenceVerifiedTitle": "DayDock mark exploration — [Verified Manual Override]",
+      "screenshots": {
+        "light1440": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-1440-light.png",
+        "dark1440": "/home/user/threadkeeper/evidence/acceptance/parity-03-manager-1440-dark.png",
+        "modalOrganize": "/home/user/threadkeeper/evidence/acceptance/parity-03-organize-modal.png"
+      }
+    },
+    "CAPTURE-04": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "evidenceType": "packaged_extension_live_dom_capture_and_unit_monotonicity",
+      "liveCapturedRecord": {
+        "threadKey": "chatgpt:acct_chatgpt_primary:ws_personal:conv_daydock_live_host:main",
+        "coverage": "partial",
+        "messageCount": 3,
+        "sourceRevision": 1
+      },
+      "details": "Verified ChatGPT & Claude visible-DOM capture only on authorized hosts, composite threadKey (provider:accountId:workspaceId:sourceConversationId:branchId), monotonic sourceRevision increments, and explicit coverage states (title_only, partial, full) where higher coverage is never downgraded."
+    },
+    "IMPORT-05": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "evidenceType": "unit_and_652_thread_chatgpt_fixture_import_export_plus_idb_preservation",
+      "sourceConversationCount": 652,
+      "importedThreadCount": 653,
+      "droppedThreadCount": 0,
+      "reconciledCountsAfter652Import": {
+        "sourceConversationCount": 652,
+        "importedThreadCount": 653,
+        "droppedThreadCount": 0,
+        "totalThreads": 653,
+        "filedCount": 545,
+        "unfiledCount": 108,
+        "sumProjectCounts": 653,
+        "projectCounts": {
+          "Daydock / Meridian": 110,
+          "HypeStake": 109,
+          "Velotic / FrameConcepts": 109,
+          "General research": 109,
+          "Personal": 108,
+          "Unfiled / Uncertain": 108
+        },
+        "coverageCounts": {
+          "full": 653,
+          "partial": 0,
+          "title_only": 0
+        },
+        "countsReconciled": true
+      },
+      "manualOverridePreservedInIdb": true,
+      "details": "Verified ChatGPT 652-thread conversations.json import (sourceConversationCount=652, importedThreadCount=653 with 2 branches on conversation #0, droppedThreadCount=0, active path via current_node, sibling branch preservation, null/system/tool node robustness), Claude export JSON import, and lossless Portable JSON / Markdown handoff export while preserving manual notes, tags, workflowState, and categoryLocked."
+    },
+    "ISOLATE-06": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "evidenceType": "packaged_extension_idb_composite_keys_and_account_mismatch_guard",
+      "audit": {
+        "hasMainBranch": true,
+        "hasAltBranch": true,
+        "hasClaudeWorkAccount": true,
+        "manualOverridePreserved": true,
+        "accountMismatchGuardStatus": "account_mismatch"
+      },
+      "details": "Verified 5-part composite threadKey (provider:accountId:workspaceId:sourceConversationId:branchId) separating main vs alternate branches and distinct provider/workspace accounts without collision, plus OPEN_ORIGINAL_THREAD account_mismatch guard."
+    },
+    "AI-07": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionUiAndContractCheck": "PASS",
+      "liveCloudflareWorkersAiSmokeStatus": "NOT_VERIFIED — gated per build prompt §14 line 248 (\"Use gated live API smoke tests only with configured, authorized credentials and a small explicit budget. Missing live access is not verified, not a passed integration.\")",
+      "evidenceType": "packaged_extension_nl_organize_negative_clause_undo_and_worker_contract_suite",
+      "negativeClauseExcludedInUi": true,
+      "details": "Verified SHA-256 Bearer token hash auth (AUTH_TOKEN_HASHES_JSON) + UsageQuotaDO daily request/token quota enforcement (unconditional fail-closed 503 SERVICE_UNAVAILABLE when USAGE_QUOTA is absent), /v1/enrich-thread and /v1/enrich route parity, localOnly/title_only 422 rejection, strict citation verification against source messages (including threadTitle), and preview-first NL organize honoring negative exclusion clauses with 1-click Undo."
+    },
+    "SEARCH-08": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionUiAndContractCheck": "PASS",
+      "liveVoyageEmbeddingAndRerankSmokeStatus": "NOT_VERIFIED — gated per build prompt §14 line 248 (\"Use gated live API smoke tests only with configured, authorized credentials and a small explicit budget. Missing live access is not verified, not a passed integration.\")",
+      "evidenceType": "packaged_extension_ui_search_and_hybrid_rrf_rerank_suite",
+      "uiQuery": "Daydock",
+      "uiSearchHitCount": 5,
+      "firstSearchHitSnippet": "Daydock / Meridian logo geometry & SVG gridWe need to lock the Daydock / Meridian mark geometry before exporting the SVG icon setWe need to ",
+      "details": "Verified exact phrase, prefix, trigram fuzzy title, and message/decision/note body search with matchReasons, filters, RRF lexical+vector fusion, dimension/model compatibility checks, rerank index validation + fallback, and default exclusion of isSyntheticBenchmark records."
+    },
+    "LIFE-09": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "evidenceType": "manifest_inspection_tombstone_transaction_and_fresh_tab_restart_check",
+      "manifestPermissions": [
+        "storage",
+        "unlimitedStorage",
+        "alarms",
+        "scripting",
+        "sidePanel"
+      ],
+      "hostPermissions": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://x.com/*",
+        "https://twitter.com/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://kimi.ai/*",
+        "https://api.anthropic.com/*",
+        "https://api.voyageai.com/*",
+        "https://api.openai.com/*"
+      ],
+      "freshHostInjectedCount": 0,
+      "restartScreenshot": "/home/user/threadkeeper/evidence/acceptance/life-09-restart-closed.png",
+      "details": "Verified atomic rw transaction across conversations, summaries, and tombstones preventing deleted-thread resurrection, cascade delete across all 6 stores, resumable job recovery, and zero auto-open on install/startup/fresh tab."
+    },
+    "PERF-10": {
+      "status": "PASS",
+      "realBrowserPackagedExtensionCheck": "PASS",
+      "evidenceType": "packaged_extension_chromium_indexeddb_10k_benchmark_plus_10k_node_benchmark",
+      "dataset": {
+        "synthetic": true,
+        "threadCount": 10000,
+        "messageCount": 200000,
+        "messagesPerThread": 20,
+        "generationMs": 287.379,
+        "coldIndexBuildMs": 528.963
+      },
+      "messageCount": 200000,
+      "sampleCount": 50,
+      "candidateSetSize": 10000,
+      "packagedExtensionIndexedDb10k": {
+        "recordCount": 10000,
+        "messageCount": 200000,
+        "warmOpenSampleCount": 20,
+        "sampleCount": 50,
+        "candidateSetSize": 10000,
+        "matchedField": "message.content",
+        "metaFieldMatchesAcross50Samples": 0,
+        "perQueryHitCountMin": 1,
+        "perQueryHitCountMax": 2750,
+        "totalHitsAcross50Samples": 12456,
+        "warmOpenMs": {
+          "p50": 110.5,
+          "p95": 175.5,
+          "max": 202
+        },
+        "localSearchMs": {
+          "p50": 3.6,
+          "p95": 4.8,
+          "max": 5.8
+        }
+      },
+      "warmOpenMs": {
+        "p50": 110.5,
+        "p95": 175.5,
+        "max": 202
+      },
+      "localSearchMs": {
+        "p50": 3.6,
+        "p95": 4.8,
+        "max": 5.8
+      },
+      "nodeEngineBenchmark10k": {
+        "warmOpenMs": {
+          "p50": 1.816,
+          "p95": 12.706,
+          "max": 19.135
+        },
+        "localSearchMs": {
+          "p50": 59.054,
+          "p95": 82.682,
+          "max": 140.253
+        }
+      }
+    }
+  },
+  "disclosures": [
+    "Per build prompt §14 line 248 (\"Use gated live API smoke tests only with configured, authorized credentials and a small explicit budget. Missing live access is not verified, not a passed integration. Record real-browser checks separately from fixture tests.\"), live external third-party API smoke tests (live Cloudflare Workers AI, live MongoDB Atlas Voyage APIs, and live authenticated chatgpt.com/claude.ai accounts) are recorded separately as NOT_VERIFIED, while real-browser packaged-extension Chromium checks and local fixture/contract checks are recorded as PASS.",
+    "In Chromium headless extension testing, chrome.action.onClicked cannot be triggered by an OS-level physical toolbar click; invocation was triggered via globalThis.__threadkeeperInvokeAction on the MV3 background ServiceWorker, which calls the exact same invokeOverlayOnTab production handler."
+  ]
+}

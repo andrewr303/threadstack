@@ -1,0 +1,10 @@
+{
+  "files": {
+    "report.md": "1f723de3e595ad170e9c6033369bd894a7f268fe605cd8de087f4e96c4cf2ab2",
+    "result.json": "d162e9c5c4fc721f874ccccafdd1fb0da0391cd00d3aaf0efc6f88a5ade61f26"
+  },
+  "missingFiles": [],
+  "schemaVersion": 1,
+  "sealedAt": "2026-11-05T05:28:50.949437+00:00",
+  "verdictAtSeal": "blocked"
+}

@@ -1,0 +1,37 @@
+# Dependencies and generated builds
+node_modules/
+worker/node_modules/
+.output/
+dist/
+.wxt/
+.wrangler/
+worker/.wrangler/
+
+# Playwright / browser caches
+ms-playwright/
+playwright-browsers/
+.playwright-browsers/
+.cache/ms-playwright/
+
+# Private configuration and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+!.dev.vars.sample
+!.dev.vars.template
+worker/.dev.vars
+worker/.dev.vars.*
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Claude Code local state (settings.json is shared and committed)
+.claude/worktrees/
+.claude/settings.local.json

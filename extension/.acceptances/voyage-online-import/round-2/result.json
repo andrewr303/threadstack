@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 1,
+  "title": "Voyage and online import: clean unit suite and packaged-extension fixture verification",
+  "requirement": "Fix Voyage embedding/rerank Atlas routing and add all-history imports from Claude and ChatGPT websites.",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Voyage embeddings and reranking work with the matching Atlas endpoint."
+    },
+    {
+      "id": "R2",
+      "text": "Import all available old and recent Claude/ChatGPT conversations through signed-in sessions."
+    },
+    {
+      "id": "R3",
+      "text": "Settings and Import UI expose endpoint and all-history choices."
+    }
+  ],
+  "createdAt": "2026-11-05T05:50:45.993382+00:00",
+  "runtime": {
+    "expected": "browseros-neo",
+    "observed": "other-browser-tool",
+    "name": "Repository Playwright Chromium extension runner",
+    "selection": "user",
+    "reason": "User requested continued verification. Lead selected the existing repository runner for supporting fixture checks after BrowserHostUnavailable; no explicit browser preference was supplied.",
+    "tools": [
+      "exec_command"
+    ],
+    "fallbacks": [
+      {
+        "runtime": "browseros-neo",
+        "status": "unavailable",
+        "reason": "Neo tools are not exposed."
+      },
+      {
+        "runtime": "codex-in-app-browser",
+        "status": "unavailable",
+        "reason": "browser_open(https://example.com) returned BrowserHostUnavailable."
+      }
+    ]
+  },
+  "context": {
+    "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+    "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+    "buildIdentity": "20261105.054637-3d90769",
+    "buildVerified": true,
+    "role": "Isolated test profile; site responses mocked; no live provider credentials",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    }
+  },
+  "plan": [
+    {
+      "id": "voyage-api",
+      "requirements": [
+        "R1"
+      ],
+      "title": "Atlas embedding and rerank requests succeed",
+      "category": "Threadkeeper",
+      "verifier": "agent",
+      "method": "In the built extension, use the configured Atlas model key and Test both Voyage services.",
+      "expected": "Both succeed against ai.mongodb.com; legacy routing remains explicit.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "all-history",
+      "requirements": [
+        "R2"
+      ],
+      "title": "Import old and recent chats from online accounts",
+      "category": "Threadkeeper",
+      "verifier": "agent",
+      "method": "Sign in to Claude and ChatGPT, open Import / Export, select All history, start, observe progress, cancel and run again.",
+      "expected": "Older chats import beyond 500, duplicates are skipped and partial progress is kept.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "settings-import-ui",
+      "requirements": [
+        "R3"
+      ],
+      "title": "Endpoint and import controls are usable",
+      "category": "Threadkeeper",
+      "verifier": "agent",
+      "method": "Inspect endpoint settings and Import controls at desktop and narrow widths.",
+      "expected": "Controls and destinations match the chosen host; all-history and recent import are reachable.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "online-import-fixture",
+      "requirements": [
+        "R2"
+      ],
+      "title": "Packaged extension imports old and recent chats from both mock sites",
+      "category": "Packaged-extension fixtures",
+      "verifier": "agent",
+      "method": "Import recent chats; import all history including archived ChatGPT and 400-day-old Claude chats; rerun ChatGPT import.",
+      "expected": "Complete stored conversations, clear signed-out error, unchanged copies skipped without duplicates.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "import-layout-fixture",
+      "requirements": [
+        "R3"
+      ],
+      "title": "Import controls fit a 420px side panel",
+      "category": "Packaged-extension fixtures",
+      "verifier": "agent",
+      "method": "Open Import / Export in the packaged side panel at 420 by 860.",
+      "expected": "All-history selector and start button remain usable with no horizontal overflow.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "voyage-api",
+      "name": "Atlas embedding and rerank requests succeed",
+      "category": "Threadkeeper",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Live account/API verification remains blocked: integrated browser unavailable, no connected signed-in account or Atlas credential. Fixture browser checks are separate cases below.",
+      "evidence": []
+    },
+    {
+      "id": "all-history",
+      "name": "Import old and recent chats from online accounts",
+      "category": "Threadkeeper",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Live account/API verification remains blocked: integrated browser unavailable, no connected signed-in account or Atlas credential. Fixture browser checks are separate cases below.",
+      "evidence": []
+    },
+    {
+      "id": "settings-import-ui",
+      "name": "Endpoint and import controls are usable",
+      "category": "Threadkeeper",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Live account/API verification remains blocked: integrated browser unavailable, no connected signed-in account or Atlas credential. Fixture browser checks are separate cases below.",
+      "evidence": []
+    },
+    {
+      "id": "online-import-fixture",
+      "name": "Packaged extension imports old and recent chats from both mock sites",
+      "category": "Packaged-extension fixtures",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Complete stored conversations, clear signed-out error, unchanged copies skipped without duplicates. Mocked site responses; no live-account claim.",
+      "evidence": [
+        {
+          "path": "assets/06-all-history.png",
+          "type": "screenshot",
+          "description": "Inspected original Chromium fixture capture: 06-all-history.png",
+          "capturedAt": "2026-11-05T05:49:15.179323+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "exec_command",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+            "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+            "buildIdentity": "20261105.054637-3d90769"
+          }
+        },
+        {
+          "path": "assets/07-claude-all-history.png",
+          "type": "screenshot",
+          "description": "Inspected original Chromium fixture capture: 07-claude-all-history.png",
+          "capturedAt": "2026-11-05T05:49:18.416991+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "exec_command",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+            "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+            "buildIdentity": "20261105.054637-3d90769"
+          }
+        },
+        {
+          "path": "assets/extension-e2e.log",
+          "type": "transcript",
+          "description": "Original packaged-extension runner output, including loaded manifest build and assertions.",
+          "capturedAt": "2026-11-05T05:49:18.678922+00:00",
+          "capturedBy": "cli",
+          "tool": "exec_command",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+            "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+            "buildIdentity": "20261105.054637-3d90769",
+            "command": "CHROME_EXECUTABLE_PATH=<installed Chromium> TK_CATCHUP_EVIDENCE_DIR=<fresh directory> npm run test:catchup"
+          }
+        },
+        {
+          "path": "assets/e2e-fixture-failure.log",
+          "type": "transcript",
+          "description": "Earlier runner failure: mock timestamps advanced between requests, creating false source updates.",
+          "capturedAt": "2026-11-05T05:47:06.891770+00:00",
+          "capturedBy": "cli",
+          "tool": "exec_command",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+            "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+            "buildIdentity": "20261105.054637-3d90769",
+            "command": "CHROME_EXECUTABLE_PATH=<installed Chromium> TK_CATCHUP_EVIDENCE_DIR=<fresh directory> npm run test:catchup"
+          }
+        }
+      ],
+      "attempts": [
+        {
+          "status": "fail",
+          "observation": "All chats imported but expected skip counts failed because the mock changed timestamps on each request.",
+          "evidencePaths": [
+            "assets/e2e-fixture-failure.log"
+          ],
+          "resolution": "Froze mock source timestamps at runner start. Same application then passed old/archived import and rerun duplicate checks; source dates no longer change between requests."
+        }
+      ]
+    },
+    {
+      "id": "import-layout-fixture",
+      "name": "Import controls fit a 420px side panel",
+      "category": "Packaged-extension fixtures",
+      "surface": "web",
+      "status": "pass",
+      "observation": "All-history selector and start button remain usable with no horizontal overflow. Mocked site responses; no live-account claim.",
+      "evidence": [
+        {
+          "path": "assets/05-catchup-420.png",
+          "type": "screenshot",
+          "description": "Inspected original Chromium fixture capture: 05-catchup-420.png",
+          "capturedAt": "2026-11-05T05:49:18.615548+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "exec_command",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/sidepanel.html",
+            "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+            "buildIdentity": "20261105.054637-3d90769"
+          }
+        },
+        {
+          "path": "assets/extension-e2e.log",
+          "type": "transcript",
+          "description": "Original packaged-extension runner output, including loaded manifest build and assertions.",
+          "capturedAt": "2026-11-05T05:49:18.678922+00:00",
+          "capturedBy": "cli",
+          "tool": "exec_command",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://bajiblleoodfabmofjmcjeejhbjikfkp/manager.html",
+            "revision": "3d90769e2eba30df550fd3510b682fbb796b8777 + working tree",
+            "buildIdentity": "20261105.054637-3d90769",
+            "command": "CHROME_EXECUTABLE_PATH=<installed Chromium> TK_CATCHUP_EVIDENCE_DIR=<fresh directory> npm run test:catchup"
+          }
+        }
+      ]
+    }
+  ],
+  "coverageGaps": [
+    "No live authenticated Atlas embedding/rerank request was made.",
+    "Claude and ChatGPT browser tests use mocked website routes, not live signed-in accounts.",
+    "Endpoint dropdown visual checks and live account import remain unverified."
+  ],
+  "previousRound": "../round-1"
+}

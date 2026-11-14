@@ -1,0 +1,108 @@
+
+> threadkeeper@0.5.0 test:catchup
+> node scripts/run-catchup-e2e.mjs
+
+[catchup-e2e] ok — a conversation whose page shows 2 messages is stored complete from the site's own data (4 messages, full, network_observer)
+[catchup-e2e] ok — only the active branch is stored, in order
+[catchup-e2e] ok — a later DOM capture neither drops nor duplicates messages and keeps the complete copy
+[catchup-e2e] ok — Check capture reports the complete conversation data for the open tab
+[catchup-e2e] ok — the capture report holds no titles or message text
+[catchup-e2e] ok — all-history import is available by default
+[catchup-e2e] ok — ChatGPT: "Done: 2 imported, 1 already up to date." (3 in the window, 1 unchanged, the 60-day-old one left out)
+[catchup-e2e] ok — a signed-out Claude is reported in plain words, not as a hang
+[catchup-e2e] ok — the two new conversations are stored complete with the history_sync source
+[catchup-e2e] ok — a conversation outside the 30-day window is not imported
+[catchup-e2e] ok — it was never even fetched
+[catchup-e2e] ok — the unchanged conversation was not fetched again (only the page's own load)
+[catchup-e2e] ok — Catch up only ever sends GET requests
+[catchup-e2e] ok — no tab is left open (3 before, 3 after)
+[catchup-e2e] ok — the on-device brief counts the recent conversations ("3 conversations across 1 project in the last 30 days.")
+[catchup-e2e] ok — a thread link in the brief opens that thread
+All-history observed UI: Import from online accounts
+
+Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. Threadkeeper reads through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then summarized and filed like any other thread.
+
+All history reads every available page in the active account or workspace, including archived ChatGPT chats. Keep the browser and site tabs open while it runs. Cancel at any time; run it again to skip complete, unchanged conversations and continue importing. Deleted or unavailable chats cannot be recovered.
+
+How far back
+All history — Claude & ChatGPT
+Last 7 days
+Last 14 days
+Last 30 days
+ChatGPT
+Complete history with dates, read through your signed-in session.
+Claude
+Complete history with dates, read through your signed-in session.
+Import all online conversations
+ChatGPT
+Done: 4 imported, 1 already up to date.
+Claude
+Sign in to Claude in this browser, then run Catch up again.
+3 conversations across 1 project in the last 30 days.
+
+Built on this device · 11/4/2026, 10:46:46 PM
+
+Unfiled / Uncertain
+
+Opening question 1: how should we handle Stripe webhook retries
+
+Stripe webhook retries
+Quarterly launch plan
+Hiring scorecard
+
+Loose ends
+Stripe webhook retries is not filed in a project yet
+Quarterly launch plan is not filed in a project yet
+Hiring scorecard is not filed in a project yet
+All-history stored fixture threads: [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    title: 'Stripe webhook retries',
+    count: 4,
+    coverage: 'full',
+    source: 'network_observer',
+    updatedAt: '2026-11-05T05:46:39.755Z'
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    title: 'Quarterly launch plan',
+    count: 4,
+    coverage: 'full',
+    source: 'history_sync',
+    updatedAt: '2026-10-26T05:46:46.000Z'
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000003',
+    title: 'Hiring scorecard',
+    count: 4,
+    coverage: 'full',
+    source: 'history_sync',
+    updatedAt: '2026-10-16T05:46:47.000Z'
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000004',
+    title: 'Old pricing experiment',
+    count: 4,
+    coverage: 'full',
+    source: 'history_sync',
+    updatedAt: '2026-09-06T05:46:48.000Z'
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000005',
+    title: 'Archived planning notes',
+    count: 4,
+    coverage: 'full',
+    source: 'history_sync',
+    updatedAt: '2025-10-01T05:46:49.000Z'
+  }
+]
+locator.waitFor: Timeout 20000ms exceeded.
+Call log:
+[2m  - waiting for locator('section[aria-labelledby="tk-catchup-h"]').locator('.tk-sync-list li').filter({ hasText: 'ChatGPT' }).locator('.tk-sync-status').filter({ hasText: /^Done: 2 imported, 3 already up to date/ }) to be visible[22m
+
+    at run (/Users/andrew/dev/threadkeeper/scripts/run-catchup-e2e.mjs:230:105) {
+  log: [
+    `  - waiting for locator('section[aria-labelledby="tk-catchup-h"]').locator('.tk-sync-list li').filter({ hasText: 'ChatGPT' }).locator('.tk-sync-status').filter({ hasText: /^Done: 2 imported, 3 already up to date/ }) to be visible`
+  ],
+  name: 'TimeoutError'
+}

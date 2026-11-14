@@ -1,0 +1,1118 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DETAIL_MODES,
+  getDisplayTitle,
+  type ConversationRecord,
+  type CoverageState,
+  type DetailMode,
+  type ProviderId,
+  type ResurfaceQueue,
+  type SettingsRecord,
+  type ThreadKind,
+  type WorkflowState,
+} from '../../core/schema.js';
+import { saveSettingsPatch, updateManualThreadFields } from '../../core/db.js';
+import { PROVIDER_IDS, detectProviderFromUrl, extractConversationIdFromUrl } from '../../core/providers.js';
+import { LOCAL_SPACE, primarySpace } from '../../core/embeddings.js';
+import { providerCategory } from '../../core/providers.js';
+import { findRelatedThreads } from '../../core/related.js';
+import { hasClaudeKey } from '../../core/ai/claude.js';
+import { enqueueLibraryAnalysis, processThreadsLocally } from '../../core/pipeline.js';
+import { notifyBackground, openModal, sharedDb } from './shared.js';
+import { SettingsDialog } from './SettingsDialog.js';
+import { ImportDialog, describeReport, syncSavedFolders } from './ImportDialog.js';
+import type { RelatedThread } from './ThreadOverview.js';
+import { StaleBuildBanner, useDiagnostics } from './Diagnostics.js';
+import { RestoreOfferBanner } from './accounts/RestoreOfferBanner.js';
+import { SendToStillDialog, type SendRequest } from './SidebarDock.js';
+import { configureDockClient, dockSyncNow, useDockState } from './dock.js';
+import { isRemoteAllowed } from '../../core/privacy.js';
+import type { SectionId } from './SettingsDialog.js';
+import { selectRange, type ThreadSortMode } from './BulkActions.js';
+import { useAnalysisRunner } from './hooks/useAnalysisRunner.js';
+import { useLibraryData } from './hooks/useLibraryData.js';
+import { useOrganize } from './hooks/useOrganize.js';
+import { useThreadActions } from './hooks/useThreadActions.js';
+import { useThreadSearch } from './hooks/useThreadSearch.js';
+import { useWorkbenchKeyboard } from './hooks/useWorkbenchKeyboard.js';
+import { HeaderBar } from './shell/HeaderBar.js';
+import { DetailPane } from './threads/DetailPane.js';
+import { ListPane } from './threads/ListPane.js';
+import { NavRail } from './threads/NavRail.js';
+import { OrganizeDialog } from './threads/OrganizeDialog.js';
+import type { EvidenceView } from './threads/claims.js';
+import type { RunFilter } from './threads/filters.js';
+import { WORKSPACE_VIEWS, type WorkspaceView } from '../../core/workspace/types.js';
+import { AddAccountDialog } from './accounts/AddAccountDialog.js';
+import { BrowseView } from './browse/BrowseView.js';
+import { DashboardView } from './dashboard/DashboardView.js';
+import { Rail } from './shell/Rail.js';
+import { FrameStage } from './workspace/FrameStage.js';
+import { WorkspaceProvider, type ThreadAccount, type WorkspaceContextValue } from './workspace/context.js';
+import { accountForThread, embedTargetFor, threadTabId } from './workspace/state.js';
+import { useWorkspace } from './workspace/useWorkspace.js';
+
+type Surface = 'overlay' | 'page' | 'sidepanel';
+
+function useEffectiveTheme(theme: SettingsRecord['theme'] | undefined): 'light' | 'dark' {
+  const query = useMemo(
+    () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null),
+    []
+  );
+  const [systemDark, setSystemDark] = useState(Boolean(query?.matches));
+  useEffect(() => {
+    if (!query) return;
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, [query]);
+  if (theme === 'dark') return 'dark';
+  if (theme === 'light') return 'light';
+  return systemDark ? 'dark' : 'light';
+}
+
+export function App() {
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const isFramed = typeof window !== 'undefined' && window.top !== window.self;
+  const requestedSurface =
+    urlParams.get('surface') ?? document.documentElement.getAttribute('data-surface');
+  const isUnauthenticatedFrame = isFramed && requestedSurface !== 'overlay';
+  const surface: Surface =
+    isFramed || requestedSurface === 'overlay'
+      ? 'overlay'
+      : requestedSurface === 'sidepanel'
+        ? 'sidepanel'
+        : 'page';
+  const handshakeToken = useMemo(() => urlParams.get('token') ?? '', [urlParams]);
+  const [overlayHandshakeState, setOverlayHandshakeState] = useState<'pending' | 'authorized' | 'rejected'>(
+    isUnauthenticatedFrame ? 'rejected' : surface === 'overlay' ? 'pending' : 'authorized'
+  );
+  const [overlayHandshakeError, setOverlayHandshakeError] = useState<string | null>(
+    isUnauthenticatedFrame ? 'Framing manager.html without surface=overlay is forbidden' : null
+  );
+  const handshakeAuthorizedRef = useRef<boolean>(!isFramed && surface !== 'overlay');
+  // The overlay proves its handshake on DOCK_SEND, like the other privileged overlay messages.
+  useMemo(() => configureDockClient({ handshakeToken: surface === 'overlay' ? handshakeToken : '' }), [surface, handshakeToken]);
+  const dock = useDockState(overlayHandshakeState === 'authorized');
+  const stillPaired = Boolean(dock.state?.paired);
+
+  const diagnostics = useDiagnostics();
+
+  // ---- UI state ----
+  const [searchQuery, setSearchQuery] = useState('');
+  const [listMode, setListMode] = useState<'search' | 'ask'>('search');
+  const [activeArea, setActiveArea] = useState<string>('All threads');
+  const [activeQueue, setActiveQueue] = useState<ResurfaceQueue | 'all'>('all');
+  const [providerFilter, setProviderFilter] = useState<ProviderId | 'all'>('all');
+  const [stateFilter, setStateFilter] = useState<WorkflowState | 'all'>('all');
+  const [coverageFilter, setCoverageFilter] = useState<CoverageState | 'all'>('all');
+  const [kindFilter, setKindFilter] = useState<ThreadKind | 'all'>('all');
+  const [selectedThreadKey, setSelectedThreadKey] = useState<string | null>(null);
+  const [mobileDetailVisible, setMobileDetailVisible] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
+  const [statusAnnouncement, setStatusAnnouncement] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [newProjectDraft, setNewProjectDraft] = useState<string | null>(null);
+  const [showAllMessages, setShowAllMessages] = useState(false);
+  const [activeTabThreadKey, setActiveTabThreadKey] = useState<string | null>(null);
+  // Checked rows for bulk actions; separate from the opened thread (selectedThreadKey).
+  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
+  const [sortMode, setSortMode] = useState<ThreadSortMode>('recent');
+  // Workspace filters of the Threads list (full page).
+  const [repositoryFilter, setRepositoryFilter] = useState<string | null>(null);
+  const [accountFilter, setAccountFilter] = useState<string | null>(null);
+  const [runFilter, setRunFilter] = useState<RunFilter>('all');
+
+  const [titleDraft, setTitleDraft] = useState('');
+  const [notesDraft, setNotesDraft] = useState('');
+  const [tagInputDraft, setTagInputDraft] = useState('');
+
+  const organizeDialogRef = useRef<HTMLDialogElement | null>(null);
+  const importDialogRef = useRef<HTMLDialogElement | null>(null);
+  const settingsDialogRef = useRef<HTMLDialogElement | null>(null);
+  const bulkDeleteDialogRef = useRef<HTMLDialogElement | null>(null);
+  const sendStillDialogRef = useRef<HTMLDialogElement | null>(null);
+  const addAccountDialogRef = useRef<HTMLDialogElement | null>(null);
+  const [addAccountRealm, setAddAccountRealm] = useState<string | null>(null);
+  const [sendStillRequest, setSendStillRequest] = useState<SendRequest | null>(null);
+  const [settingsSection, setSettingsSection] = useState<SectionId | null>(null);
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const checkAnchorRef = useRef<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const rowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const selectedKeyRef = useRef<string | null>(null);
+  const backfillStartedRef = useRef(false);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const authorized = () => !(surface === 'overlay' && !handshakeAuthorizedRef.current);
+
+  const {
+    settings,
+    setSettings,
+    conversations,
+    relationships,
+    changeLogs,
+    counts,
+    insightRows,
+    collections,
+    vectorRows,
+    pendingAnalysis,
+    reloadAll,
+    summariesByThread,
+    messagesByThread,
+    insightsByThread,
+    vectorsByThread,
+    projectNames,
+    collectionByName,
+    searchIndex,
+  } = useLibraryData({
+    surface,
+    urlParams,
+    handshakeAuthorizedRef,
+    onLoaded: ({ settings: loadedSettings, conversations: convs, firstLoad, preserveSelectionKey }) => {
+      if (firstLoad) {
+        const urlQuery = urlParams.get('q');
+        setSearchQuery(urlQuery !== null ? urlQuery : loadedSettings.lastSearchQuery);
+        setActiveArea(loadedSettings.lastActiveArea || 'All threads');
+        setActiveQueue(loadedSettings.lastActiveQueue || 'all');
+        // A link can name the view to open on (manager.html?view=browse).
+        const urlView = urlParams.get('view') as WorkspaceView | null;
+        if (urlView && WORKSPACE_VIEWS.includes(urlView) && urlView !== loadedSettings.activeView) {
+          void persistSettingPatch({ activeView: urlView });
+        }
+      }
+
+      const targetKey =
+        preserveSelectionKey !== undefined
+          ? preserveSelectionKey
+          : urlParams.get('threadKey') ||
+            loadedSettings.lastSelectedThreadKey ||
+            convs.find((c) => !c.isSyntheticBenchmark)?.threadKey ||
+            null;
+      selectedKeyRef.current = targetKey;
+      setSelectedThreadKey(targetKey);
+    },
+  });
+
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => void reloadAll(selectedKeyRef.current), 700);
+  }, [reloadAll]);
+
+  // ---- Overlay handshake ----
+  useEffect(() => {
+    if (isUnauthenticatedFrame) {
+      setOverlayHandshakeState('rejected');
+      setOverlayHandshakeError('Framing manager.html without surface=overlay is forbidden');
+      return;
+    }
+    if (surface !== 'overlay') {
+      handshakeAuthorizedRef.current = true;
+      void reloadAll();
+      return;
+    }
+    try {
+      const cleanParams = new URLSearchParams(window.location.search);
+      cleanParams.delete('token');
+      window.history.replaceState(null, '', `${window.location.pathname}?${cleanParams.toString()}`);
+    } catch {
+      // ignore replaceState failure
+    }
+    if (!handshakeToken || handshakeToken.length < 16) {
+      setOverlayHandshakeState('rejected');
+      setOverlayHandshakeError('Missing or invalid overlay handshakeToken');
+      return;
+    }
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage(
+        { type: 'REDEEM_OVERLAY_HANDSHAKE', handshakeToken },
+        (resp: { ok?: boolean; error?: string } | undefined) => {
+          if (resp?.ok) {
+            handshakeAuthorizedRef.current = true;
+            setOverlayHandshakeState('authorized');
+            void reloadAll();
+          } else {
+            handshakeAuthorizedRef.current = false;
+            setOverlayHandshakeState('rejected');
+            setOverlayHandshakeError(resp?.error ?? 'Overlay handshake token rejected');
+          }
+        }
+      );
+    } else {
+      handshakeAuthorizedRef.current = true;
+      setOverlayHandshakeState('authorized');
+      void reloadAll();
+    }
+  }, []);
+
+  // ---- Live updates from the service worker (captures, background analysis) ----
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
+    const listener = (message: { type?: string }) => {
+      if (message?.type === 'LIBRARY_CHANGED' && handshakeAuthorizedRef.current) scheduleReload();
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    const onFocus = () => handshakeAuthorizedRef.current && scheduleReload();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [scheduleReload]);
+
+  const effectiveTheme = useEffectiveTheme(settings?.theme);
+  useEffect(() => {
+    if (!settings) return;
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
+    document.documentElement.setAttribute('data-density', settings.density);
+    // "solid" turns every translucent surface opaque (Settings; also follows the system's
+    // reduced-transparency and more-contrast preferences in CSS).
+    document.documentElement.setAttribute('data-surfaces', settings.surfaces);
+  }, [effectiveTheme, settings?.density, settings?.surfaces]);
+
+  const persistSettingPatch = useCallback(async (patch: Partial<SettingsRecord>) => {
+    if (surface === 'overlay' && !handshakeAuthorizedRef.current) return;
+    const updated = await saveSettingsPatch(sharedDb, patch);
+    setSettings(updated);
+    const affectsBackground = [
+      'launchSurface',
+      'aiBackend',
+      'anthropicApiKey',
+      'aws',
+      'awsPlatformWorkspaceId',
+      'awsPlatformApiKey',
+      'aiModel',
+      'autoOrganize',
+      'embeddingProvider',
+      'voyageApiKey',
+      'voyageEndpoint',
+      'openaiApiKey',
+      'ollamaUrl',
+      'ollamaEmbeddingModel',
+      'bedrockEmbeddingModel',
+      'bedrockEmbeddingDimensions',
+      'mongodbApiKey',
+      'mongodbGeography',
+      'mongodbEmbeddingModel',
+      'mongodbEmbeddingDimensions',
+      'cohereApiKey',
+      'cohereEmbeddingModel',
+      'cohereEmbeddingDimensions',
+      'authorizedHosts',
+      'cloudExcludedProviders',
+      'sidebarDock',
+      'paperclip',
+    ].some((k) => k in patch);
+    if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
+  }, [surface]);
+
+  // ---- Workspace (the full page only): views, embedded session tabs, accounts ----
+  const isPage = surface === 'page';
+  const view: WorkspaceView = isPage ? settings?.activeView ?? 'threads' : 'threads';
+  const detailMode: DetailMode = isPage ? settings?.detailMode ?? 'summary' : 'summary';
+  // Set after the selection is known (the selection depends on the search below).
+  const [liveThreadKey, setLiveThreadKey] = useState<string | null>(null);
+  const workspace = useWorkspace({ db: sharedDb, enabled: isPage, view, settings, conversations, liveThreadKey });
+
+  const accountOfThread = useCallback(
+    (conv: Pick<ConversationRecord, 'provider' | 'accountId'>): ThreadAccount => {
+      const owner = accountForThread(conv, workspace.realms, settings?.boundAccounts[conv.provider]?.accountId);
+      if (!owner) return { realm: null, account: null, active: true, switchable: false };
+      const entry = workspace.realms.find((r) => r.realm.id === owner.realm.id);
+      // Until the accounts are known, and for sign-ins Threadkeeper does not switch, the
+      // browser's own login is the only one there is.
+      const active = !entry || !owner.realm.switchable || !entry.activeAccountId || entry.activeAccountId === owner.accountId;
+      return { realm: owner.realm, account: owner.account, active, switchable: owner.realm.switchable };
+    },
+    [workspace.realms, settings?.boundAccounts]
+  );
+
+  const accountIdOf = useCallback((conv: ConversationRecord) => accountOfThread(conv).account?.id ?? null, [accountOfThread]);
+
+  const {
+    rerankNote,
+    queueItemsMap,
+    displayedHits,
+    listHits,
+    kanbanColumns,
+    cardGroups,
+    viewKeys,
+    submitSearch: handleSearchSubmit,
+  } = useThreadSearch({
+    settings,
+    conversations,
+    searchIndex,
+    summariesByThread,
+    messagesByThread,
+    insightsByThread,
+    vectorsByThread,
+    vectorRows,
+    searchQuery,
+    providerFilter,
+    activeArea,
+    stateFilter,
+    coverageFilter,
+    kindFilter,
+    activeQueue,
+    sortMode,
+    repositoryFilter,
+    accountFilter,
+    runFilter,
+    accountIdOf,
+  });
+
+  // Drop checked threads that no longer exist (deleted here or elsewhere).
+  useEffect(() => {
+    setCheckedKeys((prev) => {
+      if (prev.size === 0) return prev;
+      const live = new Set(conversations.map((c) => c.threadKey));
+      const next = new Set(Array.from(prev).filter((k) => live.has(k)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [conversations]);
+
+  const selectedConversation = useMemo(
+    () =>
+      conversations.find((c) => c.threadKey === selectedThreadKey) ??
+      displayedHits[0]?.conversation ??
+      null,
+    [conversations, selectedThreadKey, displayedHits]
+  );
+
+  useEffect(() => {
+    if (!selectedConversation) return;
+    setTitleDraft(getDisplayTitle(selectedConversation));
+    setNotesDraft(selectedConversation.manualNotes);
+    setTagInputDraft(selectedConversation.tags.join(', '));
+    setActiveEvidenceId(null);
+  }, [
+    selectedConversation?.threadKey,
+    selectedConversation?.manualTitleOverride,
+    selectedConversation?.manualNotes,
+    selectedConversation?.tags.join(','),
+  ]);
+
+  useEffect(() => setShowAllMessages(false), [selectedConversation?.threadKey]);
+
+  const selectedMessages = useMemo(
+    () => (selectedConversation ? messagesByThread.get(selectedConversation.threadKey) ?? [] : []),
+    [selectedConversation, messagesByThread]
+  );
+  const selectedSummary = useMemo(
+    () => (selectedConversation ? summariesByThread.get(selectedConversation.threadKey) ?? null : null),
+    [selectedConversation, summariesByThread]
+  );
+  const selectedInsight = selectedConversation ? insightsByThread.get(selectedConversation.threadKey) ?? null : null;
+
+  const selectedRelationships = useMemo(() => {
+    if (!selectedConversation) return [];
+    return relationships.filter(
+      (r) =>
+        (r.fromThreadKey === selectedConversation.threadKey || r.toThreadKey === selectedConversation.threadKey) &&
+        !r.dismissedByUser
+    );
+  }, [relationships, selectedConversation]);
+
+  // Related threads: the same session under another account, the same pull request, branch or
+  // repository first, then threads that are similar in meaning (core/related.ts).
+  const semanticNeighbors: RelatedThread[] = useMemo(() => {
+    if (!selectedConversation || !settings) return [];
+    const space = primarySpace(settings);
+    const own = vectorsByThread.get(selectedConversation.threadKey);
+    const spaceId = own?.has(space.id) ? space.id : LOCAL_SPACE;
+    const byKey = new Map(conversations.map((c) => [c.threadKey, c]));
+    return findRelatedThreads({
+      selected: selectedConversation,
+      conversations,
+      vectorOf: (threadKey) => vectorsByThread.get(threadKey)?.get(spaceId),
+      threshold: spaceId === space.id ? space.relatedThreshold : 0.3,
+      limit: 8,
+      isCodingProvider: (provider) => providerCategory(provider) === 'coding_agent',
+    }).flatMap((r) => {
+      const conv = byKey.get(r.threadKey);
+      return conv ? [{ conv, similarity: r.similarity ?? 0, reason: r.reason }] : [];
+    });
+  }, [selectedConversation, vectorsByThread, conversations, settings]);
+
+  const providerOptions = useMemo(
+    () => PROVIDER_IDS.filter((id) => (counts?.providerCounts[id] ?? 0) > 0 || id === providerFilter),
+    [counts, providerFilter]
+  );
+
+  const aiReady = settings ? hasClaudeKey(settings) : false;
+
+  // ---- One-time background work when the library opens ----
+  useEffect(() => {
+    if (!settings || backfillStartedRef.current || !handshakeAuthorizedRef.current) return;
+    backfillStartedRef.current = true;
+    void (async () => {
+      // Threads captured before automatic analysis existed (or by an older version) get organized now.
+      const localKeys = new Set(insightRows.filter((i) => i.source === 'local').map((i) => i.threadKey));
+      const missing = conversations.filter((c) => !c.isSyntheticBenchmark && !localKeys.has(c.threadKey)).map((c) => c.threadKey);
+      if (missing.length > 0) {
+        setBusy(`Organizing ${missing.length} thread(s)…`);
+        const r = await processThreadsLocally(sharedDb, missing, {
+          aiDelaySeconds: 5,
+          onProgress: (done, total) => setBusy(`Organizing ${done}/${total} threads…`),
+        });
+        setBusy(null);
+        dockSyncNow(missing);
+        setStatusAnnouncement(`Organized ${r.analyzed} threads (${r.filed} filed automatically).`);
+        notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+        await reloadAll(selectedKeyRef.current);
+      }
+      if (surface !== 'overlay') {
+        try {
+          const report = await syncSavedFolders(settings, { interactive: false });
+          if (report && report.imported > 0) {
+            setStatusAnnouncement(describeReport(report));
+            await reloadAll(selectedKeyRef.current);
+          }
+        } catch {
+          // folder permission not granted this session; the Import dialog offers "Sync now"
+        }
+      }
+    })();
+  }, [settings, conversations, insightRows]);
+
+  // ---- Side panel: follow the conversation open in the active tab ----
+  useEffect(() => {
+    if (surface === 'overlay' || typeof chrome === 'undefined' || !chrome.tabs?.query) return;
+    const update = async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        const url = tab?.url ?? '';
+        const provider = detectProviderFromUrl(url);
+        const convId = extractConversationIdFromUrl(url);
+        if (!provider || !convId) {
+          setActiveTabThreadKey(null);
+          return;
+        }
+        const match = (await sharedDb.conversations.where('sourceConversationId').equals(convId).toArray()).find(
+          (c) => c.provider === provider && c.branchId === 'main'
+        );
+        setActiveTabThreadKey(match?.threadKey ?? null);
+      } catch {
+        setActiveTabThreadKey(null);
+      }
+    };
+    void update();
+    const onActivated = () => void update();
+    const onUpdated = (_id: number, info: { url?: string; status?: string }) => {
+      if (info.url || info.status === 'complete') void update();
+    };
+    chrome.tabs.onActivated?.addListener(onActivated);
+    chrome.tabs.onUpdated?.addListener(onUpdated);
+    return () => {
+      chrome.tabs.onActivated?.removeListener(onActivated);
+      chrome.tabs.onUpdated?.removeListener(onUpdated);
+    };
+  }, [surface, conversations.length]);
+
+  // ---- Handlers ----
+  const handleSelectThread = (threadKey: string) => {
+    selectedKeyRef.current = threadKey;
+    setSelectedThreadKey(threadKey);
+    setMobileDetailVisible(true);
+    void persistSettingPatch({ lastSelectedThreadKey: threadKey });
+  };
+
+  /** Check or uncheck a row; shift extends from the last row checked. Never changes the opened thread. */
+  const handleToggleChecked = (threadKey: string, checked: boolean, extendRange: boolean) => {
+    const anchor = extendRange ? checkAnchorRef.current : null;
+    setCheckedKeys((prev) => selectRange(viewKeys, prev, anchor, threadKey, checked));
+    checkAnchorRef.current = threadKey;
+  };
+
+  const handleBulkChanged = async (message: string, deletedKeys: readonly string[]) => {
+    const deleted = new Set(deletedKeys);
+    if (deleted.size > 0) setCheckedKeys((prev) => new Set(Array.from(prev).filter((k) => !deleted.has(k))));
+    const opened = selectedKeyRef.current;
+    await reloadAll(opened !== null && deleted.has(opened) ? null : opened);
+    setStatusAnnouncement(message);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    void persistSettingPatch({ lastSearchQuery: val });
+  };
+
+  const handleAreaSelect = (area: string) => {
+    setActiveArea(area);
+    setActiveQueue('all');
+    setMobileDrawerOpen(false);
+    void persistSettingPatch({ lastActiveArea: area, lastActiveQueue: 'all' });
+  };
+
+  const handleQueueSelect = (queue: ResurfaceQueue) => {
+    setActiveQueue(queue);
+    setActiveArea('All threads');
+    setMobileDrawerOpen(false);
+    void persistSettingPatch({ lastActiveQueue: queue, lastActiveArea: 'All threads' });
+  };
+
+  const actions = useThreadActions({
+    authorized,
+    selectedConversation,
+    titleDraft,
+    notesDraft,
+    tagInputDraft,
+    handshakeToken,
+    selectedKeyRef,
+    reloadAll,
+    onAnnounce: setStatusAnnouncement,
+    onProjectCreated: () => setNewProjectDraft(null),
+  });
+
+  // ---- Still (Sidebar Dock) ----
+  const localOnlyProjects = useMemo(() => new Set(collections.filter((c) => c.cloudExcluded).map((c) => c.name)), [collections]);
+  const mayShare = (conv: ConversationRecord) => (settings ? isRemoteAllowed(conv, settings, localOnlyProjects) : false);
+
+  const openSettingsAt = (section: SectionId) => {
+    setSettingsSection(section);
+    openModal(settingsDialogRef);
+  };
+
+  /** Every "Send to Still…" except the bulk bar: a picker dialog for these threads. */
+  const openSendToStill = (threadKeys: string[], label: string) => {
+    if (!authorized()) return;
+    if (!stillPaired) {
+      openSettingsAt('sidebarDock');
+      return;
+    }
+    const keys = Array.from(new Set(threadKeys)).slice(0, 500);
+    if (keys.length === 0) return;
+    setSendStillRequest({ threadKeys: keys, label });
+    openModal(sendStillDialogRef);
+  };
+
+  const copyText = (text: string, label: string) => {
+    void navigator.clipboard?.writeText(text);
+    setStatusAnnouncement(`${label} copied to clipboard.`);
+  };
+
+  const lastInnerModalCloseAtRef = useRef<number>(0);
+
+  // The thread whose real page the detail pane shows (Live or Split), when it has one.
+  const liveConversation =
+    isPage && view === 'threads' && detailMode !== 'summary' && selectedConversation && embedTargetFor(selectedConversation.canonicalUrl)
+      ? selectedConversation
+      : null;
+  const openThreadTab = workspace.openThread;
+  useEffect(() => {
+    // Showing a thread live needs its session tab; opening it here never changes the Browse tab.
+    if (liveConversation) openThreadTab(liveConversation, { activate: false });
+    setLiveThreadKey(liveConversation?.threadKey ?? null);
+  }, [liveConversation?.threadKey, openThreadTab]);
+
+  const conversationByKey = useMemo(() => new Map(conversations.map((c) => [c.threadKey, c])), [conversations]);
+
+  const setView = useCallback(
+    (next: WorkspaceView) => {
+      setMobileDrawerOpen(false);
+      void persistSettingPatch({ activeView: next });
+    },
+    [persistSettingPatch]
+  );
+  const setDetailMode = useCallback(
+    (mode: DetailMode) => {
+      if (DETAIL_MODES.includes(mode)) void persistSettingPatch({ detailMode: mode });
+    },
+    [persistSettingPatch]
+  );
+
+  const openInChromeTab = useCallback((url: string) => {
+    if (!/^https?:\/\//i.test(url)) return;
+    if (typeof chrome !== 'undefined' && chrome.tabs?.create) void chrome.tabs.create({ url }).catch(() => undefined);
+    else window.open(url, '_blank', 'noopener');
+  }, []);
+
+  const openSession = (conv: ConversationRecord, where?: WorkspaceView) => {
+    const target = where ?? view;
+    if (where && where !== view) setView(where);
+    if (target === 'threads') {
+      handleSelectThread(conv.threadKey);
+      return;
+    }
+    const opened = workspace.openThread(conv, { activate: target === 'browse' });
+    if (!opened.ok) {
+      // No web page to show (a terminal session, an import): its summary is in Threads.
+      setStatusAnnouncement(opened.message);
+      handleSelectThread(conv.threadKey);
+      setView('threads');
+      return;
+    }
+    if (target === 'dashboard') {
+      workspace.dispatch({ type: 'dashboard_pane', index: workspace.state.dashboard.focusedPane, threadKey: conv.threadKey });
+    }
+  };
+
+  const togglePinned = async (conv: ConversationRecord) => {
+    if (!authorized()) return;
+    await updateManualThreadFields(sharedDb, conv.threadKey, { pinned: !conv.pinned });
+    if (conv.pinned) workspace.dispatch({ type: 'dashboard_unpin', threadKey: conv.threadKey });
+    dockSyncNow([conv.threadKey]);
+    await reloadAll(selectedKeyRef.current);
+    setStatusAnnouncement(conv.pinned ? 'Unpinned from the dashboard.' : 'Pinned to the dashboard.');
+  };
+
+  const workspaceContext: WorkspaceContextValue = {
+    surface,
+    workspace,
+    settings,
+    patchSettings: persistSettingPatch,
+    view,
+    setView,
+    detailMode,
+    setDetailMode,
+    conversations,
+    conversationByKey,
+    insightsByThread,
+    summariesByThread,
+    selectedThreadKey: selectedConversation?.threadKey ?? null,
+    accountOfThread,
+    openSession,
+    togglePinned,
+    openInChromeTab,
+    requestAddAccount: (realmId) => {
+      setAddAccountRealm(realmId ?? null);
+      openModal(addAccountDialogRef);
+    },
+    openSettings: (section) => {
+      if (section) openSettingsAt(section);
+      else openModal(settingsDialogRef);
+    },
+    announce: setStatusAnnouncement,
+  };
+
+  const handleCloseOverlay = () => {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({ type: 'CLOSE_THREADKEEPER_OVERLAY', handshakeToken });
+      } catch {
+        // ignore if extension context invalidated
+      }
+    }
+  };
+
+  useWorkbenchKeyboard({
+    surface,
+    handshakeToken,
+    dialogRefs: [addAccountDialogRef, organizeDialogRef, importDialogRef, settingsDialogRef, bulkDeleteDialogRef, sendStillDialogRef],
+    lastInnerModalCloseAtRef,
+    listHits,
+    selectedThreadKey: selectedConversation?.threadKey,
+    checkedCount: checkedKeys.size,
+    searchInputRef,
+    selectAllRef,
+    rowRefs,
+    onFocusSearch: () => setListMode('search'),
+    onSelectThread: handleSelectThread,
+    onClearChecked: () => {
+      setCheckedKeys(new Set());
+      setStatusAnnouncement('Selection cleared.');
+    },
+    onCloseOverlay: handleCloseOverlay,
+    listShortcuts: view === 'threads',
+  });
+
+  const handleOpenFullPage = () => {
+    const params = new URLSearchParams({ surface: 'page' });
+    if (selectedConversation) params.set('threadKey', selectedConversation.threadKey);
+    if (searchQuery) params.set('q', searchQuery);
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: 'OPEN_FULL_PAGE_MANAGER',
+        threadKey: selectedConversation?.threadKey ?? null,
+        query: searchQuery,
+        handshakeToken,
+      });
+    } else {
+      window.open(`manager.html?${params.toString()}`, '_blank');
+    }
+  };
+
+  const { analysis, analyzingThread, startAnalysis, analyzeSelected, stopAnalysis } = useAnalysisRunner({
+    authorized,
+    settings,
+    aiReady,
+    selectedConversation,
+    selectedKeyRef,
+    reloadAll,
+    persistSettingPatch,
+    onAnnounce: setStatusAnnouncement,
+    onOpenSettings: () => openModal(settingsDialogRef),
+  });
+
+  const organize = useOrganize({
+    dialogRef: organizeDialogRef,
+    authorized,
+    settings,
+    conversations,
+    collections,
+    insightsByThread,
+    changeLogs,
+    aiReady,
+    selectedKeyRef,
+    reloadAll,
+    startAnalysis,
+    onAnnounce: setStatusAnnouncement,
+  });
+
+  const handleRebuildVectors = () => {
+    void (async () => {
+      setBusy('Rebuilding vectors…');
+      const keys = conversations.filter((c) => !c.isSyntheticBenchmark).map((c) => c.threadKey);
+      await processThreadsLocally(sharedDb, keys, { force: true, aiDelaySeconds: 0 });
+      dockSyncNow(keys, { privacy: true });
+      const queued = await enqueueLibraryAnalysis(sharedDb, { onlyMissing: false });
+      setBusy(null);
+      await reloadAll(selectedKeyRef.current);
+      setStatusAnnouncement(`Rebuilt on-device vectors; ${queued} thread(s) queued for hosted embeddings / analysis.`);
+      if (queued > 0) void startAnalysis();
+    })();
+  };
+
+  const evidenceView: EvidenceView = {
+    activeEvidenceId,
+    conversation: selectedConversation,
+    messages: selectedMessages,
+    onToggle: (evidenceId) => setActiveEvidenceId((prev) => (prev === evidenceId ? null : evidenceId)),
+  };
+
+  const latestUndoableLog = changeLogs.find((c) => !c.undone);
+
+  if (surface === 'overlay' && overlayHandshakeState !== 'authorized') {
+    if (overlayHandshakeState === 'rejected') {
+      return (
+        <div className="tk-workbench" data-surface="overlay" data-testid="overlay-handshake-rejected" role="alert" style={{ padding: 24 }}>
+          <strong>Unauthorized overlay frame rejected</strong>
+          <p style={{ marginTop: 8 }}>{overlayHandshakeError}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="tk-workbench" data-surface="overlay" data-testid="overlay-handshake-pending" aria-busy="true" style={{ padding: 24 }}>
+        Verifying overlay handshake…
+      </div>
+    );
+  }
+
+  const isCompact = surface === 'sidepanel';
+  const activeTabConversation = activeTabThreadKey
+    ? conversations.find((c) => c.threadKey === activeTabThreadKey) ?? null
+    : null;
+
+  const headerBar = (
+    <HeaderBar
+      surface={surface}
+      isCompact={isCompact}
+      settings={settings}
+      effectiveTheme={effectiveTheme}
+      counts={counts}
+      busy={busy}
+      analysis={analysis}
+      pendingAnalysis={pendingAnalysis}
+      aiReady={aiReady}
+      undoable={latestUndoableLog}
+      onToggleNav={() => {
+        if (window.innerWidth <= 760) setMobileDrawerOpen((v) => !v);
+        else void persistSettingPatch({ sidebarCollapsed: !settings?.sidebarCollapsed });
+      }}
+      onUndo={organize.undoLast}
+      onAutoOrganize={organize.autoOrganize}
+      onOpenOrganize={organize.openOrganize}
+      onOpenImport={() => openModal(importDialogRef)}
+      onOpenSettings={() => openModal(settingsDialogRef)}
+      onPatchSettings={persistSettingPatch}
+      onOpenFullPage={handleOpenFullPage}
+      onCloseOverlay={handleCloseOverlay}
+      onRunAnalysis={() => startAnalysis()}
+      onStopAnalysis={stopAnalysis}
+    />
+  );
+
+  const navRail = (
+    <NavRail
+      // On the full page the workspace rail holds this navigation and collapses as a whole.
+      collapsed={!isPage && Boolean(settings?.sidebarCollapsed)}
+      drawerOpen={!isPage && mobileDrawerOpen}
+      activeArea={activeArea}
+      activeQueue={activeQueue}
+      counts={counts}
+      projectNames={projectNames}
+      collectionByName={collectionByName}
+      conversations={conversations}
+      summariesByThread={summariesByThread}
+      newProjectDraft={newProjectDraft}
+      onNewProjectDraftChange={setNewProjectDraft}
+      onCreateProject={actions.createProject}
+      onAreaSelect={handleAreaSelect}
+      onQueueSelect={handleQueueSelect}
+      repositoryFilter={repositoryFilter}
+      onRepositorySelect={isPage ? setRepositoryFilter : undefined}
+    />
+  );
+
+  const listPane = (
+    <ListPane
+      repositoryFilter={repositoryFilter}
+      accountFilter={accountFilter}
+      runFilter={runFilter}
+      onRepositoryFilterChange={setRepositoryFilter}
+      onAccountFilterChange={setAccountFilter}
+      onRunFilterChange={setRunFilter}
+      settings={settings}
+      conversations={conversations}
+      insightsByThread={insightsByThread}
+      summariesByThread={summariesByThread}
+      messagesByThread={messagesByThread}
+      vectorsByThread={vectorsByThread}
+      searchIndex={searchIndex}
+      collectionByName={collectionByName}
+      projectNames={projectNames}
+      providerOptions={providerOptions}
+      listHits={listHits}
+      kanbanColumns={kanbanColumns}
+      cardGroups={cardGroups}
+      viewKeys={viewKeys}
+      queueItemsMap={queueItemsMap}
+      selectedThreadKey={selectedConversation?.threadKey ?? null}
+      activeTabConversation={activeTabConversation}
+      listMode={listMode}
+      searchQuery={searchQuery}
+      rerankNote={rerankNote}
+      providerFilter={providerFilter}
+      kindFilter={kindFilter}
+      stateFilter={stateFilter}
+      coverageFilter={coverageFilter}
+      sortMode={sortMode}
+      checkedKeys={checkedKeys}
+      isCompact={isCompact}
+      stillPaired={stillPaired}
+      searchInputRef={searchInputRef}
+      selectAllRef={selectAllRef}
+      bulkDeleteDialogRef={bulkDeleteDialogRef}
+      onListModeChange={setListMode}
+      onSearchChange={handleSearchChange}
+      onSearchSubmit={handleSearchSubmit}
+      onProviderFilterChange={setProviderFilter}
+      onKindFilterChange={setKindFilter}
+      onStateFilterChange={setStateFilter}
+      onCoverageFilterChange={setCoverageFilter}
+      onSortModeChange={setSortMode}
+      onPatchSettings={persistSettingPatch}
+      onSelectThread={handleSelectThread}
+      onToggleChecked={handleToggleChecked}
+      onSelectionChange={setCheckedKeys}
+      onBulkChanged={handleBulkChanged}
+      onBulkDialogClosed={() => {
+        lastInnerModalCloseAtRef.current = Date.now();
+      }}
+      onAnnounce={setStatusAnnouncement}
+      onSendToStill={openSendToStill}
+      onOpenSettings={() => openModal(settingsDialogRef)}
+      onOpenImport={() => openModal(importDialogRef)}
+      canEdit={authorized}
+      registerRow={(threadKey, el) => {
+        rowRefs.current.set(threadKey, el);
+      }}
+    />
+  );
+
+  const detailPane = (
+    <DetailPane
+      conversation={selectedConversation}
+      insight={selectedInsight}
+      summary={selectedSummary}
+      messages={selectedMessages}
+      relationships={selectedRelationships}
+      semanticNeighbors={semanticNeighbors}
+      conversations={conversations}
+      insightsByThread={insightsByThread}
+      projectNames={projectNames}
+      evidence={evidenceView}
+      aiReady={aiReady}
+      analyzing={selectedConversation !== null && analyzingThread === selectedConversation.threadKey}
+      cloudEnabled={Boolean(settings?.cloudEnabled)}
+      stillPaired={stillPaired}
+      stillLastPushAt={dock.state?.lastPushAt}
+      mayShare={mayShare}
+      mobileDetailVisible={mobileDetailVisible}
+      titleDraft={titleDraft}
+      tagInputDraft={tagInputDraft}
+      notesDraft={notesDraft}
+      showAllMessages={showAllMessages}
+      onTitleDraftChange={setTitleDraft}
+      onTagInputDraftChange={setTagInputDraft}
+      onNotesDraftChange={setNotesDraft}
+      onShowAllMessages={() => setShowAllMessages(true)}
+      onBackToList={() => {
+        setMobileDetailVisible(false);
+        if (selectedConversation) rowRefs.current.get(selectedConversation.threadKey)?.focus();
+      }}
+      onSelectThread={handleSelectThread}
+      onProjectChange={actions.changeProject}
+      onToggleLock={actions.toggleLock}
+      onWorkflowStateChange={actions.changeWorkflowState}
+      onOpenOriginal={actions.openOriginal}
+      onCopy={copyText}
+      onSendToStill={openSendToStill}
+      onDelete={actions.deleteSelected}
+      onAnalyze={analyzeSelected}
+      onSetCloudExcluded={actions.setCloudExcluded}
+      onEnrich={actions.enrich}
+      onSaveManualEdits={actions.saveManualEdits}
+    />
+  );
+
+  return (
+    <WorkspaceProvider value={workspaceContext}>
+      <div className="tk-workbench" data-surface={surface} data-view={isPage ? view : undefined}>
+        {surface === 'page' && (
+          <a href="#tk-main-list" className="tk-skip-link">
+            Skip to conversation list
+          </a>
+        )}
+
+        <div role="status" aria-live="polite" className="tk-visually-hidden">
+          {statusAnnouncement}
+        </div>
+
+        {isPage ? (
+          // The full page is the workspace: a rail and three views over the same sessions. Every
+          // view stays mounted so its state survives a switch, and the embedded pages live in
+          // the stage, outside the views, so no switch ever reloads one.
+          <FrameStage workspace={workspace}>
+            <div className="tk-shell" data-rail-collapsed={Boolean(settings?.sidebarCollapsed)} data-view={view}>
+              <Rail
+                collapsed={Boolean(settings?.sidebarCollapsed)}
+                drawerOpen={mobileDrawerOpen}
+                view={view}
+                effectiveTheme={effectiveTheme}
+                onViewChange={setView}
+                onToggleCollapsed={() => void persistSettingPatch({ sidebarCollapsed: !settings?.sidebarCollapsed })}
+                onCloseDrawer={() => setMobileDrawerOpen(false)}
+                onToggleTheme={() => void persistSettingPatch({ theme: effectiveTheme === 'dark' ? 'light' : 'dark' })}
+                onOpenSettings={workspaceContext.openSettings}
+              >
+                {view === 'threads' && navRail}
+              </Rail>
+              <div className="tk-main">
+                <StaleBuildBanner snapshot={diagnostics.snapshot} />
+                <RestoreOfferBanner threads={counts ? counts.totalThreads : null} />
+                <section className="tk-view tk-view-browse" aria-label="Browse" hidden={view !== 'browse'}>
+                  <BrowseView />
+                </section>
+                <section className="tk-view tk-view-threads" aria-label="Threads" hidden={view !== 'threads'}>
+                  {headerBar}
+                  <div className="tk-columns" data-detail-mode={detailMode}>
+                    {listPane}
+                    {detailPane}
+                  </div>
+                </section>
+                <section className="tk-view tk-view-dashboard" aria-label="Dashboard" hidden={view !== 'dashboard'}>
+                  <DashboardView />
+                </section>
+              </div>
+            </div>
+          </FrameStage>
+        ) : (
+          <>
+            {headerBar}
+
+            <StaleBuildBanner snapshot={diagnostics.snapshot} />
+
+            <div className="tk-columns" data-nav-collapsed={Boolean(settings?.sidebarCollapsed)}>
+              {navRail}
+              {listPane}
+              {detailPane}
+            </div>
+          </>
+        )}
+
+        <OrganizeDialog
+          dialogRef={organizeDialogRef}
+          instruction={organize.instruction}
+          proposals={organize.proposals}
+          notes={organize.notes}
+          busy={organize.busy}
+          deselected={organize.deselected}
+          aiReady={aiReady}
+          onInstructionChange={organize.changeInstruction}
+          onPreview={organize.previewKeywords}
+          onPlanWithClaude={() => organize.planOrganize(true)}
+          onToggleProposal={organize.toggleProposal}
+          onApply={organize.applyProposals}
+          onClosed={() => {
+            lastInnerModalCloseAtRef.current = Date.now();
+          }}
+        />
+
+        <ImportDialog
+          dialogRef={importDialogRef}
+          settings={settings}
+          onImported={async (message) => {
+            setStatusAnnouncement(message);
+            notifyBackground({ type: 'RUN_ANALYSIS_NOW' });
+            const before = new Set(conversations.map((c) => c.threadKey));
+            const after = (await sharedDb.conversations.toCollection().primaryKeys()) as string[];
+            dockSyncNow(after.filter((k) => !before.has(k)));
+            await reloadAll(selectedKeyRef.current);
+          }}
+          onOpenThread={(threadKey) => {
+            importDialogRef.current?.close();
+            handleSelectThread(threadKey);
+          }}
+          onClosed={() => {
+            lastInnerModalCloseAtRef.current = Date.now();
+          }}
+        />
+
+        <SettingsDialog
+          dialogRef={settingsDialogRef}
+          settings={settings}
+          threadCount={counts?.totalThreads ?? 0}
+          collections={collections}
+          projectCounts={counts?.projectCounts ?? {}}
+          onCollectionsChanged={() => {
+            notifyBackground({ type: 'SETTINGS_CHANGED' });
+            void reloadAll(selectedKeyRef.current);
+          }}
+          onPatch={persistSettingPatch}
+          onRebuildVectors={handleRebuildVectors}
+          dock={dock}
+          initialSection={settingsSection}
+          onClosed={() => {
+            lastInnerModalCloseAtRef.current = Date.now();
+            setSettingsSection(null);
+            void reloadAll(selectedKeyRef.current);
+          }}
+        />
+
+        <SendToStillDialog
+          dialogRef={sendStillDialogRef}
+          request={sendStillRequest}
+          onDone={setStatusAnnouncement}
+          onClosed={() => {
+            lastInnerModalCloseAtRef.current = Date.now();
+            setSendStillRequest(null);
+            void dock.refresh();
+          }}
+        />
+
+        {isPage && (
+          <AddAccountDialog
+            dialogRef={addAccountDialogRef}
+            realmId={addAccountRealm}
+            onClosed={() => {
+              lastInnerModalCloseAtRef.current = Date.now();
+              setAddAccountRealm(null);
+            }}
+          />
+        )}
+      </div>
+    </WorkspaceProvider>
+  );
+}
