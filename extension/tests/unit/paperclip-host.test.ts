@@ -32,9 +32,9 @@ describe('Paperclip frame host', () => {
 
   it('bounds the narrow post-overlay Threads activation message to the frame viewport', () => {
     const source = {};
-    const parse = (body: object) => parsePaperclipHostMessage({ source, origin: 'http://localhost:3100', data: { source: 'paperclip-ui', v: 1, type: 'slot-activate', view: 'threads', x: 250, y: 100, ...body } }, source, 'http://localhost:3100', { width: 1024, height: 768 });
-    expect(parse({})).toEqual({ type: 'slot-activate', view: 'threads', x: 250, y: 100 });
-    for (const body of [{ view: 'browse' }, { x: -1 }, { x: 1024 }, { y: 768 }, { y: Infinity }, { x: '250' }]) expect(parse(body)).toBeNull();
+    const parse = (body: object) => parsePaperclipHostMessage({ source, origin: 'http://localhost:3100', data: { source: 'paperclip-ui', v: 1, type: 'slot-activate', view: 'threads', x: 250, y: 100, sequence: 1, ...body } }, source, 'http://localhost:3100', { width: 1024, height: 768 });
+    expect(parse({})).toEqual({ type: 'slot-activate', view: 'threads', x: 250, y: 100, sequence: 1 });
+    for (const body of [{ view: 'browse' }, { x: -1 }, { x: 1024 }, { y: 768 }, { y: Infinity }, { x: '250' }, { sequence: 0 }, { sequence: -1 }, { sequence: 1.5 }, { sequence: '1' }, { sequence: Number.MAX_SAFE_INTEGER + 1 }, { sequence: undefined }]) expect(parse(body)).toBeNull();
   });
 
   it('reads the announced mode from ready and treats anything else as switching', () => {

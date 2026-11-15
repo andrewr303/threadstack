@@ -88,7 +88,7 @@ describe("Threadkeeper fused mode (REQ-6)", () => {
     expect(host.reportSlotActivation?.(activation)).toBe(false);
     host.reportSlot({ view: "threads", rect: { x: 240, y: 48, width: 800, height: 600 }, scheme: "light" });
     expect(host.reportSlotActivation?.(activation)).toBe(true);
-    expect(postMessage).toHaveBeenLastCalledWith({ source: "paperclip-ui", v: 1, type: "slot-activate", ...activation }, origin);
+    expect(postMessage).toHaveBeenLastCalledWith({ source: "paperclip-ui", v: 1, type: "slot-activate", ...activation, sequence: 1 }, origin);
     for (const invalid of [{ ...activation, x: 239 }, { ...activation, y: 648 }, { ...activation, x: NaN }, { ...activation, y: Infinity }, { ...activation, view: "browse" }]) {
       expect(host.reportSlotActivation?.(invalid as typeof activation)).toBe(false);
     }
@@ -96,6 +96,30 @@ describe("Threadkeeper fused mode (REQ-6)", () => {
     expect(host.reportSlotActivation?.(activation)).toBe(false);
     host.disconnect();
     expect(host.reportSlotActivation?.(activation)).toBe(false);
+  });
+
+  it("assigns monotonic gesture sequences itself and does not consume numbers for rejected input", () => {
+    const { host, postMessage, send } = connect({ fusedAvailable: () => true });
+    const activation = { view: "threads" as const, x: 300, y: 100, sequence: 9000 };
+    const slot = { view: "threads" as const, rect: { x: 240, y: 48, width: 800, height: 600 }, scheme: "light" as const };
+    expect(host.reportSlotActivation(activation)).toBe(false);
+    send({ type: "hello" }); host.reportSlot(slot);
+    expect(host.reportSlotActivation(activation)).toBe(true);
+    expect(host.reportSlotActivation({ ...activation, x: NaN })).toBe(false);
+    expect(host.reportSlotActivation({ ...activation, x: 2000 })).toBe(false);
+    expect(host.reportSlotActivation({ ...activation, x: 400 })).toBe(true);
+    send({ type: "hello" });
+    expect(host.reportSlotActivation(activation)).toBe(false); // a fresh ready needs its own slot
+    host.reportSlot(slot);
+    expect(host.reportSlotActivation(activation)).toBe(true);
+    host.disconnect();
+    expect(host.reportSlotActivation(activation)).toBe(false);
+    send({ type: "hello" }); host.reportSlot(slot);
+    expect(host.reportSlotActivation(activation)).toBe(true);
+    const packets = postMessage.mock.calls.map(([packet]) => packet).filter(packet => packet.type === "slot-activate");
+    expect(packets).toEqual([300, 400, 300, 300].map((x, index) => ({
+      source: "paperclip-ui", v: 1, type: "slot-activate", view: "threads", x, y: 100, sequence: index + 1,
+    })));
   });
 
   it("refuses slot activation while switching, after availability loss and on other plugin views", () => {

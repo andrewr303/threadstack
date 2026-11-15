@@ -8,7 +8,7 @@ export type PaperclipHostMessage =
   | { type: 'open-session'; threadKey: string }
   | { type: 'open-link'; url: string }
   /** A native click Chromium sent to the just-closed frame instead of the visible Threads list. */
-  | { type: 'slot-activate'; view: 'threads'; x: number; y: number }
+  | { type: 'slot-activate'; view: 'threads'; x: number; y: number; sequence: number }
   /** REQ-6 fused mode: the page's content rectangle, in the Paperclip frame's own viewport. */
   | { type: 'slot'; view: FusedView | null; rect: PaperclipRect | null; scheme: 'light' | 'dark' }
   /** `open` counts blocking overlays; `regions` are notices to cut out of the view. */
@@ -54,10 +54,11 @@ export function parsePaperclipHostMessage(
   if (message.type === 'ready') return { type: 'ready', mode: message.mode === 'fused' ? 'fused' : 'switching' };
   if (message.type === 'disconnected') return { type: 'disconnected' };
   if (message.type === 'slot-activate') {
-    const { x, y } = message;
+    const { x, y, sequence } = message;
     return message.view === 'threads' && typeof x === 'number' && Number.isFinite(x)
       && typeof y === 'number' && Number.isFinite(y) && x >= 0 && y >= 0 && x < bounds.width && y < bounds.height
-      ? { type: 'slot-activate', view: 'threads', x, y } : null;
+      && typeof sequence === 'number' && Number.isSafeInteger(sequence) && sequence > 0
+      ? { type: 'slot-activate', view: 'threads', x, y, sequence } : null;
   }
   if (message.type === 'route') {
     const path = paperclipPath(message.path);
