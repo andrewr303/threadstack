@@ -1,0 +1,15 @@
+{
+  "requestedAt": "2026-11-15T09:41:55.195813+00:00",
+  "serverPid": 71394,
+  "launcherPid": 71226,
+  "launchSession": 83596,
+  "scope": "Only owned3217/55487 source-server fixture and isolated tk-auth-ingress profiles.",
+  "stoppedAt": "2026-11-15T09:41:55.601802+00:00",
+  "closedPorts": [
+    3217,
+    55487
+  ],
+  "profilesClosedByRunner": true,
+  "additionalWatcherStarted": false,
+  "ownedBrowserProcessesRemaining": []
+}

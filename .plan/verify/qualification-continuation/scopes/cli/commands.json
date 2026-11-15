@@ -1,0 +1,210 @@
+[
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "paperclipai",
+      "cli/src/__tests__/doctor.test.ts",
+      "--maxWorkers=1"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:10:21.238872+00:00",
+    "status": "completed",
+    "exitCode": 0,
+    "finishedAt": "2026-11-15T08:10:23.603561+00:00"
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "paperclipai",
+      "cli/src/__tests__/worktree.test.ts",
+      "cli/src/__tests__/company-import-export-e2e.test.ts",
+      "cli/src/__tests__/doctor.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:12:38.178252+00:00",
+    "status": "completed",
+    "exitCode": 1,
+    "finishedAt": "2026-11-15T08:13:13.367071+00:00"
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "paperclipai",
+      "cli/src/__tests__/worktree.test.ts",
+      "cli/src/__tests__/company-import-export-e2e.test.ts",
+      "cli/src/__tests__/doctor.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:15:35.605824+00:00",
+    "status": "completed",
+    "exitCode": 1,
+    "finishedAt": "2026-11-15T08:16:26.966086+00:00"
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "paperclipai",
+      "cli/src/__tests__/company-import-export-e2e.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:17:46.042036+00:00",
+    "status": "completed",
+    "exitCode": 0,
+    "finishedAt": "2026-11-15T08:18:26.058679+00:00"
+  },
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "paperclipai",
+      "typecheck"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:18:14.655731+00:00",
+    "status": "completed",
+    "exitCode": 0,
+    "finishedAt": "2026-11-15T08:18:17.575565+00:00"
+  }
+]

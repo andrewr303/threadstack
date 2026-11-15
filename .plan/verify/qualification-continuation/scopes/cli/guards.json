@@ -1,0 +1,29 @@
+{
+  "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+  "sandboxProfileSha256": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945",
+  "cleanEnvironmentWrapper": "/tmp/tk-continue/runtime/run-qualification.py",
+  "wrapperSha256": "8a6309858e165d934ff20205d624e023ad9739415e6498ac5fd4e4449e372c65",
+  "testsRunOutsideCredentialDenySandbox": false,
+  "ownPidOnlyOrdinaryControl": true,
+  "productionSourceEdits": false,
+  "fixtureReview": {
+    "worktree": "All exercised repos/configs/database snapshots, archives, signing keys and worktree homes are created by mkdtemp or explicit test paths; no provider generation or helper install calls. Original cwd/env restored by test hooks.",
+    "company": "Separate temp Paperclip shell home/context/auth store/storage/secrets, embedded test DB, loopback-only server PID readback, owned child cleanup. Provider command now fixture refusing executable, all heartbeat/wake-on-demand disabled for owned agent and afterAll asserts refusing command was never invoked.",
+    "doctor": "Real repair checks use temp config/runtime files, managed-install metadata resolver points at temp fixture, external service detection stubbed, npm update disabled, fetch forbidden and asserted unused; fixture removed after test."
+  },
+  "processIdentityRuntime": {
+    "source": "/bin/ps",
+    "copy": "/tmp/tk-continue/tools/bin/ps",
+    "sourceSha256": "d0e7b30250a9b1bd2afd1d6462a10d8a2d10ca448d9ce76be067db8a9bf459e0",
+    "copySha256": "16b3b7d1b430a5545eee997b2e4db4e83e8dcc8a88e8a6788b6084e316afb517",
+    "executableTextSha256": "bf39854c0171aadf5dd094b94debac4c6311eccd586e547ad833f16bd099e1b2",
+    "executableTextIdentical": true,
+    "sourceMode": "0o4755",
+    "copyMode": "0o755",
+    "copySignature": "ad-hoc without a signing identity or private key",
+    "sourceUnchanged": true,
+    "scope": "task-local own-process identity inspection inside unchanged credential-denying sandbox"
+  },
+  "noActualOperatorCredentialReads": true,
+  "noProvidersOrHelperServiceOperations": true
+}

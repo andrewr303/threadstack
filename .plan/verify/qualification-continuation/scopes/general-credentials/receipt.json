@@ -1,0 +1,63 @@
+{
+  "head": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "sourceHashes": {
+    "server/src/services/native-runtime/native-session-executor.test.ts": "d0ce9c44e93e89dbc15880be901e2e4c2324236b3eec12b0a166223c90759ffa",
+    "server/src/services/explicit-native-continuation.test.ts": "2a4110602d7e6675123962612768278cb742116dbfbef54a8e4123aec0ed4a61",
+    "server/src/__tests__/ai-connections.test.ts": "0b7f9ae80027ad1381ca4af9b6f1c5d7c3d45e39e570ecbefd310ef3d715cb99"
+  },
+  "matchesTaskBaseline": {
+    "server/src/services/native-runtime/native-session-executor.test.ts": true,
+    "server/src/services/explicit-native-continuation.test.ts": true,
+    "server/src/__tests__/ai-connections.test.ts": false
+  },
+  "aiConnections": {
+    "red": {
+      "failed": 48,
+      "passed": 113,
+      "unhandledRejections": 4,
+      "exitCode": 1,
+      "log": "general-ai-connections-red.log"
+    },
+    "green": {
+      "passed": 162,
+      "exitCode": 0,
+      "log": "general-ai-connections-green.log"
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "log": "general-ai-connections-types.log",
+      "config": "tsconfig.json"
+    }
+  },
+  "unchangedNativeSuites": {
+    "targeted": {
+      "passed": 20,
+      "exitCode": 0,
+      "log": "general-native-red.log",
+      "note": "red-labelled attempted reproduction was GREEN; no failing claim"
+    },
+    "full": {
+      "passed": 1922,
+      "existingSkipped": 7,
+      "declaredTests": 1929,
+      "exitCode": 0,
+      "log": "general-native-full-recheck.log"
+    },
+    "skipReason": "Existing describe.skipIf(!existsSync(\"/proc/self/cmdline\")) remote runner launch stale-state holder cases; no skip edits"
+  },
+  "combined": {
+    "passed": 2084,
+    "existingLinuxSkipped": 7,
+    "failures": 0
+  },
+  "sandbox": {
+    "profileSha256": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945",
+    "wrapperSha256": "8a6309858e165d934ff20205d624e023ad9739415e6498ac5fd4e4449e372c65",
+    "sameProfileAsPreviousVerifiedCanary": true,
+    "sameWrapperAsPreviousVerifiedCanary": true,
+    "ambientProviderEnvironmentRemoved": true,
+    "node": "24.22.2",
+    "signedPsRuntime": "/tmp/tk-continue/runtime/ps-runtime.json"
+  },
+  "scope": "Only ai-connections.test.ts changed. No HOME override, production auth mock/change, build, provider login/generation, commit or push."
+}

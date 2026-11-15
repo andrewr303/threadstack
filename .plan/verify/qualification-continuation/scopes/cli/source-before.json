@@ -1,0 +1,7 @@
+{
+  "cli/src/__tests__/worktree.test.ts": "eb8c9d66260fd26fec3dfa390fb09e06d0c1eea28b43031602cd15a01f424769",
+  "cli/src/__tests__/company-import-export-e2e.test.ts": "26343307ba6a255155b6755c49b72aa9b1f0437de335c2a0c6084207b680219a",
+  "cli/src/__tests__/doctor.test.ts": "b34af8536be4b6d7654b1ab57f2ced0355af94c5b7a014a0c086a64d76c9c28d",
+  "packages/shared/src/worktree-port-registry.ts": "9c6a9cc048b0b683063289611bef810e49342394c08e235bc7fc02e45562c88d",
+  "/tmp/tk-continue/runtime/tests.sb": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945"
+}

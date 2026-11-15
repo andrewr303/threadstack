@@ -1,0 +1,34 @@
+{
+  "capturedAt": "2026-11-15T10:19:22.066400+00:00",
+  "leadRequirementCheck": "PASS for requested implementation and compact UI changes, with qualification limits below.",
+  "requirements": [
+    {
+      "request": "Compact thread header/actions and Summary/Live/Split beside title",
+      "evidence": "../fix-all-final/report.md; 2022 unchanged product hashes in lead-input-integrity.json"
+    },
+    {
+      "request": "Merge duplicate Threads list/search/Ask into existing Sessions sidebar and fix Ask/account formatting",
+      "evidence": "../fix-all-final/report.md; sealed Chrome/Edge 16 journeys each on unchanged inputs"
+    },
+    {
+      "request": "Fix remaining startup/selection/security integration defects",
+      "evidence": "../fix-all-final/reviews/ plus auth-spec-review.md/auth-quality-review.md and browser/ sealed affected acceptance"
+    },
+    {
+      "request": "Repair verification gaps and deliver PR",
+      "evidence": "report.md, scoped receipts, complete observed1891 inventory, PR11 branch"
+    }
+  ],
+  "freshServerBuild": "PASS",
+  "freshAffectedBrowserOutcomes": "6/6",
+  "finalUnmodifiedDbTeardownScopes": "166+259 passed under original30s hooks; historical failures retained",
+  "fullRootOrHostedPassClaimed": false,
+  "openQualification": [
+    "Two Darwin PATH_MAX fixtures requireLinux",
+    "One descriptor-confined localartifact-installation case requiresLinux",
+    "HostedCI startup_failure beforezerojobs; causeunknown",
+    "Manualprovider/permission/helper/service/MV3/live-library surfaces retain originalgaps"
+  ],
+  "inputIntegrity": "lead-input-integrity.json",
+  "publicationState": "Prepared local capsule; parent verifies finalcommit/push and PRreadback separately."
+}

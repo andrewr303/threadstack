@@ -1,0 +1,87 @@
+{
+  "completedAt": "2026-11-15T10:00:22.369511+00:00",
+  "sourceHeadUnchanged": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "beforeHashes": {
+    "server/src/__tests__/heartbeat-session-preparation.test.ts": "48e20fee744b0055701191eb01ecca6e1c64a9210b5296bfc46559975d40bcf2",
+    "server/src/__tests__/adapter-cost-failure-paths.test.ts": "7c2b7e895a15b4241f3ca959eb3e4385b98221a8386155e1110c5b4d4d9dfc40"
+  },
+  "finalHashes": {
+    "server/src/__tests__/heartbeat-session-preparation.test.ts": "a26e4faf2c46385eccaf816720d180fbb45de51e3cab03b1be0cef8be7ee2384",
+    "server/src/__tests__/adapter-cost-failure-paths.test.ts": "182f518d09add5ec191ccd481598fbdfd960b3664823e49e9aca5606a9ff24cb"
+  },
+  "productionChanged": false,
+  "testChangesOnly": true,
+  "wholeFileResult": {
+    "filesPassed": 2,
+    "testsPassed": 41,
+    "testsFailed": 0,
+    "testsSkipped": 0
+  },
+  "redResult": {
+    "testsFailed": 5,
+    "testsPassed": 1,
+    "excludedByFilter": 35
+  },
+  "testTypecheckExitCode": 0,
+  "diffCheckExitCode": 0,
+  "runs": [
+    {
+      "name": "preparation-cost-failed-cases-red",
+      "exitCode": 1,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--project",
+        "@paperclipai/server",
+        "server/src/__tests__/heartbeat-session-preparation.test.ts",
+        "server/src/__tests__/adapter-cost-failure-paths.test.ts",
+        "--maxWorkers",
+        "1",
+        "--no-file-parallelism",
+        "-t",
+        "opencode|refusal: true"
+      ],
+      "startedAt": "2026-11-15T09:57:43.536632+00:00",
+      "finishedAt": "2026-11-15T09:58:04.989316+00:00",
+      "logSha256": "33935b166b187fee5ade6f85377240d7fa111d969125839cfca410b14b07b169"
+    },
+    {
+      "name": "preparation-cost-whole-files-green",
+      "exitCode": 0,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--project",
+        "@paperclipai/server",
+        "server/src/__tests__/heartbeat-session-preparation.test.ts",
+        "server/src/__tests__/adapter-cost-failure-paths.test.ts",
+        "--maxWorkers",
+        "1",
+        "--no-file-parallelism"
+      ],
+      "startedAt": "2026-11-15T09:58:56.731164+00:00",
+      "finishedAt": "2026-11-15T09:59:39.976568+00:00",
+      "logSha256": "0fbe4f1a3f122fd0d36aafd7a124e449a260fd771fe412125a93a46d3feb18ed"
+    },
+    {
+      "name": "preparation-cost-test-types",
+      "exitCode": 0,
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--project",
+        "/tmp/tk-continue/preparation-cost-recheck/tsconfig.json",
+        "--pretty",
+        "false"
+      ],
+      "startedAt": "2026-11-15T09:59:31.275908+00:00",
+      "finishedAt": "2026-11-15T09:59:45.437111+00:00",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "server/src/services/native-runtime/setup-readiness.ts": {
+    "sha256": "95c1e4b9967066637d56cccc9e62ed8b3365391d8d82feab2f8477bad5eeb33d",
+    "matchesHead": true
+  },
+  "server/src/services/local-ai-credential-file.ts": {
+    "sha256": "4b88b5b48652f03681cf9592c02adac4e84bf56b72a8c4bcaf0fb3adfdd9c52a",
+    "matchesHead": true
+  },
+  "server/src/services/native-runtime/runner-api-files.ts": {
+    "sha256": "02975bac095932f2bbab236d5e0c4e00e57b1aac28056997786f9624551c483b",
+    "matchesHead": true
+  },
+  "packages/paperclip-runner/src/drivers/runtime-context-materializer.ts": {
+    "sha256": "22896a55c27eadcf43e6ddb04f37f76f8d0128e3943a1325bad920881e11e423",
+    "matchesHead": true
+  },
+  "packages/adapters/codex-local/src/server/codex-auth-copyback.ts": {
+    "sha256": "b255bb2d753c20f197abbb6510bd9a4a7f418247bc95d1244a01375405f552fa",
+    "matchesHead": true
+  }
+}

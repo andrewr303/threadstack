@@ -140,11 +140,25 @@ describe("workspace Git scan route load regression", () => {
     // accept/close races can reset clients before they reach the scheduler.
     const server = app.listen(0, "127.0.0.1");
     await new Promise<void>(resolve => server.once("listening", resolve));
-    const pendingResponses = Array.from({ length: 500 }, (_, index) => request(server)
-      .get(`/api/issues/issue-${index}/file-resources/list`)
-      .set("x-test-actor", `actor-${index % 73}`)
-      .query({ mode: "changed" })
-      .then((response) => response));
+    // Drain the TCP accept backlog between batches; macOS may cap it at 128.
+    // Every admitted request remains held until all 500 reach the scheduler.
+    const batchSize = 64;
+    const admissions = Array.from({ length: Math.ceil(500 / batchSize) }, () => Promise.withResolvers<void>());
+    let admittedRequests = 0;
+    const admitNextBatch = () => {
+      admittedRequests += 1;
+      if (admittedRequests % batchSize === 0) admissions[admittedRequests / batchSize]?.resolve();
+    };
+    server.on("request", admitNextBatch);
+    admissions[0]!.resolve();
+    const pendingResponses = Array.from({ length: 500 }, async (_, index) => {
+      await admissions[Math.floor(index / batchSize)]!.promise;
+      return request(server)
+        .get(`/api/issues/issue-${index}/file-resources/list`)
+        .set("x-test-actor", `actor-${index % 73}`)
+        .query({ mode: "changed" })
+        .then((response) => response);
+    });
     // Observe every client rejection immediately, including on assertion failure.
     const settledResponses = Promise.allSettled(pendingResponses);
     try {
@@ -152,6 +166,12 @@ describe("workspace Git scan route load regression", () => {
         () => expect(scheduler.snapshot().totals.singleFlightJoins).toBe(498),
         { timeout: 15_000, interval: 20 },
       );
+      server.off("request", admitNextBatch);
+      expect(admittedRequests).toBe(500);
+      const heldConnections = await new Promise<number>((resolve, reject) => {
+        server.getConnections((error, count) => error ? reject(error) : resolve(count));
+      });
+      expect(heldConnections).toBe(500);
       const loadedSnapshot = scheduler.snapshot();
       expect(loadedSnapshot).toMatchObject({ activeCount: 2, queuedCount: 0, inFlightCount: 2 });
 
@@ -181,6 +201,7 @@ describe("workspace Git scan route load regression", () => {
 
       console.info("workspace Git scan regression metrics", {
         requests: responses.length,
+        heldConnections,
         repositories: roots.length,
         underlyingScans: runnerCalls,
         peakActive,
@@ -190,6 +211,8 @@ describe("workspace Git scan route load regression", () => {
         unreapedChildCount: 0,
       });
     } finally {
+      server.off("request", admitNextBatch);
+      for (const admission of admissions) admission.reject(new Error("Load fixture closed before batch admission"));
       releaseScans();
       server.closeAllConnections();
       await settledResponses;

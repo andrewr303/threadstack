@@ -1,0 +1,29 @@
+{
+  "capturedAt": "2026-11-15T10:09:15.496873+00:00",
+  "sourceHead": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "files": {
+    "server/src/services/native-runtime/runner-api-artifacts.integration.test.ts": {
+      "sha256": "382524eff6c212d97ed301563ad0db087e0df2907e43b86c07dfb9ef361c45be",
+      "matchesHead": true
+    },
+    "server/src/services/native-runtime/artifact-transfer.ts": {
+      "sha256": "11b9d545c7ae92a1ca26bd407834c3b8aa958930f8612d223cc2caf15bce5aee",
+      "matchesHead": true
+    },
+    "server/src/services/native-runtime/paperclip-runner-tool-authority.ts": {
+      "sha256": "df2543ccb55daea4ccc401143e179ceb3fcf64836e6c433e9830ee409acba442",
+      "matchesHead": true
+    }
+  },
+  "changedFiles": [],
+  "runtime": "Node24.22.2 macOS arm64 protectedwrapper",
+  "wholeFile": {
+    "passed": 2,
+    "failed": 1,
+    "skipped": 0,
+    "exitCode": 1
+  },
+  "cause": "local download_artifact is advertised only on Linux; actual descriptor-confined installer rejects non-Linux",
+  "qualification": "HTTP empty-response cases pass; exact download/install integration remains Linux-held; no full file pass",
+  "receivedSignals": []
+}

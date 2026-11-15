@@ -1,0 +1,6 @@
+{
+  "server/src/__tests__/agent-hire-ai-connections.test.ts": "6e0fd1ee4890be55efe4bb31fb159c9471ff83ead2fa8e4db01af52157e181e8",
+  "server/src/services/ai-connection-runtime.ts": "b3ccf1a3a83bf62ba21a43ebe0f30103060d90c3102fd136f5e3055a24697dae",
+  "server/src/services/ai-connections.ts": "627c463cb8e33b95893d4a2dc6ffa891431f0bc5558d0076f7b0945fa70d935c",
+  "server/src/routes/agents.ts": "84f2a63846dd2442b2cb47f05c616e26319739b02c8bacc826c7fec799e38947"
+}

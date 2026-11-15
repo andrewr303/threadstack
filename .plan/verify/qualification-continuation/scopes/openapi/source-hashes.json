@@ -1,0 +1,20 @@
+{
+  "nodeVersion": "v24.22.2",
+  "before": {
+    "server/src/__tests__/openapi-routes.test.ts": "0b7550c4b6408b9764839391935a87807979cbbeab6ff05cbace8516dd8f83a7",
+    "server/src/routes/openapi.ts": "24ec6c05b48441eb237bdddabbf3f48f6032b05b727d9ca131b6fe5db422a99f",
+    "server/src/routes/company-live-events-stream.ts": "e5b8e66b083285b7aa6e46aa56025da40c79c5f919c2e980d161c8f9f4d38bc1",
+    "server/src/app.ts": "0a6e6a99be032bf117fadea15bf087c82d583047e0e297bda57a346a5f42cc11",
+    "docs/api/companies.md": "1f5983fda9de2a77d7d131fff010a7b315b11853180790763b1696de9ea8cb8d"
+  },
+  "after": {
+    "server/src/__tests__/openapi-routes.test.ts": "9271984c45b86c03ccedb5b6ba76fc8c10f1230017ed40793a3e96d5028a3f56",
+    "server/src/routes/openapi.ts": "24ec6c05b48441eb237bdddabbf3f48f6032b05b727d9ca131b6fe5db422a99f",
+    "server/src/routes/company-live-events-stream.ts": "e5b8e66b083285b7aa6e46aa56025da40c79c5f919c2e980d161c8f9f4d38bc1",
+    "server/src/app.ts": "0a6e6a99be032bf117fadea15bf087c82d583047e0e297bda57a346a5f42cc11",
+    "docs/api/companies.md": "1f5983fda9de2a77d7d131fff010a7b315b11853180790763b1696de9ea8cb8d"
+  },
+  "changedFiles": [
+    "server/src/__tests__/openapi-routes.test.ts"
+  ]
+}

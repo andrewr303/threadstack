@@ -1,0 +1,50 @@
+{
+  "capturedAt": "2026-11-15T10:15:47.619996+00:00",
+  "scope": "Local byte comparison only. Original seals/media were not rewritten. Absence from the earlier published commit is expected: copies are prepared locally for the final publication commit.",
+  "copies": [
+    {
+      "round": "chrome-1",
+      "repositoryPath": ".plan/verify/qualification-continuation/browser/chrome-1",
+      "originalSealVerdict": "pass",
+      "filesCompared": 10,
+      "missingLocalCopies": [],
+      "differentLocalCopies": [],
+      "publishedCommitCompared": "aba793728056fd80dc0057f5220af0accde9836c",
+      "publicationState": "prepared local working copy; not yet committed/published",
+      "notPresentInEarlierPublishedCommit": [
+        "seal.json",
+        "AUTH-I1.json",
+        "AUTH-I2.json",
+        "AUTH-I3.json",
+        "assets/AUTH-I1-connected.png",
+        "assets/AUTH-I2-browser-settings.png",
+        "assets/AUTH-I2-company-tasks.png",
+        "assets/AUTH-I3-shared-read.png",
+        "report.md",
+        "result.json"
+      ]
+    },
+    {
+      "round": "edge-1",
+      "repositoryPath": ".plan/verify/qualification-continuation/browser/edge-1",
+      "originalSealVerdict": "pass",
+      "filesCompared": 10,
+      "missingLocalCopies": [],
+      "differentLocalCopies": [],
+      "publishedCommitCompared": "aba793728056fd80dc0057f5220af0accde9836c",
+      "publicationState": "prepared local working copy; not yet committed/published",
+      "notPresentInEarlierPublishedCommit": [
+        "seal.json",
+        "AUTH-I1.json",
+        "AUTH-I2.json",
+        "AUTH-I3.json",
+        "assets/AUTH-I1-connected.png",
+        "assets/AUTH-I2-browser-settings.png",
+        "assets/AUTH-I2-company-tasks.png",
+        "assets/AUTH-I3-shared-read.png",
+        "report.md",
+        "result.json"
+      ]
+    }
+  ]
+}

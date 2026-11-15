@@ -1,0 +1,30 @@
+{
+  "id": "AUTH-I2",
+  "name": "Legitimate company task and settings navigation is authorized",
+  "startedAt": "2026-11-15T09:33:45.149Z",
+  "evidence": [
+    {
+      "path": "assets/AUTH-I2-company-tasks.png",
+      "capturedAt": "2026-11-15T09:33:46.347Z",
+      "url": "http://127.0.0.1:3217/THR/issues?view=all",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "type": "screenshot"
+    },
+    {
+      "path": "assets/AUTH-I2-browser-settings.png",
+      "capturedAt": "2026-11-15T09:33:47.814Z",
+      "url": "http://127.0.0.1:3217/THR/company/settings/browser-sessions",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "type": "screenshot"
+    }
+  ],
+  "observation": "The actual company Tasks list includes the owned THR-1 fixture, and its Browser sessions settings region renders through normal browser ingress.",
+  "status": "pass",
+  "completedAt": "2026-11-15T09:33:48.476Z"
+}

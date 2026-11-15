@@ -1,0 +1,45 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "@paperclipai/server",
+    "run",
+    "build:runtime"
+  ],
+  "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+  "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+  "inheritedEnvironmentKeyNames": [
+    "COLORTERM",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "__CF_USER_TEXT_ENCODING"
+  ],
+  "injectedEnvironmentKeyNames": [
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "PAPERCLIP_TEST_HOST_HOME",
+    "RUSTUP_HOME"
+  ],
+  "ambientProviderEnvironmentRemoved": true,
+  "startedAt": "2026-11-15T09:57:22.459526+00:00",
+  "status": "completed",
+  "absolutePsCompatibility": false,
+  "wrapperPid": 51700,
+  "wrapperPgid": 51700,
+  "childPid": 51895,
+  "childPgid": 51895,
+  "isolatedChildSession": true,
+  "receivedSignals": [],
+  "exitCode": 0,
+  "finishedAt": "2026-11-15T09:57:33.905607+00:00"
+}

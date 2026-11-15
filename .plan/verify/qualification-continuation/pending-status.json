@@ -1,0 +1,157 @@
+{
+  "capturedAt": "2026-11-15T10:22:21.631431+00:00",
+  "ownedQualificationJobsPending": [],
+  "localQualificationWork": "complete",
+  "unqualifiedOverallClaims": [
+    "No single frozen-revision passing pnpm test:run",
+    "No passing hosted CI"
+  ],
+  "remainingPlatformCases": 3,
+  "platformScopes": [
+    "two unchanged long skill-path cases exceed Darwin PATH_MAX",
+    "one unchanged Runner API artifact installation case requires Linux/proc/self/fd"
+  ],
+  "manualSurfaceGaps": [
+    "real providers/model keys",
+    "native permission consent",
+    "helper/launchd",
+    "MV3 suspension",
+    "live-library deployment continuity"
+  ],
+  "finalQuietResults": [
+    {
+      "receipt": "/tmp/tk-continue/runtime/general-hooks-quiet-final-node24.json",
+      "exitCode": 0,
+      "receivedSignals": []
+    },
+    {
+      "receipt": "/tmp/tk-continue/runtime/heartbeat-quiet-final-node24.json",
+      "exitCode": 0,
+      "receivedSignals": []
+    }
+  ],
+  "unchangedQuietFinalIntegrityReceipt": "/tmp/tk-continue/heartbeat-general-recheck/final-integrity.json",
+  "historicalRunningMetadata": [
+    {
+      "path": "/tmp/tk-continue/general-hook-recheck/interrupted-combined.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/general-hook-recheck/interrupted-combined.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-hook-recheck-node24.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-hook-recheck-node24.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-2-node24.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": -15
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-2-node24.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": -15
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-2-remaining-node24.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-2-remaining-node24.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-3-node24.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": -15
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-3-node24.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": -15
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-3-remaining-node24.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/general-shard-3-remaining-node24.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/heartbeat-config-repos-recheck.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/heartbeat-config-repos-recheck.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/heartbeat-queue-completion-recheck.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/heartbeat-queue-completion-recheck.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/rust-four-hooks-recheck.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/runtime/rust-four-hooks-recheck.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": 143
+    },
+    {
+      "path": "/tmp/tk-continue/rust-recheck/first-attempt-interrupted.json",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    },
+    {
+      "path": "/tmp/tk-continue/rust-recheck/first-attempt-interrupted.log",
+      "rawStatus": "running",
+      "normalizedState": "historical_unqualified_original",
+      "observedExitCode": null
+    }
+  ],
+  "publication": "prepared copies and pending Git-load test commit remain outside the last published-aba snapshot"
+}

@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-11-15T10:18:00.433731+00:00",
+  "sourceUnchangedDuringQuietFinal": {
+    "server/src/services/heartbeat/queue.test.ts": true,
+    "server/src/services/heartbeat/run-completion.test.ts": true,
+    "server/vitest.config.ts": true,
+    "server/src/__tests__/setup-supertest.ts": true
+  },
+  "quietExitCode": 0,
+  "receivedSignals": [],
+  "remainingRecordedProcessGroupMembers": [],
+  "fixtureSha256": "260e8ed68f6d5d8a1d82cbf16b41f026a0a22cbd7c020bec0887d7cf5b9ec010"
+}

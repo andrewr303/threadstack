@@ -1,0 +1,16 @@
+{
+  "node": "24.22.2",
+  "rust": "1.97.1",
+  "cargoHome": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-rust-h8ylrbst/cargo",
+  "rustupHome": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-rust-h8ylrbst/rustup",
+  "explicitCargoTargetDir": "/Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner/runner/target",
+  "sandboxProfileSha256": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945",
+  "wrapperSha256": "d6d96f24664ab7f1b7a7996c3a9f0306784bac2ce9004c95ddb4af1221b8d330",
+  "compatibilityPreloadSha256": "42c06388aba066738e4a5fa3b62b8b62b159214b54ce3c4df43aa497458ed0ab",
+  "privateCachesOnly": true,
+  "dependencyVersionsChanged": false,
+  "repositorySourceChanges": false,
+  "noTimeoutOrAssertionChanges": true,
+  "noActualProviderOrLogin": true,
+  "fixtureScope": "Owned fake Codex/Rust recovery providers, generated synthetic keys and accounts, tempPostgres, loopback PRP/MCP/usage endpoints; Cargo hooks locked exactly as in test sources."
+}

@@ -1,0 +1,13 @@
+{
+  "source": "/bin/ps",
+  "copy": "/tmp/tk-continue/tools/bin/ps",
+  "sourceSha256": "d0e7b30250a9b1bd2afd1d6462a10d8a2d10ca448d9ce76be067db8a9bf459e0",
+  "copySha256": "16b3b7d1b430a5545eee997b2e4db4e83e8dcc8a88e8a6788b6084e316afb517",
+  "executableTextSha256": "bf39854c0171aadf5dd094b94debac4c6311eccd586e547ad833f16bd099e1b2",
+  "executableTextIdentical": true,
+  "sourceMode": "0o4755",
+  "copyMode": "0o755",
+  "copySignature": "ad-hoc without a signing identity or private key",
+  "sourceUnchanged": true,
+  "scope": "task-local own-process identity inspection inside unchanged credential-denying sandbox"
+}

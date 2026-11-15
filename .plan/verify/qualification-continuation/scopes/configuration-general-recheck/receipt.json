@@ -1,0 +1,80 @@
+{
+  "capturedAt": "2026-11-15T10:04:35.973069+00:00",
+  "sourceHead": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "changedScope": [
+    "server/src/__tests__/ai-legacy-compatibility.test.ts",
+    "server/src/__tests__/claude-local-adapter-environment.test.ts",
+    "server/src/__tests__/agent-configuration-save.test.ts"
+  ],
+  "sourceHashes": {
+    "server/src/__tests__/ai-legacy-compatibility.test.ts": "51e0298ff806824d631cc6346ccd2e23e687fe53940f3fd3bfff39e834d64067",
+    "server/src/__tests__/claude-local-adapter-environment.test.ts": "8831597eddab5bd88b070a2cb379c23038e025a870548be84ec13eb5d42b9141",
+    "server/src/__tests__/agent-configuration-save.test.ts": "c06b0f9f54267883cf233ffccf2ee3995d816a8dff50a85556e89208d26137f3"
+  },
+  "allOriginalExpectLinesUnchanged": {
+    "server/src/__tests__/ai-legacy-compatibility.test.ts": {
+      "unchangedExpectLines": 65,
+      "expectLinesSha256": "09faec5da6b04757c2676e177ab49b59618b2e5adefff79cf70ce45791843b77"
+    },
+    "server/src/__tests__/claude-local-adapter-environment.test.ts": {
+      "unchangedExpectLines": 31,
+      "expectLinesSha256": "038bd0e128b1a5149027f752f8c895d2efa08347bcde6106e7c52da7e5489bf7"
+    },
+    "server/src/__tests__/agent-configuration-save.test.ts": {
+      "unchangedExpectLines": 36,
+      "expectLinesSha256": "f063e393a54c5a6d0416e3cf7313273a6ac6095933db40724949c875a1aafd76"
+    }
+  },
+  "red": {
+    "failed": 4,
+    "passed": 26,
+    "exitCode": 1
+  },
+  "green": {
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "targetedTypes": {
+    "scope": "The three test source files, using existing source-layer declarations and same test tsconfig compiler rules",
+    "exitCode": 0
+  },
+  "sourceProductionChanged": false,
+  "operatorCredentialContentsRead": false,
+  "globalHomeOverridden": false,
+  "checks": {
+    "configuration-general-red.json": {
+      "bytes": 1248,
+      "sha256": "48d0d3bf253478ff50b90386e72c54604e69073cdbee585e2dd5934ba77af7ce"
+    },
+    "configuration-general-red.log": {
+      "bytes": 10924,
+      "sha256": "14ccbdf30eb9c2ed3312d896e9f1fcce538e3d22bc16e80fa18ddd5116117ae0"
+    },
+    "configuration-general-green.json": {
+      "bytes": 1240,
+      "sha256": "4b991f016fc05e825efb5d9d9920be22d33d72d6a2a9e1df8342d3478eb932de"
+    },
+    "configuration-general-green.log": {
+      "bytes": 4075,
+      "sha256": "4b783be4e23923adf52a67951330d90b50b9ee3034e30629e1a0b1b94c8e3d51"
+    },
+    "configuration-general-types.json": {
+      "bytes": 1096,
+      "sha256": "f746f937edc3151ed569ae289c3e2fd9c38b8d8ab11f609091d4a209d12d9f3f"
+    },
+    "configuration-general-types.log": {
+      "bytes": 396,
+      "sha256": "d0aacc4b6aa6c5a12ee9843fead94907c0beb39fb6a56115b32e0fae95ab6615"
+    },
+    "configuration-general-types-final.json": {
+      "bytes": 1096,
+      "sha256": "e6fefca667456d1825de49d25e237769c7d9abfd1bf6056832b2672235cbcf91"
+    },
+    "configuration-general-types-final.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

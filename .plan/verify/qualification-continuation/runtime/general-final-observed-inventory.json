@@ -1,0 +1,106 @@
+{
+  "capturedAt": "2026-11-15T10:10:33.735557+00:00",
+  "expectedUniqueFiles": 1891,
+  "observedUniqueFiles": 1891,
+  "missingFiles": [],
+  "extraFiles": [],
+  "completeObservedInventory": true,
+  "passingFullRun": false,
+  "sourceWasNotSingleFrozenRevision": true,
+  "runs": [
+    {
+      "name": "general-shard-0-node24",
+      "observedFiles": 473,
+      "failedFiles": [
+        "server/src/__tests__/dot-runner.test.ts",
+        "server/src/services/native-runtime/native-safe-replacement.test.ts",
+        "server/src/services/native-runtime/plugin-runner-probe.test.ts",
+        "server/src/__tests__/bundled-plugin-package.test.ts"
+      ],
+      "finalSummaries": [
+        "Test Files  4 failed | 457 passed | 12 skipped (473)",
+        "Tests  1 failed | 12132 passed | 163 skipped (12296)"
+      ]
+    },
+    {
+      "name": "general-shard-1-node24",
+      "observedFiles": 472,
+      "failedFiles": [
+        "server/src/services/native-runtime/native-runner-restart-recovery.integration.test.ts",
+        "server/src/services/native-runtime/native-session-resume.test.ts",
+        "server/src/__tests__/git-workspace-expiration.test.ts",
+        "server/src/services/native-runtime/native-usage-delivery.integration.test.ts",
+        "server/src/__tests__/local-agent-process-boundary.test.ts",
+        "server/src/services/native-runtime/native-codex-runner.integration.test.ts"
+      ],
+      "finalSummaries": [
+        "Test Files  6 failed | 456 passed | 10 skipped (472)",
+        "Tests  4 failed | 8960 passed | 132 skipped (9096)"
+      ]
+    },
+    {
+      "name": "general-shard-2-node24",
+      "observedFiles": 27,
+      "failedFiles": [
+        "server/src/services/heartbeat/queue.test.ts",
+        "server/src/__tests__/heartbeat-project-repositories.test.ts"
+      ],
+      "finalSummaries": []
+    },
+    {
+      "name": "general-shard-3-node24",
+      "observedFiles": 33,
+      "failedFiles": [
+        "server/src/__tests__/voice-session-store.integration.test.ts",
+        "server/src/services/heartbeat/run-completion.test.ts",
+        "server/src/__tests__/heartbeat-execution-configuration.test.ts",
+        "server/src/__tests__/native-run-projection-work.test.ts"
+      ],
+      "finalSummaries": []
+    },
+    {
+      "name": "general-shard-2-remaining-node24",
+      "observedFiles": 8,
+      "failedFiles": [],
+      "finalSummaries": []
+    },
+    {
+      "name": "general-shard-3-remaining-node24",
+      "observedFiles": 1,
+      "failedFiles": [],
+      "finalSummaries": []
+    },
+    {
+      "name": "general-shard-2-isolated-node24",
+      "observedFiles": 441,
+      "failedFiles": [
+        "server/src/__tests__/heartbeat-session-preparation.test.ts",
+        "server/src/__tests__/ai-legacy-compatibility.test.ts",
+        "server/src/__tests__/claude-local-adapter-environment.test.ts",
+        "server/src/__tests__/agent-configuration-save.test.ts",
+        "server/src/__tests__/file-resources-git-scan-load.test.ts"
+      ],
+      "finalSummaries": [
+        "Test Files  5 failed | 426 passed | 10 skipped (441)",
+        "Tests  6 failed | 5864 passed | 93 skipped (5963)"
+      ]
+    },
+    {
+      "name": "general-shard-3-isolated-node24",
+      "observedFiles": 439,
+      "failedFiles": [
+        "server/src/__tests__/agent-hire-ai-connections.test.ts",
+        "server/src/__tests__/adapter-cost-failure-paths.test.ts",
+        "server/src/__tests__/plugin-task-credential-writeback.test.ts",
+        "server/src/services/native-runtime/native-ingress-bootstrap-retry.integration.test.ts",
+        "server/src/services/native-runtime/native-skill-library-tools.integration.test.ts",
+        "server/src/__tests__/workspace-instance-cleanup.test.ts",
+        "server/src/services/native-runtime/runner-api-artifacts.integration.test.ts"
+      ],
+      "finalSummaries": [
+        "Test Files  7 failed | 418 passed | 14 skipped (439)",
+        "Tests  63 failed | 6296 passed | 99 skipped (6458)"
+      ]
+    }
+  ]
+}

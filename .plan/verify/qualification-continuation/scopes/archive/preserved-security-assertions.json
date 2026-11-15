@@ -1,0 +1,32 @@
+[
+  {
+    "case": "rejects escaping inner tar paths",
+    "observedPass": true,
+    "exactLogLine": " \u2713 |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > rejects escaping inner tar paths despite valid OCI and layer digests before any remote effects 33ms"
+  },
+  {
+    "case": "checks the file layer's actual plaintext",
+    "observedPass": true,
+    "exactLogLine": " \u2713 |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > checks the file layer's actual plaintext against its declared code digest before any remote effects 36ms"
+  },
+  {
+    "case": "refuses a historical code hardlink with an escape target",
+    "observedPass": true,
+    "exactLogLine": " \u2713 |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > refuses a historical code hardlink with an escape target before remote effects 31ms"
+  },
+  {
+    "case": "refuses a historical code hardlink with an unknown target",
+    "observedPass": true,
+    "exactLogLine": " \u2713 |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > refuses a historical code hardlink with an unknown target before remote effects 31ms"
+  },
+  {
+    "case": "refuses an unsafe cache directory",
+    "observedPass": true,
+    "exactLogLine": " \u2713 |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > refuses an unsafe cache directory instead of following it 26ms"
+  },
+  {
+    "case": "leaves a target intact when its archive transport cannot install",
+    "observedPass": true,
+    "exactLogLine": " \u2713 |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > leaves a target intact when its archive transport cannot install the verified source 35ms"
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "receipt": "/tmp/tk-continue/runtime/heartbeat-full-state-stage-probe.json",
+  "probeConfigSha256": "6f20418e8348592855691bf13649ef02206e755cb5420c849cd0c24fdc5b6f94",
+  "results": [
+    {
+      "file": "run-completion.test.ts",
+      "pid": 14723,
+      "durationsMs": {
+        "registeredClients": 1,
+        "ownerStop": 5006,
+        "directoryRemoval": 17169,
+        "cleanupTotal": 22176,
+        "initialClientEnd": 3
+      }
+    },
+    {
+      "file": "queue.test.ts",
+      "pid": 16275,
+      "durationsMs": {
+        "registeredClients": 0,
+        "ownerStop": 5009,
+        "directoryRemoval": 8611,
+        "cleanupTotal": 13620,
+        "initialClientEnd": 3
+      }
+    }
+  ]
+}

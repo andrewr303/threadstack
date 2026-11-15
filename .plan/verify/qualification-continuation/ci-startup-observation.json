@@ -1,0 +1,28 @@
+{
+  "observedAt": "2026-11-15T10:17:37.398811+00:00",
+  "runs": [
+    {
+      "id": 43700467312,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "startup_failure",
+      "head_sha": "aba793728056fd80dc0057f5220af0accde9836c",
+      "path": "BuildFailed",
+      "html_url": "https://github.com/AVRCORP/threadkeeper/actions/runs/43700467312",
+      "jobCount": 0
+    },
+    {
+      "id": 43700457907,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "startup_failure",
+      "head_sha": "aba793728056fd80dc0057f5220af0accde9836c",
+      "path": "BuildFailed",
+      "html_url": "https://github.com/AVRCORP/threadkeeper/actions/runs/43700457907",
+      "jobCount": 0
+    }
+  ],
+  "underlyingCause": "Not exposed by these API responses; no billing or workflow-code cause established.",
+  "settingsChanged": false,
+  "manualRerunsRequested": false
+}

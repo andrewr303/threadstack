@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "title": "Auth-inspection fallback affected browser acceptance: edge-1",
+  "requirement": "The local-trusted process-inspection fallback preserves legitimate browser connection, company navigation and explicitly paired synthetic-library reads.",
+  "requirements": [
+    {
+      "id": "AUTH-I1",
+      "text": "Legitimate browser connects to the real local-trusted app"
+    },
+    {
+      "id": "AUTH-I2",
+      "text": "Legitimate company task and settings navigation is authorized"
+    },
+    {
+      "id": "AUTH-I3",
+      "text": "Pair and read a shared synthetic session while excluding its private control"
+    }
+  ],
+  "createdAt": "2026-11-15T09:36:02.220Z",
+  "runtime": {
+    "expected": "browseros-neo",
+    "observed": "other-browser-tool",
+    "name": "Existing project Playwright isolated extension runner; /Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "selection": "user",
+    "reason": "The continuation explicitly selects the existing isolated Chrome/Edge project runner. Shared Neo/Synara browser unavailable; no additional setup or role changes.",
+    "tools": [
+      "Playwright Page.screenshot",
+      "node scripts/run-paperclip-ingress-e2e.mjs"
+    ]
+  },
+  "context": {
+    "url": "http://127.0.0.1:3217",
+    "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+    "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70); source server middleware SHA256 19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+    "buildVerified": true,
+    "role": "Normal browser client against owned local-trusted THR fixture; no provider account/credential injection."
+  },
+  "plan": [
+    {
+      "id": "AUTH-I1",
+      "title": "Legitimate browser connects to the real local-trusted app",
+      "category": "Local-trusted browser compatibility",
+      "requirements": [
+        "AUTH-I1"
+      ],
+      "verifier": "program",
+      "method": "Fresh isolated Chrome/Edge profile, existing exact extension/static UI, modified TS server3217; exercise actual Settings Connect, company routes and pairing/search UI. No injected authentication.",
+      "expected": "Legitimate browser connects to the real local-trusted app",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "AUTH-I2",
+      "title": "Legitimate company task and settings navigation is authorized",
+      "category": "Local-trusted browser compatibility",
+      "requirements": [
+        "AUTH-I2"
+      ],
+      "verifier": "program",
+      "method": "Fresh isolated Chrome/Edge profile, existing exact extension/static UI, modified TS server3217; exercise actual Settings Connect, company routes and pairing/search UI. No injected authentication.",
+      "expected": "Legitimate company task and settings navigation is authorized",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "AUTH-I3",
+      "title": "Pair and read a shared synthetic session while excluding its private control",
+      "category": "Local-trusted browser compatibility",
+      "requirements": [
+        "AUTH-I3"
+      ],
+      "verifier": "program",
+      "method": "Fresh isolated Chrome/Edge profile, existing exact extension/static UI, modified TS server3217; exercise actual Settings Connect, company routes and pairing/search UI. No injected authentication.",
+      "expected": "Pair and read a shared synthetic session while excluding its private control",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "AUTH-I1",
+      "name": "Legitimate browser connects to the real local-trusted app",
+      "category": "Local-trusted browser compatibility",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Real extension Settings Connect reached running status and the actual company sidebar rendered. No provider account or credential was injected.",
+      "evidence": [
+        {
+          "path": "assets/AUTH-I1-connected.png",
+          "capturedAt": "2026-11-15T09:35:49.654Z",
+          "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot",
+          "description": "AUTH I1 connected.png",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Owned local-trusted THR fixture; normal browser ingress, synthetic library only"
+          }
+        },
+        {
+          "path": "AUTH-I1.json",
+          "type": "transcript",
+          "description": "Original program execution outcome; the real controls and assertions are preserved in assets/runner.mjs.",
+          "capturedAt": "2026-11-15T09:35:49.779Z",
+          "capturedBy": "program",
+          "tool": "node scripts/run-paperclip-ingress-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-ingress-e2e.mjs",
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "AUTH-I2",
+      "name": "Legitimate company task and settings navigation is authorized",
+      "category": "Local-trusted browser compatibility",
+      "surface": "web",
+      "status": "pass",
+      "observation": "The actual company Tasks list includes the owned THR-1 fixture, and its Browser sessions settings region renders through normal browser ingress.",
+      "evidence": [
+        {
+          "path": "assets/AUTH-I2-company-tasks.png",
+          "capturedAt": "2026-11-15T09:35:51.513Z",
+          "url": "http://127.0.0.1:3217/THR/issues?view=all",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot",
+          "description": "AUTH I2 company tasks.png",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217/THR/issues?view=all",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Owned local-trusted THR fixture; normal browser ingress, synthetic library only"
+          }
+        },
+        {
+          "path": "assets/AUTH-I2-browser-settings.png",
+          "capturedAt": "2026-11-15T09:35:53.151Z",
+          "url": "http://127.0.0.1:3217/THR/company/settings/browser-sessions",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot",
+          "description": "AUTH I2 browser settings.png",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217/THR/company/settings/browser-sessions",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Owned local-trusted THR fixture; normal browser ingress, synthetic library only"
+          }
+        },
+        {
+          "path": "AUTH-I2.json",
+          "type": "transcript",
+          "description": "Original program execution outcome; the real controls and assertions are preserved in assets/runner.mjs.",
+          "capturedAt": "2026-11-15T09:35:53.195Z",
+          "capturedBy": "program",
+          "tool": "node scripts/run-paperclip-ingress-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-ingress-e2e.mjs",
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "AUTH-I3",
+      "name": "Pair and read a shared synthetic session while excluding its private control",
+      "category": "Local-trusted browser compatibility",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Real board/extension pairing and explicit sharing succeeded. Company search read the seeded message excerpt and excluded its private control. The disposable pairing was then disconnected. Pairing code and tokens were never captured.",
+      "evidence": [
+        {
+          "path": "assets/AUTH-I3-shared-read.png",
+          "capturedAt": "2026-11-15T09:35:59.324Z",
+          "url": "http://127.0.0.1:3217/THR/search?q=authfallback",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot",
+          "description": "AUTH I3 shared read.png",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217/THR/search?q=authfallback",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Owned local-trusted THR fixture; normal browser ingress, synthetic library only"
+          }
+        },
+        {
+          "path": "AUTH-I3.json",
+          "type": "transcript",
+          "description": "Original program execution outcome; the real controls and assertions are preserved in assets/runner.mjs.",
+          "capturedAt": "2026-11-15T09:36:00.709Z",
+          "capturedBy": "program",
+          "tool": "node scripts/run-paperclip-ingress-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-ingress-e2e.mjs",
+            "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    }
+  ],
+  "coverageGaps": [],
+  "scopeLimitations": [
+    "Authenticated-mode browser ingress is not re-exercised on the local-trusted3217 fixture. Worker direct boundary/auth tests supply separate coverage.",
+    "Real unauthorized-agent denial is verified by the middleware worker real HTTP cases; browser operator success is not a substitute.",
+    "Unchanged UI/extension geometry and gesture cases reuse sealed43/44 with original provenance after2022 production hashes matched.",
+    "No video/DOM dump of pairing steps was captured because transient pairing codes must stay out of media. These checks assert static/data outcomes, not animation timing.",
+    "No real provider login/generation, real keys, live helper/deploy, native consent prompt or MV3 suspension."
+  ]
+}

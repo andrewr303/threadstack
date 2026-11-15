@@ -1,0 +1,43 @@
+{
+  "command": [
+    "/Users/andrew/.nvm/versions/node/v24.22.2/bin/node",
+    "-e",
+    "console.log(JSON.stringify({pid:process.pid,ppid:process.ppid})); setTimeout(()=>process.exit(0),1000)"
+  ],
+  "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+  "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+  "inheritedEnvironmentKeyNames": [
+    "COLORTERM",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "__CF_USER_TEXT_ENCODING"
+  ],
+  "injectedEnvironmentKeyNames": [
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "PAPERCLIP_TEST_HOST_HOME",
+    "RUSTUP_HOME"
+  ],
+  "ambientProviderEnvironmentRemoved": true,
+  "startedAt": "2026-11-15T09:45:03.492978+00:00",
+  "status": "completed",
+  "absolutePsCompatibility": false,
+  "wrapperPid": 36716,
+  "wrapperPgid": 36716,
+  "childPid": 36793,
+  "childPgid": 36793,
+  "isolatedChildSession": true,
+  "receivedSignals": [],
+  "exitCode": 0,
+  "finishedAt": "2026-11-15T09:45:04.522706+00:00"
+}

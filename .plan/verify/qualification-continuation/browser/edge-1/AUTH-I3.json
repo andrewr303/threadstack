@@ -1,0 +1,20 @@
+{
+  "id": "AUTH-I3",
+  "name": "Pair and read a shared synthetic session while excluding its private control",
+  "startedAt": "2026-11-15T09:35:53.196Z",
+  "evidence": [
+    {
+      "path": "assets/AUTH-I3-shared-read.png",
+      "capturedAt": "2026-11-15T09:35:59.324Z",
+      "url": "http://127.0.0.1:3217/THR/search?q=authfallback",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "type": "screenshot"
+    }
+  ],
+  "observation": "Real board/extension pairing and explicit sharing succeeded. Company search read the seeded message excerpt and excluded its private control. The disposable pairing was then disconnected. Pairing code and tokens were never captured.",
+  "status": "pass",
+  "completedAt": "2026-11-15T09:36:00.709Z"
+}

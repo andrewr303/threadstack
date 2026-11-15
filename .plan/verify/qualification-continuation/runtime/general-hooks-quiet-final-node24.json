@@ -1,0 +1,47 @@
+{
+  "command": [
+    "node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "--project",
+    "@paperclipai/server",
+    "server/src/services/native-runtime/native-safe-replacement.test.ts",
+    "server/src/__tests__/git-workspace-expiration.test.ts"
+  ],
+  "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+  "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+  "inheritedEnvironmentKeyNames": [
+    "COLORTERM",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "__CF_USER_TEXT_ENCODING"
+  ],
+  "injectedEnvironmentKeyNames": [
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "PAPERCLIP_TEST_HOST_HOME",
+    "RUSTUP_HOME"
+  ],
+  "ambientProviderEnvironmentRemoved": true,
+  "startedAt": "2026-11-15T10:10:27.458858+00:00",
+  "status": "completed",
+  "absolutePsCompatibility": false,
+  "wrapperPid": 18109,
+  "wrapperPgid": 18109,
+  "childPid": 18185,
+  "childPgid": 18185,
+  "isolatedChildSession": true,
+  "receivedSignals": [],
+  "exitCode": 0,
+  "finishedAt": "2026-11-15T10:13:55.034734+00:00"
+}

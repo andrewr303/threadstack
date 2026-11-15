@@ -1,0 +1,20 @@
+{
+  "id": "AUTH-I1",
+  "name": "Legitimate browser connects to the real local-trusted app",
+  "startedAt": "2026-11-15T09:33:42.309Z",
+  "evidence": [
+    {
+      "path": "assets/AUTH-I1-connected.png",
+      "capturedAt": "2026-11-15T09:33:45.077Z",
+      "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "type": "screenshot"
+    }
+  ],
+  "observation": "Real extension Settings Connect reached running status and the actual company sidebar rendered. No provider account or credential was injected.",
+  "status": "pass",
+  "completedAt": "2026-11-15T09:33:45.148Z"
+}

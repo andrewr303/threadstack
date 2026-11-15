@@ -1,0 +1,5 @@
+{
+  "server/src/services/native-runtime/native-session-executor.test.ts": "d0ce9c44e93e89dbc15880be901e2e4c2324236b3eec12b0a166223c90759ffa",
+  "server/src/services/explicit-native-continuation.test.ts": "2a4110602d7e6675123962612768278cb742116dbfbef54a8e4123aec0ed4a61",
+  "server/src/__tests__/ai-connections.test.ts": "d388385114e12eaa74ddbff999409fe87eaa0e05fcfec22879d4398317f7244c"
+}

@@ -1,0 +1,17 @@
+{
+  "files": {
+    "AUTH-I1.json": "f0589951e8162d93d51f5241701beb953356d6c959523b1b563fc5d00c4a609a",
+    "AUTH-I2.json": "4b19fd32047eb0b8d91b0bd5a328cdf5eda3301c86c7cebaa3395d628f1f496c",
+    "AUTH-I3.json": "05f74fe182ff11a97fafc4bf15e27584c716380c70a97d47a2fac90015fbd9eb",
+    "assets/AUTH-I1-connected.png": "79fd526c12924aa2e65d40f2e813347edc3bc10ae19988f2a27c04a6fbb451da",
+    "assets/AUTH-I2-browser-settings.png": "31b1c2858635bd7da0d34d2e41707633b74456f08f353b5f538ff11fa6d08355",
+    "assets/AUTH-I2-company-tasks.png": "f9221613ebf75e556284dda6e3f660bcff200aa1d469fe49942aad18d3a3b352",
+    "assets/AUTH-I3-shared-read.png": "d5c5a75057ae65c97ba35a90af4076c82ea035c6438c66aeec3861e625c23a68",
+    "report.md": "ee7546134db595dab50d4b3fd63fcbc2b791cf95263e7cd50921aee0388f57ad",
+    "result.json": "12fa34f89dfe26fe8719b5e72b46f15fe5ba280667433adda02e0e25579575d2"
+  },
+  "missingFiles": [],
+  "schemaVersion": 1,
+  "sealedAt": "2026-11-15T09:41:27.393668+00:00",
+  "verdictAtSeal": "pass"
+}

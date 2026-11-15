@@ -1,0 +1,9 @@
+{
+  "capturedAt": "2026-11-15T10:06:38.139457+00:00",
+  "RLIMIT_NOFILE": [
+    1048575,
+    9223372036854775807
+  ],
+  "somaxconn": "128",
+  "systemSettingsChanged": false
+}

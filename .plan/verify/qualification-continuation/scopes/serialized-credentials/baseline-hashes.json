@@ -1,0 +1,4 @@
+{
+  "server/src/__tests__/ai-connection-router.test.ts": "3d2a8489eb15c6eeb8fa93c148e8cbe368ff02413ca58eafc43bd97160445bc1",
+  "server/src/__tests__/heartbeat-process-recovery.test.ts": "05362d6cbaf272accc726d7cd42552b07b85fee65529772e95b4d8a7ea5f925b"
+}

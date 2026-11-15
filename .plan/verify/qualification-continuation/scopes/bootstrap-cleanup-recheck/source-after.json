@@ -1,0 +1,4 @@
+{
+  "server/src/services/native-runtime/native-ingress-bootstrap-retry.integration.test.ts": "aa11a0b853b8bc418eecfd8d7e03b33067e9ec9ffe35e5fec865c219998c25eb",
+  "server/src/__tests__/workspace-instance-cleanup.test.ts": "836d86a56137810faeb6cf4f386a5d3656c97f3ece1b0417f2221e29930e5763"
+}

@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-11-15T10:22:21.631431+00:00",
+  "provenance": "Parent continuation steering; no API calls by documentation assembler.",
+  "pr": "https://github.com/AVRCORP/threadkeeper/pull/11",
+  "publishedHead": "aba793728056fd80dc0057f5220af0accde9836c",
+  "localUnpushedHead": "d29108f16304eaed1d21a9366a78484ff6ff046e",
+  "observedPrRun": "https://github.com/AVRCORP/threadkeeper/actions/runs/43700467312",
+  "observedConclusion": "startup_failure",
+  "jobs": 0,
+  "cause": "unknown",
+  "notClaimed": [
+    "billing cause",
+    "code cause",
+    "CI success on latest local delivery"
+  ],
+  "stateInputSha256": "866dd8d9880e55f4fc701d075203f3332e8a92b5bcce90ad7513e9aca45ffe44",
+  "capturePhase": "Prepublication; final commit/push/PR readback belongs to parent after this artifact capture."
+}

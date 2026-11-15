@@ -1,0 +1,5 @@
+{
+  "server/src/__tests__/ai-legacy-compatibility.test.ts": "4905f1dea5472734c28c215ed48de913963f0a7995823d828e5ebdb5ad06049b",
+  "server/src/__tests__/claude-local-adapter-environment.test.ts": "1fbfd1e7a40d3f3c4f37497521e46bb3999e348f394a8d18877bcb9046233d29",
+  "server/src/__tests__/agent-configuration-save.test.ts": "be03a9a6472b019f2d5cdbf7730d21ce73e2f02bcfb54f4dd9180d36f1400019"
+}
