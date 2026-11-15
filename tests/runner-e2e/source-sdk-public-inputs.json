@@ -1,6 +1,6 @@
 {
   "inputs": {
-    "package.json": "e704ca28508fa7c887f704fc26603cf8fd623867",
+    "package.json": "bdc5a1470d68482f9d510cafc39d573554963324",
     "packages/plugins/sdk/package.json": "b7a4936e2803fd0d3b32dd7f17fc1ea86609ead0",
     "packages/plugins/sdk/src/bundlers.ts": "883bf3d9f2bd42877cfc0c3707cd882a6f6248d0",
     "packages/plugins/sdk/src/define-plugin.ts": "a99e07ce77ef72fcf1df1347346aacb8ba12e284",
@@ -22,7 +22,7 @@
     "packages/plugins/sdk/src/protocol.duplex-channel.test.ts": "18255eb3d63038dc459240c111cbcb29fcba25cc",
     "packages/plugins/sdk/src/protocol.ts": "6cbc642412650a511c60b23f5625ac018d189f9d",
     "packages/plugins/sdk/src/testing.ts": "fa99065efa867d8f8a9372cb4a448b8f9d687883",
-    "packages/plugins/sdk/src/types.ts": "80375e46504f96c7c0c1f156319dfb81275d16cc",
+    "packages/plugins/sdk/src/types.ts": "6499b05b941fe16e523d63a0b606b42444bd1ff6",
     "packages/plugins/sdk/src/ui/clipboard.ts": "1f42069c97d731e636a6ad5481dad22d20c0ed63",
     "packages/plugins/sdk/src/ui/components.ts": "3f0594408a1bb5ac3a8d00e709f91877dd260359",
     "packages/plugins/sdk/src/ui/hooks.ts": "686d02cf4b35f1cddb79a83a4c4d81fd52f0100e",
@@ -539,12 +539,12 @@
     "packages/shared/src/worktree-seed-source.test.ts": "852856b1b5b8f4d0d3dada6501886fe50a2c2dde",
     "packages/shared/src/worktree-seed-source.ts": "3d1a09bed2d969feabef3400ff84fd499c1408f4",
     "packages/shared/tsconfig.json": "5a24989cd30dcf3749ca7e60d4e83d6ddbb14714",
-    "pnpm-lock.yaml": "678a34129128e3f65eb6752ebd5dd1ab51687ce6",
+    "pnpm-lock.yaml": "de7255bb4e25bff134d3575aa18914f12132b60f",
     "scripts/ensure-plugin-build-deps.mjs": "356e0e0f80e50890067027da3003485cf5d2ccbe",
     "tsconfig.base.json": "2d0e41f723add0c678936eb9ae1c60eab710f8e0",
     "tsconfig.json": "994ee490fb97be7cc0954f4dfd88cf0723290e6c"
   },
-  "lockSha256": "33360fbf59530ddddd735eba7dbcbcdf05797b68b6418799e6470265c875accb",
+  "lockSha256": "2e78848e16d0b2fb93ea0a01b92285cb083b12329884da758fd61e122d014737",
   "compilerPackageSha256": "3722b30210616a13a3213ded11575ba6b2dbab10c32a5ef67afca8513e27017e",
   "parserPackageSha256": "6d6a65b879cd7cd249a4367c0b57cce00e78c728de45056ac2a5ca1d1f528d1a",
   "parserEntrySha256": "6969920ae0610df927b6b3e675d1309372c268e36d391652af8e3e0183cbe8f8",
