@@ -29,6 +29,7 @@ import { configureDockClient, dockSyncNow, useDockState } from './dock.js';
 import { isRemoteAllowed } from '../../core/privacy.js';
 import type { SectionId } from './SettingsDialog.js';
 import { selectRange, type ThreadSortMode } from './BulkActions.js';
+import { SESSION_KINDS, sanitizeSort, type SessionKind, type ShowInThreadsRequest } from './workspace/lens.js';
 import { useAnalysisRunner } from './hooks/useAnalysisRunner.js';
 import { useLibraryData } from './hooks/useLibraryData.js';
 import { useOrganize } from './hooks/useOrganize.js';
@@ -44,15 +45,19 @@ import type { EvidenceView } from './threads/claims.js';
 import type { RunFilter } from './threads/filters.js';
 import { WORKSPACE_VIEWS, type WorkspaceView } from '../../core/workspace/types.js';
 import { AddAccountDialog } from './accounts/AddAccountDialog.js';
+import { PendingSignInBanner } from './accounts/PendingSignInBanner.js';
 import { BrowseView } from './browse/BrowseView.js';
 import { DashboardView } from './dashboard/DashboardView.js';
 import { Rail } from './shell/Rail.js';
 import { FrameStage } from './workspace/FrameStage.js';
 import { WorkspaceProvider, type ThreadAccount, type WorkspaceContextValue } from './workspace/context.js';
-import { accountForThread, embedTargetFor, threadTabId } from './workspace/state.js';
+import { accountForThread, embedTargetFor, needsSignIn, threadTabId } from './workspace/state.js';
 import { useWorkspace } from './workspace/useWorkspace.js';
 
 type Surface = 'overlay' | 'page' | 'sidepanel';
+
+/** sessionStorage: this browser tab has already landed on the start page once. */
+const LANDED_KEY = 'threadkeeper.landed';
 
 function useEffectiveTheme(theme: SettingsRecord['theme'] | undefined): 'light' | 'dark' {
   const query = useMemo(
@@ -118,11 +123,11 @@ export function App() {
   const [activeTabThreadKey, setActiveTabThreadKey] = useState<string | null>(null);
   // Checked rows for bulk actions; separate from the opened thread (selectedThreadKey).
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
-  const [sortMode, setSortMode] = useState<ThreadSortMode>('recent');
   // Workspace filters of the Threads list (full page).
   const [repositoryFilter, setRepositoryFilter] = useState<string | null>(null);
   const [accountFilter, setAccountFilter] = useState<string | null>(null);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<SessionKind | 'all'>('all');
 
   const [titleDraft, setTitleDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
@@ -320,15 +325,22 @@ export function App() {
       const owner = accountForThread(conv, workspace.realms, settings?.boundAccounts[conv.provider]?.accountId);
       if (!owner) return { realm: null, account: null, active: true, switchable: false };
       const entry = workspace.realms.find((r) => r.realm.id === owner.realm.id);
-      // Until the accounts are known, and for sign-ins Threadkeeper does not switch, the
-      // browser's own login is the only one there is.
-      const active = !entry || !owner.realm.switchable || !entry.activeAccountId || entry.activeAccountId === owner.accountId;
+      // Until the accounts are known, and for sign-ins Threadkeeper keeps no accounts for, the
+      // browser's own login is the only one there is. Otherwise an account is signed in when it
+      // is the browser's own, or an added one with a saved sign-in.
+      const active =
+        !entry || !owner.realm.switchable || !entry.activeAccountId || entry.activeAccountId === owner.accountId || !needsSignIn(owner.account);
       return { realm: owner.realm, account: owner.account, active, switchable: owner.realm.switchable };
     },
     [workspace.realms, settings?.boundAccounts]
   );
 
   const accountIdOf = useCallback((conv: ConversationRecord) => accountOfThread(conv).account?.id ?? null, [accountOfThread]);
+  const accountOrder = useMemo(() => workspace.realms.flatMap((r) => r.accounts.map((a) => a.id)), [workspace.realms]);
+
+  // The Threads order is remembered across reloads (the filters are not).
+  const sortMode: ThreadSortMode = sanitizeSort(settings?.threadsSort);
+  const setSortMode = useCallback((mode: ThreadSortMode) => void persistSettingPatch({ threadsSort: mode }), [persistSettingPatch]);
 
   const {
     rerankNote,
@@ -359,7 +371,9 @@ export function App() {
     repositoryFilter,
     accountFilter,
     runFilter,
+    typeFilter,
     accountIdOf,
+    accountOrder,
   });
 
   // Drop checked threads that no longer exist (deleted here or elsewhere).
@@ -608,12 +622,53 @@ export function App() {
 
   const conversationByKey = useMemo(() => new Map(conversations.map((c) => [c.threadKey, c])), [conversations]);
 
+  // ---- Landing: the start page, once per browser tab ----
+  // Opening Threadkeeper lands on the person's start page (Claude Code unless changed in
+  // Settings; "where I left off" skips this). A link that names a thread, a view or a search is
+  // followed instead, and a reload of the page (which the workspace does to change accounts)
+  // stays where it was.
+  const landed = useRef(false);
+  const openStartPage = workspace.openStartPage;
+  useEffect(() => {
+    if (!isPage || landed.current || !settings || !workspace.ready || !workspace.embedding) return;
+    landed.current = true;
+    let seenBefore = false;
+    try {
+      seenBefore = window.sessionStorage.getItem(LANDED_KEY) === '1';
+      window.sessionStorage.setItem(LANDED_KEY, '1');
+    } catch {
+      // storage blocked: land every time
+    }
+    const linked = urlParams.has('threadKey') || urlParams.has('view') || urlParams.has('q');
+    if (seenBefore || linked || !settings.startPage) return;
+    if (openStartPage(settings.startPage).ok) void persistSettingPatch({ activeView: 'browse' });
+  }, [isPage, settings, workspace.ready, workspace.embedding, openStartPage, urlParams, persistSettingPatch]);
+
   const setView = useCallback(
     (next: WorkspaceView) => {
       setMobileDrawerOpen(false);
       void persistSettingPatch({ activeView: next });
     },
     [persistSettingPatch]
+  );
+  // "Show all" in the side navigation: Threads, narrowed to the group it was pressed on.
+  const showInThreads = useCallback(
+    (request: ShowInThreadsRequest) => {
+      setTypeFilter('all');
+      setProviderFilter('all');
+      setAccountFilter(null);
+      setRepositoryFilter(null);
+      setRunFilter('all');
+      const { by, key } = request;
+      if (key) {
+        if (by === 'kind' && (SESSION_KINDS as readonly string[]).includes(key)) setTypeFilter(key as SessionKind);
+        else if (by === 'provider' && (PROVIDER_IDS as readonly string[]).includes(key)) setProviderFilter(key as ProviderId);
+        else if (by === 'account') setAccountFilter(key);
+        else if (by === 'repository') setRepositoryFilter(key);
+      }
+      setView('threads');
+    },
+    [setView]
   );
   const setDetailMode = useCallback(
     (mode: DetailMode) => {
@@ -673,6 +728,7 @@ export function App() {
     selectedThreadKey: selectedConversation?.threadKey ?? null,
     accountOfThread,
     openSession,
+    showInThreads,
     togglePinned,
     openInChromeTab,
     requestAddAccount: (realmId) => {
@@ -860,6 +916,8 @@ export function App() {
       repositoryFilter={repositoryFilter}
       accountFilter={accountFilter}
       runFilter={runFilter}
+      typeFilter={typeFilter}
+      onTypeFilterChange={setTypeFilter}
       onRepositoryFilterChange={setRepositoryFilter}
       onAccountFilterChange={setAccountFilter}
       onRunFilterChange={setRunFilter}
@@ -984,7 +1042,7 @@ export function App() {
           // The full page is the workspace: a rail and three views over the same sessions. Every
           // view stays mounted so its state survives a switch, and the embedded pages live in
           // the stage, outside the views, so no switch ever reloads one.
-          <FrameStage workspace={workspace}>
+          <FrameStage workspace={workspace} fullNavigation={settings?.embedFullNavigation !== false}>
             <div className="tk-shell" data-rail-collapsed={Boolean(settings?.sidebarCollapsed)} data-view={view}>
               <Rail
                 collapsed={Boolean(settings?.sidebarCollapsed)}
@@ -1002,6 +1060,7 @@ export function App() {
               <div className="tk-main">
                 <StaleBuildBanner snapshot={diagnostics.snapshot} />
                 <RestoreOfferBanner threads={counts ? counts.totalThreads : null} />
+                <PendingSignInBanner />
                 <section className="tk-view tk-view-browse" aria-label="Browse" hidden={view !== 'browse'}>
                   <BrowseView />
                 </section>

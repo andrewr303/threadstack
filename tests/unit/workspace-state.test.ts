@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_COLLAPSED_GROUPS,
   accountForThread,
   embedTargetFor,
+  needsSignIn,
   normalizeWorkspaceState,
   planFrames,
   sessionGroupOf,
+  slotOfTab,
   threadKeyForUrl,
   threadTabId,
+  wantedProfiles,
   workspaceReducer,
+  workspaceShape,
   type WorkspaceAction,
 } from '../../src/entrypoints/manager/workspace/state.js';
 import { primaryAccountId, realmById, realmForProvider } from '../../src/core/workspace/realms.js';
@@ -41,11 +46,11 @@ const anthropic = realmById('anthropic')!;
 const openai = realmById('openai')!;
 const google = realmById('google')!;
 
-function realms(activeClaude = primaryAccountId('anthropic')): RealmAccounts[] {
+function realms(activeClaude = primaryAccountId('anthropic'), work: Partial<AccountRecord> = { hasJar: true }): RealmAccounts[] {
   return [
     {
       realm: anthropic,
-      accounts: [account(primaryAccountId('anthropic'), 'anthropic'), account('acct_work000001', 'anthropic')],
+      accounts: [account(primaryAccountId('anthropic'), 'anthropic'), account('acct_work000001', 'anthropic', work)],
       activeAccountId: activeClaude,
     },
     { realm: openai, accounts: [account(primaryAccountId('openai'), 'openai')], activeAccountId: primaryAccountId('openai') },
@@ -187,6 +192,19 @@ describe('normalizeWorkspaceState', () => {
     expect(s.collapsedGroups).toEqual(['coding']);
     expect(normalizeWorkspaceState(null)).toEqual(EMPTY_WORKSPACE_STATE);
   });
+
+  it('keeps the newest collapsed groups when there are more than it stores', () => {
+    const many = Array.from({ length: MAX_COLLAPSED_GROUPS + 5 }, (_, i) => `repository:owner/r${i}`);
+    const loaded = normalizeWorkspaceState({ collapsedGroups: many });
+    expect(loaded.collapsedGroups).toHaveLength(MAX_COLLAPSED_GROUPS);
+    expect(loaded.collapsedGroups[0]).toBe('repository:owner/r5');
+    expect(loaded.collapsedGroups.at(-1)).toBe(`repository:owner/r${MAX_COLLAPSED_GROUPS + 4}`);
+
+    const next = workspaceReducer(loaded, { type: 'toggle_group', group: 'kind:coding' });
+    expect(next.collapsedGroups).toHaveLength(MAX_COLLAPSED_GROUPS);
+    expect(next.collapsedGroups.at(-1)).toBe('kind:coding');
+    expect(next.collapsedGroups).not.toContain('repository:owner/r5');
+  });
 });
 
 describe('planFrames', () => {
@@ -197,17 +215,85 @@ describe('planFrames', () => {
     { id: 'gemini', provider: 'gemini', realm: 'google', accountId: primaryAccountId('google'), url: 'https://gemini.google.com/app', title: '', threadKey: null, createdAt: 1, lastActiveAt: 2 },
   ];
 
-  it('loads only tabs of the signed-in account of a realm and pauses the other account', () => {
-    const plan = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(['claude-main', 'codex']), realms: realms(), maxLive: 6 });
-    expect(plan.resting['claude-work']).toBe('account');
-    expect(plan.live).toEqual(['claude-main', 'codex']);
-    expect(plan.resting.gemini).toBe('asleep');
+  it("loads the browser account's tabs in ordinary frames and another account's once the profile slot holds it", () => {
+    const waiting = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(['claude-main', 'codex']), realms: realms(), maxLive: 6 });
+    // The slot is claimed for it as soon as it is shown; until then it is about to load.
+    expect(waiting.resting['claude-work']).toBe('asleep');
+    expect(waiting.live).toEqual(['claude-main', 'codex']);
+    expect(waiting.resting.gemini).toBe('asleep');
+    const ready = planFrames({
+      tabs,
+      visible: ['claude-work', 'claude-main'],
+      warmed: new Set(['codex']),
+      realms: realms(),
+      slots: { anthropic: { accountId: 'acct_work000001', status: 'ready' } },
+      maxLive: 6,
+    });
+    // Both accounts of the same sign-in are live at once.
+    expect(ready.live).toEqual(['claude-work', 'claude-main', 'codex']);
   });
 
-  it('after switching accounts the other account loads and the first one pauses', () => {
-    const plan = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(['claude-main']), realms: realms('acct_work000001'), maxLive: 6 });
+  it('a profile tab waits while its sign-in is put in place, and says when that failed', () => {
+    const seeding = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(), realms: realms(), slots: { anthropic: { accountId: 'acct_work000001', status: 'seeding' } }, maxLive: 6 });
+    expect(seeding.resting['claude-work']).toBe('seeding');
+    expect(seeding.live).toEqual([]);
+    const failed = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(), realms: realms(), slots: { anthropic: { accountId: 'acct_work000001', status: 'failed', error: 'x' } }, maxLive: 6 });
+    expect(failed.resting['claude-work']).toBe('failed');
+  });
+
+  it('a profile tab whose sign-in was replaced since the page loaded it waits for a reload, and nothing is claimed', () => {
+    const slots = { anthropic: { accountId: 'acct_work000001', status: 'stale' as const } };
+    const plan = planFrames({ tabs, visible: ['claude-work', 'claude-main'], warmed: new Set(['claude-work']), realms: realms(), slots, maxLive: 6 });
+    expect(plan.resting['claude-work']).toBe('stale');
+    expect(plan.live).toEqual(['claude-main']);
+    expect(wantedProfiles({ tabs, visible: ['claude-work'], realms: realms(), slots })).toEqual([]);
+  });
+
+  it('a third account of a sign-in waits for the profile slot, held by another account', () => {
+    const three: RealmAccounts[] = [
+      { ...realms()[0], accounts: [...realms()[0].accounts, account('acct_third00001', 'anthropic', { hasJar: true })] },
+    ];
+    const third: SessionTab = { ...tabs[1], id: 'claude-third', accountId: 'acct_third00001' };
+    const plan = planFrames({
+      tabs: [tabs[0], tabs[1], third],
+      visible: ['claude-third', 'claude-main'],
+      warmed: new Set(),
+      realms: three,
+      slots: { anthropic: { accountId: 'acct_work000001', status: 'ready' } },
+      maxLive: 6,
+    });
+    expect(plan.resting['claude-third']).toBe('profile');
+    expect(plan.live).toEqual(['claude-main']);
+  });
+
+  it('an account without a saved sign-in waits for the person to choose how to sign in', () => {
+    const plan = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(), realms: realms(undefined, { hasJar: false, signedIn: 'no' }), maxLive: 6 });
+    expect(plan.resting['claude-work']).toBe('signin');
+  });
+
+  it('every tab of a sign-in waits while one of its accounts signs in through the browser', () => {
+    const pending: RealmAccounts[] = realms().map((r) =>
+      r.realm.id === 'anthropic'
+        ? { ...r, pendingSignIn: { realm: 'anthropic', accountId: 'acct_work000001', returnToAccountId: primaryAccountId('anthropic'), startedAt: '' } }
+        : r
+    );
+    const plan = planFrames({ tabs, visible: ['claude-main', 'claude-work', 'codex'], warmed: new Set(), realms: pending, maxLive: 6 });
+    expect(plan.resting['claude-main']).toBe('pending');
+    expect(plan.resting['claude-work']).toBe('pending');
+    expect(plan.live).toEqual(['codex']);
+  });
+
+  it('when another account becomes the browser account, its tabs move to ordinary frames', () => {
+    // The swap saved the outgoing account's cookies as its jar.
+    const swapped = realms('acct_work000001').map((r) =>
+      r.realm.id === 'anthropic'
+        ? { ...r, accounts: r.accounts.map((a) => (a.id === primaryAccountId('anthropic') ? { ...a, hasJar: true } : a)) }
+        : r
+    );
+    const plan = planFrames({ tabs, visible: ['claude-work'], warmed: new Set(['claude-main']), realms: swapped, maxLive: 6 });
     expect(plan.live).toEqual(['claude-work']);
-    expect(plan.resting['claude-main']).toBe('account');
+    // The previous browser account is now a profile with a saved sign-in, loaded when shown.
+    expect(plan.resting['claude-main']).toBe('asleep');
   });
 
   it('different providers stay loaded side by side, and a realm that is not switched always loads', () => {
@@ -223,13 +309,65 @@ describe('planFrames', () => {
     expect(plan.resting.c2).toBe('asleep');
   });
 
-  it('never embeds a tab of an account that lives in its own Chrome window', () => {
-    const iso: RealmAccounts[] = [
-      { realm: anthropic, accounts: [account(primaryAccountId('anthropic'), 'anthropic'), account('acct_iso0000001', 'anthropic', { mode: 'isolated', profileId: '11111111-1111-4111-8111-111111111111' })], activeAccountId: primaryAccountId('anthropic') },
+  it('treats an account stored by an earlier version as living in its own window like any other account', () => {
+    const legacy: RealmAccounts[] = [
+      {
+        realm: anthropic,
+        accounts: [
+          account(primaryAccountId('anthropic'), 'anthropic'),
+          account('acct_iso0000001', 'anthropic', { mode: 'isolated', profileId: '11111111-1111-4111-8111-111111111111' }),
+        ],
+        activeAccountId: primaryAccountId('anthropic'),
+      },
     ];
-    const plan = planFrames({ tabs: [{ ...tabs[1], accountId: 'acct_iso0000001' }], visible: ['claude-work'], warmed: new Set(), realms: iso, maxLive: 6 });
+    const plan = planFrames({ tabs: [{ ...tabs[1], accountId: 'acct_iso0000001' }], visible: ['claude-work'], warmed: new Set(), realms: legacy, maxLive: 6 });
     expect(plan.live).toEqual([]);
-    expect(plan.resting['claude-work']).toBe('isolated');
+    expect(plan.resting['claude-work']).toBe('signin');
+  });
+});
+
+describe('profile slots', () => {
+  const browserTab: SessionTab = { id: 'b', provider: 'claude_code', realm: 'anthropic', accountId: primaryAccountId('anthropic'), url: 'https://claude.ai/code', title: '', threadKey: null, createdAt: 1, lastActiveAt: 1 };
+  const workTab: SessionTab = { ...browserTab, id: 'w', accountId: 'acct_work000001' };
+  const geminiTab: SessionTab = { ...browserTab, id: 'g', provider: 'gemini', realm: 'google', accountId: primaryAccountId('google'), url: 'https://gemini.google.com/app' };
+
+  it("puts the browser account's tabs in ordinary frames and every other account's in the profile slot", () => {
+    expect(slotOfTab(browserTab, realms())).toBe('plain');
+    expect(slotOfTab(workTab, realms())).toBe('profile');
+    expect(slotOfTab(workTab, realms('acct_work000001'))).toBe('plain');
+    expect(slotOfTab(browserTab, realms('acct_work000001'))).toBe('profile');
+    // Sign-ins Threadkeeper keeps no accounts for, and accounts not known yet, use the browser's.
+    expect(slotOfTab(geminiTab, [...realms(), { realm: google, accounts: [], activeAccountId: null }])).toBe('plain');
+    expect(slotOfTab(workTab, [])).toBe('plain');
+  });
+
+  it('says an account needs a sign-in when it has no saved one or the site said it is signed out', () => {
+    expect(needsSignIn(null)).toBe(true);
+    expect(needsSignIn({ hasJar: false, signedIn: 'unknown' })).toBe(true);
+    expect(needsSignIn({ hasJar: true, signedIn: 'no' })).toBe(true);
+    expect(needsSignIn({ hasJar: true, signedIn: 'unknown' })).toBe(false);
+    expect(needsSignIn({ hasJar: true, signedIn: 'yes' })).toBe(false);
+  });
+
+  it('asks for the first shown account with a saved sign-in, once per sign-in, and never over a held slot', () => {
+    const third: SessionTab = { ...workTab, id: 't', accountId: 'acct_third00001' };
+    const three: RealmAccounts[] = [
+      { ...realms()[0], accounts: [...realms()[0].accounts, account('acct_third00001', 'anthropic', { hasJar: true })] },
+    ];
+    expect(wantedProfiles({ tabs: [browserTab, workTab, third], visible: ['b', 'w', 't'], realms: three })).toEqual([
+      { realm: 'anthropic', accountId: 'acct_work000001' },
+    ]);
+    expect(wantedProfiles({ tabs: [workTab, third], visible: ['t', 'w'], realms: three })).toEqual([{ realm: 'anthropic', accountId: 'acct_third00001' }]);
+    expect(wantedProfiles({ tabs: [workTab], visible: ['w'], realms: three, slots: { anthropic: { accountId: 'acct_third00001', status: 'ready' } } })).toEqual([]);
+    // Only what is shown, and only the browser account's: nothing to ask for.
+    expect(wantedProfiles({ tabs: [workTab], visible: [], realms: three })).toEqual([]);
+    expect(wantedProfiles({ tabs: [browserTab], visible: ['b'], realms: three })).toEqual([]);
+  });
+
+  it('leaves an account without a saved sign-in, and a sign-in in progress, to the person', () => {
+    expect(wantedProfiles({ tabs: [workTab], visible: ['w'], realms: realms(undefined, { hasJar: false }) })).toEqual([]);
+    const pending = realms().map((r) => (r.realm.id === 'anthropic' ? { ...r, pendingSignIn: { realm: 'anthropic', accountId: 'acct_work000001', returnToAccountId: primaryAccountId('anthropic'), startedAt: '' } } : r));
+    expect(wantedProfiles({ tabs: [workTab], visible: ['w'], realms: pending })).toEqual([]);
   });
 });
 
@@ -255,5 +393,20 @@ describe('threads and accounts', () => {
     expect(threadKeyForUrl(url, account(primaryAccountId('anthropic'), 'anthropic'), bound)).toBe('claude_code:acct_claude_code_primary:ws_personal:session_abc123:main');
     expect(threadKeyForUrl(url, account('acct_work000001', 'anthropic'), bound)).toBe('claude_code:acct_work000001:ws_personal:session_abc123:main');
     expect(threadKeyForUrl('https://claude.ai/code', account('acct_work000001', 'anthropic'), bound)).toBeNull();
+  });
+});
+
+describe('what is written at once', () => {
+  it('changes with what the person arranges, not with what pages report about themselves', () => {
+    const start = build([open('a', 'https://claude.ai/code', primaryAccountId('anthropic'), 1)]);
+    const shape = workspaceShape(start);
+    // A page reporting its address and title, or a tab being used again: written a moment later.
+    expect(workspaceShape(workspaceReducer(start, { type: 'navigated', id: 'a', url: 'https://claude.ai/code/session_x', title: 'X' }))).toBe(shape);
+    expect(workspaceShape(workspaceReducer(start, { type: 'activate', id: 'a', now: 99 }))).toBe(shape);
+    // Arranging something: written at once.
+    expect(workspaceShape(workspaceReducer(start, open('b', 'https://chatgpt.com/', primaryAccountId('openai'), 2)))).not.toBe(shape);
+    expect(workspaceShape(workspaceReducer(start, { type: 'dashboard_pane', index: 0, threadKey: 'k1' }))).not.toBe(shape);
+    expect(workspaceShape(workspaceReducer(start, { type: 'retarget_account', id: 'a', accountId: 'acct_work000001' }))).not.toBe(shape);
+    expect(workspaceShape(workspaceReducer(start, { type: 'toggle_group', group: 'kind:coding' }))).not.toBe(shape);
   });
 });

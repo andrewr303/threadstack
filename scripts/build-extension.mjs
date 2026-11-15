@@ -496,10 +496,12 @@ async function build() {
     description:
       'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
     // activeTab: lets Settings → Capture read the address of the tab the user invoked Threadkeeper
-    // on ("Add this site"); it adds no install warning. cookies: switching accounts and the
-    // embedded pages' cookie bridge. declarativeNetRequestWithHostAccess: the session rule that
-    // lets provider pages load inside the workspace tab. Neither adds an install warning; they
-    // act only on hosts Threadkeeper already has access to.
+    // on ("Add this site"); it adds no install warning. cookies: the browser account's sign-in
+    // and the embedded pages' cookie bridge. declarativeNetRequestWithHostAccess: the session
+    // rules that let provider pages load inside the workspace tab and put an added account's
+    // saved sign-in in place there. webRequest: seeing (never changing) the cookies the pages of
+    // an added account are given inside the workspace tab, so its saved sign-in stays current.
+    // None adds an install warning; all act only on hosts Threadkeeper already has access to.
     permissions: [
       'storage',
       'unlimitedStorage',
@@ -509,8 +511,9 @@ async function build() {
       'activeTab',
       'cookies',
       'declarativeNetRequestWithHostAccess',
+      'webRequest',
     ],
-    // The Mac helper (isolated accounts in their own Chrome profile), asked for when set up.
+    // The Mac helper (library backups kept on disk), asked for when set up.
     optional_permissions: ['nativeMessaging'],
     // Unchanged since v0.4: an update that grows this list disables the extension until approved.
     host_permissions: hostPermissions,

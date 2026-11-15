@@ -14,6 +14,7 @@ import { processThreadsLocally } from '../../src/core/pipeline.js';
 import { seedSyntheticWorkbenchLibrary } from '../../src/core/synthetic-fixtures.js';
 import { realmById } from '../../src/core/workspace/realms.js';
 import type { AccountRecord, RealmAccounts } from '../../src/core/workspace/types.js';
+import type { SettingsRecord } from '../../src/core/schema.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -222,10 +223,20 @@ const selectedRowTitle = () => q('.tk-row-btn[aria-selected="true"] .tk-row-titl
 const openDialogs = () => qa<HTMLDialogElement>('dialog').filter((d) => d.hasAttribute('open')).map((d) => d.id || d.getAttribute('aria-label') || d.className);
 const settingsRow = () => sharedDb.settings.get('default');
 
-/** Fresh library, fresh DOM: every scenario starts from the same seeded state. */
-async function mountApp(options: { surface?: 'sidepanel'; tabUrl?: string } = {}) {
+/** sessionStorage key: this browser tab has already landed on the start page (App.tsx). */
+const LANDED_KEY = 'threadkeeper.landed';
+
+/**
+ * Fresh library, fresh DOM: every scenario starts from the same seeded state. The page surface
+ * lands on the start page once per browser tab; scenarios about a view say the tab has already
+ * landed (the default) so they record that view, and `land: true` lets the landing happen.
+ */
+async function mountApp(options: { surface?: 'sidepanel'; tabUrl?: string; land?: boolean; settings?: Partial<SettingsRecord> } = {}) {
   await Promise.all(sharedDb.tables.map((t) => t.clear()));
   await ensureStarterCollectionsAndSettings(sharedDb);
+  if (options.settings) await sharedDb.settings.update('default', options.settings);
+  window.sessionStorage.clear();
+  if (!options.land) window.sessionStorage.setItem(LANDED_KEY, '1');
   await seedSyntheticWorkbenchLibrary(sharedDb);
   // Analysis the app would otherwise run itself right after opening; done up front so the DOM is
   // not changing under the recording.
@@ -253,6 +264,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  window.sessionStorage.clear();
+  window.history.replaceState(null, '', '/');
   host.remove();
   delete document.documentElement.dataset.surface;
   document.documentElement.removeAttribute('data-theme');
@@ -607,6 +620,8 @@ describe('manager workbench interactions', () => {
     const before = (await sharedDb.conversations.count());
     await click(button('Delete', q('.tk-detail-header')));
     expect(await sharedDb.conversations.count()).toBe(before - 1);
+    // The announcement follows the tombstone write; on a busy machine it can land a moment later.
+    await waitFor(() => (q('[role="status"].tk-visually-hidden').textContent ?? '') !== '', 'delete announcement');
     expect(q('[role="status"].tk-visually-hidden').textContent).toMatch(/^Deleted ".+" and recorded tombstone\.$/);
   });
 
@@ -624,5 +639,112 @@ describe('manager workbench interactions', () => {
     expect(types.filter((type) => type !== 'WORKSPACE_HELLO')).toEqual([
       'GET_HISTORY_SYNC_STATE', 'DOCK_GET_STATE', 'GET_DIAGNOSTICS', 'GET_DIAGNOSTICS',
     ]);
+  });
+
+  it('remembers the Threads order across a reload', async () => {
+    await mountApp();
+    const sort = () => q<HTMLSelectElement>('select[aria-label="Sort threads"]');
+    expect(sort().value).toBe('recent');
+    await setValue(sort(), 'created');
+    expect((await settingsRow())?.threadsSort).toBe('created');
+    // A reload: same database, a fresh page.
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await act(async () => root.render(<App />));
+    await waitFor(() => qa('.tk-row-item').length > 0, 'library rows');
+    await settle();
+    expect(sort().value).toBe('created');
+  });
+
+  it('"Show all" in the side navigation opens Threads narrowed to that type, with a chip to remove it', async () => {
+    await mountApp();
+    const chatsHead = qa<HTMLButtonElement>('.tk-rail-group-head').find((b) => b.textContent?.includes('Chats'))!;
+    expect(chatsHead).toBeTruthy();
+    const showAll = qa<HTMLButtonElement>('.tk-rail-more').find((b) => /chats/i.test(b.getAttribute('aria-label') ?? ''))!;
+    expect(showAll).toBeTruthy();
+    const total = rowTitles().length;
+    await click(showAll);
+    expect(q<HTMLSelectElement>('select[aria-label="Filter by type"]').value).toBe('chats');
+    expect(q('.tk-thr-chips')!.textContent).toContain('Type: Chats');
+    // The test library holds only chats, so narrowing to Chats keeps every row (the narrowing
+    // itself is covered in threads-view.test.tsx).
+    expect(rowTitles().length).toBe(total);
+    await click(button('Clear filters'));
+    expect(q<HTMLSelectElement>('select[aria-label="Filter by type"]').value).toBe('all');
+    expect(rowTitles().length).toBe(total);
+  });
+
+  it('the sidebar Organize menu regroups the rail and the choice is saved', async () => {
+    await mountApp();
+    const organize = qa<HTMLButtonElement>('.tk-rail-heading button').find((b) => b.textContent?.includes('Organize'))!;
+    await click(organize);
+    const provider = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((el) => el.textContent === 'Provider')!;
+    await click(provider);
+    expect((await settingsRow())?.railLens).toEqual({ groupBy: 'provider', sortBy: 'recent' });
+    expect(qa('.tk-rail-group-head').some((b) => b.textContent?.includes('ChatGPT'))).toBe(true);
+  });
+});
+
+// ---- Landing on the start page --------------------------------------------------------------------
+
+describe('manager workbench landing', () => {
+  const view = () => host.querySelector('.tk-workbench')!.getAttribute('data-view');
+  /** Browse's session tabs (the Threads list has a Search / Ask tab pair of its own). */
+  const sessionTabs = () => qa('.tk-browse-tabs [role="tab"]');
+  /** Date is frozen in this file, so a wait is counted in ticks, not in time. */
+  async function until(check: () => boolean | Promise<boolean>, label: string, ticks = 300) {
+    for (let i = 0; i < ticks; i++) {
+      if (await check()) return;
+      await tick(10);
+    }
+    throw new Error(`timed out waiting for ${label}`);
+  }
+  const storedTabs = async () => {
+    const row = await sharedDb.kv.get('workspace.state');
+    return ((row?.value as { tabs?: Array<{ url: string }> } | undefined)?.tabs ?? []).map((t) => t.url);
+  };
+
+  it('opens Claude Code in Browse the first time the page opens in a browser tab', async () => {
+    await mountApp({ land: true });
+    await until(() => view() === 'browse', 'the Browse view');
+    expect((await settingsRow())?.activeView).toBe('browse');
+    await until(() => sessionTabs().length === 1, 'one session tab');
+    expect(sessionTabs()[0].getAttribute('aria-label')).toContain('Claude Code');
+    // The tab is kept, so a reload of the page comes back to it.
+    await until(async () => (await storedTabs()).length > 0, 'the stored tab');
+    expect(await storedTabs()).toEqual(['https://claude.ai/code']);
+    expect(window.sessionStorage.getItem(LANDED_KEY)).toBe('1');
+  });
+
+  it('lands on the start page chosen in Settings', async () => {
+    await mountApp({ land: true, settings: { startPage: 'https://chatgpt.com/codex' } });
+    await until(() => sessionTabs().length === 1, 'one session tab');
+    expect(sessionTabs()[0].getAttribute('aria-label')).toContain('Codex');
+    expect(view()).toBe('browse');
+  });
+
+  it('stays where the person left off when they chose that, or once the tab has already landed', async () => {
+    await mountApp({ land: true, settings: { startPage: '' } });
+    expect(view()).toBe('threads');
+    expect(sessionTabs()).toHaveLength(0);
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    // A reload of the page (which is how the workspace changes accounts) does not land again.
+    await mountApp({ land: false });
+    expect(view()).toBe('threads');
+    expect(sessionTabs()).toHaveLength(0);
+  });
+
+  it('follows a link that names a thread instead of landing', async () => {
+    window.history.replaceState(null, '', '/manager.html?threadKey=chatgpt%3Aacct_chatgpt_primary%3Aws_personal%3Anot-there%3Amain');
+    await mountApp({ land: true });
+    expect(view()).toBe('threads');
+    expect(sessionTabs()).toHaveLength(0);
+  });
+
+  it('never lands on the side panel', async () => {
+    await mountApp({ surface: 'sidepanel', land: true });
+    expect(sessionTabs()).toHaveLength(0);
+    expect((await settingsRow())?.activeView).not.toBe('browse');
   });
 });

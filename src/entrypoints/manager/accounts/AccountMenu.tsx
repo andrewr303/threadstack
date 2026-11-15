@@ -1,20 +1,23 @@
-// The button that shows which account a sign-in is using, and the menu that switches it.
+// The button that shows which account a sign-in is on, and the menu that goes to another one.
+// Every account of a sign-in stays signed in; choosing one only changes which is in front.
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../shell/icons.js';
 import { AccountChip, accountSubtitle, onMenuKeyDown, usePopover } from '../shell/primitives.js';
 import { useWorkspaceContext } from '../workspace/context.js';
+import { needsSignIn } from '../workspace/state.js';
 import type { AccountRecord } from '../../../core/workspace/types.js';
-import { useMounted } from './common.js';
 
 export interface AccountMenuButtonProps {
-  /** The sign-in whose accounts the menu lists and switches. */
+  /** The sign-in whose accounts the menu lists. */
   realmId: string;
   /**
    * `toolbar`: "Claude · Work" with a chevron, in the Browse toolbar.
-   * `rail`: one row of the "Signed in" list in the side navigation.
+   * `rail`: one row of the "Accounts" list in the side navigation.
    */
   variant: 'toolbar' | 'rail';
+  /** The account in front where the button sits (the tab's). Defaults to the one Browse shows, else the browser's own. */
+  accountId?: string | null;
 }
 
 interface MenuPlace {
@@ -26,17 +29,21 @@ interface MenuPlace {
 const MENU_WIDTH = 340;
 const EDGE = 8;
 
-/** The button that shows which account a sign-in is using and opens the menu to switch it. */
-export function AccountMenuButton({ realmId, variant }: AccountMenuButtonProps) {
-  const { workspace, announce, requestAddAccount, openSettings } = useWorkspaceContext();
+/** What the right-hand side of an account's row says about its sign-in. */
+export function accountState(account: AccountRecord, browserAccountId: string | null): 'browser' | 'signed_in' | 'signed_out' {
+  if (account.id === browserAccountId) return 'browser';
+  return needsSignIn(account) ? 'signed_out' : 'signed_in';
+}
+
+/** The button that shows which account a sign-in is on and opens the menu to go to another. */
+export function AccountMenuButton({ realmId, variant, accountId }: AccountMenuButtonProps) {
+  const { workspace, announce, requestAddAccount, openSettings, setView } = useWorkspaceContext();
   const popover = usePopover();
-  const mounted = useMounted();
   const [error, setError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
   const [place, setPlace] = useState<MenuPlace | null>(null);
 
   const entry = workspace.realms.find((r) => r.realm.id === realmId) ?? null;
-  const switching = workspace.switchingRealm === realmId;
+  const busy = workspace.busyRealm === realmId;
   const { open, setOpen } = popover;
 
   // The menu is drawn on the page, not inside the toolbar or the rail: those are glass, and a
@@ -77,48 +84,36 @@ export function AccountMenuButton({ realmId, variant }: AccountMenuButtonProps) 
   if (!entry) return null;
 
   const { realm } = entry;
-  const active = entry.accounts.find((a) => a.id === entry.activeAccountId) ?? null;
-  const embedded = entry.accounts.filter((a) => a.mode === 'embedded');
-  const isolated = entry.accounts.filter((a) => a.mode === 'isolated');
+  // Every account opens inside Threadkeeper now, including ones that used to open in their own window.
+  const accounts = entry.accounts;
+  const browseTab = workspace.state.tabs.find((t) => t.id === workspace.state.activeTabId) ?? null;
+  const inFrontId = accountId ?? (browseTab?.realm === realmId ? browseTab.accountId : null) ?? entry.activeAccountId;
+  const inFront = accounts.find((a) => a.id === inFrontId) ?? accounts.find((a) => a.id === entry.activeAccountId) ?? null;
+  const pending = entry.pendingSignIn ? accounts.find((a) => a.id === entry.pendingSignIn?.accountId) ?? null : null;
 
   const closeToButton = () => {
     setOpen(false);
     popover.triggerProps.ref.current?.focus();
   };
 
-  const choose = async (account: AccountRecord) => {
-    if (switching) return;
-    if (account.id === entry.activeAccountId) {
-      closeToButton();
+  const choose = (account: AccountRecord) => {
+    setError(null);
+    const outcome = workspace.goToAccount(account.id);
+    if (!outcome.ok) {
+      setError(outcome.message);
       return;
     }
-    setError(null);
-    setPendingId(account.id);
-    const result = await workspace.switchAccount(account.id);
-    if (!mounted.current) return;
-    setPendingId(null);
-    if (result.ok) {
-      announce(`${realm.label} is now signed in as ${account.label}.`);
-      closeToButton();
-    } else {
-      setError(result.error);
-    }
-  };
-
-  const openWindow = async (account: AccountRecord) => {
-    setError(null);
-    const result = await workspace.openIsolated(account.id, realm.homeUrl);
-    if (!mounted.current) return;
-    if (result.ok) {
-      announce(`Opening ${account.label} in its own Chrome window.`);
-      closeToButton();
-    } else {
-      setError(result.error);
-    }
+    setView('browse');
+    announce(
+      needsSignIn(account) && account.id !== entry.activeAccountId
+        ? `${account.label} is not signed in to ${realm.label} yet. Choose how to sign in.`
+        : `Showing ${realm.label} as ${account.label}.`
+    );
+    closeToButton();
   };
 
   const buttonLabel = realm.switchable
-    ? `${realm.label} account: ${active ? `${active.label}, signed in` : 'not known yet'}. Switch account`
+    ? `${realm.label} account: ${inFront ? inFront.label : 'not known yet'}. ${accounts.length > 1 ? 'Choose another account' : 'Accounts'}`
     : `${realm.label} accounts`;
 
   return (
@@ -127,9 +122,9 @@ export function AccountMenuButton({ realmId, variant }: AccountMenuButtonProps) 
         type="button"
         className="tk-btn tk-btn-quiet tk-acct-menu-btn"
         data-variant={variant}
-        data-busy={switching ? 'true' : undefined}
+        data-busy={busy ? 'true' : undefined}
         aria-label={buttonLabel}
-        aria-busy={switching || undefined}
+        aria-busy={busy || undefined}
         {...popover.triggerProps}
         onClick={() => {
           if (!open) measure();
@@ -137,10 +132,10 @@ export function AccountMenuButton({ realmId, variant }: AccountMenuButtonProps) 
         }}
       >
         <span className="tk-acct-realm">{realm.label}</span>
-        {active ? (
-          <AccountChip account={active} active />
+        {inFront ? (
+          <AccountChip account={inFront} active={accountState(inFront, entry.activeAccountId) !== 'signed_out'} />
         ) : (
-          <span className="tk-acct-fixed">{realm.switchable ? 'Not signed in' : 'This browser’s sign-in'}</span>
+          <span className="tk-acct-fixed">{realm.switchable ? 'No account yet' : 'This browser’s sign-in'}</span>
         )}
         <Icon name="chevronDown" size={14} className="tk-acct-chev" />
       </button>
@@ -151,7 +146,7 @@ export function AccountMenuButton({ realmId, variant }: AccountMenuButtonProps) 
             {...popover.menuProps}
             className="tk-pop tk-acct-menu"
             aria-label={`${realm.label} accounts`}
-            aria-busy={switching || undefined}
+            aria-busy={busy || undefined}
             tabIndex={-1}
             style={{ left: place.left, top: place.top, bottom: place.bottom }}
             onKeyDown={onMenuKeyDown}
@@ -159,73 +154,42 @@ export function AccountMenuButton({ realmId, variant }: AccountMenuButtonProps) 
             <div className="tk-acct-menu-head">
               <strong>{realm.label} accounts</strong>
               {realm.switchable ? (
-                <span>One account is signed in at a time. Switching reloads {realm.label} tabs.</span>
+                <span>Every account stays signed in. Choose one to go to its tabs.</span>
               ) : (
                 <span>{realm.fixedReason}</span>
               )}
             </div>
-            {realm.switchable && (
-              <>
-                {embedded.map((account) => {
-                  const isActive = account.id === entry.activeAccountId;
-                  const isPending = pendingId === account.id;
-                  return (
-                    <button
-                      key={account.id}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={isActive}
-                      aria-disabled={switching || undefined}
-                      className="tk-acct-item"
-                      data-busy={isPending ? 'true' : undefined}
-                      onClick={() => void choose(account)}
-                    >
-                      <span className="tk-acct-swatch" data-color={account.color} aria-hidden="true" />
-                      <span className="tk-acct-item-text">
-                        <span className="tk-acct-item-name">{account.label}</span>
-                        <span className="tk-acct-item-sub">{accountSubtitle(account)}</span>
-                      </span>
-                      <span className="tk-acct-item-right">
-                        {isPending ? (
-                          'Switching…'
-                        ) : isActive ? (
-                          <>
-                            <Icon name="check" size={14} />
-                            Signed in
-                          </>
-                        ) : null}
-                      </span>
-                    </button>
-                  );
-                })}
-                {isolated.length > 0 && (
-                  <div role="group" aria-labelledby={`${popover.menuProps.id}-own`}>
-                    <div className="tk-acct-menu-group" id={`${popover.menuProps.id}-own`}>
-                      In their own window
-                    </div>
-                    {isolated.map((account) => (
-                      <button
-                        key={account.id}
-                        type="button"
-                        role="menuitem"
-                        className="tk-acct-item"
-                        onClick={() => void openWindow(account)}
-                      >
-                        <span className="tk-acct-swatch" data-color={account.color} aria-hidden="true" />
-                        <span className="tk-acct-item-text">
-                          <span className="tk-acct-item-name">{account.label}</span>
-                          <span className="tk-acct-item-sub">{accountSubtitle(account)}</span>
-                        </span>
-                        <span className="tk-acct-item-right">
-                          <Icon name="window" size={14} />
-                          Open window
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+            {realm.switchable &&
+              accounts.map((account) => {
+                const state = accountState(account, entry.activeAccountId);
+                const front = account.id === inFront?.id;
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={front}
+                    className="tk-acct-item"
+                    onClick={() => choose(account)}
+                  >
+                    <span className="tk-acct-swatch" data-color={account.color} aria-hidden="true" />
+                    <span className="tk-acct-item-text">
+                      <span className="tk-acct-item-name">{account.label}</span>
+                      <span className="tk-acct-item-sub">{accountSubtitle(account, state === 'browser')}</span>
+                    </span>
+                    <span className="tk-acct-item-right">
+                      {front && <Icon name="check" size={14} />}
+                      {pending?.id === account.id
+                        ? 'Signing in…'
+                        : state === 'browser'
+                          ? 'This browser'
+                          : state === 'signed_in'
+                            ? 'Signed in'
+                            : 'Sign in'}
+                    </span>
+                  </button>
+                );
+              })}
             {error && (
               <p className="tk-acct-menu-error" role="alert">
                 {error}

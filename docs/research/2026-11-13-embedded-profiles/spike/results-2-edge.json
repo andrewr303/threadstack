@@ -1,0 +1,80 @@
+{
+  "findings": {
+    "a_getFrameId_type": "undefined",
+    "a_frame_id_before_first_load": null,
+    "a_frame_ids_reported_by_content_script": [
+      {
+        "frameId": 4,
+        "credentialless": true
+      },
+      {
+        "frameId": 4,
+        "credentialless": true
+      }
+    ],
+    "a_frame_id_after": null,
+    "b_ws_plain_frame": {
+      "state": "open",
+      "seen": {
+        "none": "A"
+      },
+      "fetchSees": {
+        "sessionKey": "A",
+        "strict": "A",
+        "none": "A"
+      }
+    },
+    "b_ws_credentialless_frame": {
+      "state": "open",
+      "seen": {
+        "none": "B"
+      },
+      "fetchSees": {
+        "sessionKey": "B",
+        "strict": "B",
+        "none": "B"
+      }
+    },
+    "b_ws_top_level_tab": {
+      "state": "open",
+      "seen": {
+        "sessionKey": "A",
+        "strict": "A",
+        "none": "A"
+      }
+    },
+    "c_large_seed_rule": {
+      "ok": true,
+      "id": 100
+    },
+    "c_large_seed_cookies_stored": {
+      "big": 6,
+      "huge": 4000
+    },
+    "d_plain-app": {
+      "sidebarHidden": true,
+      "probe": "true|set-through-self|object|true|true|parent:false",
+      "module": "true|function"
+    },
+    "d_top-app": {
+      "sidebarHidden": false,
+      "probe": "false|set-through-self|object|true|false|parent:false",
+      "module": "true|function"
+    },
+    "d_top-app-meta": {
+      "sidebarHidden": false,
+      "probe": "false|set-through-self|object|true|false|parent:false",
+      "module": "true|function"
+    },
+    "d_top-cred-app": {
+      "sidebarHidden": false,
+      "probe": "false|set-through-self|object|true|false|parent:false",
+      "module": "true|function"
+    },
+    "d_ordinary_tab": {
+      "sidebarHidden": false,
+      "probe": "false|set-through-self|object|true|true|parent:true"
+    }
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+}

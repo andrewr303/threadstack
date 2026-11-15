@@ -15,7 +15,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { EMBED_FRAME_NAME_PREFIX, type SessionTab } from '../../../core/workspace/types.js';
+import { buildPaneName } from '../../../core/embed/frame.js';
+import type { SessionTab } from '../../../core/workspace/types.js';
 import { EMBED_ALLOW, EMBED_SANDBOX, realmLabel, type WorkspaceController } from './useWorkspace.js';
 
 interface SlotRegistry {
@@ -54,7 +55,16 @@ function measure(element: HTMLElement): Box | null {
  * Hosts the iframes of every loaded session tab and gives descendants the slot registry.
  * Mount once, around the views.
  */
-export function FrameStage({ workspace, children }: { workspace: WorkspaceController; children: React.ReactNode }) {
+export function FrameStage({
+  workspace,
+  fullNavigation = true,
+  children,
+}: {
+  workspace: WorkspaceController;
+  /** Settings: make sites that hide their navigation inside a frame show it (on by default). */
+  fullNavigation?: boolean;
+  children: React.ReactNode;
+}) {
   // tabId -> the slot elements asking for it. Every view stays mounted, so one tab can have a
   // slot in several views at once (the Browse tab, the Threads live pane, a Dashboard pane);
   // the page goes to the one that is on screen, the most recently registered first.
@@ -165,27 +175,46 @@ export function FrameStage({ workspace, children }: { workspace: WorkspaceContro
     <SlotContext.Provider value={registry}>
       {children}
       <div className="tk-frame-stage" data-testid="frame-stage">
-        {liveTabs.map((tab) => (
-          <EmbeddedPage
-            key={`${tab.id}#${workspace.runtime(tab.id).reloads}`}
-            tab={tab}
-            box={boxes[tab.id] ?? null}
-            loaded={workspace.runtime(tab.id).loaded}
-            onLoad={workspace.noteFrameLoaded}
-          />
-        ))}
+        {liveTabs.map((tab) => {
+          const profile = workspace.slotOf(tab) === 'profile';
+          return (
+            <EmbeddedPage
+              // The slot and the navigation option are fixed when a frame is created, so a tab
+              // that changes either gets a new frame (a new key), like a reload does.
+              key={`${tab.id}#${workspace.runtime(tab.id).reloads}#${profile ? 'p' : 'b'}${fullNavigation ? '' : 'n'}`}
+              tab={tab}
+              profile={profile}
+              fullNavigation={fullNavigation}
+              box={boxes[tab.id] ?? null}
+              loaded={workspace.runtime(tab.id).loaded}
+              onLoad={workspace.noteFrameLoaded}
+            />
+          );
+        })}
       </div>
     </SlotContext.Provider>
   );
 }
 
+/**
+ * `credentialless` puts the frame in the page's own cookie partition (the profile slot) instead
+ * of the browser's. It has to be on the element before it loads, and React does not know the
+ * attribute by name, so it is passed through as a plain attribute.
+ */
+const CREDENTIALLESS = { credentialless: '' } as React.IframeHTMLAttributes<HTMLIFrameElement>;
+
 const EmbeddedPage = React.memo(function EmbeddedPage({
   tab,
+  profile,
+  fullNavigation,
   box,
   loaded,
   onLoad,
 }: {
   tab: SessionTab;
+  /** Loads in the profile slot (another account than the browser's own sign-in). */
+  profile: boolean;
+  fullNavigation: boolean;
   box: Box | null;
   loaded: boolean;
   onLoad: (id: string) => void;
@@ -199,13 +228,15 @@ const EmbeddedPage = React.memo(function EmbeddedPage({
       { display: 'none' };
   return (
     <iframe
+      {...(profile ? CREDENTIALLESS : null)}
       className="tk-frame"
-      name={`${EMBED_FRAME_NAME_PREFIX}${tab.id}`}
+      name={buildPaneName(tab.id, fullNavigation ? [] : ['n'])}
       title={`${tab.title || realmLabel(tab.realm)} (embedded page)`}
       src={src}
       sandbox={EMBED_SANDBOX}
       allow={EMBED_ALLOW}
       data-tab={tab.id}
+      data-slot={profile ? 'profile' : 'browser'}
       data-loaded={loaded ? 'true' : 'false'}
       style={style}
       onLoad={() => onLoad(tab.id)}

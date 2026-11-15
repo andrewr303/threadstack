@@ -1,9 +1,12 @@
 // Workspace state: the open session tabs, the dashboard panes, and the plan that decides which
 // embedded pages are loaded. Pure functions only, so the rules can be tested without a browser.
 //
-// One rule shapes everything here: a Chrome profile has one set of cookies per login realm, so
-// only the tabs of the realm's signed-in account can be loaded. Tabs of another account of the
-// same realm are shown paused until the person switches to that account.
+// Two places a tab's page can load, per login realm. Tabs of the realm's browser account (the
+// one the browser itself is signed in to) load in ordinary frames. Tabs of any other account
+// load in the page's profile slot: credentialless frames that share the page's own cookie
+// partition, which Threadkeeper fills with that account's saved sign-in. The slot holds one
+// account per realm for the life of the page, so two accounts of a realm are live at once; a
+// third needs the page reloaded.
 import {
   detectProviderFromUrl,
   extractConversationIdFromUrl,
@@ -177,6 +180,11 @@ export type WorkspaceAction =
   | { type: 'toggle_group'; group: string };
 
 const MAX_TABS = 40;
+/**
+ * Collapsed sidebar groups kept. Groups can be by provider, account, repository or date, so a
+ * busy library has many; past the cap the oldest collapse is forgotten, never the newest.
+ */
+export const MAX_COLLAPSED_GROUPS = 150;
 
 function clampPanes(panes: Array<string | null>, layout: DashboardLayout): Array<string | null> {
   const next = panes.slice(0, layout);
@@ -334,10 +342,23 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         ...state,
         collapsedGroups: collapsed
           ? state.collapsedGroups.filter((g) => g !== action.group)
-          : [...state.collapsedGroups, action.group],
+          : [...state.collapsedGroups, action.group].slice(-MAX_COLLAPSED_GROUPS),
       };
     }
   }
+}
+
+/**
+ * What the person arranged, without what the pages report about themselves (titles, addresses,
+ * when a tab was last used): a change here is written at once (useWorkspace).
+ */
+export function workspaceShape(state: WorkspaceState): string {
+  return JSON.stringify([
+    state.tabs.map((t) => [t.id, t.accountId, t.realm, t.threadKey]),
+    state.activeTabId,
+    state.dashboard,
+    state.collapsedGroups,
+  ]);
 }
 
 /** Make stored state safe to use: drop what is malformed, keep the invariants. */
@@ -386,7 +407,7 @@ export function normalizeWorkspaceState(raw: unknown): WorkspaceState {
       focusedPane: typeof focused === 'number' && focused >= 0 && focused < layout ? focused : 0,
     },
     collapsedGroups: Array.isArray(base.collapsedGroups)
-      ? base.collapsedGroups.filter((g): g is string => typeof g === 'string').slice(0, 40)
+      ? base.collapsedGroups.filter((g): g is string => typeof g === 'string').slice(-MAX_COLLAPSED_GROUPS)
       : [],
   };
 }
@@ -395,14 +416,54 @@ export function normalizeWorkspaceState(raw: unknown): WorkspaceState {
 // Which embedded pages are loaded
 // ---------------------------------------------------------------------------------------------
 
+/** Where a tab's page loads: an ordinary frame (the browser's own sign-in) or the profile slot. */
+export type TabSlot = 'plain' | 'profile';
+
+/** What this page's profile slot of one realm holds. Kept by the page; gone when it reloads. */
+export interface ProfileSlotState {
+  accountId: string;
+  /**
+   * `seeding`: the account's saved sign-in is being put in place. `stale`: the saved sign-in was
+   * replaced after this page loaded it (PROFILE_RETIRED), so the page has to reload to show it.
+   */
+  status: 'seeding' | 'ready' | 'failed' | 'stale';
+  /** Why seeding failed, in plain words. */
+  error?: string;
+  /** The saved sign-in was too large to load whole (see ProfileClaimResult.truncated). */
+  truncated?: boolean;
+}
+
+/** Realm id to what its slot holds. */
+export type ProfileSlotMap = Readonly<Record<string, ProfileSlotState>>;
+
+/**
+ * Which place a tab loads in. A realm Threadkeeper keeps no accounts for, and a realm whose
+ * accounts are not known yet, has only the browser's own sign-in.
+ */
+export function slotOfTab(tab: Pick<SessionTab, 'realm' | 'accountId'>, realms: readonly RealmAccounts[]): TabSlot {
+  const entry = realms.find((r) => r.realm.id === tab.realm);
+  if (!entry || !entry.realm.switchable || !entry.activeAccountId) return 'plain';
+  return tab.accountId === entry.activeAccountId ? 'plain' : 'profile';
+}
+
+/** Whether an account has no saved sign-in to show: its pages would open on the site's sign-in page. */
+export function needsSignIn(account: Pick<AccountRecord, 'hasJar' | 'signedIn'> | null): boolean {
+  return !account || !account.hasJar || account.signedIn === 'no';
+}
+
 /**
  * Why a tab is not loaded right now.
- * - `account`: its realm is signed in as another account; switching accounts loads it.
- * - `isolated`: its account lives in its own Chrome window (Mac helper) and is never embedded.
+ * - `signin`: its account has no saved sign-in; the person chooses how to sign in.
+ * - `profile`: the realm's profile slot holds another account; showing this one reloads the page.
+ * - `seeding`: its account's sign-in is being put in place; the page loads in a moment.
+ * - `failed`: that did not work; the person can try again.
+ * - `stale`: the account's saved sign-in changed after this page loaded it; reloading shows it.
+ * - `pending`: an account of the realm is signing in through the browser right now, so the
+ *   browser's own sign-in for the realm is set aside until that ends.
  * - `asleep`: nothing is wrong; it was not shown yet this session, or was unloaded to keep the
  *   number of loaded pages within the limit. Showing it loads it.
  */
-export type TabRest = 'account' | 'isolated' | 'asleep';
+export type TabRest = 'signin' | 'profile' | 'seeding' | 'failed' | 'stale' | 'pending' | 'asleep';
 
 export interface FramePlan {
   /** Tabs whose page should be mounted, most recently used first. */
@@ -418,27 +479,37 @@ export interface FramePlanInput {
   /** Tabs whose page has been mounted this session (candidates to keep loaded in the background). */
   warmed: ReadonlySet<string>;
   realms: readonly RealmAccounts[];
+  /** What this page's profile slots hold. */
+  slots?: ProfileSlotMap;
   maxLive: number;
 }
 
 export function planFrames(input: FramePlanInput): FramePlan {
-  const active = activeAccountsOf(input.realms);
+  const slots = input.slots ?? {};
   const resting: Record<string, TabRest> = {};
   const eligible: SessionTab[] = [];
   for (const tab of input.tabs) {
-    const account = findAccount(input.realms, tab.accountId);
-    if (account?.mode === 'isolated') {
-      resting[tab.id] = 'isolated';
-      continue;
-    }
     const entry = input.realms.find((r) => r.realm.id === tab.realm);
-    // A realm Threadkeeper does not switch has one login, the browser's: every tab can load.
-    const signedIn = !entry || !entry.realm.switchable || !active[tab.realm] || active[tab.realm] === tab.accountId;
-    if (!signedIn) {
-      resting[tab.id] = 'account';
+    if (entry?.pendingSignIn) {
+      resting[tab.id] = 'pending';
       continue;
     }
-    eligible.push(tab);
+    if (slotOfTab(tab, input.realms) === 'plain') {
+      eligible.push(tab);
+      continue;
+    }
+    const slot = slots[tab.realm];
+    if (!slot) {
+      // Unclaimed: an account with a saved sign-in is loaded as soon as its tab is shown
+      // (wantedProfiles); one without waits for the person to choose how to sign in.
+      resting[tab.id] = needsSignIn(findAccount(input.realms, tab.accountId)) ? 'signin' : 'asleep';
+    } else if (slot.accountId !== tab.accountId) {
+      resting[tab.id] = 'profile';
+    } else if (slot.status === 'ready') {
+      eligible.push(tab);
+    } else {
+      resting[tab.id] = slot.status;
+    }
   }
   const limit = Math.max(1, input.maxLive);
   const live: string[] = [];
@@ -453,6 +524,26 @@ export function planFrames(input: FramePlanInput): FramePlan {
   for (const t of background) take(t.id);
   for (const t of eligible) if (!live.includes(t.id)) resting[t.id] = 'asleep';
   return { live, resting };
+}
+
+/**
+ * The profile accounts to load now: for each realm whose slot is still free, the account of the
+ * first shown tab that needs the slot and has a saved sign-in. Nothing is claimed for a realm in
+ * the middle of a browser sign-in, or for an account that still has to sign in (that is the
+ * person's choice to start).
+ */
+export function wantedProfiles(input: Pick<FramePlanInput, 'tabs' | 'visible' | 'realms' | 'slots'>): Array<{ realm: string; accountId: string }> {
+  const slots = input.slots ?? {};
+  const wanted = new Map<string, string>();
+  for (const id of input.visible) {
+    const tab = input.tabs.find((t) => t.id === id);
+    if (!tab || wanted.has(tab.realm) || slots[tab.realm]) continue;
+    const entry = input.realms.find((r) => r.realm.id === tab.realm);
+    if (!entry || entry.pendingSignIn || slotOfTab(tab, input.realms) !== 'profile') continue;
+    if (needsSignIn(findAccount(input.realms, tab.accountId))) continue;
+    wanted.set(tab.realm, tab.accountId);
+  }
+  return [...wanted].map(([realm, accountId]) => ({ realm, accountId }));
 }
 
 /** A short name for a tab when the page has not reported a title yet. */

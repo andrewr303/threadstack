@@ -80,8 +80,19 @@
   min-width: 0;
 }
 
-.tk-thr-groupby .tk-seg {
+.tk-thr-groupby .tk-seg,
+.tk-thr-groupby .tk-select {
   width: 100%;
+}
+
+/* The removable chips of the active workspace filters, shown even while the filter controls are
+   collapsed, with one action to clear them all. */
+.tk-thr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
 }
 
 .tk-thr-filter-chip {
@@ -111,13 +122,19 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px;
+  /* No padding above: an expanded group's header sticks to the top edge of this scroller. The
+     first group carries the space instead. */
+  padding: 0 6px 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-2) transparent;
 }
 
 .tk-thr-group + .tk-thr-group {
   margin-top: 4px;
+}
+
+.tk-thr-group:first-child {
+  margin-top: 6px;
 }
 
 /* The rows keep their list markup; inside a group the list no longer scrolls on its own. */
@@ -145,6 +162,24 @@
 .tk-thr-group-head:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+
+/* While a group is open its header stays at the top as its rows scroll by (the group is the
+   containing block, so it moves on when the group ends). Opaque, because rows pass beneath it. */
+.tk-thr-group-head[aria-expanded="true"] {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.tk-thr-group-head[aria-expanded="true"]:hover {
+  background: var(--surface-2);
+}
+
+.tk-thr-group-head:focus-visible {
+  outline-offset: -2px;
 }
 
 .tk-thr-group-head:active {

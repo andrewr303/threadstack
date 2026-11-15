@@ -7,6 +7,7 @@ import {
   type DomExtractionResult,
 } from '../core/dom-capture.js';
 import {
+  IDENTITY_REPLAY_SOURCE,
   parseIdentityMessage,
   parseSiteConversation,
   parseSiteDataMessage,
@@ -25,7 +26,7 @@ import {
   providerCategory,
   type ProviderId,
 } from '../core/providers.js';
-import { frameMode, paneName } from '../core/embed/frame.js';
+import { frameMode, inProfileFrame, paneName } from '../core/embed/frame.js';
 import { agentStateOf, readAgentPage } from '../core/embed/agent-state.js';
 import { parseIdentity, providerForIdentitySource } from '../core/accounts/identity.js';
 import { realmForProvider, realmOwnsHost, switchableRealms } from '../core/workspace/realms.js';
@@ -598,7 +599,7 @@ const HELLO_RETRY_MS = [2000, 10_000];
 
 function sendEmbedHello(attempt = 0): void {
   sendToExtension(
-    { type: 'EMBED_HELLO', pane: EMBED_PANE, url: window.location.href, title: document.title },
+    { type: 'EMBED_HELLO', pane: EMBED_PANE, url: window.location.href, title: document.title, profile: inProfileFrame(window) },
     (response) => {
       const r = response as { ok?: unknown; frameId?: unknown } | undefined;
       if (r?.ok === true && typeof r.frameId === 'number' && Number.isInteger(r.frameId) && r.frameId > 0) {
@@ -1015,6 +1016,12 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
     window.addEventListener('message', onSiteDataWindowMessage);
   }
   window.addEventListener('message', onIdentityWindowMessage);
+  // The page may have asked who is signed in before this script started; hear it again.
+  try {
+    window.postMessage({ source: IDENTITY_REPLAY_SOURCE }, window.location.origin);
+  } catch {
+    // never disturb the page
+  }
 
   // Listen for deliberate invocation from background service worker
   if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {

@@ -7,7 +7,7 @@ import { providerCategory } from '../../../core/providers.js';
 import { AccountChip, ProviderMark, RunState, providerName } from '../shell/primitives.js';
 import { useWorkspaceContext } from '../workspace/context.js';
 import { launchSections, type LaunchProvider } from '../workspace/launch.js';
-import { embedTargetFor } from '../workspace/state.js';
+import { embedTargetFor, needsSignIn } from '../workspace/state.js';
 import { relativeTime } from './format.js';
 
 const RECENT_COUNT = 8;
@@ -18,7 +18,7 @@ function ProviderCard({ entry, onOpen }: { entry: LaunchProvider; onOpen: (url: 
   const name = providerName(entry.provider);
   const realm = realmForProvider(entry.provider);
   const group = realm ? workspace.realms.find((r) => r.realm.id === realm.id) : undefined;
-  const accounts: AccountRecord[] = (group?.accounts ?? []).filter((a) => a.mode === 'embedded');
+  const accounts: AccountRecord[] = group?.accounts ?? [];
   const several = accounts.length > 1;
   return (
     <li className="tk-browse-prov" role="group" aria-labelledby={nameId}>
@@ -28,14 +28,15 @@ function ProviderCard({ entry, onOpen }: { entry: LaunchProvider; onOpen: (url: 
         <div className="tk-browse-prov-actions">
           {several ? (
             accounts.map((account) => {
-              const signedIn = account.id === group?.activeAccountId;
+              const browser = account.id === group?.activeAccountId;
+              const signedIn = browser || !needsSignIn(account);
               return (
                 <button key={account.id} type="button" className="tk-btn" onClick={() => onOpen(entry.url, account.id)}>
                   <span className="tk-acct" data-color={account.color} data-active={signedIn ? 'true' : 'false'} aria-hidden="true">
                     <span className="tk-acct-dot" />
                   </span>
                   <span>Open as {account.label}</span>
-                  {signedIn && <small className="tk-browse-prov-note">signed in</small>}
+                  {!signedIn && <small className="tk-browse-prov-note">not signed in yet</small>}
                 </button>
               );
             })
@@ -70,7 +71,7 @@ export const NewTabPage = forwardRef<
         <div className="tk-browse-launch-main">
           <h2 className="tk-browse-launch-title">Open a session</h2>
           <p className="tk-browse-launch-sub">
-            Pick a provider and the account to use. Switching to another account of the same provider pauses that provider’s other tabs here.
+            Pick a provider and the account to use. Accounts of the same provider stay signed in side by side.
           </p>
           {sections.map((section) => (
             <section key={section.group} className="tk-browse-launch-group" aria-label={section.label}>

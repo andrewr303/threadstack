@@ -133,6 +133,33 @@ describe('workspace tabs bookkeeping', () => {
     expect([...dnr.rules.keys()]).toEqual([1000]);
   });
 
+  it("keeps a workspace tab whose address it cannot read: the extension never sees its own page's address", async () => {
+    const store = memoryStore();
+    const dnr = fakeDnr();
+    // How Chrome answers without the "tabs" permission: the tabs exist, their addresses are hidden.
+    const hidden = new Set([5, 6]);
+    const tabs = new WorkspaceTabs({ store, rules: dnr.api, tabUrl: async (id) => (hidden.has(id) ? undefined : null), managerUrl: MANAGER });
+    await tabs.hello(5);
+    // A second workspace tab saying hello used to drop the first one's rule.
+    await tabs.hello(6);
+    expect(tabs.has(5) && tabs.has(6)).toBe(true);
+    expect(dnr.rules.size).toBe(2);
+    // So did a worker restart.
+    const restarted = new WorkspaceTabs({ store, rules: dnr.api, tabUrl: async (id) => (hidden.has(id) ? undefined : null), managerUrl: MANAGER });
+    await restarted.prune();
+    expect(restarted.has(5) && restarted.has(6)).toBe(true);
+    expect(dnr.rules.size).toBe(2);
+    // A tab that is gone, or seen showing another address, is still forgotten.
+    hidden.delete(6);
+    await restarted.prune();
+    expect(restarted.has(6)).toBe(false);
+    expect(dnr.rules.size).toBe(1);
+    const seen = new WorkspaceTabs({ store, rules: dnr.api, tabUrl: async () => 'https://example.com/', managerUrl: MANAGER });
+    await seen.prune();
+    expect(seen.has(5)).toBe(false);
+    expect(dnr.rules.size).toBe(0);
+  });
+
   it('forgets a closed tab and removes its rule', async () => {
     const { store, dnr, urls, tabs } = setup();
     urls.set(5, MANAGER);

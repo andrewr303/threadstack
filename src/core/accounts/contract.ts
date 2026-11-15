@@ -10,6 +10,7 @@ import type {
   AccountMode,
   AccountRecord,
   AccountsChangeResult,
+  PendingSignIn,
   RealmAccounts,
   StoredCookie,
   WorkspaceFailure,
@@ -52,6 +53,11 @@ export interface IdentityOutcome {
   reassigned: boolean;
   /** True when the stored identity or sign-in state of an account changed. */
   updated: boolean;
+  /**
+   * The account this report named, when it named someone and was taken into account (not a
+   * "nobody signed in" report, and not one set aside right after a switch).
+   */
+  named?: string | null;
 }
 
 export interface AccountService {
@@ -70,13 +76,52 @@ export interface AccountService {
    */
   resolveForCapture(provider: ProviderId, bound: { accountId: string; workspaceId: string }): Promise<CaptureAccount>;
   /**
-   * Add an account. An embedded account becomes the realm's active account at once: the
-   * current cookies are saved to the outgoing account and the realm is left signed out, ready
-   * for the person to sign in. An isolated account only records the profile.
+   * Add an account. It is a profile from the start: no cookie of the browser is touched, and
+   * the account has no sign-in until the person signs in inside its profile pages or through
+   * `beginBrowserSignIn`.
    */
   add(input: AddAccountInput): Promise<AccountsChangeResult | WorkspaceFailure>;
-  /** Make an embedded account the signed-in one: save the outgoing cookies, restore its own. */
+  /**
+   * Make an account the browser's own sign-in for its realm: save the browser's current cookies
+   * as the outgoing account's jar, restore this account's. Every tab of the realm changes.
+   */
   activate(accountId: string): Promise<AccountsChangeResult | WorkspaceFailure>;
+  /** An account by id, or null. Legacy isolated accounts are returned as embedded profiles. */
+  account(accountId: string): Promise<AccountRecord | null>;
+  /**
+   * A profile account's saved cookies, or null when it has none (or they cannot be read). The
+   * realm's browser account has no jar to read: its cookies are the browser's.
+   */
+  readJar(accountId: string): Promise<StoredCookie[] | null>;
+  /**
+   * Save a profile account's cookies as they are now. Ignored for an account that is the
+   * browser's own sign-in at that moment (its cookies live in the browser). An empty list
+   * deletes the jar.
+   */
+  writeJar(accountId: string, cookies: StoredCookie[]): Promise<void>;
+  /** The bot-check cookies the browser holds for a realm, which every profile of it shares. */
+  deviceCookies(realmId: string): Promise<StoredCookie[]>;
+  /**
+   * Keep a copy of the browser account's cookies as they are now, so that signing in as someone
+   * else in the browser (a sign-in popup from a profile page does that) cannot lose them.
+   */
+  snapshotBrowserAccount(realmId: string): Promise<void>;
+  /**
+   * The site named who is signed in inside a profile's pages (or, with null, that nobody is).
+   * Recorded on that account only; a profile is whoever signed in there.
+   */
+  noteProfileIdentity(accountId: string, identity: Omit<AccountIdentity, 'observedAt'> | null): Promise<IdentityOutcome | null>;
+  /**
+   * Sign a profile account in through the browser itself: the browser's own sign-in for the
+   * realm is saved and cleared, and the account becomes the browser account until
+   * `finishBrowserSignIn` or `cancelBrowserSignIn`.
+   */
+  beginBrowserSignIn(accountId: string): Promise<AccountsChangeResult | WorkspaceFailure>;
+  /** Keep what the browser is signed in to as the pending account's jar; restore the browser's own. */
+  finishBrowserSignIn(): Promise<AccountsChangeResult | WorkspaceFailure>;
+  /** Give the pending sign-in up: restore the browser's own sign-in and keep nothing. */
+  cancelBrowserSignIn(): Promise<AccountsChangeResult | WorkspaceFailure>;
+  pendingSignIn(): Promise<PendingSignIn | null>;
   update(accountId: string, patch: { label?: string; color?: AccountColor }): Promise<AccountsChangeResult | WorkspaceFailure>;
   /** Forget an account and its saved cookies. Threads keep their keys. A primary account cannot be removed. */
   remove(accountId: string): Promise<AccountsChangeResult | WorkspaceFailure>;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { ConversationRecord, WorkflowState } from '../../core/schema.js';
+import type { ConversationRecord, LensSort, WorkflowState } from '../../core/schema.js';
 import {
   UNFILED_PROJECT,
   applyBulkThreadEdit,
@@ -10,6 +10,7 @@ import {
 import { exportThreadToMarkdown, type PortableBundle } from '../../core/adapters.js';
 import { normalizeTag, undoChangeLog } from '../../core/organization.js';
 import { WORKFLOW_LABELS, openModal, sharedDb } from './shared.js';
+import { LENS_SORT_LABELS, hitConversation, sortLens } from './workspace/lens.js';
 import {
   NEW_COLLECTION,
   describeSendOutcome,
@@ -23,44 +24,22 @@ import { StillTargetPicker } from './SidebarDock.js';
 
 // ---- List order ----
 
-export type ThreadSortMode = 'recent' | 'oldest' | 'title' | 'messages';
+export type ThreadSortMode = LensSort;
 
-export const THREAD_SORT_LABELS: Record<ThreadSortMode, string> = {
-  recent: 'Recent activity',
-  oldest: 'Oldest first',
-  title: 'Title A–Z',
-  messages: 'Most messages',
-};
-
-function activityTime(conv: ConversationRecord): number {
-  const t = Date.parse(conv.updatedAt ?? conv.lastCapturedAt);
-  return Number.isFinite(t) ? t : 0;
-}
+export const THREAD_SORT_LABELS: Record<ThreadSortMode, string> = LENS_SORT_LABELS;
 
 /**
  * Order the list. 'recent' keeps the order the list already has (latest activity, or best
- * match while searching); the sort is stable, so ties keep that order too.
+ * match while searching); the other modes are the shared lens orders. The sort is stable, so
+ * ties keep the incoming order.
  */
 export function sortThreadHits<T extends { conversation: ConversationRecord }>(
   hits: readonly T[],
   mode: ThreadSortMode,
   titleOf: (conv: ConversationRecord) => string
 ): T[] {
-  const out = [...hits];
-  if (mode === 'oldest') {
-    out.sort((a, b) => activityTime(a.conversation) - activityTime(b.conversation));
-  } else if (mode === 'title') {
-    const titles = new Map(out.map((h) => [h.conversation.threadKey, titleOf(h.conversation)]));
-    out.sort((a, b) =>
-      (titles.get(a.conversation.threadKey) ?? '').localeCompare(titles.get(b.conversation.threadKey) ?? '', undefined, {
-        sensitivity: 'base',
-        numeric: true,
-      })
-    );
-  } else if (mode === 'messages') {
-    out.sort((a, b) => b.conversation.messageCount - a.conversation.messageCount);
-  }
-  return out;
+  if (mode === 'recent') return [...hits];
+  return sortLens(hits, mode, hitConversation, titleOf);
 }
 
 // ---- Selection ----

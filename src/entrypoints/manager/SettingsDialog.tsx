@@ -28,6 +28,7 @@ import {
 } from '../../core/ai/claude.js';
 import { CaptureSettings } from './CaptureSettings.js';
 import { AccountsSettings } from './accounts/AccountsSettings.js';
+import { LAUNCH_PROVIDERS } from './workspace/launch.js';
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost, resolveModelId } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
@@ -647,6 +648,37 @@ export function SettingsDialog({
           </div>
         </Section>
         <Section title="Workspace">
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Start page
+              <select
+                className="tk-select"
+                aria-describedby="tk-start-page-hint"
+                value={settings.startPage}
+                onChange={(e) => void onPatch({ startPage: e.target.value })}
+              >
+                <option value="">Where I left off</option>
+                {LAUNCH_PROVIDERS.map((entry) => (
+                  <option key={entry.provider} value={entry.url}>
+                    {PROVIDERS[entry.provider].label}
+                  </option>
+                ))}
+                {settings.startPage !== '' && !LAUNCH_PROVIDERS.some((entry) => entry.url === settings.startPage) && (
+                  <option value={settings.startPage}>{settings.startPage}</option>
+                )}
+              </select>
+            </label>
+          </div>
+          <p id="tk-start-page-hint" className="tk-settings-note">
+            The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat
+            and code.
+          </p>
+          <Toggle
+            checked={settings.embedFullNavigation}
+            onChange={(v) => void onPatch({ embedFullNavigation: v })}
+            label="Show each site’s full navigation"
+            hint="Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
+          />
           <Toggle
             checked={settings.surfaces === 'solid'}
             onChange={(v) => void onPatch({ surfaces: v ? 'solid' : 'glass' })}

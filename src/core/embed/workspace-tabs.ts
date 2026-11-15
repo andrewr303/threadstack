@@ -14,9 +14,11 @@ import {
   type AccountRecord,
   type AccountsChangeResult,
   type HelperPingResult,
+  type ProfileClaimResult,
   type WorkspaceBroadcast,
   type WorkspaceFailure,
 } from '../workspace/types.js';
+import { realmById } from '../workspace/realms.js';
 import { installEmbedRule, orphanRuleIds, removeEmbedRules, type SessionRulesApi } from './rules.js';
 
 /** chrome.storage.session key: Record<tabId, ruleId | null>. */
@@ -30,8 +32,12 @@ export interface KeyValueStore {
 export interface WorkspaceTabsEnv {
   store: KeyValueStore | null;
   rules: SessionRulesApi | null;
-  /** The tab's address, or null when the tab is gone or its address is not visible. */
-  tabUrl(tabId: number): Promise<string | null>;
+  /**
+   * The tab's address; `undefined` when the tab exists but its address is not visible to the
+   * extension (which is always the case for Threadkeeper's own pages: it holds no "tabs"
+   * permission), `null` when the tab is gone.
+   */
+  tabUrl(tabId: number): Promise<string | null | undefined>;
   /** chrome-extension://<id>/manager.html */
   managerUrl: string;
 }
@@ -146,8 +152,10 @@ export class WorkspaceTabs {
   private async pruneNow(keep: number | null): Promise<void> {
     for (const tabId of [...this.tabs.keys()]) {
       if (tabId === keep) continue;
-      const url = await this.env.tabUrl(tabId).catch(() => null);
-      if (!isManagerTabUrl(url, this.env.managerUrl)) await this.forgetNow(tabId);
+      // Only what is known counts: a closed tab, or one seen showing another address. A tab whose
+      // address cannot be read is left alone; its page's connection tells when it leaves.
+      const url = await this.env.tabUrl(tabId).catch(() => undefined);
+      if (url === null || (typeof url === 'string' && !isManagerTabUrl(url, this.env.managerUrl))) await this.forgetNow(tabId);
     }
     if (!this.env.rules) return;
     try {
@@ -221,6 +229,24 @@ export function sanitizeIdentity(value: unknown): Omit<AccountIdentity, 'observe
 
 // ---- Workspace commands ----------------------------------------------------------------------
 
+/** The profile slots as the commands use them (core/embed/profiles.ts behind it). */
+export interface ProfileCommands {
+  /** Whether the worker can see the cookies profile pages are given, so sign-ins are saved. */
+  available: boolean;
+  claim(tabId: number, realmId: string, accountId: string): Promise<ProfileClaimResult | WorkspaceFailure>;
+  ready(tabId: number, realmId: string): Promise<{ ok: true } | WorkspaceFailure>;
+  /** The tab loaded a new workspace page: its slots start empty. */
+  reset(tabId: number): Promise<void>;
+  /**
+   * The account's saved jar was replaced or removed behind the worker's live copy: drop the copy,
+   * retire every slot showing the account and tell the pages (PROFILE_RETIRED). Awaited before the
+   * change is announced, so no page re-places its frames in a partition that is out of date.
+   */
+  accountReplaced(accountId: string): Promise<void>;
+  /** Save the account's live copy now, so a switch that uses its saved jar has the latest cookies. */
+  flush(accountId: string): Promise<void>;
+}
+
 export interface WorkspaceCommandDeps {
   /** Null when the account service could not be created. */
   accounts: AccountService | null;
@@ -228,6 +254,12 @@ export interface WorkspaceCommandDeps {
   helperPing(): Promise<HelperPingResult | WorkspaceFailure>;
   helperOpen(account: AccountRecord | null, url: unknown): Promise<{ ok: true } | WorkspaceFailure>;
   broadcast(message: WorkspaceBroadcast): void;
+  /** Null in a browser without the pieces profiles need. */
+  profiles?: ProfileCommands | null;
+  /** Open a realm's sign-in page in an ordinary tab, for a sign-in borrowed from the browser. */
+  openSignInTab?(url: string): Promise<void>;
+  /** Close the tab `openSignInTab` opened, when it is still there. */
+  closeSignInTab?(): Promise<void>;
 }
 
 const UNAVAILABLE: WorkspaceFailure = { ok: false, error: 'Accounts are not available right now. Reload Threadkeeper and try again.' };
@@ -277,9 +309,55 @@ export async function handleWorkspaceCommand(
   try {
     switch (message.type) {
       case 'WORKSPACE_HELLO': {
+        // A new page in this tab has a new, empty cookie partition for profiles.
+        await deps.profiles?.reset(tabId).catch(() => undefined);
         const { embedding } = await deps.tabs.hello(tabId);
         const realms = accounts ? await accounts.list().catch(() => []) : [];
-        return { ok: true, tabId, embedding, realms };
+        return { ok: true, tabId, embedding, profiles: Boolean(deps.profiles?.available), realms };
+      }
+      case 'PROFILE_CLAIM': {
+        if (!accounts || !deps.profiles) return UNAVAILABLE;
+        const realm = idString(message.realm);
+        const accountId = idString(message.accountId);
+        if (!realm || !accountId) return { ok: false, error: 'That account request is not valid.', code: 'not_allowed' };
+        return await deps.profiles.claim(tabId, realm, accountId);
+      }
+      case 'PROFILE_READY': {
+        if (!deps.profiles) return UNAVAILABLE;
+        const realm = idString(message.realm);
+        if (!realm) return { ok: false, error: 'That account request is not valid.', code: 'not_allowed' };
+        return await deps.profiles.ready(tabId, realm);
+      }
+      case 'ACCOUNTS_SIGNIN_BEGIN': {
+        if (!accounts) return UNAVAILABLE;
+        const accountId = idString(message.accountId);
+        if (!accountId) return { ok: false, error: 'That account no longer exists.', code: 'unknown_account' };
+        await deps.profiles?.flush(accountId).catch(() => undefined);
+        const result = await accounts.beginBrowserSignIn(accountId);
+        if (isChange(result)) {
+          // Its saved jar went into the browser; the worker's copy of it is no longer the truth.
+          await deps.profiles?.accountReplaced(accountId).catch(() => undefined);
+          const realm = result.account?.realm;
+          if (realm) {
+            announce(deps, result, realm);
+            const url = realmById(realm)?.signInUrl;
+            if (url) await deps.openSignInTab?.(url).catch(() => undefined);
+          }
+        }
+        return result;
+      }
+      case 'ACCOUNTS_SIGNIN_FINISH':
+      case 'ACCOUNTS_SIGNIN_CANCEL': {
+        if (!accounts) return UNAVAILABLE;
+        const pending = await accounts.pendingSignIn();
+        const result = message.type === 'ACCOUNTS_SIGNIN_FINISH' ? await accounts.finishBrowserSignIn() : await accounts.cancelBrowserSignIn();
+        if (isChange(result) && pending) {
+          await deps.profiles?.accountReplaced(pending.accountId).catch(() => undefined);
+          await deps.profiles?.accountReplaced(pending.returnToAccountId).catch(() => undefined);
+          announce(deps, result, pending.realm);
+          await deps.closeSignInTab?.().catch(() => undefined);
+        }
+        return result;
       }
       case 'ACCOUNTS_LIST': {
         if (!accounts) return UNAVAILABLE;
@@ -308,6 +386,8 @@ export async function handleWorkspaceCommand(
         if (!accountId) return { ok: false, error: 'That account no longer exists.', code: 'unknown_account' };
         const before = await findAccount(accounts, accountId);
         let result: AccountsChangeResult | WorkspaceFailure;
+        // Its saved jar is about to go into the browser: first save what its pages changed.
+        if (message.type === 'ACCOUNTS_ACTIVATE') await deps.profiles?.flush(accountId).catch(() => undefined);
         if (message.type === 'ACCOUNTS_ACTIVATE') result = await accounts.activate(accountId);
         else if (message.type === 'ACCOUNTS_REMOVE') result = await accounts.remove(accountId);
         else {
@@ -317,6 +397,14 @@ export async function handleWorkspaceCommand(
           result = await accounts.update(accountId, { label, color });
         }
         const realm = (isChange(result) ? result.account?.realm : undefined) ?? before?.realm;
+        // A removed account, and one whose jar went into the browser, have no live copy to keep.
+        if (isChange(result) && message.type !== 'ACCOUNTS_UPDATE') await deps.profiles?.accountReplaced(accountId).catch(() => undefined);
+        // Removing the browser's own account hands the browser to another account, whose saved
+        // sign-in goes into it: a slot showing that one is out of date too.
+        if (isChange(result) && message.type === 'ACCOUNTS_REMOVE' && realm) {
+          const next = result.realms.find((r) => r.realm.id === realm)?.activeAccountId;
+          if (next && next !== accountId) await deps.profiles?.accountReplaced(next).catch(() => undefined);
+        }
         if (isChange(result) && realm) announce(deps, result, realm);
         return result;
       }

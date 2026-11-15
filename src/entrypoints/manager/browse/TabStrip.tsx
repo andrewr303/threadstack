@@ -6,7 +6,16 @@ import type { SessionTab } from '../../../core/workspace/types.js';
 import { Icon } from '../shell/icons.js';
 import { AccountChip, ProviderMark, RunState, providerName } from '../shell/primitives.js';
 import { useWorkspaceContext } from '../workspace/context.js';
-import { findAccount } from '../workspace/state.js';
+import { needsSignIn, type TabRest } from '../workspace/state.js';
+
+/** What a tab that is waiting on its account says about itself, for its label and its tooltip. */
+const WAITING: Partial<Record<TabRest, { label: string; tip: (account: string) => string }>> = {
+  signin: { label: 'not signed in yet', tip: (account) => `${account} is not signed in yet` },
+  profile: { label: 'another account is showing', tip: (account) => `switch to ${account} to show it` },
+  pending: { label: 'waiting for a sign-in', tip: () => 'waiting for a sign-in to finish' },
+  failed: { label: 'could not be loaded', tip: (account) => `${account} could not be loaded` },
+  stale: { label: 'sign-in changed, reload to show it', tip: (account) => `${account}'s sign-in changed: reload to show it` },
+};
 
 /** DOM id of a tab button, stable for aria-controls and aria-labelledby. */
 export function tabDomId(prefix: string, tabId: string): string {
@@ -151,12 +160,6 @@ export function TabStrip({
     }
   };
 
-  const otherAccountLabel = (tab: SessionTab): string | null => {
-    const entry = workspace.realms.find((r) => r.realm.id === tab.realm);
-    const signedIn = entry?.activeAccountId ? findAccount(workspace.realms, entry.activeAccountId) : null;
-    return signedIn?.label ?? null;
-  };
-
   return (
     <div className="tk-browse-row">
       {tabs.length === 0 ? (
@@ -165,8 +168,8 @@ export function TabStrip({
         <div ref={stripRef} className="tk-browse-tabs" role="tablist" aria-label="Open sessions">
           {tabs.map((tab, index) => {
             const rest = workspace.plan.resting[tab.id];
-            const paused = rest === 'account';
-            const isolated = rest === 'isolated';
+            const waiting = rest ? WAITING[rest] : undefined;
+            const paused = Boolean(waiting);
             const account = workspace.accountOf(tab);
             const conv = tab.threadKey ? conversationByKey.get(tab.threadKey) : undefined;
             const runState = providerCategory(tab.provider ?? '') === 'coding_agent'
@@ -175,18 +178,11 @@ export function TabStrip({
             const title = tab.title || 'Untitled session';
             const selected = tab.id === selectedId;
             const parts = [title, providerName(tab.provider), account?.label ?? 'removed account'];
-            if (paused) {
-              const other = otherAccountLabel(tab);
-              parts.push(other ? `paused, signed in as ${other}` : 'paused');
-            }
-            if (isolated) parts.push('opens in its own window');
+            if (waiting) parts.push(waiting.label);
             const label = parts.join(', ');
-            const tip = paused
-              ? `${title} (paused until you switch to ${account?.label ?? 'this account'})`
-              : isolated
-                ? `${title} (opens in its own window)`
-                : title;
-            const signedIn = !paused;
+            const tip = waiting ? `${title} (${waiting.tip(account?.label ?? 'this account')})` : title;
+            // The browser's own sign-in, or an account with a saved one.
+            const signedIn = Boolean(account) && (workspace.slotOf(tab) === 'plain' || !needsSignIn(account));
             return (
               <div
                 key={tab.id}
@@ -194,7 +190,7 @@ export function TabStrip({
                 role="presentation"
                 data-active={selected ? 'true' : 'false'}
                 data-paused={paused ? 'true' : 'false'}
-                data-isolated={isolated ? 'true' : 'false'}
+                data-slot={workspace.slotOf(tab) === 'profile' ? 'profile' : 'browser'}
               >
                 <button
                   type="button"
@@ -227,7 +223,6 @@ export function TabStrip({
                   <ProviderMark provider={tab.provider} size="sm" />
                   <span className="tk-browse-tab-title">{title}</span>
                   {paused && <Icon name="pause" size={12} className="tk-browse-tab-pause" />}
-                  {isolated && <Icon name="window" size={12} className="tk-browse-tab-pause" />}
                   {runState && <RunState state={runState} observedAt={conv?.agentStateAt} compact />}
                   <AccountChip account={account} active={signedIn} showName={false} />
                 </button>

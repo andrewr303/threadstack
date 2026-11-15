@@ -2,7 +2,7 @@
 // the views draw sessions from, and the few actions that cross views (open a session, add an
 // account, open Settings). App.tsx provides it; on the side panel and the in-page overlay the
 // workspace inside it is simply not enabled.
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type {
   ConversationRecord,
   DetailMode,
@@ -13,7 +13,10 @@ import type {
 import type { RealmInfo } from '../../../core/workspace/realms.js';
 import type { AccountRecord, WorkspaceView } from '../../../core/workspace/types.js';
 import type { SectionId } from '../SettingsDialog.js';
+import { EMPTY_LENS_FILTERS, type LensFilters, type ShowInThreadsRequest } from './lens.js';
 import type { WorkspaceController } from './useWorkspace.js';
+
+export type { ShowInThreadsRequest };
 
 export interface ThreadAccount {
   realm: RealmInfo | null;
@@ -46,6 +49,13 @@ export interface WorkspaceContextValue {
    * focused pane in Dashboard. `where` forces a view (and switches to it).
    */
   openSession: (conv: ConversationRecord, where?: WorkspaceView) => void;
+  /**
+   * Switch to Threads narrowed to one group of the side navigation: its type, provider, account or
+   * repository becomes the matching Threads filter (the other workspace filters are cleared).
+   * A group by date, or no group, just switches to Threads. Absent where there is no Threads list
+   * to narrow (callers then just switch view).
+   */
+  showInThreads?: (request: ShowInThreadsRequest) => void;
   /** Pin to or unpin from the Dashboard. */
   togglePinned: (conv: ConversationRecord) => Promise<void>;
   openInChromeTab: (url: string) => void;
@@ -58,8 +68,41 @@ export interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
+/** The surfaces whose filters are kept here (Threads keeps its own in the list's state). */
+export type LensFilterSurface = 'sidebar' | 'dashboard';
+
+interface LensFilterStore {
+  filters: Record<LensFilterSurface, LensFilters>;
+  setFilters: (surface: LensFilterSurface, filters: LensFilters) => void;
+}
+
+const LensFilterContext = createContext<LensFilterStore | null>(null);
+
+/**
+ * The side navigation's and the Dashboard's filters. They live here, above the views, so they
+ * survive switching views, and they are never saved: a filter that hides sessions should not
+ * greet the person on the next visit.
+ */
 export function WorkspaceProvider({ value, children }: { value: WorkspaceContextValue; children: React.ReactNode }) {
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  const [filters, setAll] = useState<Record<LensFilterSurface, LensFilters>>({
+    sidebar: EMPTY_LENS_FILTERS,
+    dashboard: EMPTY_LENS_FILTERS,
+  });
+  const setFilters = useCallback((surface: LensFilterSurface, next: LensFilters) => setAll((all) => ({ ...all, [surface]: next })), []);
+  const store = useMemo(() => ({ filters, setFilters }), [filters, setFilters]);
+  return (
+    <WorkspaceContext.Provider value={value}>
+      <LensFilterContext.Provider value={store}>{children}</LensFilterContext.Provider>
+    </WorkspaceContext.Provider>
+  );
+}
+
+/** Filters of one surface and how to change them. */
+export function useLensFilters(surface: LensFilterSurface): [LensFilters, (filters: LensFilters) => void] {
+  const store = useContext(LensFilterContext);
+  if (!store) throw new Error('useLensFilters must be used inside WorkspaceProvider');
+  const set = useCallback((next: LensFilters) => store.setFilters(surface, next), [store, surface]);
+  return [store.filters[surface], set];
 }
 
 export function useWorkspaceContext(): WorkspaceContextValue {

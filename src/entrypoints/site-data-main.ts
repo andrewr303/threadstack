@@ -11,6 +11,7 @@ import { embeddedInExtensionPage } from '../core/embed/frame.js';
 import {
   IDENTITY_MESSAGE_SOURCE,
   MAX_IDENTITY_BODY_CHARS,
+  isIdentityReplayRequest,
   SITE_DATA_MESSAGE_SOURCE,
   matchSiteConversationRequest,
   type IdentityMessage,
@@ -40,7 +41,11 @@ function post(provider: SiteDataMessage['provider'], conversationId: string, jso
   }
 }
 
+/** The last identity response seen, posted again when the content script asks (see site-api.ts). */
+let lastIdentity: { kind: IdentityMessage['kind']; body: string } | null = null;
+
 function postIdentity(kind: IdentityMessage['kind'], body: string): void {
+  lastIdentity = { kind, body };
   try {
     const message: IdentityMessage = { source: IDENTITY_MESSAGE_SOURCE, kind, body };
     window.postMessage(message, location.origin);
@@ -141,6 +146,14 @@ try {
   if (wanted && !Reflect.get(window, HOOK_FLAG)) {
     Reflect.defineProperty(window, HOOK_FLAG, { value: true });
     hookFetch();
+    window.addEventListener('message', (event: MessageEvent) => {
+      try {
+        if (event.source !== window || !isIdentityReplayRequest(event.data) || !lastIdentity) return;
+        postIdentity(lastIdentity.kind, lastIdentity.body);
+      } catch {
+        // never disturb the page
+      }
+    });
   }
 } catch {
   // never disturb the page

@@ -223,6 +223,11 @@ export interface InstallCookieShimOptions {
   /** Where the bridge events are dispatched and heard: the document. */
   events: EventTarget;
   context(): CookieContext;
+  /**
+   * Profile frames: how an assignment is rewritten before the browser's own setter sees it
+   * (profile-page.ts asCrossSiteAssignment). The page's assignment is forwarded unchanged.
+   */
+  rewriteNative?: (raw: string) => string;
 }
 
 /**
@@ -278,7 +283,15 @@ export function installCookieShim(options: InstallCookieShimOptions): boolean {
       // String() once, as the native setter would; a value that cannot be a string throws the
       // same TypeError the native setter would throw.
       const text = String(value);
-      Reflect.apply(nativeSet, this, [text]);
+      let native = text;
+      if (this === doc && options.rewriteNative) {
+        try {
+          native = options.rewriteNative(text);
+        } catch {
+          native = text;
+        }
+      }
+      Reflect.apply(nativeSet, this, [native]);
       if (this !== doc) return;
       try {
         shim.write(text);

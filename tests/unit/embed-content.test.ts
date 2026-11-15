@@ -132,6 +132,8 @@ describe('content script in a workspace frame', () => {
       pane: 'tab_77aa',
       url: 'https://claude.ai/code/session_011CUabc',
       title: 'Fix flaky test - Claude Code',
+      // An ordinary frame: it loads with the browser's own sign-in.
+      profile: false,
     });
     expect(ofType('EMBED_NAV')[0]).toEqual({
       type: 'EMBED_NAV',
@@ -311,5 +313,71 @@ describe('MAIN-world identity observer', () => {
     await flush();
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe('markEmbeddedDocument', () => {
+  // Called by embed-bridge.ts's startup (and only when frameMode() is 'workspace') with the
+  // result of inProfileFrame() and wantsTopLevelView(host) && !paneHasFlag('n').
+  const load = async () => {
+    const [bridge, profilePage, frame] = await Promise.all([
+      import('../../src/entrypoints/embed-bridge.js'),
+      import('../../src/core/embed/profile-page.js'),
+      import('../../src/core/embed/frame.js'),
+    ]);
+    return { markEmbeddedDocument: bridge.markEmbeddedDocument, PROFILE_MARK: profilePage.PROFILE_MARK, TOP_LEVEL_MARK: frame.TOP_LEVEL_MARK };
+  };
+  const fresh = () => ({ documentElement: document.createElement('html') });
+
+  it('leaves no mark when neither is asked for', async () => {
+    const { markEmbeddedDocument } = await load();
+    const doc = fresh();
+    markEmbeddedDocument(doc, { profile: false, topLevel: false });
+    expect(doc.documentElement.getAttributeNames()).toEqual([]);
+  });
+
+  it('marks a profile frame for the page-world script', async () => {
+    const { markEmbeddedDocument, PROFILE_MARK, TOP_LEVEL_MARK } = await load();
+    const doc = fresh();
+    markEmbeddedDocument(doc, { profile: true, topLevel: false });
+    expect(doc.documentElement.hasAttribute(PROFILE_MARK)).toBe(true);
+    expect(doc.documentElement.hasAttribute(TOP_LEVEL_MARK)).toBe(false);
+  });
+
+  it('marks a frame that should answer framing checks like a top-level page', async () => {
+    const { markEmbeddedDocument, PROFILE_MARK, TOP_LEVEL_MARK } = await load();
+    const doc = fresh();
+    markEmbeddedDocument(doc, { profile: false, topLevel: true });
+    expect(doc.documentElement.hasAttribute(TOP_LEVEL_MARK)).toBe(true);
+    expect(doc.documentElement.hasAttribute(PROFILE_MARK)).toBe(false);
+  });
+
+  it('can leave both marks', async () => {
+    const { markEmbeddedDocument } = await load();
+    const doc = fresh();
+    markEmbeddedDocument(doc, { profile: true, topLevel: true });
+    expect(doc.documentElement.getAttributeNames().sort()).toEqual(['data-tk-profile', 'data-tk-top-level']);
+  });
+
+  it('is silent when there is no document element or setting an attribute throws', async () => {
+    const { markEmbeddedDocument } = await load();
+    expect(() => markEmbeddedDocument({ documentElement: null as unknown as HTMLElement }, { profile: true, topLevel: true })).not.toThrow();
+    const hostile = {
+      documentElement: {
+        setAttribute() {
+          throw new Error('no');
+        },
+      } as unknown as HTMLElement,
+    };
+    expect(() => markEmbeddedDocument(hostile, { profile: true, topLevel: true })).not.toThrow();
+  });
+
+  it('writes marks the page-world script consumes exactly once', async () => {
+    const { markEmbeddedDocument, PROFILE_MARK } = await load();
+    const { consumeMark } = await import('../../src/core/embed/profile-page.js');
+    const doc = fresh();
+    markEmbeddedDocument(doc, { profile: true, topLevel: false });
+    expect(consumeMark(doc, PROFILE_MARK)).toBe(true);
+    expect(consumeMark(doc, PROFILE_MARK)).toBe(false);
   });
 });

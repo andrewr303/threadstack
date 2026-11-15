@@ -5,7 +5,7 @@ import { BrowseView } from '../../src/entrypoints/manager/browse/BrowseView.js';
 import { resolveAddress } from '../../src/entrypoints/manager/browse/address.js';
 import { WorkspaceProvider, type WorkspaceContextValue } from '../../src/entrypoints/manager/workspace/context.js';
 import { FrameStage } from '../../src/entrypoints/manager/workspace/FrameStage.js';
-import { workspaceReducer } from '../../src/entrypoints/manager/workspace/state.js';
+import { slotOfTab, workspaceReducer, type TabRest } from '../../src/entrypoints/manager/workspace/state.js';
 import type { FrameRuntime, WorkspaceController } from '../../src/entrypoints/manager/workspace/useWorkspace.js';
 import { DEFAULT_SETTINGS, type ConversationRecord, type StructuredSummaryRecord, type ThreadInsight } from '../../src/core/schema.js';
 import { realmById } from '../../src/core/workspace/realms.js';
@@ -56,7 +56,8 @@ function conversation(over: Partial<ConversationRecord> = {}): ConversationRecor
 interface Spies {
   closeTab: ReturnType<typeof vi.fn>;
   activateTab: ReturnType<typeof vi.fn>;
-  switchAccount: ReturnType<typeof vi.fn>;
+  /** Everything that could change which account is signed in or shown. None may run from Browse chrome. */
+  accountActions: Record<'goToAccount' | 'showProfile' | 'switchProfile' | 'useAsBrowserAccount' | 'beginBrowserSignIn' | 'finishBrowserSignIn' | 'cancelBrowserSignIn', ReturnType<typeof vi.fn>>;
   back: ReturnType<typeof vi.fn>;
   forward: ReturnType<typeof vi.fn>;
   reload: ReturnType<typeof vi.fn>;
@@ -72,11 +73,14 @@ interface Setup {
   tabs: SessionTab[];
   active?: string | null;
   runtimes?: Record<string, Partial<FrameRuntime>>;
-  resting?: Record<string, 'account' | 'isolated' | 'asleep'>;
+  resting?: Record<string, TabRest>;
   conversations?: ConversationRecord[];
   insights?: ThreadInsight[];
   summaries?: StructuredSummaryRecord[];
+  /** The realm's browser account (`activeAccountId`); defaults to Work. */
   signedIn?: string;
+  /** Replace the accounts of the anthropic realm (to give one no saved sign-in, say). */
+  anthropicAccounts?: AccountRecord[];
 }
 
 let container: HTMLDivElement;
@@ -103,20 +107,25 @@ function Harness({ setup }: { setup: Setup }) {
     tabs: setup.tabs,
     activeTabId: setup.active === undefined ? (setup.tabs[0]?.id ?? null) : setup.active,
   } as WorkspaceState);
-  const realms = setup.signedIn
-    ? REALMS.map((r) => (r.realm.id === 'anthropic' ? { ...r, activeAccountId: setup.signedIn! } : r))
-    : REALMS;
+  const realms = REALMS.map((r) =>
+    r.realm.id === 'anthropic'
+      ? { ...r, accounts: setup.anthropicAccounts ?? r.accounts, activeAccountId: setup.signedIn ?? r.activeAccountId }
+      : r
+  );
   const live = state.tabs.filter((t) => setup.resting?.[t.id] === undefined).map((t) => t.id);
   const workspace = {
     enabled: true, ready: true, embedding: true, error: null, tabId: 1, realms, state,
     plan: { live, resting: setup.resting ?? {} },
     runtime: (id: string) => ({ ...IDLE, ...(setup.runtimes?.[id] ?? {}) }),
-    switchingRealm: null,
+    busyRealm: null,
+    slots: {},
+    profilesSaved: true,
+    slotOf: (t: SessionTab) => slotOfTab(t, realms),
     dispatch,
     openUrl: spies.openUrl,
     closeTab: (id: string) => { spies.closeTab(id); dispatch({ type: 'close', id }); },
     activateTab: (id: string) => { spies.activateTab(id); dispatch({ type: 'activate', id, now: 5 }); },
-    switchAccount: spies.switchAccount,
+    ...spies.accountActions,
     back: spies.back, forward: spies.forward, reload: spies.reload, navigate: spies.navigate,
     noteFrameLoaded: vi.fn(),
     accountOf: (t: SessionTab) => realms.flatMap((r) => r.accounts).find((a) => a.id === t.accountId) ?? null,
@@ -148,7 +157,13 @@ function Harness({ setup }: { setup: Setup }) {
 
 async function mount(setup: Setup) {
   spies = {
-    closeTab: vi.fn(), activateTab: vi.fn(), switchAccount: vi.fn(), back: vi.fn(), forward: vi.fn(), reload: vi.fn(),
+    closeTab: vi.fn(), activateTab: vi.fn(),
+    accountActions: {
+      goToAccount: vi.fn(() => ({ ok: true, tabId: 'z' })), showProfile: vi.fn(async () => {}), switchProfile: vi.fn(async () => {}),
+      useAsBrowserAccount: vi.fn(async () => ({ ok: true })), beginBrowserSignIn: vi.fn(async () => ({ ok: true })),
+      finishBrowserSignIn: vi.fn(async () => ({ ok: true })), cancelBrowserSignIn: vi.fn(async () => ({ ok: true })),
+    },
+    back: vi.fn(), forward: vi.fn(), reload: vi.fn(),
     navigate: vi.fn(() => ({ ok: true, tabId: 'x' })), openUrl: vi.fn(() => ({ ok: true, tabId: 'y' })),
     openInChromeTab: vi.fn(), openSession: vi.fn(), togglePinned: vi.fn(async () => {}), announce: vi.fn(),
   };
@@ -187,11 +202,68 @@ describe('Browse tab strip', () => {
     expect(q('[data-tab="a"]')).not.toBeNull();
   });
 
-  it('shows whether the tab\'s account is the one signed in, by dot state and not by name', async () => {
+  it('shows whether the tab\'s account is signed in, by dot state and not by name', async () => {
     await mount({ tabs: [tab('a', 'One')] });
     const chip = tabs()[0].querySelector('.tk-acct');
     expect(chip?.getAttribute('data-active')).toBe('true');
+    expect(chip?.getAttribute('title')).toBe('Work (signed in)');
     expect(tabs()[0].querySelector('.tk-acct-name')).toBeNull();
+  });
+
+  it('counts a profile with a saved sign-in as signed in, and one without as not signed in', async () => {
+    const fresh = account('acct_fresh', 'anthropic', 'Fresh', 'blue', { primary: false, hasJar: false, signedIn: 'unknown' });
+    const lapsed = account('acct_lapsed', 'anthropic', 'Lapsed', 'gold', { primary: false, hasJar: true, signedIn: 'no' });
+    await mount({
+      tabs: [
+        tab('w', 'Browser', { accountId: WORK.id }),
+        tab('p', 'Saved profile', { accountId: PERSONAL.id }),
+        tab('f', 'No sign-in', { accountId: fresh.id }),
+        tab('l', 'Lapsed sign-in', { accountId: lapsed.id }),
+      ],
+      anthropicAccounts: [WORK, PERSONAL, fresh, lapsed],
+      resting: { f: 'signin', l: 'signin' },
+    });
+    const active = () => tabs().map((t) => t.querySelector('.tk-acct')?.getAttribute('data-active'));
+    expect(active()).toEqual(['true', 'true', 'false', 'false']);
+    expect(tabs()[2].querySelector('.tk-acct')?.getAttribute('title')).toBe('Fresh (not signed in)');
+    expect(tabs()[0].closest('.tk-browse-tab')?.getAttribute('data-slot')).toBe('browser');
+    expect(tabs()[1].closest('.tk-browse-tab')?.getAttribute('data-slot')).toBe('profile');
+  });
+
+  it('names no paused or isolated state for a tab that is merely asleep or live in either slot', async () => {
+    await mount({
+      tabs: [tab('a', 'Work session'), tab('p', 'Personal session', { accountId: PERSONAL.id }), tab('z', 'Sleeper')],
+      active: 'a',
+      resting: { z: 'asleep' },
+    });
+    for (const t of tabs()) {
+      expect(t.closest('.tk-browse-tab')?.getAttribute('data-paused')).toBe('false');
+      expect(t.querySelector('.tk-browse-tab-pause')).toBeNull();
+      expect(t.getAttribute('aria-label')).not.toMatch(/paused|isolated|own window|signed in as/);
+    }
+    expect(tabs()[1].getAttribute('aria-label')).toBe('Personal session, Claude Code, Personal');
+  });
+
+  it.each([
+    ['signin', 'not signed in yet', 'Personal is not signed in yet'],
+    ['profile', 'another account is showing', 'switch to Personal to show it'],
+    ['pending', 'waiting for a sign-in', 'waiting for a sign-in to finish'],
+    ['failed', 'could not be loaded', 'Personal could not be loaded'],
+  ] as const)('marks a tab waiting on its account (%s) with the pause icon and the matching words', async (rest, words, tip) => {
+    await mount({
+      tabs: [tab('a', 'Work session'), tab('p', 'Personal session', { accountId: PERSONAL.id })],
+      active: 'a',
+      resting: { p: rest },
+    });
+    const waiting = tabs()[1];
+    expect(waiting.getAttribute('aria-label')).toBe(`Personal session, Claude Code, Personal, ${words}`);
+    expect(waiting.getAttribute('title')).toBe(`Personal session (${tip})`);
+    expect(waiting.closest('.tk-browse-tab')?.getAttribute('data-paused')).toBe('true');
+    expect(waiting.closest('.tk-browse-tab')?.getAttribute('data-slot')).toBe('profile');
+    expect(waiting.querySelector('.tk-browse-tab-pause')).not.toBeNull();
+    // The tab that is not waiting is not marked.
+    expect(tabs()[0].closest('.tk-browse-tab')?.getAttribute('data-paused')).toBe('false');
+    expect(tabs()[0].querySelector('.tk-browse-tab-pause')).toBeNull();
   });
 
   it('moves focus with the arrow keys, Home and End, wrapping at the ends', async () => {
@@ -235,26 +307,22 @@ describe('Browse tab strip', () => {
     expect(q('[aria-label="New tab"]')).not.toBeNull();
   });
 
-  it('names a paused tab as paused and never switches accounts when it is activated', async () => {
+  it('never calls anything that changes accounts when a waiting tab is activated', async () => {
     await mount({
       tabs: [tab('a', 'Work session'), tab('p', 'Personal session', { accountId: PERSONAL.id })],
       active: 'a',
-      resting: { p: 'account' },
+      resting: { p: 'profile' },
     });
-    const paused = tabs()[1];
-    expect(paused.getAttribute('aria-label')).toBe('Personal session, Claude Code, Personal, paused, signed in as Work');
-    expect(paused.closest('.tk-browse-tab')?.getAttribute('data-paused')).toBe('true');
-    click(paused);
+    const waiting = tabs()[1];
+    click(waiting);
     expect(spies.activateTab).toHaveBeenCalledWith('p');
-    expect(spies.switchAccount).not.toHaveBeenCalled();
-    expect(paused.getAttribute('aria-selected')).toBe('true');
+    for (const [name, spy] of Object.entries(spies.accountActions)) expect(spy, name).not.toHaveBeenCalled();
+    expect(waiting.getAttribute('aria-selected')).toBe('true');
     // Its page is not loaded: the toolbar cannot drive it.
     expect((byName('Reload') as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('says that a tab of a separate-window account opens in its own window', async () => {
-    await mount({ tabs: [tab('i', 'Isolated')], resting: { i: 'isolated' } });
-    expect(tabs()[0].getAttribute('aria-label')).toContain('opens in its own window');
+    // The slot says what is going on, and still nothing has been switched.
+    expect(container.textContent).toContain('Show Personal here?');
+    for (const [name, spy] of Object.entries(spies.accountActions)) expect(spy, name).not.toHaveBeenCalled();
   });
 
   it('shows the run state of a coding session as observed, and not for chats', async () => {
@@ -334,6 +402,13 @@ describe('Browse toolbar', () => {
     expect(spies.announce).toHaveBeenCalled();
   });
 
+  it('shows the account of the tab in front on the account button, not the browser account', async () => {
+    await mount({ tabs: [tab('p', 'Personal session', { accountId: PERSONAL.id })] });
+    const button = q('.tk-acct-menu-btn')!;
+    expect(button.getAttribute('aria-label')).toBe('Claude account: Personal. Choose another account');
+    expect(button.querySelector('.tk-acct-name')?.textContent).toBe('Personal');
+  });
+
   it('restores the current address on Escape', async () => {
     await mount({ tabs: [tab('a', 'One')] });
     const input = q<HTMLInputElement>('input[aria-label="Address"]')!;
@@ -372,10 +447,10 @@ describe('Browse new tab page', () => {
   it('opens the chosen provider under the chosen account', async () => {
     await mount({ tabs: [] });
     const card = (name: string) => [...container.querySelectorAll('[role="group"]')].find((g) => g.querySelector('.tk-browse-prov-name')?.textContent === name)!;
-    // Two accounts in the realm: one button per account.
+    // Two accounts in the realm: one button per account, and both are signed in.
     const claudeCode = card('Claude Code');
     const buttons = [...claudeCode.querySelectorAll('button')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Open as Worksigned in', 'Open as Personal']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Open as Work', 'Open as Personal']);
     click(buttons[1]);
     expect(spies.openUrl).toHaveBeenCalledWith('https://claude.ai/code', { accountId: PERSONAL.id });
     // A realm with one account: a single Open button.
@@ -412,6 +487,20 @@ describe('Browse new tab page', () => {
     expect(spies.openUrl).toHaveBeenCalled();
     expect(q('[aria-label="New tab"]')).toBeNull();
     await flush();
+  });
+
+  it('says an account that still needs a sign-in is not signed in yet, and says accounts stay signed in', async () => {
+    const fresh = account('acct_fresh', 'anthropic', 'Fresh', 'blue', { primary: false, hasJar: false, signedIn: 'unknown' });
+    await mount({ tabs: [], anthropicAccounts: [WORK, PERSONAL, fresh] });
+    expect(q('.tk-browse-launch-sub')?.textContent).toContain('stay signed in side by side');
+    const card = [...container.querySelectorAll('[role="group"]')].find((g) => g.querySelector('.tk-browse-prov-name')?.textContent === 'Claude Code')!;
+    const buttons = [...card.querySelectorAll('button')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['Open as Work', 'Open as Personal', 'Open as Freshnot signed in yet']);
+    expect(buttons[2].querySelector('.tk-browse-prov-note')?.textContent).toBe('not signed in yet');
+    expect(buttons[0].querySelector('.tk-browse-prov-note')).toBeNull();
+    expect(buttons[1].querySelector('.tk-browse-prov-note')).toBeNull();
+    click(buttons[2]);
+    expect(spies.openUrl).toHaveBeenCalledWith('https://claude.ai/code', { accountId: 'acct_fresh' });
   });
 
   it('keeps the page open and says why when a provider cannot be opened', async () => {

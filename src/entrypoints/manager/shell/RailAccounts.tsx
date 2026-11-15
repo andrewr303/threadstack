@@ -32,7 +32,7 @@ export function RailAccounts({
       {realms.length > 0 && (
         <section aria-labelledby={headingId}>
           <h2 className={collapsed ? 'tk-visually-hidden' : 'tk-rail-label'} id={headingId}>
-            Signed in
+            Accounts
           </h2>
           <ul className="tk-rail-realms">
             {realms.map((r) => (

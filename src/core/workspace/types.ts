@@ -14,10 +14,12 @@ export type AccountColor = (typeof ACCOUNT_COLORS)[number];
 
 /**
  * How an account's sessions are reached.
- * - `embedded`: inside the workspace. One embedded account per realm is signed in at a time;
- *   the others are stored as encrypted cookie jars and restored on switch.
- * - `isolated`: in its own Chrome profile window opened by the Mac helper (never embedded).
- *   Lets two accounts of one realm be signed in at the same moment.
+ * - `embedded`: inside the workspace. The realm's *browser account* is the one the browser itself
+ *   is signed in to and loads in ordinary frames; every other account is a *profile*: its sign-in
+ *   is kept as an encrypted cookie jar and loads in the workspace page's separate (credentialless)
+ *   cookie partition, so it is signed in at the same moment as the browser account.
+ * - `isolated`: legacy. Accounts that used to open in their own Chrome profile window through the
+ *   Mac helper. They are read as `embedded` profiles that still need a sign-in (accounts/service).
  */
 export type AccountMode = 'embedded' | 'isolated';
 
@@ -42,7 +44,7 @@ export interface AccountRecord {
   label: string;
   color: AccountColor;
   mode: AccountMode;
-  /** Isolated accounts: the Chrome profile directory id (a UUID) the Mac helper opens. */
+  /** Legacy isolated accounts: the Chrome profile directory id (a UUID) the Mac helper opened. */
   profileId?: string;
   /**
    * The login the browser already had when Threadkeeper first saw this realm. Its threads keep
@@ -52,7 +54,10 @@ export interface AccountRecord {
   identity: AccountIdentity | null;
   /** `unknown` until the site has been seen with this account. */
   signedIn: 'yes' | 'no' | 'unknown';
-  /** A saved cookie jar exists, so this (inactive) account can be restored without signing in. */
+  /**
+   * A saved cookie jar exists: the account can be shown as a profile, or made the browser's
+   * sign-in, without signing in again.
+   */
   hasJar: boolean;
   order: number;
   createdAt: string;
@@ -83,6 +88,8 @@ export interface StoredCookie {
   session: boolean;
   expirationDate?: number;
   partitionKey?: { topLevelSite?: string; hasCrossSiteAncestor?: boolean };
+  /** The site set it with the Partitioned attribute (cookies read from a response, not from chrome.cookies). */
+  partitioned?: boolean;
 }
 
 /** Small values owned by one writer each (see KV_KEYS). */
@@ -97,6 +104,8 @@ export const KV_KEYS = {
   activeAccounts: 'accounts.active',
   /** Written by the service worker only: an account switch in progress (crash recovery). */
   switchJournal: 'accounts.switchJournal',
+  /** Written by the service worker only: PendingSignIn, a sign-in borrowed from the browser. */
+  pendingSignIn: 'accounts.signIn',
   /** Written by the workspace page only: WorkspaceState. */
   workspaceState: 'workspace.state',
 } as const;
@@ -109,15 +118,40 @@ export interface SwitchJournal {
   /** `saved`: the outgoing jar is stored and cookies may be partly cleared or restored. */
   phase: 'saved';
   startedAt: string;
+  /**
+   * The target's saved jar is put into the browser but kept, not deleted (a browser sign-in:
+   * cancelling it must leave the account's earlier sign-in as it was).
+   */
+  keepTargetJar?: true;
 }
 
 export type ActiveAccounts = Record<string, string>;
 
-/** What a page needs to draw accounts: the realm, its accounts and which one is signed in. */
+/**
+ * A profile account signing in through the browser itself (for sign-ins that cannot finish
+ * inside a frame: Google, Apple, passkeys). The browser's own sign-in for the realm is set aside
+ * while the person signs in as `accountId` in an ordinary tab, then put back.
+ */
+export interface PendingSignIn {
+  realm: string;
+  /** The account being signed in; it is the realm's browser account until the sign-in ends. */
+  accountId: string;
+  /** The account that was the browser's own before, restored when the sign-in ends. */
+  returnToAccountId: string;
+  startedAt: string;
+}
+
+/** What a page needs to draw accounts: the realm, its accounts and which one the browser holds. */
 export interface RealmAccounts {
   realm: RealmInfo;
   accounts: AccountRecord[];
+  /**
+   * The realm's browser account: the one signed in to the browser itself (ordinary tabs and the
+   * workspace's ordinary frames). Every other embedded account is a profile.
+   */
   activeAccountId: string | null;
+  /** Set while a profile account is signing in through the browser (see PendingSignIn). */
+  pendingSignIn?: PendingSignIn | null;
 }
 
 /**
@@ -218,6 +252,14 @@ export const EMPTY_WORKSPACE_STATE: WorkspaceState = {
   collapsedGroups: [],
 };
 
+/**
+ * Name of the port the workspace page keeps open to the service worker while it is showing
+ * (see background.ts: the worker follows the cookies of profile pages and must stay running).
+ */
+export const WORKSPACE_PORT_NAME = 'tk-workspace';
+/** How often the workspace page sends a message over that port. */
+export const WORKSPACE_PORT_BEAT_MS = 20_000;
+
 /** Prefix of the `name` given to every embedded iframe; the rest is the SessionTab id. */
 export const EMBED_FRAME_NAME_PREFIX = 'tk-pane~';
 
@@ -245,8 +287,28 @@ export type WorkspaceCommand =
       /** Isolated accounts imported from Session Control keep their existing profile. */
       profileId?: string;
     }
-  /** Make `accountId` the signed-in account of its realm (saves and restores cookies). */
+  /**
+   * Make `accountId` the browser's own sign-in for its realm (saves the browser's current
+   * cookies as the outgoing account's jar and restores this account's). Changes every tab.
+   */
   | { type: 'ACCOUNTS_ACTIVATE'; accountId: string }
+  /**
+   * Sign a profile account in through the browser: the browser's own sign-in is set aside, the
+   * realm's sign-in page opens in an ordinary tab, and ACCOUNTS_SIGNIN_FINISH puts things back.
+   */
+  | { type: 'ACCOUNTS_SIGNIN_BEGIN'; accountId: string }
+  /** Keep what the browser is signed in to now as the pending account's jar and restore the browser's own. */
+  | { type: 'ACCOUNTS_SIGNIN_FINISH' }
+  /** Give the pending sign-in up: restore the browser's own sign-in, keep nothing. */
+  | { type: 'ACCOUNTS_SIGNIN_CANCEL' }
+  /**
+   * Show `accountId` in this tab's profile slot for its realm. Answers ProfileClaimResult: the
+   * addresses the page loads in hidden credentialless frames to put the account's cookies in
+   * place. One profile per realm per page load; another one needs the page reloaded.
+   */
+  | { type: 'PROFILE_CLAIM'; realm: string; accountId: string }
+  /** The seeding addresses have loaded: the slot is ready and its header rules are removed. */
+  | { type: 'PROFILE_READY'; realm: string }
   | { type: 'ACCOUNTS_UPDATE'; accountId: string; label?: string; color?: AccountColor }
   /** Forget an account and its saved cookies. Its threads stay in the library. */
   | { type: 'ACCOUNTS_REMOVE'; accountId: string }
@@ -263,6 +325,11 @@ export const WORKSPACE_COMMAND_TYPES: ReadonlySet<string> = new Set<WorkspaceCom
   'ACCOUNTS_LIST',
   'ACCOUNTS_ADD',
   'ACCOUNTS_ACTIVATE',
+  'ACCOUNTS_SIGNIN_BEGIN',
+  'ACCOUNTS_SIGNIN_FINISH',
+  'ACCOUNTS_SIGNIN_CANCEL',
+  'PROFILE_CLAIM',
+  'PROFILE_READY',
   'ACCOUNTS_UPDATE',
   'ACCOUNTS_REMOVE',
   'HELPER_PING',
@@ -282,14 +349,43 @@ export type WorkspaceErrorCode =
   | 'unknown_account'
   | 'busy'
   | 'helper_unavailable'
-  | 'not_allowed';
+  | 'not_allowed'
+  /** This page already shows another profile of the realm; reload it to show this one. */
+  | 'needs_reload'
+  /** The account is the browser's own sign-in: it loads in ordinary frames, not the profile slot. */
+  | 'browser_account'
+  /** Another account is signing in through the browser right now. */
+  | 'signin_pending'
+  /** The account is shown in another workspace tab; two pages must not keep one sign-in apart. */
+  | 'profile_in_use';
 
 export interface WorkspaceHelloResult {
   ok: true;
   tabId: number;
   /** Whether embedding rules are installed for this tab. */
   embedding: boolean;
+  /**
+   * Whether the worker can see the cookies profile pages are given (the webRequest permission).
+   * Without it a profile still works until the page reloads, but its sign-in is not saved.
+   */
+  profiles: boolean;
   realms: RealmAccounts[];
+}
+
+/** Answer to PROFILE_CLAIM. */
+export interface ProfileClaimResult {
+  ok: true;
+  realm: string;
+  accountId: string;
+  /** Addresses to load, in order, each in a hidden credentialless frame, before PROFILE_READY. */
+  steps: string[];
+  /** Whether the account has a saved sign-in (false: its pages will show the site's sign-in page). */
+  signedIn: boolean;
+  /**
+   * The saved sign-in is larger than a profile can hold (the browser keeps about 10 KB of cookies
+   * per site there), so part of it was left out and the site may ask for a sign-in.
+   */
+  truncated: boolean;
 }
 
 export interface AccountsListResult {
@@ -314,6 +410,12 @@ export interface HelperPingResult {
 /** Service worker → every extension page. */
 export type WorkspaceBroadcast =
   | { type: 'ACCOUNTS_CHANGED'; realm: string; activeAccountId: string | null; switched: boolean }
+  /**
+   * The account's saved sign-in was replaced (it became the browser's, came back from it, or was
+   * removed): a page whose profile slot shows it holds old cookies and must reload to show it.
+   * Sent before the ACCOUNTS_CHANGED of the same change.
+   */
+  | { type: 'PROFILE_RETIRED'; accountId: string }
   /** An embedded page tried to open a new window; open the address as a session tab instead. */
   | { type: 'EMBED_OPEN_REQUEST'; tabId: number; url: string };
 
@@ -322,8 +424,12 @@ export type WorkspaceBroadcast =
  * the workspace page receives it too and reads `sender.frameId`.
  */
 export type EmbedFrameEvent =
-  /** First message of an embedded document. The worker answers `EmbedHelloResult`. */
-  | { type: 'EMBED_HELLO'; pane: string | null; url: string; title: string }
+  /**
+   * First message of an embedded document. The worker answers `EmbedHelloResult`. `profile` is
+   * true in a credentialless frame (the workspace's profile slot), read by the content script
+   * itself, never taken from the page.
+   */
+  | { type: 'EMBED_HELLO'; pane: string | null; url: string; title: string; profile?: boolean }
   | {
       type: 'EMBED_NAV';
       pane: string | null;
@@ -341,8 +447,8 @@ export type EmbedFrameEvent =
    * script-visible cookies of its own address and forwards what the page sets. The worker
    * takes the address from the sender, never from the message.
    */
-  | { type: 'EMBED_COOKIES_GET' }
-  | { type: 'EMBED_COOKIE_SET'; cookie: string };
+  | { type: 'EMBED_COOKIES_GET'; profile?: boolean }
+  | { type: 'EMBED_COOKIE_SET'; cookie: string; profile?: boolean };
 
 export const EMBED_FRAME_EVENT_TYPES: ReadonlySet<string> = new Set<EmbedFrameEvent['type']>([
   'EMBED_HELLO',

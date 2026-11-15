@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { FrameSlot, FrameStage } from '../../src/entrypoints/manager/workspace/FrameStage.js';
 import { EMBED_SANDBOX, type FrameRuntime, type WorkspaceController } from '../../src/entrypoints/manager/workspace/useWorkspace.js';
+import { buildPaneName, parsePaneName } from '../../src/core/embed/frame.js';
 import { EMPTY_WORKSPACE_STATE, type SessionTab } from '../../src/core/workspace/types.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -13,11 +14,18 @@ function tab(id: string, url: string, createdAt: number): SessionTab {
   return { id, provider: 'claude_code', realm: 'anthropic', accountId: 'primary~anthropic', url, title: id, threadKey: null, createdAt, lastActiveAt: createdAt };
 }
 
-function controller(tabs: SessionTab[], live: string[], runtimes: Record<string, FrameRuntime> = {}): WorkspaceController {
+function controller(
+  tabs: SessionTab[],
+  live: string[],
+  runtimes: Record<string, FrameRuntime> = {},
+  /** Tabs whose page loads in the profile slot; every other tab loads in an ordinary frame. */
+  profileTabs: readonly string[] = []
+): WorkspaceController {
   return {
     state: { ...EMPTY_WORKSPACE_STATE, tabs },
     plan: { live, resting: {} },
     runtime: (id: string) => runtimes[id] ?? runtime,
+    slotOf: (t: SessionTab) => (profileTabs.includes(t.id) ? 'profile' : 'plain'),
     noteFrameLoaded: vi.fn(),
   } as unknown as WorkspaceController;
 }
@@ -40,8 +48,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function render(ws: WorkspaceController, children: React.ReactNode) {
-  act(() => root.render(<FrameStage workspace={ws}>{children}</FrameStage>));
+function render(ws: WorkspaceController, children: React.ReactNode, fullNavigation?: boolean) {
+  act(() => root.render(<FrameStage workspace={ws} fullNavigation={fullNavigation}>{children}</FrameStage>));
 }
 
 const frames = () => [...container.querySelectorAll<HTMLIFrameElement>('iframe.tk-frame')];
@@ -128,5 +136,75 @@ describe('FrameStage', () => {
     render(controller([a], ['a']), null);
     expect(frames()).toHaveLength(1);
     expect(frames()[0].style.display).toBe('none');
+  });
+  it('puts a profile account in a credentialless frame and the browser account in an ordinary one', () => {
+    const a = tab('a', 'https://claude.ai/code/one', 1);
+    const b = { ...tab('b', 'https://claude.ai/code/two', 2), accountId: 'acct_personal' };
+    render(controller([a, b], ['a', 'b'], {}, ['b']), null);
+    const [plain, profile] = frames();
+    expect(plain.dataset.slot).toBe('browser');
+    expect(plain.hasAttribute('credentialless')).toBe(false);
+    expect(profile.dataset.slot).toBe('profile');
+    expect(profile.hasAttribute('credentialless')).toBe(true);
+    // A profile page is still sandboxed the same way.
+    expect(profile.getAttribute('sandbox')).toBe(EMBED_SANDBOX);
+  });
+
+  it('gives a tab a new frame when its slot changes, and keeps the old one when it does not', () => {
+    const a = tab('a', 'https://claude.ai/code/one', 1);
+    render(controller([a], ['a']), null);
+    const plain = frames()[0];
+    expect(plain.hasAttribute('credentialless')).toBe(false);
+    // Same slot again: the same element.
+    render(controller([a], ['a']), null);
+    expect(frames()[0]).toBe(plain);
+    // The tab's account stops being the browser's: it loads in the profile slot, in a new frame.
+    render(controller([a], ['a'], {}, ['a']), null);
+    const profile = frames()[0];
+    expect(profile).not.toBe(plain);
+    expect(profile.hasAttribute('credentialless')).toBe(true);
+    expect(profile.dataset.slot).toBe('profile');
+    expect(frames()).toHaveLength(1);
+    // And back again.
+    render(controller([a], ['a']), null);
+    expect(frames()[0]).not.toBe(profile);
+    expect(frames()[0].hasAttribute('credentialless')).toBe(false);
+  });
+
+  it('names the frame with the no-full-navigation flag only when full navigation is off', () => {
+    const a = tab('a', 'https://claude.ai/code/one', 1);
+    render(controller([a], ['a']), null, true);
+    expect(frames()[0].name).toBe(buildPaneName('a'));
+    expect(frames()[0].name).toBe('tk-pane~a');
+    render(controller([a], ['a']), null, false);
+    expect(frames()[0].name).toBe('tk-pane~!n!a');
+    expect(parsePaneName(frames()[0].name)).toEqual({ id: 'a', flags: 'n' });
+  });
+
+  it('defaults to full navigation when the prop is not given', () => {
+    const a = tab('a', 'https://claude.ai/code/one', 1);
+    render(controller([a], ['a']), null);
+    expect(frames()[0].name).toBe('tk-pane~a');
+  });
+
+  it('gives a tab a new frame when full navigation is switched, and keeps it when it is not', () => {
+    const a = tab('a', 'https://claude.ai/code/one', 1);
+    render(controller([a], ['a']), null, true);
+    const first = frames()[0];
+    render(controller([a], ['a']), null, true);
+    expect(frames()[0]).toBe(first);
+    render(controller([a], ['a']), null, false);
+    const second = frames()[0];
+    expect(second).not.toBe(first);
+    expect(second.name).toBe('tk-pane~!n!a');
+    expect(frames()).toHaveLength(1);
+  });
+
+  it('keeps the profile attribute and the navigation flag together on one frame', () => {
+    const a = tab('a', 'https://claude.ai/code/one', 1);
+    render(controller([a], ['a'], {}, ['a']), null, false);
+    const f = frames()[0];
+    expect(f.hasAttribute('credentialless')).toBe(true);
+    expect(f.name).toBe('tk-pane~!n!a');
   });
 });

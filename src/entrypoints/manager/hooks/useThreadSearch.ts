@@ -34,6 +34,7 @@ import {
   useThreadGrouping,
 } from '../threads/grouping.js';
 import { CARD_ITEMS, KANBAN_STATES } from '../threads/ListPane.js';
+import { sessionGroupOf, type SessionGroup as SessionKind } from '../workspace/state.js';
 
 export interface ThreadSearchInput {
   settings: SettingsRecord | null;
@@ -58,8 +59,12 @@ export interface ThreadSearchInput {
   /** Workspace account id to keep (see accountOfThread), or null for every account. */
   accountFilter?: string | null;
   runFilter?: RunFilter;
+  /** Type of session (coding, chats, bots, other) to keep, or 'all'. */
+  typeFilter?: SessionKind | 'all';
   /** The workspace account id a thread belongs to; needed for `accountFilter`. */
   accountIdOf?: (conv: ConversationRecord) => string | null;
+  /** Account ids in sign-in order then account order; orders account groups. */
+  accountOrder?: readonly string[];
 }
 
 /** The threads a query, the filters and the chosen queue leave, in list order, plus the explicit-submit rerank. */
@@ -83,7 +88,9 @@ export function useThreadSearch({
   repositoryFilter = null,
   accountFilter = null,
   runFilter = 'all',
+  typeFilter = 'all',
   accountIdOf,
+  accountOrder,
 }: ThreadSearchInput) {
   const scope = useMemo(
     () => ({
@@ -108,14 +115,15 @@ export function useThreadSearch({
       (kindFilter === 'all' || insightsByThread.get(c.threadKey)?.kind === kindFilter) &&
       (!repositoryFilter || matchesRepository(repositoryIndex.get(c.threadKey), repositoryFilter)) &&
       (!accountFilter || !accountIdOf || accountIdOf(c) === accountFilter) &&
-      (runFilter === 'all' || matchesRunFilter(c.agentState, runFilter));
-  }), [searchIndex, scope, queueItemsMap, kindFilter, insightsByThread, repositoryFilter, repositoryIndex, accountFilter, accountIdOf, runFilter]);
+      (runFilter === 'all' || matchesRunFilter(c.agentState, runFilter)) &&
+      (typeFilter === 'all' || sessionGroupOf(c.provider) === typeFilter);
+  }), [searchIndex, scope, queueItemsMap, kindFilter, insightsByThread, repositoryFilter, repositoryIndex, accountFilter, accountIdOf, runFilter, typeFilter]);
   const scopedKeys = useMemo(() => new Set(scopedHits.map((h) => h.conversation.threadKey)), [scopedHits]);
   const gists = useMemo(() => new Map([...insightsByThread].map(([key, i]) => [key, i.gist])), [insightsByThread]);
 
   const configuredSpace = settings ? remoteSpace(settings) : null;
   const searchKey = JSON.stringify([searchQuery.trim(), scope, kindFilter, activeQueue, repositoryFilter,
-    accountFilter, runFilter, configuredSpace?.id, settings?.voyageEndpoint, settings?.mongodbGeography,
+    accountFilter, runFilter, typeFilter, configuredSpace?.id, settings?.voyageEndpoint, settings?.mongodbGeography,
     settings?.cloudExcludedProviders, settings?.rerankProvider, settings?.rerankInSearch, settings?.rerankModel,
     settings?.mongodbRerankModel, settings?.cohereRerankModel, settings?.bedrockRerankModel, settings?.rerankCandidates]);
   const currentKeyRef = useRef(searchKey);
@@ -174,8 +182,9 @@ export function useThreadSearch({
     return groupThreadHits(sortedHits, groupBy, {
       repository: (c) => repositoryIndex.get(c.threadKey) ?? null,
       account: (c) => accountIdOf?.(c) ?? null,
+      accountOrder,
     });
-  }, [pageList, groupBy, settings?.viewMode, sortedHits, repositoryIndex, accountIdOf]);
+  }, [pageList, groupBy, settings?.viewMode, sortedHits, repositoryIndex, accountIdOf, accountOrder]);
 
   const listHits: SearchHit[] = useMemo(() => (groups ? groups.flatMap((g) => g.hits) : sortedHits), [groups, sortedHits]);
 

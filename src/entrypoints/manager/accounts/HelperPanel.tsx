@@ -69,15 +69,13 @@ export function HelperPanel() {
         Mac helper
       </h3>
       <p className="tk-settings-note">
-        Optional. Threadkeeper keeps one account per sign-in signed in inside the workspace at a time. If you need two accounts of
-        the same sign-in signed in at the same moment, give the second one its own Chrome window. The Mac helper is a small
-        program that opens that window with a separate profile, so its sign-ins never mix with your main browser. It also keeps
-        backups of your library on this Mac. It works on macOS with Node.js 22 or newer; account windows open in Google Chrome,
-        whichever browser Threadkeeper itself runs in.
+        Optional. The Mac helper is a small program that keeps backups of your library on this Mac, outside the browser, so the
+        library survives the extension being removed or its ID changing. It works on macOS with Node.js 22 or newer.
       </p>
       <p className="tk-settings-note">
-        The helper does not read, copy or write cookies, passwords or any login data. It answers three kinds of request: ping,
-        open an address in a profile on a fixed list of AI sites, and store or return a library backup in its own folder.
+        Accounts no longer need it: every account now opens inside Threadkeeper. The helper does not read, copy or write cookies,
+        passwords or any login data. It answers three kinds of request: ping, open an address in a separate Chrome profile on a
+        fixed list of AI sites (used by earlier versions), and store or return a library backup in its own folder.
       </p>
 
       <div className="tk-field-row tk-acct-helper-check">
