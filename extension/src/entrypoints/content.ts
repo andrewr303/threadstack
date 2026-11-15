@@ -7,6 +7,7 @@ import {
   type DomExtractionResult,
 } from '../core/dom-capture.js';
 import {
+  IDENTITY_REPLAY_SOURCE,
   parseIdentityMessage,
   parseSiteConversation,
   parseSiteDataMessage,
@@ -25,11 +26,12 @@ import {
   providerCategory,
   type ProviderId,
 } from '../core/providers.js';
-import { frameMode, paneName } from '../core/embed/frame.js';
-import { agentStateOf, readAgentPage } from '../core/embed/agent-state.js';
+import { frameMode, inProfileFrame, paneName } from '../core/embed/frame.js';
+import { agentStateOf, readAgentPage, shouldReportAgentObservation } from '../core/embed/agent-state.js';
 import { parseIdentity, providerForIdentitySource } from '../core/accounts/identity.js';
 import { realmForProvider, realmOwnsHost, switchableRealms } from '../core/workspace/realms.js';
 import type { AgentState, EmbedFrameEvent } from '../core/workspace/types.js';
+import { createSessionDeliveryHandler } from '../core/embed/session-delivery.js';
 
 const OVERLAY_DIALOG_ID = 'threadkeeper-overlay-root';
 
@@ -598,7 +600,7 @@ const HELLO_RETRY_MS = [2000, 10_000];
 
 function sendEmbedHello(attempt = 0): void {
   sendToExtension(
-    { type: 'EMBED_HELLO', pane: EMBED_PANE, url: window.location.href, title: document.title },
+    { type: 'EMBED_HELLO', pane: EMBED_PANE, url: window.location.href, title: document.title, profile: inProfileFrame(window) },
     (response) => {
       const r = response as { ok?: unknown; frameId?: unknown } | undefined;
       if (r?.ok === true && typeof r.frameId === 'number' && Number.isInteger(r.frameId) && r.frameId > 0) {
@@ -640,14 +642,19 @@ function scheduleNavReport(): void {
 
 let lastAgentState: AgentState = 'unknown';
 let lastAgentUrl = '';
+let lastAgentReportAt = 0;
+let lastAgentCheckAt = 0;
 
 function reportAgentState(): void {
   const url = window.location.href;
   const state = agentStateFor(detectProviderFromUrl(url)) ?? 'unknown';
-  // A new address with the same state is news (another session); "still not observed" is not.
-  if (state === lastAgentState && (url === lastAgentUrl || state === 'unknown')) return;
+  const now = Date.now();
+  lastAgentCheckAt = now;
+  // Stable controls stay fresh through a lightweight heartbeat; historical state never does.
+  if (!shouldReportAgentObservation(lastAgentUrl ? { state: lastAgentState, url: lastAgentUrl, at: lastAgentReportAt } : null, { state, url }, now)) return;
   lastAgentState = state;
   lastAgentUrl = url;
+  lastAgentReportAt = now;
   sendToExtension({ type: 'EMBED_AGENT_STATE', pane: EMBED_PANE, url, state });
 }
 
@@ -1015,10 +1022,18 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
     window.addEventListener('message', onSiteDataWindowMessage);
   }
   window.addEventListener('message', onIdentityWindowMessage);
+  // The page may have asked who is signed in before this script started; hear it again.
+  try {
+    window.postMessage({ source: IDENTITY_REPLAY_SOURCE }, window.location.origin);
+  } catch {
+    // never disturb the page
+  }
 
   // Listen for deliberate invocation from background service worker
   if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+    const deliverSession = createSessionDeliveryHandler({ ownId: chrome.runtime.id, doc: document, url: () => window.location.href, workspace: IN_WORKSPACE });
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (deliverSession(message, _sender, sendResponse)) return true;
       if (IN_WORKSPACE && message && message.type === 'TK_EMBED_COMMAND') {
         sendResponse(runEmbedCommand(message as Record<string, unknown>));
         return true;
@@ -1162,7 +1177,10 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
   // (X has no DOM observer, and its sign-in form appears after the address).
   let lastHref = window.location.href;
   window.setInterval(() => {
-    if (IN_WORKSPACE) scheduleNavReport();
+    if (IN_WORKSPACE) {
+      scheduleNavReport();
+      if (Date.now() - lastAgentCheckAt >= 10_000) schedulePageCheck();
+    }
     if (window.location.href === lastHref) {
       if (!signedOutSent && LOGIN_PATH.test(window.location.pathname)) schedulePageCheck();
       return;

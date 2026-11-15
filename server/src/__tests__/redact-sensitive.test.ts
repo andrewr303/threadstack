@@ -6,6 +6,10 @@ import {
   stripSecretBearingUrlParts,
 } from "../middleware/redact-sensitive.js";
 
+it("never logs paired browser credentials", () => {
+  expect(redactSensitive({ bridgeToken: "bridge-canary", pollToken: "poll-canary", headers: { "x-threadkeeper-bridge-token": "header-canary" } })).toEqual({ bridgeToken: "[REDACTED]", pollToken: "[REDACTED]", headers: { "x-threadkeeper-bridge-token": "[REDACTED]" } });
+});
+
 it("redacts Slack manager grants and sealed OAuth handoffs", () => {
   const result = redactSensitive({ managerToken: "manager-canary", refreshToken: "refresh-canary", sealed: { ct: "sealed-canary" }, handoff: { token: "handoff-canary" }, claim_id: "claim-canary" });
   expect(JSON.stringify(result)).not.toContain("canary");

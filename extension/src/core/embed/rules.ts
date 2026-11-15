@@ -26,7 +26,7 @@ export interface EmbedRule {
     type: 'modifyHeaders';
     responseHeaders: Array<{ header: string; operation: 'remove' }>;
   };
-  condition: { tabIds: number[]; resourceTypes: ['sub_frame'] };
+  condition: { tabIds: number[]; resourceTypes: ['sub_frame']; excludedRequestDomains?: string[] };
 }
 
 /** The slice of chrome.declarativeNetRequest used here. */
@@ -39,7 +39,7 @@ export function isEmbedRuleId(id: number): boolean {
   return Number.isInteger(id) && id >= EMBED_RULE_ID_MIN && id <= EMBED_RULE_ID_MAX;
 }
 
-export function embedRule(ruleId: number, tabId: number): EmbedRule {
+export function embedRule(ruleId: number, tabId: number, protectedDomains: string[] = []): EmbedRule {
   return {
     id: ruleId,
     priority: 1,
@@ -47,7 +47,10 @@ export function embedRule(ruleId: number, tabId: number): EmbedRule {
       type: 'modifyHeaders',
       responseHeaders: EMBED_STRIPPED_HEADERS.map((header) => ({ header, operation: 'remove' as const })),
     },
-    condition: { tabIds: [tabId], resourceTypes: ['sub_frame'] },
+    condition: {
+      tabIds: [tabId], resourceTypes: ['sub_frame'],
+      ...(protectedDomains.length ? { excludedRequestDomains: [...new Set(protectedDomains)].sort() } : {}),
+    },
   };
 }
 
@@ -68,17 +71,18 @@ function ruleTargetsTab(rule: { condition?: { tabIds?: number[] } }, tabId: numb
  * Install (or keep) the rule for `tabId`. `remembered` maps every known workspace tab to its
  * rule id. Returns the rule id now in force, or null when no id is free.
  */
-export async function installEmbedRule(api: SessionRulesApi, tabId: number, remembered: ReadonlyMap<number, number>): Promise<number | null> {
+export async function installEmbedRule(api: SessionRulesApi, tabId: number, remembered: ReadonlyMap<number, number>, protectedDomains: string[] = []): Promise<number | null> {
   const installed = await api.getSessionRules();
   const own = remembered.get(tabId);
   if (own !== undefined) {
     const current = installed.find((r) => r.id === own);
-    if (current && ruleTargetsTab(current, tabId)) return own;
+    const exclusions = (current?.condition as EmbedRule['condition'] | undefined)?.excludedRequestDomains ?? [];
+    if (current && ruleTargetsTab(current, tabId) && JSON.stringify([...exclusions].sort()) === JSON.stringify([...new Set(protectedDomains)].sort())) return own;
   }
-  const taken = [...installed.map((r) => r.id), ...[...remembered.entries()].filter(([t]) => t !== tabId).map(([, id]) => id)];
+  const taken = [...installed.filter((r) => r.id !== own).map((r) => r.id), ...[...remembered.entries()].filter(([t]) => t !== tabId).map(([, id]) => id)];
   const ruleId = own !== undefined && !taken.includes(own) ? own : allocateRuleId(taken);
   if (ruleId === null) return null;
-  await api.updateSessionRules({ removeRuleIds: [ruleId], addRules: [embedRule(ruleId, tabId)] });
+  await api.updateSessionRules({ removeRuleIds: [ruleId], addRules: [embedRule(ruleId, tabId, protectedDomains)] });
   return ruleId;
 }
 

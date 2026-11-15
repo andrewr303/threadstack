@@ -2199,6 +2199,7 @@ async function startServerWithDatabaseTeardown(
     logger.info({ signal }, "shutdown signal received; starting ordered shutdown");
     eventLoopStallMonitor.stop();
     setStartupRecoveryPhase("draining");
+    app.locals.closeCompanyLiveStreams?.();
     for (const client of liveEventsWebSocketServer.clients) client.close(1012, "Server restarting");
     liveEventsWebSocketServer.close();
     // Finish admitted HTTP requests while their services, workers and database

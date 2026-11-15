@@ -1,0 +1,17 @@
+{
+  "server/src/static-index-html.ts": "518b5d45e1e42b00861d2bc876889f635874753447fd9359de645b2878d3f221",
+  "server/src/__tests__/static-index-html.test.ts": "28a18cc6e908b246337ac14372d2e4eb0ed0556bae771ccf9a7966f5810964e6",
+  "ui/src/main.tsx": "ccf113c564806fd20ee5e0fa1d35b3f6559a740174877dba5117201d20198e37",
+  "ui/src/pages/Search.tsx": "c5d1789c4a3165daf2d50c9fda0dea57e6a61058f894ea7323d967e82a3569cc",
+  "ui/src/components/CommandPalette.tsx": "41b7b5de5048f519e5f7fb527e18a1d29ec5bf02c23323373fd8f79898c166a5",
+  "ui/src/components/CommandPalette.test.tsx": "d179aadb5b426cc78cd4e1831ef9734b8c6d5cc9c9cbca7459f3250c7985613d",
+  "ui/src/components/ThreadkeeperHostBridge.tsx": "4743313a89a472bec533e20ea9f07d67163602ef038c195580de73a84773c08e",
+  "ui/src/components/search/BrowserSessionResults.tsx": "78269884ae0f6239ee032829a44d95552be0a7a9132834866abcebea4d2d18dc",
+  "ui/src/components/search/BrowserSessionResults.test.tsx": "63265ce2efa02d4971ed224a1ab68a7e71dee5636b07e2f053e1eec89bd7cbf6",
+  "ui/src/components/search/BrowserSessionPaletteGroup.tsx": "c0fd6dfed9d3badab6c228a02c160986b5ed07d6db0181fee0c8c39d4b12d602",
+  "ui/src/hooks/useBrowserSessionSearch.ts": "7271e2f6ac36048b5c7e7b470c857015407540e2a8874f813b37e52c5b524ccd",
+  "ui/src/api/browser-sessions.ts": "e969186bdbd88a39d7307a4ad1ed2fc636f3b03baf9e5a6750b39bf2520ce722",
+  "ui/src/api/browser-sessions.test.ts": "fd3c69a95c61c156339cbade0257e0a3a4104bc5d4a7c7df05ce079ca478068f",
+  "ui/src/lib/threadkeeper-host.ts": "b61937ed1e3ef9d13ef7e8ed2aa3300398022e979d57b80c889cbd186c49ed69",
+  "ui/src/lib/threadkeeper-host.test.ts": "5e42ccd664b27bb7bc85c871791976cfffa83f54efd0a2b6e8740b8e63a9e1af"
+}

@@ -5,11 +5,15 @@ import { getSmartTitle } from '../../../core/insights.js';
 import { providerLabel } from '../../../core/providers.js';
 import { CoverageTick, KindLabel, StatusPill, relativeTime } from '../shared.js';
 import { RowCheck } from '../BulkActions.js';
-import { AccountChip, RunState } from '../shell/primitives.js';
+import { AccountChip, ProviderMark, RunState } from '../shell/primitives.js';
+import { Icon } from '../shell/icons.js';
+import { threadTabId } from '../workspace/state.js';
 import { useOptionalWorkspaceContext } from '../workspace/context.js';
 import { isCodingProvider } from './grouping.js';
 
 export interface ThreadRowProps {
+  /** A compact session row in the workspace sidebar; selection and search remain the same. */
+  compact?: boolean;
   hit: SearchHit;
   /** Opened in the detail pane. */
   selected: boolean;
@@ -30,6 +34,7 @@ export interface ThreadRowProps {
 }
 
 export function ThreadRow({
+  compact = false,
   hit,
   selected,
   checked,
@@ -51,6 +56,31 @@ export function ThreadRow({
   const showAccount = Boolean(owner?.account && ((ownerRealm?.accounts.length ?? 0) > 1 || !owner.active));
   const showRun = onPage && isCodingProvider(c.provider) && Boolean(c.agentState) && c.agentState !== 'unknown';
   const secondLine = queueInfo ? queueInfo.resurfaceReason : searching ? hit.supportingExcerpt : whereYouLeftOff ?? hit.supportingExcerpt;
+  const live = compact && ws?.workspace.plan.live.includes(threadTabId(c.threadKey));
+  if (compact) {
+    const title = getSmartTitle(c, insight);
+    return (
+      <li className="tk-row-item tk-session-index-row" data-checked={checked}>
+        <RowCheck threadKey={c.threadKey} title={title} checked={checked} onToggle={onToggleChecked} />
+        <button ref={(el) => { if (el) registerRow(c.threadKey, el); }} type="button" className="tk-row-btn tk-session-index-button"
+          title={title} aria-selected={selected} aria-current={selected ? 'true' : undefined} data-open={live ? 'true' : undefined}
+          onClick={() => onSelect(c.threadKey)}>
+          <ProviderMark provider={c.provider} />
+          <span className="tk-session-index-text">
+            <span className="tk-row-title tk-rail-row-title">{title}</span>
+            <span className="tk-rail-row-meta">
+              <span className="tk-visually-hidden">{providerLabel(c.provider)}, </span>
+              {owner?.account && <AccountChip account={owner.account} active={owner.active} />}
+              {showRun ? <RunState state={c.agentState} observedAt={c.agentStateAt} /> : <StatusPill state={c.workflowState} />}
+            </span>
+            {(searching || queueInfo) && secondLine && <span className="tk-session-index-excerpt">{secondLine}</span>}
+            {searching && hit.matchReasons[0] && <span className="tk-session-index-match">{hit.matchReasons[0]}</span>}
+          </span>
+          {live && <span className="tk-rail-row-open" title="Open in the workspace"><Icon name="live" size={14} /><span className="tk-visually-hidden">, Open</span></span>}
+        </button>
+      </li>
+    );
+  }
   return (
     <li className="tk-row-item" data-checked={checked}>
       <RowCheck threadKey={c.threadKey} title={getSmartTitle(c, insight)} checked={checked} onToggle={onToggleChecked} />

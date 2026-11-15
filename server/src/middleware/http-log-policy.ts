@@ -103,6 +103,7 @@ export function isPrivateWebhookHttpRequest(
     // Do not let URL dot-segment normalization erase an explicitly supplied
     // ingress namespace on a malformed absolute-form callback.
     const rawPath = pathname.replace(/^https?:\/\/[^/]*/i, "");
+    if (/^\/api\/plugins\/[^/]+\/api\/(?:bridge|pair)(?:\/|$)/i.test(rawPath)) return true;
     if (/^\/api\/(?:chat-webhooks|voice-webhooks|routine-triggers\/public)(?:\/|$)/i.test(rawPath)) return true;
     try {
       pathname = new URL(url).pathname;
@@ -112,7 +113,10 @@ export function isPrivateWebhookHttpRequest(
   }
   // This namespace is reserved for provider ingress, including malformed or
   // unknown callback paths. Rejecting a route must not make its payload public.
-  return /^\/api\/(?:chat-webhooks|voice-webhooks|routine-triggers\/public)(?:\/|$)/i.test(pathname);
+  // Paired browser ingress carries transcripts and one-time credentials, and
+  // needs the same closed log projection even when authentication rejects it.
+  return /^\/api\/(?:chat-webhooks|voice-webhooks|routine-triggers\/public)(?:\/|$)/i.test(pathname)
+    || /^\/api\/plugins\/[^/]+\/api\/(?:bridge|pair)(?:\/|$)/i.test(pathname);
 }
 
 export function isPrivateDotPrincipalHttpRequest(url: string | undefined): boolean {

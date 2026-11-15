@@ -12,7 +12,8 @@ import { usePinnedNavigation } from "@/hooks/usePinnedNavigation";
 import { useDialogActions } from "@/context/DialogContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { queryKeys } from "@/lib/queryKeys";
-import { Link, useLocation } from "@/lib/router";
+import { Link, useActiveCompanyPrefix, useLocation } from "@/lib/router";
+import { PluginSlotOutlet } from "@/plugins/slots";
 import { agentRouteRef, cn, projectRouteRef, SIDEBAR_RAIL_HIDDEN_LABEL } from "@/lib/utils";
 import { SidebarCompanyMenu } from "./SidebarCompanyMenu";
 import { SidebarNavItem } from "./SidebarNavItem";
@@ -108,6 +109,7 @@ function RecentNavigationList({ children }: { children: ReactNode }) {
  * or task just because someone visits or switches agents. */
 export function CoordinatorSidebar({ children }: { children?: ReactNode }) {
   const { companyId, userId, agents, chats, session } = useAgentChatNavigation();
+  const companyPrefix = useActiveCompanyPrefix();
   const unreadChatCount = chats.data?.filter(chat => chat.isUnreadForMe).length ?? 0;
   const pinnedNavigation = usePinnedNavigation(userId);
   const { data: experimental } = useQuery({
@@ -172,6 +174,7 @@ export function CoordinatorSidebar({ children }: { children?: ReactNode }) {
           <SidebarNavItem className="design-sidebar-item" to="/decisions" label="Inbox" icon={Inbox} badge={attentionCount} badgeLabel="decisions" />
           {orderedPins.length > 0 && <PinnedNavigationList key={`${companyId}:${userId}`} items={orderedPins} rail={rail} onReorder={pinnedNavigation.reorder} onUnpin={pinnedNavigation.toggle} />}
         </div>
+        <PluginSlotOutlet slotTypes={["sidebar"]} context={{ companyId, companyPrefix }} className="flex flex-col gap-1" missingBehavior="placeholder" />
         <Flyout open={moreOpen} onOpenChange={setMoreOpen}>
           <FlyoutTrigger asChild><button type="button" aria-label="More workspace pages" className="design-sidebar-item flex w-auto items-center gap-2.5 rounded-lg py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring"><MoreHorizontal className="size-4 shrink-0" /><span className={rail ? SIDEBAR_RAIL_HIDDEN_LABEL : undefined}>More</span></button></FlyoutTrigger>
           <FlyoutContent ref={moreContentRef} tabIndex={-1} onOpenAutoFocus={(event) => { event.preventDefault(); moreContentRef.current?.focus(); }} side={isMobile ? "bottom" : "right"} align="start" className="w-56 p-1" aria-label="More workspace pages">

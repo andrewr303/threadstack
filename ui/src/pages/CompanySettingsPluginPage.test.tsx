@@ -46,6 +46,9 @@ vi.mock("@/plugins/slots", () => ({
     </div>
   ),
 }));
+vi.mock("@/components/BrowserSessionCredentialSettings", () => ({
+  BrowserSessionCredentialSettings: ({ pluginId, companyId }: { pluginId: string; companyId: string }) => <div data-testid="native-browser-session-credentials">{pluginId}:{companyId}</div>,
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -113,6 +116,7 @@ describe("CompanySettingsPluginPage", () => {
     expect(container.querySelector('[data-testid="plugin-slot-mount"]')?.textContent).toBe(
       "Permissions:company-1:PAP",
     );
+    expect(container.querySelector('[data-testid="native-browser-session-credentials"]')).toBeNull();
     expect(mockSetBreadcrumbs).toHaveBeenCalledWith([
       { label: "Settings", href: "/company/settings" },
       { label: "Permissions" },
@@ -121,6 +125,14 @@ describe("CompanySettingsPluginPage", () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it("mounts the native company-scoped secret picker only for browser-sessions", async () => {
+    mockParams.settingsRoutePath = "browser-sessions";
+    mockUsePluginSlots.mockReturnValue({ slots: [{ type: "companySettingsPage", id: "settings", displayName: "Browser sessions", exportName: "SettingsPage", routePath: "browser-sessions", pluginId: "browser-plugin-id", pluginKey: "browser-sessions" }], isLoading: false, errorMessage: null });
+    const root = await renderPage(container);
+    expect(container.querySelector('[data-testid="native-browser-session-credentials"]')?.textContent).toBe("browser-plugin-id:company-1");
+    await act(() => root.unmount());
   });
 
   it("fails closed when no ready plugin declares the route", async () => {

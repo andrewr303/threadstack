@@ -33,6 +33,7 @@ import { bindConnectivity, createAppQueryClient } from "./lib/query-client";
 import { captureBrowserException } from "./lib/sentry";
 import { startPersistedQueryCache } from "./lib/persisted-query-cache";
 import { hasPendingWrites, subscribePendingWrites } from "./lib/reload-safety";
+import { ThreadkeeperHostBridge } from "./components/ThreadkeeperHostBridge";
 import "@mdxeditor/editor/style.css";
 import "./index.css";
 
@@ -127,6 +128,7 @@ getOrCreatePaperclipReactRoot(window, rootElement).render(
         <SentryGate />
         <ThemeProvider>
           <BrowserRouter>
+            <ThreadkeeperHostBridge />
             <CompanyProvider>
               <EditorAutocompleteProvider>
                 <ToastProvider>

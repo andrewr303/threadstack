@@ -63,6 +63,9 @@ import { useLocation } from "../lib/router";
 import { agentRouteRef } from "../lib/utils";
 import { buildSameOriginWebSocketUrl } from "../lib/websocket-url";
 import { tryCreateWebSocket } from "../lib/websocket";
+import { notifyCompanyLiveDisconnected } from "../lib/company-live-connection-events";
+import { createHostedLiveTransport } from "../lib/hosted-live-transport";
+import { isVerifiedThreadkeeperHost, subscribeVerifiedThreadkeeperHost } from "../lib/threadkeeper-host-state";
 
 const TOAST_COOLDOWN_WINDOW_MS = 10_000;
 const TOAST_COOLDOWN_MAX = 3;
@@ -2437,7 +2440,8 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
     let reconnectAttempt = 0;
     let reconnectTimer: number | null = null;
     let pollTimer: number | null = null;
-    let socket: WebSocket | null = null;
+    let transport: ReturnType<typeof createHostedLiveTransport> | null = null;
+    let notifiedOutage = false;
 
     const clearReconnect = () => {
       if (reconnectTimer !== null) {
@@ -2477,30 +2481,33 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
 
     const connect = () => {
       if (closed) return;
+      transport?.dispose();
       const url = buildSameOriginWebSocketUrl(
         `/api/companies/${encodeURIComponent(liveCompanyId)}/events/ws`,
       );
-      const nextSocket = tryCreateWebSocket(url);
-      if (!nextSocket) {
-        startPolling();
-        scheduleReconnect();
-        return;
-      }
-      socket = nextSocket;
       let recoveryActive = true;
       const recoverQueries = createLiveQueryRecovery(queryClient,
-        () => !closed && recoveryActive && socket === nextSocket && getPageVisibility().visible,
+        () => !closed && recoveryActive && transport === channel && getPageVisibility().visible,
         { predicate: isLiveReconciledQuery });
-
-      nextSocket.onopen = () => {
-        if (closed || socket !== nextSocket) {
-          closeSocketQuietly(nextSocket, "stale_connection");
-          return;
-        }
+      const channel = createHostedLiveTransport({
+        socketUrl: url,
+        streamUrl: `/api/companies/${encodeURIComponent(liveCompanyId)}/events/stream`,
+        createSocket: tryCreateWebSocket,
+        disposeSocket: socket => closeSocketQuietly(socket, "transport_replaced"),
+        isVerifiedHost: isVerifiedThreadkeeperHost,
+        subscribeVerifiedHost: subscribeVerifiedThreadkeeperHost,
+        onFallback: () => { clearReconnect(); stopPolling(); transcripts.close(); },
+        onOpen: sender => {
+        if (closed) return;
+        recoveryActive = true;
+        notifiedOutage = false;
         setConnectedScopeKey(socketScopeKey);
         stopPolling();
         connectivity.reportSocketStatus("open");
-        transcripts.open(nextSocket);
+        // HTTP delivery is the server's default authorized company stream. It
+        // does not pretend to negotiate bidirectional run-interest controls.
+        if (sender) transcripts.open(sender); else transcripts.close();
+        document.documentElement.setAttribute("data-paperclip-live-transport", channel.mode());
         if (reconnectAttempt > 0) {
           gateRef.current.suppressUntil = Date.now() + RECONNECT_SUPPRESS_MS;
         }
@@ -2521,11 +2528,11 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
           } : isLiveReconciledQuery,
         }, { cancelRefetch: false });
         reconnectAttempt = 0;
-      };
+      },
 
-      nextSocket.onmessage = (message) => {
-        if (closed || socket !== nextSocket) return;
-        const raw = typeof message.data === "string" ? message.data : "";
+      onMessage: (data) => {
+        if (closed || transport !== channel) return;
+        const raw = typeof data === "string" ? data : "";
         if (!raw) return;
 
         try {
@@ -2560,29 +2567,28 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
         } catch {
           // Ignore non-JSON payloads.
         }
-      };
+      },
 
-      nextSocket.onerror = () => {
-        if (closed || socket !== nextSocket) return;
-        recoveryActive = false;
-        setConnectedScopeKey((current) => current === socketScopeKey ? null : current);
-        // Wait for onclose to drive the reconnect. Self-closing here is what
-        // produces the "closed before connection established" browser noise.
-      };
-
-      nextSocket.onclose = () => {
-        if (socket !== nextSocket) return;
-        recoveryActive = false;
-        socket = null;
-        transcripts.close();
+      onLost: () => {
         if (closed) return;
+        recoveryActive = false;
+        if (notifiedOutage) return;
+        notifiedOutage = true;
+        transcripts.close();
+        notifyCompanyLiveDisconnected(liveCompanyId);
         setConnectedScopeKey((current) => current === socketScopeKey ? null : current);
+        hasNeededSocketRecovery.current = true;
         // A dropped socket may be the first sign of an outage; the store
         // confirms with a health probe before it changes state.
         connectivity.reportSocketStatus("closed");
-        startPolling();
+      },
+      onClosed: () => {
+        if (closed) return;
+        if (!isVerifiedThreadkeeperHost()) startPolling();
         scheduleReconnect();
-      };
+      },
+      });
+      transport = channel;
     };
 
     // Delay initial connect slightly so React StrictMode's double-invoke
@@ -2596,10 +2602,11 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(connectTimer);
       clearReconnect();
       stopPolling();
-      const activeSocket = socket;
-      socket = null;
+      const activeTransport = transport;
+      transport = null;
       transcripts.close();
-      closeSocketQuietly(activeSocket, "provider_unmount");
+      activeTransport?.dispose();
+      document.documentElement.removeAttribute("data-paperclip-live-transport");
     };
   }, [
     visible,

@@ -43,6 +43,8 @@ import {
   type SearchQueryParserContext,
 } from "../lib/search-query-parser";
 import { companyProjectsQuery } from "@/lib/company-projects-query";
+import { useBrowserSessionSearch } from "../hooks/useBrowserSessionSearch";
+import { BrowserSessionPaletteGroup } from "./search/BrowserSessionPaletteGroup";
 
 const SEARCH_ALL_VALUE = "__paperclip-search-all__";
 
@@ -158,6 +160,7 @@ export function CommandPalette() {
   }), [agents, currentUserId, labels, projects]);
   const parsedQuery = useMemo(() => parseSearchQuery(query, parserContext), [parserContext, query]);
   const quickSearchQuery = parsedQuery.query.trim();
+  const browserSessions = useBrowserSessionSearch({ companyId: selectedCompanyId, query: quickSearchQuery, enabled: open, limit: 5 });
 
   const { data: issues = [] } = useQuery({
     queryKey: queryKeys.issues.list(selectedCompanyId!),
@@ -215,7 +218,7 @@ export function CommandPalette() {
   const showPromotedProjects = showSearchAll && matchedProjects.length > 0;
   const taskLimit = showPromotedProjects ? TASK_LIMIT_WITH_PROJECTS : TASK_LIMIT;
   const showEmptyHint =
-    showSearchAll && visibleIssues.length === 0 && matchedProjects.length === 0;
+    showSearchAll && visibleIssues.length === 0 && matchedProjects.length === 0 && browserSessions.rows.length === 0;
 
   return (
     <CommandDialog open={open} onOpenChange={(v) => {
@@ -416,6 +419,8 @@ export function CommandPalette() {
             </CommandGroup>
           </>
         )}
+
+        <BrowserSessionPaletteGroup search={browserSessions} query={quickSearchQuery} onOpened={() => setOpen(false)} />
 
         {agents.length > 0 && (
           <>

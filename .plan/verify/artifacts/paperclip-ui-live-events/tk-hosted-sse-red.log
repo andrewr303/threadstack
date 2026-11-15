@@ -1,0 +1,27 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/lib/hosted-live-transport.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/hosted-live-transport.test.ts [ src/lib/hosted-live-transport.test.ts ]
+Error: Cannot find module './hosted-live-transport' imported from /Users/andrew/dev/threadkeeper/paperclip/ui/src/lib/hosted-live-transport.test.ts
+ ❯ src/lib/hosted-live-transport.test.ts:2:1
+      1| import { afterEach, describe, expect, it, vi } from "vitest";
+      2| import { createHostedLiveTransport } from "./hosted-live-transport";
+       | ^
+      3|
+      4| class Socket {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  23:49:12
+   Duration  119ms (transform 66%, setup 20%, worker 14%)
+

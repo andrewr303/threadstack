@@ -16,7 +16,8 @@ vi.mock("../api/auth", () => ({
   authApi: { getSession: sessionRead },
 }));
 vi.mock("../api/health", () => ({ healthApi: { get: healthRead } }));
-import { LiveUpdatesProvider, useHasCompanyLiveConnection, useTaskRunLiveUpdates } from "./LiveUpdatesProvider";
+import { LiveUpdatesProvider, useCompanyLiveEvent, useHasCompanyLiveConnection, useTaskRunLiveUpdates } from "./LiveUpdatesProvider";
+import { setVerifiedThreadkeeperHost } from "../lib/threadkeeper-host-state";
 import { CONNECTED_ACTIVE_RUN_REFETCH_MS, liveRunRefetchInterval } from "../lib/live-runs-cache";
 import { taskBrowsersQueryKey } from "../lib/task-browsers-refresh";
 import { taskBrowsersRefetchInterval } from "../hooks/useTaskBrowsers";
@@ -34,6 +35,15 @@ class Socket {
   constructor() { Socket.instances.push(this); }
   send(encoded: string) { this.sent.push(JSON.parse(encoded)); }
   close() { this.readyState = 3; }
+}
+class EventStream {
+  static instances: EventStream[] = [];
+  readyState = 0;
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessage: ((message: { data: string }) => void) | null = null;
+  constructor(readonly url: string, readonly options: EventSourceInit) { EventStream.instances.push(this); }
+  close = vi.fn();
 }
 
 describe("LiveUpdatesProvider connection recovery", () => {
@@ -54,6 +64,8 @@ describe("LiveUpdatesProvider connection recovery", () => {
     sessionRead.mockReset().mockResolvedValue({ user: { id: "viewer" }, session: { id: "session", userId: "viewer" } });
     healthRead.mockReset().mockResolvedValue({ deploymentMode: "authenticated" });
     Socket.instances = [];
+    EventStream.instances = [];
+    setVerifiedThreadkeeperHost(false);
     client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: Infinity } } });
     client.setQueryData(queryKeys.auth.session, { user: { id: "viewer" }, session: { id: "session", userId: "viewer" } });
     client.setQueryData(queryKeys.health, { deploymentMode: "authenticated" });
@@ -63,6 +75,7 @@ describe("LiveUpdatesProvider connection recovery", () => {
 
   afterEach(async () => {
     await act(async () => root.unmount());
+    setVerifiedThreadkeeperHost(false);
     client.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -105,6 +118,56 @@ describe("LiveUpdatesProvider connection recovery", () => {
       await act(async () => vi.advanceTimersByTimeAsync(1001));
     }
   }
+
+  it("uses the same company event processor after verified iframe SSE fallback and cleans it up", async () => {
+    vi.stubGlobal("WebSocket", Socket); vi.stubGlobal("EventSource", EventStream);
+    setVerifiedThreadkeeperHost(true);
+    const receive = vi.fn();
+    function Consumer() { useCompanyLiveEvent(receive); return <IdleRuns companyId="company-1" />; }
+    await act(async () => root.render(<QueryClientProvider client={client}><LiveUpdatesProvider><Consumer /></LiveUpdatesProvider></QueryClientProvider>));
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    await act(async () => Socket.instances[0].onerror?.());
+    expect(EventStream.instances).toHaveLength(1);
+    const stream = EventStream.instances[0];
+    expect(stream.url).toBe("/api/companies/company-1/events/stream"); expect(stream.options).toEqual({ withCredentials: true });
+    await act(async () => stream.onopen?.()); expect(container.textContent).toBe("connected");
+    const event = { id: 1, companyId: "company-1", type: "activity.logged", createdAt: "2026-11-13T00:00:00Z", payload: { action: "issue.created", entityType: "issue", entityId: "task-a" } };
+    await act(async () => stream.onmessage?.({ data: JSON.stringify(event) }));
+    expect(receive).toHaveBeenCalledWith(event);
+    await act(async () => root.unmount());
+    expect(stream.close).toHaveBeenCalledOnce();
+  });
+
+  it("notifies the verified host once across terminal stream retries until recovery", async () => {
+    vi.stubGlobal("WebSocket", Socket); vi.stubGlobal("EventSource", EventStream); setVerifiedThreadkeeperHost(true);
+    const lost = vi.fn(); window.addEventListener("paperclip:company-live-disconnected", lost);
+    try {
+      await renderPolling();
+      await act(async () => Socket.instances[0].onerror?.());
+      EventStream.instances[0].readyState = 2;
+      await act(async () => EventStream.instances[0].onerror?.());
+      expect(lost).toHaveBeenCalledTimes(1);
+      await act(async () => vi.advanceTimersByTimeAsync(1001));
+      await act(async () => Socket.instances.at(-1)?.onerror?.());
+      const retry = EventStream.instances.at(-1)!; retry.readyState = 2;
+      await act(async () => retry.onerror?.());
+      expect(lost).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener("paperclip:company-live-disconnected", lost); }
+  });
+
+  it.each(["error", "close"])("reports native socket %s once for the optional application host", async (kind) => {
+    vi.stubGlobal("WebSocket", Socket);
+    const lost = vi.fn();
+    window.addEventListener("paperclip:company-live-disconnected", lost);
+    try {
+      await render();
+      const socket = Socket.instances[0];
+      await act(async () => socket.onopen?.());
+      await act(async () => { if (kind === "error") socket.onerror?.(); socket.onclose?.(); });
+      expect(lost).toHaveBeenCalledTimes(1);
+      expect(lost.mock.calls[0][0].detail).toEqual({ companyId: "company-1" });
+    } finally { window.removeEventListener("paperclip:company-live-disconnected", lost); }
+  });
 
   it.each([false, true])("discovers a run started in the resync gap after acknowledgement (older read pending=%s)", async pending => {
     vi.stubGlobal("WebSocket", Socket);

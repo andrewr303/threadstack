@@ -7,6 +7,7 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDb, plugins } from "@paperclipai/db";
+import { ensureBundledPlugins, type BundledPluginProvisionerDeps } from "../services/bundled-plugins.js";
 import {
   ensureLocalPluginBuilt,
   pluginLoader,
@@ -172,6 +173,24 @@ describe("ensureLocalPluginBuilt", () => {
       await rm(cleanupPath, { recursive: true, force: true });
     }
     cleanupPaths.clear();
+  });
+
+  it("builds and activates the first-party bridge from a fresh source checkout through normal provisioning", async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "paperclip-fresh-bridge-")); cleanupPaths.add(repoRoot);
+    const packageRoot = path.join(repoRoot, "packages/plugins/plugin-browser-sessions"); await mkdir(path.join(packageRoot, "src"), { recursive: true });
+    const pkg = { name: "@paperclipai/plugin-browser-sessions", scripts: { build: "tsc" }, paperclipPlugin: { manifest: "./dist/manifest.js", worker: "./dist/worker.js", ui: "./dist/ui" } };
+    await writeFile(path.join(packageRoot, "package.json"), JSON.stringify(pkg)); await writeFile(path.join(packageRoot, "src/manifest.ts"), "export default {};\n");
+    const build = vi.fn(async () => { await mkdir(path.join(packageRoot, "dist/ui"), { recursive: true }); await writeFile(path.join(packageRoot, "dist/manifest.js"), "export default {id:'browser-sessions'};\n"); await writeFile(path.join(packageRoot, "dist/worker.js"), "export {};\n"); await writeFile(path.join(packageRoot, "dist/ui/index.js"), "export {};\n"); return { stdout: "", stderr: "" }; });
+    let installed = false; let ready = false;
+    const installPlugin = vi.fn(async ({ localPath }: { localPath: string }) => { await ensureLocalPluginBuilt(localPath, pkg, { repoRoot, execFileAsyncImpl: build }); installed = true; return { manifest: { id: "browser-sessions" } }; });
+    const load = vi.fn(async () => { ready = true; });
+    const deps = { registry: { getByKey: vi.fn(async () => installed ? { id: "fresh-source-bridge", pluginKey: "browser-sessions", status: ready ? "ready" : "installed", version: "0.1.0", manifestJson: {} } : null) }, loader: { installPlugin }, lifecycle: { load }, logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } } as unknown as BundledPluginProvisionerDeps;
+    expect(existsSync(path.join(packageRoot, "dist/manifest.js"))).toBe(false);
+    await ensureBundledPlugins([{ key: "browser-sessions", pluginKey: "browser-sessions", localPath: packageRoot, allowSourceBuild: true }], deps, { reinstallUninstalled: false });
+    expect(installPlugin).toHaveBeenCalledExactlyOnceWith({ localPath: packageRoot });
+    expect(build).toHaveBeenCalledExactlyOnceWith("pnpm", ["--filter", "@paperclipai/plugin-browser-sessions", "build"], { cwd: repoRoot, timeout: 120_000 });
+    expect(load).toHaveBeenCalledExactlyOnceWith("fresh-source-bridge"); expect(ready).toBe(true);
+    expect(existsSync(path.join(packageRoot, "dist/ui/index.js"))).toBe(true);
   });
 
   it("skips auto-build for local plugin paths outside the repo", async () => {

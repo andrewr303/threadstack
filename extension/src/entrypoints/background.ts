@@ -15,6 +15,7 @@ import {
   embeddedFrameUrl,
   validateDockPageSender,
   validateRuntimeMessageSender,
+  validateWorkspaceSender,
   type EmbedSenderContext,
 } from '../core/messaging.js';
 import { DockService } from '../core/dock/external.js';
@@ -41,11 +42,13 @@ import {
 } from '../core/custom-sites.js';
 import { createAccountService } from '../core/accounts/service.js';
 import { chromeAccountsEnv } from '../core/accounts/chrome-env.js';
-import type { AccountService, CaptureAccount } from '../core/accounts/contract.js';
-import { realmForProvider } from '../core/workspace/realms.js';
+import type { AccountService, CaptureAccount, IdentityOutcome } from '../core/accounts/contract.js';
+import { ProfileJars } from '../core/accounts/profile-jars.js';
+import { realmForProvider, switchableRealms } from '../core/workspace/realms.js';
 import {
   EMBED_FRAME_EVENT_TYPES,
   WORKSPACE_COMMAND_TYPES,
+  WORKSPACE_PORT_NAME,
   isAgentState,
   threadAccountId,
   type AgentState,
@@ -59,6 +62,9 @@ import {
   sanitizeIdentity,
 } from '../core/embed/workspace-tabs.js';
 import type { EmbedRule, SessionRulesApi } from '../core/embed/rules.js';
+import { seedNonceOf, type SeedRule } from '../core/embed/profile-seed.js';
+import { ProfileSlots, type SeedRulesApi } from '../core/embed/profile-slots.js';
+import { Profiles, realmOfHost, type FrameAccount } from '../core/embed/profiles.js';
 import { bridgeGetCookies, bridgeSetCookie, chromeCookiesApi } from '../core/embed/cookie-bridge.js';
 import { chromeHelperEnv, helperOpen, helperPing } from '../core/embed/helper.js';
 import {
@@ -75,12 +81,19 @@ import {
   PAPERCLIP_SYNC_PERIOD_MINUTES,
   chromeStateStore as paperclipStateStore,
   runPaperclipSync,
+  runPaperclipHintSync,
   type SyncOutcome,
 } from '../core/paperclip/sync.js';
 import { PaperclipLiveHint } from '../core/paperclip/live.js';
 import { normalizeServerUrl } from '../core/paperclip/client.js';
+import { BRIDGE_KEEPALIVE_ALARM, createManagerActionExecutor, createPaperclipIntegrationRuntime, focusWorkspaceTab } from '../core/paperclip/integration-runtime.js';
+import { BridgeActionError } from '../core/paperclip/actions.js';
+import type { AgentAction, ActionOutcome } from '../core/paperclip/bridge-protocol.js';
+import { SessionObservationLedger } from '../core/paperclip/observations.js';
 
 const db = new ThreadkeeperDB();
+const sessionObservations = new SessionObservationLedger();
+const observedFrameUrls = new Map<string, string>();
 
 const ANALYSIS_DUE_ALARM = 'tk-analysis-due';
 const ANALYSIS_SWEEP_ALARM = 'tk-analysis-sweep';
@@ -115,7 +128,7 @@ function accounts(): AccountService | null {
 }
 
 /**
- * The account a capture of `provider` is filed under right now: the realm's active account,
+ * The account a capture of `provider` is filed under right now: the realm's browser account,
  * which keeps settings.boundAccounts' id while it is the primary one. Providers without a login
  * realm (imports, Paperclip, added sites) and any failure fall back to `bound`.
  */
@@ -131,10 +144,40 @@ async function resolveCaptureAccount(provider: ProviderId, bound: { accountId: s
   }
 }
 
+/**
+ * The account of the page a message came from. A page in a workspace tab's profile slot belongs
+ * to that slot's account and to no other: when the slot has no account ready, the answer is null
+ * and nothing may be filed (never the browser account's, which the page is not signed in as).
+ * Every other page is the realm's browser account, as before.
+ */
+async function resolveSenderAccount(
+  provider: ProviderId,
+  bound: { accountId: string; workspaceId: string },
+  sender: chrome.runtime.MessageSender,
+  embed: EmbedSenderContext | null
+): Promise<CaptureAccount | null> {
+  const frameUrl = embed ? embeddedFrameUrl(sender, embed) : null;
+  const tabId = sender.tab?.id;
+  if (frameUrl && typeof tabId === 'number' && typeof sender.frameId === 'number' && realmForProvider(provider)?.switchable) {
+    let owner: FrameAccount;
+    try {
+      owner = await profiles.accountOfFrame(tabId, sender.frameId, frameUrl);
+    } catch {
+      return null;
+    }
+    if (owner.kind === 'profile') {
+      if (!owner.account) return null;
+      return { accountId: threadAccountId(owner.account, bound.accountId), workspaceId: bound.workspaceId, account: owner.account };
+    }
+  }
+  return resolveCaptureAccount(provider, bound);
+}
+
 // A switch interrupted when the worker stopped is finished before anything reads the cookies.
 if (typeof chrome !== 'undefined' && typeof chrome.cookies?.getAll === 'function') {
   void Promise.resolve()
     .then(() => accounts()?.recover())
+    .then(() => retireBrowserAccountSlots())
     .catch(() => console.warn('[threadkeeper] account switch recovery failed'));
 }
 
@@ -145,6 +188,204 @@ function broadcastWorkspace(message: WorkspaceBroadcast): void {
   } catch {
     // no listeners open
   }
+}
+
+// ---- Profiles: accounts shown next to the browser's own sign-in ------------------------------
+
+function chromeSeedRules(): SeedRulesApi | null {
+  if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateSessionRules) return null;
+  return {
+    getSessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
+    updateSessionRules: (options: { removeRuleIds?: number[]; addRules?: SeedRule[] }) =>
+      chrome.declarativeNetRequest.updateSessionRules(options as unknown as chrome.declarativeNetRequest.UpdateRuleOptions),
+  };
+}
+
+const profileSlots = new ProfileSlots({
+  store: typeof chrome !== 'undefined' && chrome.storage?.session ? chrome.storage.session : null,
+  rules: chromeSeedRules(),
+  now: () => Date.now(),
+  observesResponses: () => canObserveResponses(),
+  isWorkspaceTab: (tabId) => workspaceTabs.has(tabId),
+});
+
+/** Tell the workspace an account's sign-in state changed, without any cookie of the browser moving. */
+async function announceAccount(accountId: string): Promise<void> {
+  try {
+    const account = await accounts()?.account(accountId);
+    if (!account) return;
+    const [entry] = (await accounts()?.list([account.realm])) ?? [];
+    broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: account.realm, activeAccountId: entry?.activeAccountId ?? null, switched: false });
+  } catch {
+    // the page refreshes its accounts on the next change
+  }
+}
+
+const profileJars = new ProfileJars({
+  read: async (accountId) => (await accounts()?.readJar(accountId)) ?? null,
+  write: async (accountId, cookies) => {
+    await accounts()?.writeJar(accountId, cookies);
+  },
+  now: () => Date.now(),
+  schedule: (fn, ms) => {
+    const timer = setTimeout(fn, ms);
+    return () => clearTimeout(timer);
+  },
+  onSignedInChange: (accountId) => void announceAccount(accountId),
+});
+
+const profiles = new Profiles({
+  accounts,
+  slots: profileSlots,
+  jars: profileJars,
+  hasHostAccess: async (patterns) => {
+    if (patterns.length === 0) return false;
+    try {
+      return await chrome.permissions.contains({ origins: patterns });
+    } catch {
+      return false;
+    }
+  },
+  now: () => Date.now(),
+  randomHex: (length) => {
+    const bytes = crypto.getRandomValues(new Uint8Array(Math.ceil(length / 2)));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, length);
+  },
+  ownOrigin: typeof chrome !== 'undefined' && chrome.runtime?.id ? `chrome-extension://${chrome.runtime.id}` : undefined,
+});
+
+/**
+ * An account's saved sign-in was replaced behind the partitions seeded from it: retire its slots
+ * and tell every workspace page, before the change itself is announced (ACCOUNTS_CHANGED), so no
+ * page puts that account's pages back in a partition holding its old cookies.
+ */
+async function retireProfileAccount(accountId: string): Promise<void> {
+  try {
+    await profiles.accountReplaced(accountId);
+  } finally {
+    broadcastWorkspace({ type: 'PROFILE_RETIRED', accountId });
+  }
+}
+
+/**
+ * After a restart: a switch the worker finished on recovery never reached the code that retires
+ * slots. A slot whose account is now its realm's browser account holds cookies the browser owns
+ * now, so it is retired like any other replaced sign-in.
+ */
+async function retireBrowserAccountSlots(): Promise<void> {
+  const svc = accounts();
+  if (!svc) return;
+  await profileSlots.ready();
+  for (const entry of await svc.list()) {
+    const id = entry.activeAccountId;
+    if (id && profileSlots.tabsShowing(id).length > 0) await retireProfileAccount(id);
+  }
+}
+
+/** Requests to the sites of the realms that have accounts: the only ones a profile's cookies come from. */
+const PROFILE_URL_PATTERNS = Array.from(new Set(switchableRealms().flatMap((r) => r.cookieDomains.flatMap((d) => [`https://${d}/*`, `https://*.${d}/*`]))));
+
+function canObserveResponses(): boolean {
+  return typeof chrome !== 'undefined' && typeof chrome.webRequest?.onHeadersReceived?.addListener === 'function';
+}
+
+type ResponseListener = (details: chrome.webRequest.WebResponseHeadersDetails) => void;
+const responseListeners = new Map<number, ResponseListener>();
+
+/**
+ * See the `Set-Cookie` headers of responses to one workspace tab's requests, so each profile's
+ * saved jar follows what its pages are given. One listener per workspace tab, filtered to that
+ * tab and to the realms' own hosts: ordinary browsing never reaches it. Nothing is modified
+ * (this is the observing kind of webRequest listener; Manifest V3 has no other).
+ */
+function watchWorkspaceTab(tabId: number): void {
+  if (!canObserveResponses() || responseListeners.has(tabId) || PROFILE_URL_PATTERNS.length === 0) return;
+  const listener: ResponseListener = (details) => {
+    if (details.tabId !== tabId) return;
+    const setCookies = (details.responseHeaders ?? [])
+      .filter((h) => h.name.toLowerCase() === 'set-cookie' && typeof h.value === 'string')
+      .map((h) => h.value as string);
+    if (setCookies.length === 0 && !seedNonceOf(details.url)) return;
+    void profiles
+      .onResponse({ tabId, frameId: details.frameId, parentFrameId: details.parentFrameId, url: details.url, setCookies, initiator: details.initiator, type: details.type })
+      .catch(() => undefined);
+  };
+  try {
+    chrome.webRequest.onHeadersReceived.addListener(listener, { urls: PROFILE_URL_PATTERNS, tabId }, ['responseHeaders', 'extraHeaders']);
+    responseListeners.set(tabId, listener);
+  } catch {
+    // An older manifest without the permission: profiles work until the page reloads, unsaved.
+  }
+}
+
+function unwatchWorkspaceTab(tabId: number): void {
+  const listener = responseListeners.get(tabId);
+  if (!listener) return;
+  responseListeners.delete(tabId);
+  try {
+    chrome.webRequest.onHeadersReceived.removeListener(listener);
+  } catch {
+    // already gone
+  }
+}
+
+// A sign-in borrowed from the browser opens the realm's sign-in page in a tab of its own.
+const SIGNIN_TAB_KEY = 'tk_signin_tab';
+
+async function openSignInTab(url: string): Promise<void> {
+  const tab = await chrome.tabs.create({ url, active: true });
+  if (typeof tab.id === 'number') await chrome.storage.session?.set({ [SIGNIN_TAB_KEY]: tab.id }).catch(() => undefined);
+}
+
+async function closeSignInTab(): Promise<void> {
+  const stored = (await chrome.storage.session?.get(SIGNIN_TAB_KEY).catch(() => undefined))?.[SIGNIN_TAB_KEY];
+  await chrome.storage.session?.remove(SIGNIN_TAB_KEY).catch(() => undefined);
+  if (typeof stored !== 'number') return;
+  // Only while it still shows a site of a sign-in Threadkeeper keeps accounts for: a tab the person
+  // has since used for something else stays open. (Its address is visible only on those sites.)
+  const tab = await chrome.tabs.get(stored).catch(() => null);
+  let host: string | null = null;
+  try {
+    host = new URL(tab?.url || tab?.pendingUrl || '').hostname.toLowerCase();
+  } catch {
+    host = null;
+  }
+  if (!host || !realmOfHost(host)) return;
+  await chrome.tabs.remove(stored).catch(() => undefined);
+}
+
+/** How long after the site names the person the sign-in is taken over (its last cookies are still arriving). */
+const SIGNIN_SETTLE_MS = 2_000;
+let signInFinishTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * A sign-in borrowed from the browser ends by itself once the site has named who signed in: the
+ * cookies become that account's saved sign-in and the browser's own sign-in is put back. Sites
+ * that do not name the person are finished from the workspace ("I've signed in").
+ */
+async function maybeFinishBrowserSignIn(outcome: IdentityOutcome): Promise<void> {
+  const svc = accounts();
+  if (!svc || signInFinishTimer) return;
+  const realmId = outcome.realm;
+  const pending = await svc.pendingSignIn();
+  if (!pending || pending.realm !== realmId) return;
+  // Only a report that named the browser's account now counts: not "nobody signed in", not one
+  // set aside right after the switch, and not the account that was set aside. A stored
+  // "signed in" is no evidence, since the account may have been signed in before it began.
+  const named = outcome.named ?? null;
+  if (!named || named !== outcome.activeAccountId || named === pending.returnToAccountId) return;
+  signInFinishTimer = setTimeout(() => {
+    signInFinishTimer = null;
+    void (async () => {
+      const result = await svc.finishBrowserSignIn();
+      if (!result.ok) return;
+      await retireProfileAccount(pending.accountId);
+      await retireProfileAccount(pending.returnToAccountId);
+      const now = result.realms.find((r) => r.realm.id === realmId);
+      broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: realmId, activeAccountId: now?.activeAccountId ?? null, switched: true });
+      await closeSignInTab();
+    })().catch(() => undefined);
+  }, SIGNIN_SETTLE_MS);
 }
 
 async function getOrganizeContext(settings: SettingsRecord): Promise<OrganizeContext> {
@@ -233,11 +474,57 @@ async function organizeStoredThread(threadKey: string, settings: SettingsRecord)
 
 let paperclipRun: Promise<SyncOutcome> | null = null;
 let paperclipHint: PaperclipLiveHint | null = null;
+let paperclipWork: Promise<unknown> = Promise.resolve();
+function serializePaperclipWork<T>(task: () => Promise<T>): Promise<T> {
+  const run = paperclipWork.then(task, task);
+  paperclipWork = run.catch(() => undefined);
+  return run;
+}
+
+/** Send once to one manager document. An uncertain provider submission is never replayed. */
+const executePaperclipAction = createManagerActionExecutor({
+  ready: () => workspaceTabs.ready(),
+  tabId: () => workspaceTabs.ids()[0],
+  sendExecute: (tabId, action) => chrome.tabs.sendMessage(tabId, { type: 'PAPERCLIP_EXECUTE_ACTION', action }, { frameId: 0, ...(workspaceDocuments.has(tabId) ? { documentId: workspaceDocuments.get(tabId)! } : {}) }),
+  // The manager stops and reports why; its verdict is awaited briefly instead of being replaced (NF-2).
+  sendCancel: (tabId, requestId, reason) => chrome.tabs.sendMessage(tabId, { type: 'PAPERCLIP_CANCEL_ACTION', requestId, reason }, { frameId: 0, ...(workspaceDocuments.has(tabId) ? { documentId: workspaceDocuments.get(tabId)! } : {}) }),
+});
+
+const paperclipIntegration = createPaperclipIntegrationRuntime({
+  // The bridge sends only the commit part of buildId and detects Edge/Chrome itself (REQ-7 AC-1, D-11).
+  db, extensionVersion: BUILD_INFO.version, extensionCommit: BUILD_INFO.buildId,
+  alarms: typeof chrome !== 'undefined' && chrome.alarms ? chrome.alarms : undefined,
+  observations: sessionObservations,
+  executeAction: executePaperclipAction,
+  openThread: async (threadKey) => {
+    await workspaceTabs.ready();
+    const tabId = workspaceTabs.ids()[0];
+    if (tabId !== undefined) {
+      const answer = await chrome.tabs.sendMessage(tabId, { type: 'PAPERCLIP_OPEN_THREAD', threadKey }, { frameId: 0 }).catch(() => null);
+      if (answer?.ok) { await focusWorkspaceTab(chrome as never, tabId); return; }
+    }
+    await openManagerTab({ threadKey });
+  },
+  onHint: async (hint) => {
+    await serializePaperclipWork(async () => {
+      // The bridge does not await this (REQ-12 F-4); the store lets "Last synced" follow hint fetches.
+      const keys = await runPaperclipHintSync(hint, { db, store: paperclipStateStore() });
+      if (keys.length) {
+        organizeCtxCache = null;
+        await dock.markDirty(keys);
+        broadcastLibraryChanged();
+        await scheduleAnalysisAlarm();
+      }
+    });
+  },
+  onChange: () => { void ensureStarterCollectionsAndSettings(db).then(refreshPaperclipHint).catch(() => undefined); },
+  log: (message) => logSecurity(message),
+});
 
 /** One Paperclip sync at a time per service-worker lifetime; later callers share the running one. */
 function kickPaperclipSync(options: { force?: boolean; budgetMs?: number; maxIssues?: number } = {}): Promise<SyncOutcome> {
   if (paperclipRun) return paperclipRun;
-  paperclipRun = (async () => {
+  paperclipRun = serializePaperclipWork(async () => {
     try {
       const settings = await ensureStarterCollectionsAndSettings(db);
       const outcome = await runPaperclipSync({
@@ -271,14 +558,14 @@ function kickPaperclipSync(options: { force?: boolean; budgetMs?: number; maxIss
     } finally {
       paperclipRun = null;
     }
-  })();
+  });
   return paperclipRun;
 }
 
 /** Live events from a local (local_trusted) server schedule a sync sooner; polling covers the rest. */
 async function refreshPaperclipHint(settings: SettingsRecord): Promise<void> {
   const pc = settings.paperclip;
-  const wanted = pc.enabled && pc.liveUpdates && pc.deploymentMode === 'local_trusted';
+  const wanted = pc.enabled && pc.liveUpdates && pc.deploymentMode === 'local_trusted' && !paperclipIntegration.bridge.isConnected();
   if (!wanted) {
     paperclipHint?.close();
     paperclipHint = null;
@@ -342,6 +629,9 @@ const syncOrchestrator = new HistorySyncOrchestrator(
       if (!identity || !svc) return;
       const outcome = await svc.noteIdentity(provider, identity);
       if (outcome && (outcome.reassigned || outcome.updated)) {
+        // As for a page's own report: the account the browser turned out to be signed in as has
+        // its saved sign-in in the browser now, so a profile slot showing it is out of date.
+        if (outcome.reassigned && outcome.activeAccountId) await retireProfileAccount(outcome.activeAccountId);
         broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: outcome.realm, activeAccountId: outcome.activeAccountId, switched: false });
       }
     },
@@ -659,19 +949,96 @@ function chromeSessionRules(): SessionRulesApi | null {
 const workspaceTabs = new WorkspaceTabs({
   store: typeof chrome !== 'undefined' && chrome.storage?.session ? chrome.storage.session : null,
   rules: chromeSessionRules(),
+  protectedDomains: async () => {
+    const settings = await ensureStarterCollectionsAndSettings(db);
+    const origin = normalizeServerUrl(settings.paperclip.serverUrl);
+    // Domain exclusion deliberately covers every port: an uploaded Paperclip document must
+    // retain its sandbox even when the server redirects to another local service port.
+    return origin ? [new URL(origin).hostname] : [];
+  },
   tabUrl: async (tabId) => {
+    let tab: chrome.tabs.Tab;
     try {
-      return (await chrome.tabs.get(tabId)).url ?? null;
+      tab = await chrome.tabs.get(tabId);
     } catch {
+      // The tab is gone.
       return null;
     }
+    // Without the "tabs" permission the address of Threadkeeper's own page is not visible.
+    return tab.url ?? undefined;
   },
   managerUrl: MANAGER_URL,
 });
 
-// A restarted worker checks that the tabs it remembers are still workspace pages.
+// A restarted worker checks that the tabs it remembers are still workspace pages, watches the
+// ones that are again, and drops the profile slots and seeding rules of the ones that are not.
 if (typeof chrome !== 'undefined' && typeof chrome.tabs?.get === 'function') {
-  void workspaceTabs.prune();
+  void workspaceTabs
+    .prune()
+    .then(async () => {
+      for (const tabId of workspaceTabs.ids()) watchWorkspaceTab(tabId);
+      await profileSlots.prune((tabId) => workspaceTabs.has(tabId));
+    })
+    .catch(() => undefined);
+}
+
+/**
+ * The tab closed or stopped being a workspace page: its header rule goes at once. Its profile
+ * slots go with it when the tab is gone (`gone`); a page that only reloads clears them itself
+ * with its next hello, and clearing them here could land after that page claimed a slot.
+ */
+async function forgetWorkspaceTab(tabId: number, options: { gone?: boolean } = {}): Promise<void> {
+  sessionObservations.forgetTab(tabId);
+  for (const key of observedFrameUrls.keys()) if (key.startsWith(`${tabId}:`)) observedFrameUrls.delete(key);
+  unwatchWorkspaceTab(tabId);
+  await workspaceTabs.forget(tabId);
+  if (options.gone) await profileSlots.resetTab(tabId);
+  // What its profile pages were given last is saved now rather than when the timer fires.
+  await profileJars.flush().catch(() => undefined);
+}
+
+// The workspace page keeps a port open for as long as it is showing. It is how the worker knows a
+// tab is still a workspace page (the worker cannot read the address of Threadkeeper's own pages),
+// so the header rule leaves with the page: when its last port closes (the tab closed, reloaded
+// or went to another address), the tab is forgotten and its rule removed. A reloaded page says
+// hello and connects again. Regular messages on the port also keep the worker running under a
+// page in use, which matters because the worker follows the cookies of profile pages.
+const workspacePorts = new Map<number, number>();
+/** The document in each workspace tab that said hello last: a newer page in the same tab wins. */
+const workspaceDocuments = new Map<number, string>();
+
+if (typeof chrome !== 'undefined' && chrome.runtime?.onConnect) {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== WORKSPACE_PORT_NAME) return;
+    const sender = port.sender;
+    const tabId = sender?.tab?.id;
+    if (!sender || typeof tabId !== 'number' || !validateWorkspaceSender('WORKSPACE_PORT', sender, chrome.runtime.id).allowed) {
+      port.disconnect();
+      return;
+    }
+    const documentId = (sender as { documentId?: string }).documentId;
+    workspacePorts.set(tabId, (workspacePorts.get(tabId) ?? 0) + 1);
+    // A page whose hello was answered by a worker that has since stopped is registered again.
+    void workspaceTabs.ready().then(async () => {
+      if (!workspaceTabs.has(tabId)) await workspaceTabs.hello(tabId);
+      watchWorkspaceTab(tabId);
+    });
+    port.onMessage.addListener(() => {
+      // Receiving the message is the point.
+    });
+    port.onDisconnect.addListener(() => {
+      const left = (workspacePorts.get(tabId) ?? 1) - 1;
+      if (left > 0) workspacePorts.set(tabId, left);
+      else workspacePorts.delete(tabId);
+      // A reloaded page may say hello before the old one's port is reported closed: the tab
+      // then belongs to the newer page, whose own port will report when it leaves.
+      const current = workspaceDocuments.get(tabId);
+      if (documentId && current && current !== documentId) return;
+      if (left > 0) return;
+      workspaceDocuments.delete(tabId);
+      void forgetWorkspaceTab(tabId).catch(() => undefined);
+    });
+  });
 }
 
 /** What the sender checks need to recognise a page embedded in a workspace tab. */
@@ -769,7 +1136,11 @@ if (typeof chrome !== 'undefined' && chrome.tabs?.onUpdated) {
     // A workspace tab that navigated away from manager.html loses its header rule at once.
     void (async () => {
       await workspaceTabs.ready();
-      if (workspaceTabs.has(tabId) && !isManagerTabUrl(tab.url, MANAGER_URL)) await workspaceTabs.forget(tabId);
+      // Chrome reports a frame of the page loading as the tab loading, without the address of
+      // Threadkeeper's own page (no "tabs" permission). Only an address seen to be another
+      // page's means the tab left; the page's own connection reports the rest (below).
+      const url = tab.url ?? changeInfo.url;
+      if (workspaceTabs.has(tabId) && typeof url === 'string' && !isManagerTabUrl(url, MANAGER_URL)) await forgetWorkspaceTab(tabId, { gone: true });
     })();
   });
 }
@@ -790,13 +1161,14 @@ async function writeAgentState(threadKey: string, state: AgentState): Promise<vo
   broadcastLibraryChanged(threadKey);
 }
 
-async function noteAgentState(frameUrl: string, state: AgentState): Promise<void> {
+async function noteAgentState(frameUrl: string, state: AgentState, sender: chrome.runtime.MessageSender, embed: EmbedSenderContext): Promise<void> {
   const provider = detectProviderFromUrl(frameUrl);
   if (!provider || !isCaptureProviderId(provider) || !isProviderAllowedOnUrl(provider, frameUrl)) return;
   const conversationId = extractConversationIdFromUrl(frameUrl);
   if (!conversationId) return;
   const settings = await ensureStarterCollectionsAndSettings(db);
-  const resolved = await resolveCaptureAccount(provider, settings.boundAccounts[provider]);
+  const resolved = await resolveSenderAccount(provider, settings.boundAccounts[provider], sender, embed);
+  if (!resolved) return;
   const threadKey = buildThreadKey({
     provider,
     accountId: resolved.accountId,
@@ -804,6 +1176,10 @@ async function noteAgentState(frameUrl: string, state: AgentState): Promise<void
     sourceConversationId: conversationId,
     branchId: 'main',
   });
+  if (typeof sender.tab?.id === 'number' && typeof sender.frameId === 'number') {
+    sessionObservations.observe({ tabId: sender.tab.id, frameId: sender.frameId, threadKey, state });
+    observedFrameUrls.set(`${sender.tab.id}:${sender.frameId}`, frameUrl);
+  }
   const last = agentStateWrites.get(threadKey);
   const elapsed = last ? Date.now() - last.at : Infinity;
   if (last && elapsed < AGENT_STATE_MIN_MS) {
@@ -828,6 +1204,10 @@ async function handleEmbedEvent(
   sender: chrome.runtime.MessageSender,
   ctx: EmbedSenderContext
 ): Promise<unknown> {
+  // The address always comes from chrome's sender object, never from the message.
+  const frameUrl = embeddedFrameUrl(sender, ctx);
+  const tabId = sender.tab?.id;
+  const frameId = sender.frameId;
   // ACCOUNT_IDENTITY may come from a provider's own tab; it reads no address below.
   if (message.type === 'ACCOUNT_IDENTITY') {
     const identity = sanitizeIdentity(message.identity);
@@ -835,33 +1215,67 @@ async function handleEmbedEvent(
     const svc = accounts();
     if (!svc) return { ok: true };
     try {
+      // A page in a profile slot names that slot's account, and only that one. It says nothing
+      // about who the browser itself is signed in as.
+      if (frameUrl && typeof tabId === 'number' && typeof frameId === 'number') {
+        const owner = await profiles.accountOfFrame(tabId, frameId, frameUrl);
+        if (owner.kind === 'profile') {
+          if (owner.account) {
+            const outcome = await svc.noteProfileIdentity(owner.account.id, identity);
+            if (outcome?.updated) await announceAccount(owner.account.id);
+          }
+          return { ok: true };
+        }
+      }
       const outcome = await svc.noteIdentity(message.provider, identity);
       if (outcome && (outcome.reassigned || outcome.updated)) {
+        // The browser is now signed in as another known account. Its saved jar went into the
+        // browser, so the worker's copy of it is stale. Workspace pages re-place their frames by
+        // themselves; nothing is reloaded for a sign-in that happened in another tab.
+        if (outcome.reassigned && outcome.activeAccountId) await retireProfileAccount(outcome.activeAccountId);
         broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: outcome.realm, activeAccountId: outcome.activeAccountId, switched: false });
       }
+      if (outcome) await maybeFinishBrowserSignIn(outcome);
     } catch {
       // the next report tries again
     }
     // The page learns nothing about accounts from the answer.
     return { ok: true };
   }
-  // The address always comes from chrome's sender object, never from the message.
-  const frameUrl = embeddedFrameUrl(sender, ctx);
-  if (!frameUrl) return { ok: false, error: 'Not a page embedded in Threadkeeper.', code: 'not_allowed' };
+  if (!frameUrl || typeof tabId !== 'number' || typeof frameId !== 'number') {
+    return { ok: false, error: 'Not a page embedded in Threadkeeper.', code: 'not_allowed' };
+  }
+  // What kind of frame this is, as its own content script read it: said with the first message
+  // of every document, before the page has run.
+  const hint = typeof message.profile === 'boolean' ? message.profile : undefined;
+  if (hint !== undefined) await profiles.frameSeen(tabId, frameId, hint).catch(() => undefined);
   switch (message.type) {
     case 'EMBED_HELLO':
-      return { ok: true, frameId: sender.frameId, tabId: sender.tab?.id };
+      sessionObservations.forgetFrame(tabId, frameId);
+      observedFrameUrls.set(`${tabId}:${frameId}`, frameUrl);
+      return { ok: true, frameId, tabId };
     case 'EMBED_NAV':
+      if (observedFrameUrls.get(`${tabId}:${frameId}`) !== frameUrl) sessionObservations.forgetFrame(tabId, frameId);
+      observedFrameUrls.set(`${tabId}:${frameId}`, frameUrl);
       // The workspace page receives the same message and reads sender.frameId itself.
       return { ok: true };
     case 'EMBED_AGENT_STATE':
       if (!isAgentState(message.state)) return { ok: false, error: 'Unknown agent state.' };
-      await noteAgentState(frameUrl, message.state).catch(() => undefined);
+      await noteAgentState(frameUrl, message.state, sender, ctx).catch(() => undefined);
       return { ok: true };
-    case 'EMBED_COOKIES_GET':
-      return bridgeGetCookies(chromeCookiesApi(), frameUrl);
-    case 'EMBED_COOKIE_SET':
-      return bridgeSetCookie(chromeCookiesApi(), frameUrl, message.cookie, Date.now());
+    case 'EMBED_COOKIES_GET': {
+      const owner = await profiles.accountOfFrame(tabId, frameId, frameUrl, hint);
+      if (owner.kind === 'plain') return bridgeGetCookies(chromeCookiesApi(), frameUrl);
+      // A profile page reads its own account's cookies; the browser's are another person's.
+      if (!owner.account) return { ok: true, cookie: '' };
+      return { ok: true, cookie: await profileJars.scriptCookieString(owner.account.id, frameUrl) };
+    }
+    case 'EMBED_COOKIE_SET': {
+      const owner = await profiles.accountOfFrame(tabId, frameId, frameUrl, hint);
+      if (owner.kind === 'plain') return bridgeSetCookie(chromeCookiesApi(), frameUrl, message.cookie, Date.now());
+      if (!owner.account) return { ok: false, error: 'Cookies are not available for this page.' };
+      return profileJars.applyScript(owner.account.id, message.cookie, frameUrl);
+    }
     default:
       return { ok: false, error: `Unknown ${message.type}`, code: 'not_allowed' };
   }
@@ -894,7 +1308,7 @@ if (typeof chrome !== 'undefined' && chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener((tabId) => {
     void deleteTabHandshake(tabId);
     explicitGrants.delete(tabId);
-    void workspaceTabs.forget(tabId);
+    void forgetWorkspaceTab(tabId, { gone: true });
     dropPendingAdoption(tabId);
   });
 }
@@ -1027,6 +1441,8 @@ async function initializeBackground(): Promise<void> {
   await reconcileCaptureSites(settings);
   dock.kickDrain();
   await schedulePaperclipAlarm(settings);
+  // Starts the bridge and keeps its own alarm while any company is paired (REQ-7 finding 5).
+  await paperclipIntegration.keepAlive();
 }
 
 // Host access granted or withdrawn (in Settings, or on the browser's extension page): keep the
@@ -1073,6 +1489,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onStartup) {
   });
 }
 
+// The worker (the only bridge context; reads are served here, not by the manager page) is going away:
+// tell Paperclip at once so agents get browser_offline instead of waiting 40 s (REQ-8 AC-13, NF-3).
+// Best effort, non-revoking; a plugin without the route answers 404, which is ignored.
+if (typeof chrome !== 'undefined' && chrome.runtime?.onSuspend) {
+  chrome.runtime.onSuspend.addListener(() => { void paperclipIntegration.bridge.signalOffline(); });
+}
+
 if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'threadkeeper-resumable-jobs') {
@@ -1096,6 +1519,10 @@ if (typeof chrome !== 'undefined' && chrome.alarms?.onAlarm) {
       void dock.deliverGrant();
     } else if (alarm.name === PAPERCLIP_SYNC_ALARM || alarm.name === `${PAPERCLIP_SYNC_ALARM}-continue`) {
       void kickPaperclipSync();
+      void paperclipIntegration.keepAlive().catch(() => undefined);
+    } else if (alarm.name === BRIDGE_KEEPALIVE_ALARM) {
+      // Wakes an evicted worker and restarts the bridge, independent of library sync.
+      void paperclipIntegration.keepAlive().catch(() => undefined);
     }
   });
 }
@@ -1106,7 +1533,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       const type = typeof message?.type === 'string' ? message.type : '';
       // Pages embedded in a workspace tab are recognised from the remembered tabs and added sites.
       const embed =
-        EMBED_FRAME_EVENT_TYPES.has(type) || type === 'PASSIVE_DOM_CAPTURE' || type === 'GET_CAPTURE_SITE'
+        EMBED_FRAME_EVENT_TYPES.has(type) || type === 'PASSIVE_DOM_CAPTURE' || type === 'GET_CAPTURE_SITE' || type === 'GET_CAPTURE_AUTH_STATE'
           ? await embedContext()
           : null;
       const validation = validateRuntimeMessageSender(
@@ -1125,6 +1552,24 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       }
 
       // Workspace commands: the sender is Threadkeeper's manager page as a top-level tab.
+      if (type === 'PAPERCLIP_INTEGRATION' || type === 'PAPERCLIP_SERVICE_STATUS' || type === 'PAPERCLIP_SERVICE_START' || type === 'PAPERCLIP_SERVICE_INSTALL') {
+        if (type === 'PAPERCLIP_INTEGRATION' && message.action === 'frame_gone') {
+          const frameId = message.payload?.frameId;
+          if (!Number.isSafeInteger(frameId) || frameId <= 0 || typeof sender.tab?.id !== 'number') {
+            sendResponse({ ok: false, error: 'Invalid embedded frame' }); return;
+          }
+          sessionObservations.forgetFrame(sender.tab.id, frameId);
+          observedFrameUrls.delete(`${sender.tab.id}:${frameId}`);
+          sendResponse({ ok: true, data: { forgotten: true } }); return;
+        }
+        try { sendResponse(await paperclipIntegration.handle(message)); }
+        catch (error) {
+          // The code (never a value) lets manager-side model-key callers tell a missing secret from an outage.
+          const code = error && typeof error === 'object' && typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code.slice(0, 40) : undefined;
+          sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Paperclip request failed', ...(code ? { code } : {}) });
+        }
+        return;
+      }
       if (type === 'BACKUP_STATUS' || type === 'BACKUP_NOW' || type === 'BACKUP_RESTORE') {
         const backupEnv = chromeBackupEnv(BUILD_INFO.version);
         try {
@@ -1137,6 +1582,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
       if (WORKSPACE_COMMAND_TYPES.has(type) && typeof sender.tab?.id === 'number') {
+        const documentId = (sender as { documentId?: string }).documentId;
+        if (type === 'WORKSPACE_HELLO' && documentId) workspaceDocuments.set(sender.tab.id, documentId);
         sendResponse(
           await handleWorkspaceCommand(message, sender.tab.id, {
             accounts: accounts(),
@@ -1144,6 +1591,22 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             helperPing: () => helperPing(chromeHelperEnv()),
             helperOpen: (account, url) => helperOpen(chromeHelperEnv(), account, url),
             broadcast: broadcastWorkspace,
+            profiles: {
+              available: canObserveResponses(),
+              claim: (tabId, realmId, accountId) => {
+                watchWorkspaceTab(tabId);
+                return profiles.claim(tabId, realmId, accountId);
+              },
+              ready: (tabId, realmId) => profiles.markReady(tabId, realmId),
+              reset: async (tabId) => {
+                await profileSlots.resetTab(tabId);
+                watchWorkspaceTab(tabId);
+              },
+              accountReplaced: (accountId) => retireProfileAccount(accountId),
+              flush: (accountId) => profiles.flush(accountId),
+            },
+            openSignInTab,
+            closeSignInTab,
           })
         );
         return;
@@ -1158,7 +1621,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         const settings = await ensureStarterCollectionsAndSettings(db);
         const provider = message.provider as CaptureProviderId;
         const authorized = Boolean(settings.authorizedHosts[provider]);
-        const bound = isProviderId(provider) ? await resolveCaptureAccount(provider, settings.boundAccounts[provider]) : undefined;
+        const bound = isProviderId(provider) ? ((await resolveSenderAccount(provider, settings.boundAccounts[provider], sender, embed)) ?? undefined) : undefined;
         sendResponse({
           ok: true,
           authorized,
@@ -1205,8 +1668,16 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           return;
         }
         const provider = decision.provider;
-        // Filed under the account signed in to the provider's realm right now.
-        const bound = await resolveCaptureAccount(provider, settings.boundAccounts[provider]);
+        // Filed under the account of the page it came from: the profile a workspace page shows,
+        // else the account the browser is signed in to for the provider's realm.
+        const bound = await resolveSenderAccount(provider, settings.boundAccounts[provider], sender, embed);
+        if (!bound) {
+          // A profile page whose account is not known: nothing is filed, least of all under
+          // the browser's account, which that page is not signed in as.
+          settleExplicitWaiter(tabId, message.explicitToken, { ok: false, error: 'Threadkeeper could not tell which account this page belongs to.' });
+          sendResponse({ ok: false, skipped: 'no_account' });
+          return;
+        }
         const threadKey = buildThreadKey({
           provider,
           accountId: bound.accountId,
@@ -1317,6 +1788,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         await dock.syncNow({ privacy: true }).catch(() => undefined);
         await schedulePaperclipAlarm(settings);
         await refreshPaperclipHint(settings);
+        for (const tabId of workspaceTabs.ids()) await workspaceTabs.hello(tabId);
+        void paperclipIntegration.bridge.tick().catch(() => undefined);
         sendResponse({ ok: true });
         return;
       }

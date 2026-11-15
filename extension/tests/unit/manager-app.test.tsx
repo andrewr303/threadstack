@@ -14,6 +14,8 @@ import { processThreadsLocally } from '../../src/core/pipeline.js';
 import { seedSyntheticWorkbenchLibrary } from '../../src/core/synthetic-fixtures.js';
 import { realmById } from '../../src/core/workspace/realms.js';
 import type { AccountRecord, RealmAccounts } from '../../src/core/workspace/types.js';
+import type { SettingsRecord } from '../../src/core/schema.js';
+import { DEFAULT_PAPERCLIP_SETTINGS } from '../../src/core/schema.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -45,6 +47,8 @@ function stubChrome(): ChromeStub {
       sendMessage: async (message: Record<string, unknown>) => {
         stub.sent.push(message);
         if (message.type === 'WORKSPACE_HELLO') return { ok: true, tabId: 1, embedding: true, realms: stub.helloRealms };
+        if (message.type === 'PAPERCLIP_INTEGRATION' && message.action === 'status') return { ok: true, data: { serverUrl: 'http://localhost:3100', companies: {}, policy: { enabled: false, providers: [], disabledAt: 0 }, allowRemoteModels: false, shareTranscripts: false } };
+        if (message.type === 'PAPERCLIP_SERVICE_STATUS') return { ok: false, error: 'helper_not_installed' };
         return message.type === 'GET_DIAGNOSTICS' ? { ok: true, recentEvents: [] } : { ok: false };
       },
       onMessage: event(),
@@ -222,10 +226,20 @@ const selectedRowTitle = () => q('.tk-row-btn[aria-selected="true"] .tk-row-titl
 const openDialogs = () => qa<HTMLDialogElement>('dialog').filter((d) => d.hasAttribute('open')).map((d) => d.id || d.getAttribute('aria-label') || d.className);
 const settingsRow = () => sharedDb.settings.get('default');
 
-/** Fresh library, fresh DOM: every scenario starts from the same seeded state. */
-async function mountApp(options: { surface?: 'sidepanel'; tabUrl?: string } = {}) {
+/** sessionStorage key: this browser tab has already landed on the start page (App.tsx). */
+const LANDED_KEY = 'threadkeeper.landed';
+
+/**
+ * Fresh library, fresh DOM: every scenario starts from the same seeded state. The page surface
+ * lands on the start page once per browser tab; scenarios about a view say the tab has already
+ * landed (the default) so they record that view, and `land: true` lets the landing happen.
+ */
+async function mountApp(options: { surface?: 'sidepanel'; tabUrl?: string; land?: boolean; settings?: Partial<SettingsRecord> } = {}) {
   await Promise.all(sharedDb.tables.map((t) => t.clear()));
   await ensureStarterCollectionsAndSettings(sharedDb);
+  if (options.settings) await sharedDb.settings.update('default', options.settings);
+  window.sessionStorage.clear();
+  if (!options.land) window.sessionStorage.setItem(LANDED_KEY, '1');
   await seedSyntheticWorkbenchLibrary(sharedDb);
   // Analysis the app would otherwise run itself right after opening; done up front so the DOM is
   // not changing under the recording.
@@ -245,6 +259,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-10T12:00:00.000Z'));
   chromeStub = stubChrome();
+  // The host's real local Paperclip service must not decide these fixtures' connection state.
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Paperclip is stopped in this fixture.'); }));
   restoreDialog = polyfillDialog();
   host = document.createElement('div');
   document.body.append(host);
@@ -253,6 +269,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  window.sessionStorage.clear();
+  window.history.replaceState(null, '', '/');
   host.remove();
   delete document.documentElement.dataset.surface;
   document.documentElement.removeAttribute('data-theme');
@@ -374,6 +392,75 @@ describe('manager workbench DOM', () => {
 // ---- (c): interactions ---------------------------------------------------------------------------
 
 describe('manager workbench interactions', () => {
+  it('preserves a deep link while settings hydrate and clears it only for a later server change', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: unknown) => new Response(JSON.stringify(String(input).endsWith('/api/health')
+      ? { status: 'ok', deploymentMode: 'local_trusted' }
+      : []), { status: 200 })));
+    window.history.replaceState(null, '', '/manager.html?surface=page&view=paperclip&pc=%2FACME%2Fissues');
+    const paperclip = { ...DEFAULT_PAPERCLIP_SETTINGS, serverUrl: 'http://localhost:3217', deploymentMode: 'local_trusted' as const };
+    await mountApp({ settings: { paperclip } });
+    await waitFor(() => Boolean(host.querySelector('iframe.tk-paperclip-frame')), 'Paperclip frame');
+    await settle();
+    expect(q<HTMLIFrameElement>('iframe.tk-paperclip-frame').src).toBe('http://localhost:3217/ACME/issues');
+    expect(new URL(window.location.href).searchParams.get('pc')).toBe('/ACME/issues');
+    const first = q<HTMLIFrameElement>('iframe.tk-paperclip-frame');
+    await sharedDb.settings.update('default', { paperclip: { ...paperclip, serverUrl: 'http://localhost:3333' } });
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => host.querySelector<HTMLIFrameElement>('iframe.tk-paperclip-frame')?.src === 'http://localhost:3333/', 'new Paperclip origin');
+    await settle();
+    expect(q('iframe.tk-paperclip-frame')).not.toBe(first);
+    expect(new URL(window.location.href).searchParams.get('pc')).toBe('/');
+  });
+  it('uses the existing sidebar as the only Threads index and opens it for the search shortcut', async () => {
+    await mountApp({ settings: { sidebarCollapsed: true } });
+    expect(qa('.tk-list-pane')).toHaveLength(1);
+    expect(q('.tk-list-pane').closest('.tk-rail')).not.toBeNull();
+    expect(host.querySelector('.tk-main .tk-columns > .tk-list-pane')).toBeNull();
+    await press('/');
+    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('false');
+    expect(document.activeElement).toBe(q('.tk-search-input'));
+    expect((await settingsRow())!.sidebarCollapsed).toBe(false);
+  });
+
+  it('opens the narrow navigation drawer and focuses search with one slash press', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(max-width: 899px)', media: query,
+      addEventListener() {}, removeEventListener() {},
+    }));
+    await mountApp();
+    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('true');
+    await press('/');
+    expect(q('.tk-rail').getAttribute('data-drawer-open')).toBe('true');
+    expect(document.activeElement).toBe(q('.tk-search-input'));
+    await click(q('.tk-list-sidebar .tk-row-btn'));
+    expect(q('.tk-rail').getAttribute('data-drawer-open')).toBe('false');
+  });
+
+  it('search reopens navigation after the person collapses it during the same visit', async () => {
+    await mountApp();
+    await click(q('button[aria-label="Collapse navigation"]'));
+    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('true');
+    await press('/');
+    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('false');
+    expect(document.activeElement).toBe(q('.tk-search-input'));
+  });
+
+  it('opens Paperclip in a dedicated frame and preserves it while switching views', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: unknown) => new Response(JSON.stringify(String(input).endsWith('/api/health')
+      ? { status: 'ok', deploymentMode: 'local_trusted' }
+      : []), { status: 200 })));
+    await mountApp();
+    await click(button('Paperclip', q('[role="radiogroup"][aria-label="View"]')));
+    const frame = q<HTMLIFrameElement>('iframe.tk-paperclip-frame');
+    expect(frame.src).toBe('http://localhost:3100/');
+    expect(q('.tk-shell').getAttribute('data-view')).toBe('paperclip');
+    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('true');
+    expect(frame.hasAttribute('data-tab')).toBe(false);
+    await click(q('button[aria-label="Browse"]'));
+    expect(q('iframe.tk-paperclip-frame')).toBe(frame);
+    await click(button('Paperclip', q('[role="radiogroup"][aria-label="View"]')));
+    expect(q('iframe.tk-paperclip-frame')).toBe(frame);
+  });
   it('Escape dismisses the account menu before the narrow workspace drawer', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: query === '(max-width: 899px)', media: query,
@@ -431,15 +518,13 @@ describe('manager workbench interactions', () => {
     expect(document.activeElement).toBe(q('input[type="search"]'));
   });
 
-  it('"/" in Ask mode switches back to search mode; the box is focused by the next press', async () => {
+  it('"/" in Ask mode switches back to search and focuses the box on the first press', async () => {
     await mountApp();
     await click(button('Ask', q('.tk-segmented')));
     expect(host.querySelector('input[type="search"]')).toBeNull();
     await press('/');
     expect(button('Search', q('.tk-segmented')).getAttribute('aria-selected')).toBe('true');
-    // The box did not exist yet when focus was requested, so the first press leaves focus alone.
-    expect(document.activeElement).not.toBe(q('input[type="search"]'));
-    await press('/');
+    // Focus follows the mode change after the search input is mounted.
     expect(document.activeElement).toBe(q('input[type="search"]'));
   });
 
@@ -607,6 +692,8 @@ describe('manager workbench interactions', () => {
     const before = (await sharedDb.conversations.count());
     await click(button('Delete', q('.tk-detail-header')));
     expect(await sharedDb.conversations.count()).toBe(before - 1);
+    // The announcement follows the tombstone write; on a busy machine it can land a moment later.
+    await waitFor(() => (q('[role="status"].tk-visually-hidden').textContent ?? '') !== '', 'delete announcement');
     expect(q('[role="status"].tk-visually-hidden').textContent).toMatch(/^Deleted ".+" and recorded tombstone\.$/);
   });
 
@@ -621,8 +708,117 @@ describe('manager workbench interactions', () => {
     expect(types.every((t) => typeof t === 'string')).toBe(true);
     // Workspace registration is independent of the library loads and belongs only to a full tab.
     expect(types.filter((type) => type === 'WORKSPACE_HELLO')).toHaveLength(surface === 'page' ? 1 : 0);
-    expect(types.filter((type) => type !== 'WORKSPACE_HELLO')).toEqual([
+    expect(types.filter((type) => !['WORKSPACE_HELLO', 'PAPERCLIP_INTEGRATION', 'PAPERCLIP_SERVICE_STATUS'].includes(String(type)))).toEqual([
       'GET_HISTORY_SYNC_STATE', 'DOCK_GET_STATE', 'GET_DIAGNOSTICS', 'GET_DIAGNOSTICS',
     ]);
+    expect(types.filter((type) => type === 'PAPERCLIP_SERVICE_STATUS')).toHaveLength(surface === 'page' ? 1 : 0);
+    expect(chromeStub.sent.filter((message) => message.type === 'PAPERCLIP_INTEGRATION').every(message => message.action === 'status')).toBe(true);
+  });
+
+  it('remembers the Threads order across a reload', async () => {
+    await mountApp();
+    const sort = () => q<HTMLSelectElement>('select[aria-label="Sort threads"]');
+    expect(sort().value).toBe('recent');
+    await setValue(sort(), 'created');
+    expect((await settingsRow())?.threadsSort).toBe('created');
+    // A reload: same database, a fresh page.
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await act(async () => root.render(<App />));
+    await waitFor(() => qa('.tk-row-item').length > 0, 'library rows');
+    await settle();
+    expect(sort().value).toBe('created');
+  });
+
+  it('"Show all" in the side navigation opens Threads narrowed to that type, with a chip to remove it', async () => {
+    await mountApp({ settings: { activeView: 'browse' } });
+    const chatsHead = qa<HTMLButtonElement>('.tk-rail-group-head').find((b) => b.textContent?.includes('Chats'))!;
+    expect(chatsHead).toBeTruthy();
+    const showAll = qa<HTMLButtonElement>('.tk-rail-more').find((b) => /chats/i.test(b.getAttribute('aria-label') ?? ''))!;
+    expect(showAll).toBeTruthy();
+    const total = rowTitles().length;
+    await click(showAll);
+    expect(q<HTMLSelectElement>('select[aria-label="Filter by type"]').value).toBe('chats');
+    expect(q('.tk-thr-chips')!.textContent).toContain('Type: Chats');
+    // The test library holds only chats, so narrowing to Chats keeps every row (the narrowing
+    // itself is covered in threads-view.test.tsx).
+    expect(rowTitles().length).toBe(total);
+    await click(button('Clear filters'));
+    expect(q<HTMLSelectElement>('select[aria-label="Filter by type"]').value).toBe('all');
+    expect(rowTitles().length).toBe(total);
+  });
+
+  it('the sidebar Organize menu regroups the rail and the choice is saved', async () => {
+    await mountApp({ settings: { activeView: 'browse' } });
+    const organize = qa<HTMLButtonElement>('.tk-rail-heading button').find((b) => b.textContent?.includes('Organize'))!;
+    await click(organize);
+    const provider = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((el) => el.textContent === 'Provider')!;
+    await click(provider);
+    expect((await settingsRow())?.railLens).toEqual({ groupBy: 'provider', sortBy: 'recent' });
+    expect(qa('.tk-rail-group-head').some((b) => b.textContent?.includes('ChatGPT'))).toBe(true);
+  });
+});
+
+// ---- Landing on the start page --------------------------------------------------------------------
+
+describe('manager workbench landing', () => {
+  const view = () => host.querySelector('.tk-workbench')!.getAttribute('data-view');
+  /** Browse's session tabs (the Threads list has a Search / Ask tab pair of its own). */
+  const sessionTabs = () => qa('.tk-browse-tabs [role="tab"]');
+  /** Date is frozen in this file, so a wait is counted in ticks, not in time. */
+  async function until(check: () => boolean | Promise<boolean>, label: string, ticks = 300) {
+    for (let i = 0; i < ticks; i++) {
+      if (await check()) return;
+      await tick(10);
+    }
+    throw new Error(`timed out waiting for ${label}`);
+  }
+  const storedTabs = async () => {
+    const row = await sharedDb.kv.get('workspace.state');
+    return ((row?.value as { tabs?: Array<{ url: string }> } | undefined)?.tabs ?? []).map((t) => t.url);
+  };
+
+  it('opens Claude Code in Browse the first time the page opens in a browser tab', async () => {
+    await mountApp({ land: true });
+    await until(() => view() === 'browse', 'the Browse view');
+    expect((await settingsRow())?.activeView).toBe('browse');
+    await until(() => sessionTabs().length === 1, 'one session tab');
+    expect(sessionTabs()[0].getAttribute('aria-label')).toContain('Claude Code');
+    // The tab is kept, so a reload of the page comes back to it.
+    await until(async () => (await storedTabs()).length > 0, 'the stored tab');
+    expect(await storedTabs()).toEqual(['https://claude.ai/code']);
+    expect(window.sessionStorage.getItem(LANDED_KEY)).toBe('1');
+  });
+
+  it('lands on the start page chosen in Settings', async () => {
+    await mountApp({ land: true, settings: { startPage: 'https://chatgpt.com/codex' } });
+    await until(() => sessionTabs().length === 1, 'one session tab');
+    expect(sessionTabs()[0].getAttribute('aria-label')).toContain('Codex');
+    expect(view()).toBe('browse');
+  });
+
+  it('stays where the person left off when they chose that, or once the tab has already landed', async () => {
+    await mountApp({ land: true, settings: { startPage: '' } });
+    expect(view()).toBe('threads');
+    expect(sessionTabs()).toHaveLength(0);
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    // A reload of the page (which is how the workspace changes accounts) does not land again.
+    await mountApp({ land: false });
+    expect(view()).toBe('threads');
+    expect(sessionTabs()).toHaveLength(0);
+  });
+
+  it('follows a link that names a thread instead of landing', async () => {
+    window.history.replaceState(null, '', '/manager.html?threadKey=chatgpt%3Aacct_chatgpt_primary%3Aws_personal%3Anot-there%3Amain');
+    await mountApp({ land: true });
+    expect(view()).toBe('threads');
+    expect(sessionTabs()).toHaveLength(0);
+  });
+
+  it('never lands on the side panel', async () => {
+    await mountApp({ surface: 'sidepanel', land: true });
+    expect(sessionTabs()).toHaveLength(0);
+    expect((await settingsRow())?.activeView).not.toBe('browse');
   });
 });

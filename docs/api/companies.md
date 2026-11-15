@@ -5,6 +5,28 @@ summary: Company CRUD endpoints
 
 Manage companies within your Paperclip instance.
 
+## Live events over HTTP
+
+`GET /api/companies/{companyId}/events/stream` provides a same-origin
+`text/event-stream` alternative for an authenticated browser embedded in
+Threadkeeper. Ordinary pages retain the WebSocket transport. The endpoint uses
+the existing HTTP session or board API authentication and company access guard;
+it adds no cookie changes, authentication tickets, or URL credentials.
+
+Each default SSE message has `data: <JSON>` containing the same viewer-filtered
+`LiveEvent` payload as the WebSocket stream. It uses the same task, run, case,
+project, skill, revocation, and transcript-redaction checks. Full company agent
+API keys are accepted for their own company; restricted agent keys and run JWTs
+are refused, matching the native live-event key boundary. Browser clients use
+`new EventSource(path, { withCredentials: true })`.
+
+The stream has no bidirectional run-interest negotiation. It sends the existing
+default company delivery, with bounded buffering; persistent backlog closes the
+connection so the client can reconnect and resync ordinary reads. A comment
+establishes the connection, and a comment keepalive runs every 30 seconds only
+while it is connected. Disconnect and server shutdown remove subscriptions and
+clear that keepalive. Idle connections perform no database polling.
+
 ## List Companies
 
 ```

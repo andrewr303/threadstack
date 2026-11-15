@@ -20,6 +20,9 @@ import {
 } from '../../core/paperclip/sync.js';
 import { relativeTime } from './shared.js';
 import { paperclipPermissionOrigins } from '../../core/host-access.js';
+import { PaperclipStatus } from './PaperclipConnection.js';
+import { PaperclipBridgeSettings } from './PaperclipBridgeSettings.js';
+import { PaperclipCredentials } from './PaperclipCredentials.js';
 
 type Note = { message: string | null; ok?: boolean };
 
@@ -290,6 +293,9 @@ export function PaperclipSettings({
 
   return (
     <>
+      <PaperclipStatus onConfigure={() => { if (needsKey && !signedIn) onSignIn(); else openTab(pc.serverUrl); }} />
+      <PaperclipBridgeSettings companies={companies} />
+      <PaperclipCredentials settings={settings} onPatch={onPatch} companies={companies ?? []} />
       <section className="tk-settings-section" data-testid="paperclip-settings">
         <h3 className="tk-settings-h3">Paperclip server</h3>
         <p className="tk-settings-note">

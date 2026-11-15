@@ -163,6 +163,21 @@ async function runPnpm(cwd: string, args: string[]) {
   await execFileAsync("pnpm", args, { cwd });
 }
 
+/** These provisioning fixtures exercise the config writer, not a CLI installed on the host. */
+async function withoutAmbientPaperclipCli<T>(run: () => Promise<T>): Promise<T> {
+  const fixtureBin = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-unavailable-cli-"));
+  const previousPath = process.env.PATH;
+  try {
+    await fs.writeFile(path.join(fixtureBin, "paperclipai"), "#!/bin/sh\nexit 127\n", { mode: 0o755 });
+    process.env.PATH = `${fixtureBin}${path.delimiter}${previousPath ?? ""}`;
+    return await run();
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    await fs.rm(fixtureBin, { recursive: true, force: true });
+  }
+}
+
 async function writeRegisteredSourceConfig(baseCwd: string, instanceId = "source-instance") {
   const configDir = path.join(baseCwd, ".paperclip");
   await fs.mkdir(configDir, { recursive: true });
@@ -2194,7 +2209,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
 
   it(
     "provisions worktree-local pnpm node_modules instead of reusing base-repo links",
-    async () => {
+    async () => withoutAmbientPaperclipCli(async () => {
     const repoRoot = await createTempRepo();
     await writeRegisteredSourceConfig(repoRoot);
     await fs.mkdir(path.join(repoRoot, "scripts"), { recursive: true });
@@ -2293,11 +2308,11 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
     await expect(fs.realpath(path.join(repoRoot, "server", "node_modules", "@repo", "shared"))).resolves.toBe(
       await fs.realpath(path.join(repoRoot, "packages", "shared")),
     );
-    },
+    }),
     30_000,
   );
 
-  it("provisions successfully when install is needed but there are no symlinked node_modules to move", async () => {
+  it("provisions successfully when install is needed but there are no symlinked node_modules to move", async () => withoutAmbientPaperclipCli(async () => {
     const repoRoot = await createTempRepo();
     await writeRegisteredSourceConfig(repoRoot);
     await fs.mkdir(path.join(repoRoot, "scripts"), { recursive: true });
@@ -2369,9 +2384,9 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
     await expect(fs.readFile(path.join(workspace.cwd, ".paperclip", "config.json"), "utf8")).resolves.toContain(
       "\"database\"",
     );
-  }, 30_000);
+  }), 30_000);
 
-  it("reinstalls worktree-local pnpm dependencies when package metadata changes", async () => {
+  it("reinstalls worktree-local pnpm dependencies when package metadata changes", async () => withoutAmbientPaperclipCli(async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-worktree-stale-deps-"));
     const baseRoot = path.join(tempRoot, "base");
     const worktreeRoot = path.join(tempRoot, "worktree");
@@ -2463,7 +2478,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
     } finally {
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
-  }, 30_000);
+  }), 30_000);
 
   it("fails instead of writing an unseeded fallback config when worktree init errors after CLI detection succeeds", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-worktree-provision-fail-"));
@@ -2614,7 +2629,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
     }
   });
 
-  it("retries worktree-local pnpm install without a frozen lockfile when the lockfile is outdated", async () => {
+  it("retries worktree-local pnpm install without a frozen lockfile when the lockfile is outdated", async () => withoutAmbientPaperclipCli(async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-worktree-outdated-lockfile-"));
     const baseRoot = path.join(tempRoot, "base");
     const worktreeRoot = path.join(tempRoot, "worktree");
@@ -2688,7 +2703,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
     } finally {
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
-  });
+  }));
 
 
 

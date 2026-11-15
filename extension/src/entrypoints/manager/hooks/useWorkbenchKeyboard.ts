@@ -92,7 +92,8 @@ export function useWorkbenchKeyboard({
         searchInputRef.current?.focus();
         return;
       }
-      if (!isEditing && (e.key === 'j' || e.key === 'k')) {
+      // Modified keys (Command+K opens Paperclip's palette in fused mode) are not row navigation.
+      if (!isEditing && !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'j' || e.key === 'k')) {
         if (listHits.length === 0) return;
         e.preventDefault();
         const curIdx = listHits.findIndex((h) => h.conversation.threadKey === selectedThreadKey);

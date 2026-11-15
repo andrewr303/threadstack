@@ -95,6 +95,7 @@ import {
 import { isCloudManagedInstance } from "../services/cloud-instance.js";
 import { getHiddenSettings } from "../services/settings-visibility.js";
 import { secretService } from "../services/secrets.js";
+import { boundRunIssueIdSql } from "../services/run-task-binding.js";
 import { badRequest, forbidden, notFound, unauthorized, unprocessable } from "../errors.js";
 
 /**
@@ -566,13 +567,16 @@ export function pluginRoutes(
     return params;
   }
 
-  function sanitizePluginRequestHeaders(req: Request): Record<string, string> {
+  function sanitizePluginRequestHeaders(req: Request, pluginKey: string): Record<string, string> {
     const safeHeaderNames = new Set([
       "accept",
       "content-type",
       "user-agent",
       "x-paperclip-run-id",
       "x-request-id",
+      // This paired-browser credential is intentionally separate from board
+      // and agent bearer credentials and is consumed only by its owning plugin.
+      ...(pluginKey === "browser-sessions" ? ["x-threadkeeper-bridge-token"] : []),
     ]);
     const headers: Record<string, string> = {};
     for (const [name, value] of Object.entries(req.headers)) {
@@ -840,26 +844,26 @@ export function pluginRoutes(
     return companyId === undefined ? base : { ...base, companyId };
   }
 
-  async function validateToolRunContextScope(runContext: ToolRunContext): Promise<string | null> {
+  async function validateToolRunContextScope(runContext: ToolRunContext): Promise<{ error: string } | { error: null; boundIssueId: string | null }> {
     const [agent] = await db
       .select({ companyId: agents.companyId })
       .from(agents)
       .where(eq(agents.id, runContext.agentId))
       .limit(1);
     if (!agent || agent.companyId !== runContext.companyId) {
-      return '"runContext.agentId" does not belong to "runContext.companyId"';
+      return { error: '"runContext.agentId" does not belong to "runContext.companyId"' };
     }
 
     const [run] = await db
-      .select({ companyId: heartbeatRuns.companyId, agentId: heartbeatRuns.agentId })
+      .select({ companyId: heartbeatRuns.companyId, agentId: heartbeatRuns.agentId, issueId: boundRunIssueIdSql() })
       .from(heartbeatRuns)
       .where(eq(heartbeatRuns.id, runContext.runId))
       .limit(1);
     if (!run || run.companyId !== runContext.companyId) {
-      return '"runContext.runId" does not belong to "runContext.companyId"';
+      return { error: '"runContext.runId" does not belong to "runContext.companyId"' };
     }
     if (run.agentId !== runContext.agentId) {
-      return '"runContext.runId" does not belong to "runContext.agentId"';
+      return { error: '"runContext.runId" does not belong to "runContext.agentId"' };
     }
 
     if (runContext.projectId) {
@@ -869,11 +873,11 @@ export function pluginRoutes(
         .where(eq(projects.id, runContext.projectId))
         .limit(1);
       if (!project || project.companyId !== runContext.companyId) {
-        return '"runContext.projectId" does not belong to "runContext.companyId"';
+        return { error: '"runContext.projectId" does not belong to "runContext.companyId"' };
       }
     }
 
-    return null;
+    return { error: null, boundIssueId: typeof run.issueId === "string" && run.issueId ? run.issueId : null };
   }
 
   /**
@@ -1092,9 +1096,9 @@ export function pluginRoutes(
     const runContext: ToolRunContext = { ...requestedRunContext, projectId: requestedProjectId ?? "" };
 
     assertCompanyAccess(req, runContext.companyId);
-    const scopeError = await validateToolRunContextScope(runContext);
-    if (scopeError) {
-      res.status(403).json({ error: scopeError });
+    const scope = await validateToolRunContextScope(runContext);
+    if (scope.error !== null) {
+      res.status(403).json({ error: scope.error });
       return;
     }
 
@@ -1134,11 +1138,15 @@ export function pluginRoutes(
       return;
     }
 
+    // Defence in depth (REQ-9 D-4, REQ-11 D-8): the task comes from the verified run, never from the
+    // request body, so a caller cannot act as an agent on a task that run is not bound to.
+    const { issueId: _requestedIssueId, ...unboundRunContext } = runContext;
+    const directRunContext: ToolRunContext = scope.boundIssueId ? { ...unboundRunContext, issueId: scope.boundIssueId } : unboundRunContext;
     try {
       const result = await toolDeps.toolDispatcher.executeTool(
         tool,
         parameters ?? {},
-        runContext,
+        directRunContext,
       );
       res.json(result);
     } catch (err) {
@@ -1890,6 +1898,10 @@ export function pluginRoutes(
       res.status(404).json({ error: "Plugin not found" });
       return;
     }
+    if (plugin.pluginKey === "browser-sessions" && plugin.status === "disabled") {
+      res.status(404).json({ error: "Plugin not found" });
+      return;
+    }
     if (plugin.status !== "ready") {
       res.status(503).json({ error: `Plugin is not ready (current status: ${plugin.status})` });
       return;
@@ -1945,7 +1957,8 @@ export function pluginRoutes(
       }
       const requestBody = req.body ?? null;
       const bodySize = Buffer.byteLength(JSON.stringify(requestBody));
-      if (bodySize > PLUGIN_API_BODY_LIMIT_BYTES) {
+      const bodyLimit = plugin.pluginKey === "browser-sessions" ? 4 * 1024 * 1024 : PLUGIN_API_BODY_LIMIT_BYTES;
+      if (bodySize > bodyLimit) {
         res.status(413).json({ error: "Plugin API request body is too large" });
         return;
       }
@@ -1966,7 +1979,7 @@ export function pluginRoutes(
           runId: actor.runId,
         },
         companyId,
-        headers: sanitizePluginRequestHeaders(req),
+        headers: sanitizePluginRequestHeaders(req, plugin.pluginKey),
       };
 
       const result = await bridgeDeps.workerManager.call(

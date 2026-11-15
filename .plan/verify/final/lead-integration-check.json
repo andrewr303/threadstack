@@ -1,0 +1,71 @@
+{
+  "checkedAt": "2026-11-14T08:21:37.079153+00:00",
+  "sourceFilesReviewed": 184,
+  "reviewsHaveIdenticalScope": true,
+  "sourceDrift": [
+    "extension/scripts/run-paperclip-e2e.mjs"
+  ],
+  "originalSourceFilesChecked": 443,
+  "originalDifferences": [],
+  "originalHeadUnchanged": true,
+  "forkMasterUnchanged": true,
+  "liveManifestBytesUnchanged": true,
+  "liveManifestMtimeUnchanged": true,
+  "liveManifestKeyAbsent": true,
+  "passingCheckArtifacts": [
+    {
+      "path": ".plan/verify/final/artifacts/fork-typecheck.log",
+      "original": "/tmp/threadkeeper-fork-typecheck-round4.log",
+      "sha256": "45b6da197af96880f4f758c7a08d36429b181b07fd1333fac8110722cb59a0d2"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/extension-typecheck.log",
+      "original": "/tmp/threadkeeper-extension-final-typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/extension-tests.log",
+      "original": "/tmp/threadkeeper-extension-final-tests.log",
+      "sha256": "bbb824717283e6b0eef20c84ee96713e7cf71d90b9183c86883e7342d3560463"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/plugin-tests.log",
+      "original": "/tmp/threadkeeper-rate-reuse-green.log",
+      "sha256": "bdff71b487fd86e64043bd045215695c0c2b72b7e1e51fcbb5b251ca7ab1382b"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/sse-tests.log",
+      "original": "/tmp/threadkeeper-company-sse-green.log",
+      "sha256": "de2baa7bd82d70356a879a3cc4cb2641db4e80cdfe0e43abb33fe73863451efd"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/node-policy.log",
+      "original": "/tmp/threadkeeper-node-policy-final.log",
+      "sha256": "b5f1f2d3e0fc62369eb1dfefd98ed38b925262986b8a5f33251ca07713e07571"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/module-boundaries.log",
+      "original": "/tmp/threadkeeper-module-boundaries-final.log",
+      "sha256": "24dbde6cfa3a8b0e645bf60455fdd60285b74ec0e5dd7907ec56baa0c7429500"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/whitespace.log",
+      "original": "/tmp/threadkeeper-final-whitespace-round2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/bundled-current-tests.log",
+      "original": "/tmp/threadkeeper-bundled-final-current.log",
+      "sha256": "9fe6d1704f02b55b3eab3bf6945299ec313495ce122460d6021b74a43d676582"
+    },
+    {
+      "path": ".plan/verify/final/artifacts/rate-sql-receipt.json",
+      "original": "/tmp/threadkeeper-rate-sql-probe-receipt.json",
+      "sha256": "16c3376d0f84d03d0028d1d49193a294178eedc89c6f11ceb17b2c422ba00491"
+    }
+  ],
+  "fullSuiteQualified": false,
+  "liveDeploymentPerformed": false,
+  "userServiceRegistrationPerformed": false,
+  "realProviderDeliveryPerformed": false
+}

@@ -1,0 +1,198 @@
+Selected18 fixture-only cases; setup-readiness21 privacy-blocked; no HOME/CODEX_HOME changes.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip
+
+ ❯ |@paperclipai/server| src/__tests__/cli-invocation-safety.test.ts (40 tests | 1 failed | 39 skipped) 580ms
+   ❯ paperclipai CLI invocation safety (40)
+     × allows only exact-allowlist pnpm paperclipai commands on every guidance surface 579ms
+ ❯ |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts (34 tests | 6 failed | 28 skipped) 243ms
+   × installs the exact retained pack through the real uploader on an empty host instead of the current image archive 70ms
+   × keeps a matching current pack on its existing path without registry or cache reads 35ms
+   × preserves historical code hardlinks only to earlier confined regular files 36ms
+   × reuses a verified derived cache without registry reads and reconstructs it after an empty-host reset 35ms
+   × shares warm-cache verification while a stopped caller leaves another waiter active 34ms
+   × rejects a changed cached archive before any remote command or transfer 33ms
+ ❯ |@paperclipai/server| src/services/native-runtime/native-skill-library-tools.integration.test.ts (20 tests | 2 failed | 18 skipped) 1277ms
+   ❯ native company skill discovery (20)
+     × loads long supporting paths from the returned inventory (repository wrapper: false) 89ms
+     × loads long supporting paths from the returned inventory (repository wrapper: true) 8ms
+[02:04:21] [33mWARN[39m: [36midle warm native sessions did not close[39m [90m{"reason":"fixture cleanup","failures":[{"runId":"ac4545ad-7a25-465b-8e0f-7b193f4471bf","issueId":"92c3b607-6415-4745-95ee-cd42952a7e75","environmentId":"6d9292e0-5ae0-4806-96cb-fe521989b271","providerLeaseId":"c7642faa-c53f-48de-8b05-844ccc54fd1e","reason":"close failed: expected true to be false // Object.is equality"}]}[39m
+[02:04:21] [33mWARN[39m: [36midle warm native sessions did not close[39m [90m{"reason":"fixture cleanup","failures":[{"runId":"66f97bcc-a6e0-40bd-bbf8-8f93a0efc740","issueId":"9f3796b4-6b5f-47ba-9972-c7daff3424ba","environmentId":"873ad544-00b3-4e6f-bc13-ceb03714d792","providerLeaseId":"f0b25c96-0937-479d-be0a-017fdee5855a","reason":"close failed: expected true to be false // Object.is equality"}]}[39m
+[02:04:42] [33mWARN[39m: [36midle warm native sessions did not close[39m [90m{"reason":"fixture cleanup","failures":[{"runId":"14bde5b8-3319-4556-aa24-d0dd7124740e","issueId":"3748e79f-92ea-4649-b2d2-3a8b2613e909","environmentId":"4cb1355e-1b5b-45b6-bf41-48a21a0653ce","providerLeaseId":"adfdc130-bb5b-4b24-bd3b-a197c492f6a4","reason":"close failed: expected true to be false // Object.is equality"}]}[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@paperclipai/server| src/__tests__/cli-invocation-safety.test.ts > paperclipai CLI invocation safety > allows only exact-allowlist pnpm paperclipai commands on every guidance surface
+AssertionError: Each pnpm paperclipai line must match an exact allowlist entry, else use npx paperclipai (or the direct-exec form for local source):
+.acceptances/paperclip-merge/round-10/assets/attempt-2026-11-14T064245185Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.acceptances/paperclip-merge/round-11/assets/attempt-2026-11-14T070849431Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.acceptances/paperclip-merge/round-13/assets/attempt-2026-11-14T072435871Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.acceptances/paperclip-merge/round-14/assets/attempt-2026-11-14T072959983Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.acceptances/paperclip-merge/round-3/assets/attempt-2026-11-14T054302477Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.\n\nSettings\nGeneral\nCapture\n15 of 41\nAccounts\nPaperclip\nOff\nAI models\nOff\nAmazon Web Services\nUnused\nSearch & embeddings\nLocal\nOrganization\n5\nPrivacy & limits\nSidebar Dock\nOff\nDiagnostics\nOK\n\nPaperclip is stopped\n\nStart\n\nRun \"pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.\n\nBrowser sessions\n\nPair each company in Paperclip, then choose whether its agents may read your browser library. Local-only threads and projects are never shared.\n\nThreadkeeper acceptance\nNot paired\nPair Threadkeeper acceptance\nAllow agents to read full transcripts\nTurn off to limit reads to summaries and bounded context.\nAllow configured remote models for agent searches\nOtherwise agent searches use the local index without remote embedding or reranking calls.\nAgent actions\nAllow trusted agents to act in my browser\n\nAgents will send messages and start sessions as you. Providers may forbid automated use of personal accounts. Both Paperclip and this browser must allow an action; turning either side off stops queued actions.\n\nClaude\nClaude Code\nChatGPT\nCodex\n\n10 messages and 3 new sessions per agent per hour. At most one message per session per minute. Mark trusted agents in Paperclip’s Browser sessions settings.\n\nRecent actions\nCompany\nChoose a company\nThreadkeeper acceptance\n\nNo agent has acted yet.\n\nRefresh recent actions\nModel keys\n\nKeep model keys in Paperclip. Linked values stay in memory for the current call and are left out of Threadkeeper storage and backups.\n\nRead keys from\nChoose a company\nThreadkeeper acceptance\nAllow paired Threadkeeper to use this company’s model keys\nKeys cross the paired connection only when a feature needs them. Linked remote features pause while Paperclip is unavailable; local search keeps working.\nPaperclip server\n\nPaperclip runs companies of AI agents on your own server. Threadkeeper reads each issue with its comments and the transcripts of the agent runs that worked on it, as one thread per issue. It never changes anything in Paperclip.\n\nServer address\nCheck again\n\nConnected to http://127.0.0.1:3217 (local trusted mode, no sign-in needed).\n\nCompanies\nWhich companies to sync\nEvery company I can see\nOnly the companies I choose\nRefresh list\nSync\nSync Paperclip issues into Threadkeeper\nChecks for changes every 5 minutes while this browser runs. Threads are analyzed and filed by Paperclip project like any other thread.\nSync sooner when Paperclip reports a change\nListens to the local server's live events while Threadkeeper is awake.\nSync now\nLast sync\nNot synced yet.\nThreads from Paperclip\n0\n\nClaude Code runs keep their sessions in ~/.claude/projects, so importing that folder links each issue to its sessions. Paperclip gives Codex agents their own Codex home: import ~/.paperclip/instances/default/companies/<company id>/codex-home in Import / Export → Codex CLI sessions to link Codex runs.\n\nDone",
+.acceptances/paperclip-merge/round-3/assets/attempt-2026-11-14T054302477Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.\n\nBrowser sessions\n\nPair each company in Paperclip, then choose whether its agents may read your browser library. Local-only threads and projects are never shared.\n\nThreadkeeper acceptance\nNot paired\nPair Threadkeeper acceptance\nAllow agents to read full transcripts\nTurn off to limit reads to summaries and bounded context.\nAllow configured remote models for agent searches\nOtherwise agent searches use the local index without remote embedding or reranking calls.\nAgent actions\nAllow trusted agents to act in my browser\n\nAgents will send messages and start sessions as you. Providers may forbid automated use of personal accounts. Both Paperclip and this browser must allow an action; turning either side off stops queued actions.\n\nClaude\nClaude Code\nChatGPT\nCodex\n\n10 messages and 3 new sessions per agent per hour. At most one message per session per minute. Mark trusted agents in Paperclip’s Browser sessions settings.\n\nRecent actions\nCompany\nChoose a company\nThreadkeeper acceptance\n\nNo agent has acted yet.\n\nRefresh recent actions\nModel keys\n\nKeep model keys in Paperclip. Linked values stay in memory for the current call and are left out of Threadkeeper storage and backups.\n\nRead keys from\nChoose a company\nThreadkeeper acceptance\nAllow paired Threadkeeper to use this company’s model keys\nKeys cross the paired connection only when a feature needs them. Linked remote features pause while Paperclip is unavailable; local search keeps working.\nPaperclip server\n\nPaperclip runs companies of AI agents on your own server. Threadkeeper reads each issue with its comments and the transcripts of the agent runs that worked on it, as one thread per issue. It never changes anything in Paperclip.\n\nServer address\nCheck again\n\nConnected to http://127.0.0.1:3217 (local trusted mode, no sign-in needed).\n\nCompanies\nWhich companies to sync\nEvery company I can see\nOnly the companies I choose\nRefresh list\nSync\nSync Paperclip issues into Threadkeeper\nChecks for changes every 5 minutes while this browser runs. Threads are analyzed and filed by Paperclip project like any other thread.\nSync sooner when Paperclip reports a change\nListens to the local server's live events while Threadkeeper is awake.\nSync now\nLast sync\nNot synced yet.\nThreads from Paperclip\n0\n\nClaude Code runs keep their sessions in ~/.claude/projects, so importing that folder links each issue to its sessions. Paperclip gives Codex agents their own Codex home: import ~/.paperclip/instances/default/companies/<company id>/codex-home in Import / Export → Codex CLI sessions to link Codex runs.\n\nDone",
+.acceptances/paperclip-merge/round-4/assets/attempt-2026-11-14T055621353Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.acceptances/paperclip-merge/round-6/assets/attempt-2026-11-14T061515925Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.acceptances/paperclip-merge/round-7/assets/attempt-2026-11-14T062547199Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.",
+.plan/context/platform.md:144: pnpm paperclipai <command>
+.plan/reqs/REQ-4-paperclip-running-and-connected.md:75: pnpm paperclipai service start" in the Paperclip folder, or install the Mac helper to start it automatically.` |
+.plan/reqs/REQ-4-paperclip-running-and-connected.md:80: pnpm paperclipai service logs" for details.` |
+doc/THREADKEEPER-SERVICE.md:66: pnpm paperclipai service start
+extension/src/entrypoints/manager/PaperclipConnection.tsx:91: pnpm paperclipai service start" in the Paperclip folder, or install the Mac helper to start it automatically.</p></>}
+extension/src/entrypoints/manager/PaperclipConnection.tsx:96: pnpm paperclipai service logs" for details.</p>}: expected [ …(15) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   ".acceptances/paperclip-merge/round-10/assets/attempt-2026-11-14T064245185Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".acceptances/paperclip-merge/round-11/assets/attempt-2026-11-14T070849431Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".acceptances/paperclip-merge/round-13/assets/attempt-2026-11-14T072435871Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".acceptances/paperclip-merge/round-14/assets/attempt-2026-11-14T072959983Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".acceptances/paperclip-merge/round-3/assets/attempt-2026-11-14T054302477Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\n\\nSettings\\nGeneral\\nCapture\\n15 of 41\\nAccounts\\nPaperclip\\nOff\\nAI models\\nOff\\nAmazon Web Services\\nUnused\\nSearch & embeddings\\nLocal\\nOrganization\\n5\\nPrivacy & limits\\nSidebar Dock\\nOff\\nDiagnostics\\nOK\\n\\nPaperclip is stopped\\n\\nStart\\n\\nRun \\\"pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\n\\nBrowser sessions\\n\\nPair each company in Paperclip, then choose whether its agents may read your browser library. Local-only threads and projects are never shared.\\n\\nThreadkeeper acceptance\\nNot paired\\nPair Threadkeeper acceptance\\nAllow agents to read full transcripts\\nTurn off to limit reads to summaries and bounded context.\\nAllow configured remote models for agent searches\\nOtherwise agent searches use the local index without remote embedding or reranking calls.\\nAgent actions\\nAllow trusted agents to act in my browser\\n\\nAgents will send messages and start sessions as you. Providers may forbid automated use of personal accounts. Both Paperclip and this browser must allow an action; turning either side off stops queued actions.\\n\\nClaude\\nClaude Code\\nChatGPT\\nCodex\\n\\n10 messages and 3 new sessions per agent per hour. At most one message per session per minute. Mark trusted agents in Paperclip’s Browser sessions settings.\\n\\nRecent actions\\nCompany\\nChoose a company\\nThreadkeeper acceptance\\n\\nNo agent has acted yet.\\n\\nRefresh recent actions\\nModel keys\\n\\nKeep model keys in Paperclip. Linked values stay in memory for the current call and are left out of Threadkeeper storage and backups.\\n\\nRead keys from\\nChoose a company\\nThreadkeeper acceptance\\nAllow paired Threadkeeper to use this company’s model keys\\nKeys cross the paired connection only when a feature needs them. Linked remote features pause while Paperclip is unavailable; local search keeps working.\\nPaperclip server\\n\\nPaperclip runs companies of AI agents on your own server. Threadkeeper reads each issue with its comments and the transcripts of the agent runs that worked on it, as one thread per issue. It never changes anything in Paperclip.\\n\\nServer address\\nCheck again\\n\\nConnected to http://127.0.0.1:3217 (local trusted mode, no sign-in needed).\\n\\nCompanies\\nWhich companies to sync\\nEvery company I can see\\nOnly the companies I choose\\nRefresh list\\nSync\\nSync Paperclip issues into Threadkeeper\\nChecks for changes every 5 minutes while this browser runs. Threads are analyzed and filed by Paperclip project like any other thread.\\nSync sooner when Paperclip reports a change\\nListens to the local server's live events while Threadkeeper is awake.\\nSync now\\nLast sync\\nNot synced yet.\\nThreads from Paperclip\\n0\\n\\nClaude Code runs keep their sessions in ~/.claude/projects, so importing that folder links each issue to its sessions. Paperclip gives Codex agents their own Codex home: import ~/.paperclip/instances/default/companies/<company id>/codex-home in Import / Export → Codex CLI sessions to link Codex runs.\\n\\nDone\",",
++   ".acceptances/paperclip-merge/round-3/assets/attempt-2026-11-14T054302477Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\n\\nBrowser sessions\\n\\nPair each company in Paperclip, then choose whether its agents may read your browser library. Local-only threads and projects are never shared.\\n\\nThreadkeeper acceptance\\nNot paired\\nPair Threadkeeper acceptance\\nAllow agents to read full transcripts\\nTurn off to limit reads to summaries and bounded context.\\nAllow configured remote models for agent searches\\nOtherwise agent searches use the local index without remote embedding or reranking calls.\\nAgent actions\\nAllow trusted agents to act in my browser\\n\\nAgents will send messages and start sessions as you. Providers may forbid automated use of personal accounts. Both Paperclip and this browser must allow an action; turning either side off stops queued actions.\\n\\nClaude\\nClaude Code\\nChatGPT\\nCodex\\n\\n10 messages and 3 new sessions per agent per hour. At most one message per session per minute. Mark trusted agents in Paperclip’s Browser sessions settings.\\n\\nRecent actions\\nCompany\\nChoose a company\\nThreadkeeper acceptance\\n\\nNo agent has acted yet.\\n\\nRefresh recent actions\\nModel keys\\n\\nKeep model keys in Paperclip. Linked values stay in memory for the current call and are left out of Threadkeeper storage and backups.\\n\\nRead keys from\\nChoose a company\\nThreadkeeper acceptance\\nAllow paired Threadkeeper to use this company’s model keys\\nKeys cross the paired connection only when a feature needs them. Linked remote features pause while Paperclip is unavailable; local search keeps working.\\nPaperclip server\\n\\nPaperclip runs companies of AI agents on your own server. Threadkeeper reads each issue with its comments and the transcripts of the agent runs that worked on it, as one thread per issue. It never changes anything in Paperclip.\\n\\nServer address\\nCheck again\\n\\nConnected to http://127.0.0.1:3217 (local trusted mode, no sign-in needed).\\n\\nCompanies\\nWhich companies to sync\\nEvery company I can see\\nOnly the companies I choose\\nRefresh list\\nSync\\nSync Paperclip issues into Threadkeeper\\nChecks for changes every 5 minutes while this browser runs. Threads are analyzed and filed by Paperclip project like any other thread.\\nSync sooner when Paperclip reports a change\\nListens to the local server's live events while Threadkeeper is awake.\\nSync now\\nLast sync\\nNot synced yet.\\nThreads from Paperclip\\n0\\n\\nClaude Code runs keep their sessions in ~/.claude/projects, so importing that folder links each issue to its sessions. Paperclip gives Codex agents their own Codex home: import ~/.paperclip/instances/default/companies/<company id>/codex-home in Import / Export → Codex CLI sessions to link Codex runs.\\n\\nDone\",",
++   ".acceptances/paperclip-merge/round-4/assets/attempt-2026-11-14T055621353Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".acceptances/paperclip-merge/round-6/assets/attempt-2026-11-14T061515925Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".acceptances/paperclip-merge/round-7/assets/attempt-2026-11-14T062547199Z/pc-recovery-offline.dom.json:14: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\",",
++   ".plan/context/platform.md:144: pnpm paperclipai <command>",
++   ".plan/reqs/REQ-4-paperclip-running-and-connected.md:75: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.` |",
++   ".plan/reqs/REQ-4-paperclip-running-and-connected.md:80: pnpm paperclipai service logs\" for details.` |",
++   "doc/THREADKEEPER-SERVICE.md:66: pnpm paperclipai service start",
++   "extension/src/entrypoints/manager/PaperclipConnection.tsx:91: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.</p></>}",
++   "extension/src/entrypoints/manager/PaperclipConnection.tsx:96: pnpm paperclipai service logs\" for details.</p>}",
++ ]
+
+ ❯ src/__tests__/cli-invocation-safety.test.ts:567:7
+    565|       `Each pnpm paperclipai line must match an exact allowlist entry,…
+    566|         `npx paperclipai (or the direct-exec form for local source):\n…
+    567|     ).toEqual([]);
+       |       ^
+    568|   });
+    569|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/native-skill-library-tools.integration.test.ts > native company skill discovery > loads long supporting paths from the returned inventory (repository wrapper: false)
+Error: ENAMETOOLONG: name too long, mkdir '/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/native-skill-library-iNxkat/instances/vt-84066/skills/b1255bc1-6e63-4229-8294-b359f1e32b31/__packages__/.upload-aTIH7w/restored/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+ ❯ extractSkillPackageArchive src/services/skill-package-files.ts:135:7
+    133|       expected.delete(entry.header.name);
+    134|       const target = path.join(directory, file.path);
+    135|       await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o…
+       |       ^
+    136|       const digest = boundedHashStream(file.size);
+    137|       const output = await fs.open(target, constants.O_CREAT | constan…
+ ❯ src/services/skill-package-store.ts:509:11
+ ❯ withPackageIo src/services/skill-package-store.ts:119:41
+ ❯ Object.prepare src/services/skill-package-store.ts:452:24
+ ❯ src/services/native-runtime/native-skill-library-tools.integration.test.ts:212:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/native-skill-library-tools.integration.test.ts > native company skill discovery > loads long supporting paths from the returned inventory (repository wrapper: true)
+Error: ENAMETOOLONG: name too long, mkdir '/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/native-skill-library-iNxkat/instances/vt-84066/skills/934334a9-0040-4a94-b111-725406a3a15f/__packages__/.upload-7OAL8G/restored/skills/review/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/nested-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+ ❯ extractSkillPackageArchive src/services/skill-package-files.ts:135:7
+    133|       expected.delete(entry.header.name);
+    134|       const target = path.join(directory, file.path);
+    135|       await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o…
+       |       ^
+    136|       const digest = boundedHashStream(file.size);
+    137|       const output = await fs.open(target, constants.O_CREAT | constan…
+ ❯ src/services/skill-package-store.ts:509:11
+ ❯ withPackageIo src/services/skill-package-store.ts:119:41
+ ❯ Object.prepare src/services/skill-package-store.ts:452:24
+ ❯ src/services/native-runtime/native-skill-library-tools.integration.test.ts:212:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > installs the exact retained pack through the real uploader on an empty host instead of the current image archive
+Error: runner_remote_provider_archive_transport_unavailable
+ ❯ uploadVerifiedProviderPack src/services/native-runtime/provider-pack-upload.ts:54:65
+     52|       bypassSession: true, timeoutMs: 10_000,
+     53|     }));
+     54|     if (capability.exitCode !== 0 || capability.timedOut) throw Error(…
+       |                                                                 ^
+     55|   }
+     56|   if (!archive) await verifyDirectory();
+ ❯ src/services/native-runtime/retained-provider-pack-source.test.ts:207:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > keeps a matching current pack on its existing path without registry or cache reads
+Error: current_directory_fallback_forbidden
+ ❯ Object.verifyDirectory src/services/native-runtime/retained-provider-pack-source.test.ts:197:52
+    195|   return uploadVerifiedProviderPack({ root: input.current.pack, source…
+    196|     manifest: input.selected.manifest, runner: input.runner, cwd: inpu…
+    197|     reuseRoots: [], verifyDirectory: () => { throw Error("current_dire…
+       |                                                    ^
+    198|     stageDirectory: async () => { throw Error("current_directory_fallb…
+    199| }
+ ❯ src/services/native-runtime/provider-pack-upload.ts:39:93
+ ❯ measure src/services/native-runtime/provider-pack-upload.ts:33:108
+ ❯ verifyDirectory src/services/native-runtime/provider-pack-upload.ts:39:33
+ ❯ src/services/native-runtime/provider-pack-upload.ts:71:24
+ ❯ uploadVerifiedProviderPack src/services/native-runtime/provider-pack-upload.ts:65:3
+ ❯ src/services/native-runtime/retained-provider-pack-source.test.ts:271:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > preserves historical code hardlinks only to earlier confined regular files
+Error: runner_remote_provider_archive_transport_unavailable
+ ❯ uploadVerifiedProviderPack src/services/native-runtime/provider-pack-upload.ts:54:65
+     52|       bypassSession: true, timeoutMs: 10_000,
+     53|     }));
+     54|     if (capability.exitCode !== 0 || capability.timedOut) throw Error(…
+       |                                                                 ^
+     55|   }
+     56|   if (!archive) await verifyDirectory();
+ ❯ src/services/native-runtime/retained-provider-pack-source.test.ts:327:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > reuses a verified derived cache without registry reads and reconstructs it after an empty-host reset
+Error: runner_remote_provider_archive_transport_unavailable
+ ❯ uploadVerifiedProviderPack src/services/native-runtime/provider-pack-upload.ts:54:65
+     52|       bypassSession: true, timeoutMs: 10_000,
+     53|     }));
+     54|     if (capability.exitCode !== 0 || capability.timedOut) throw Error(…
+       |                                                                 ^
+     55|   }
+     56|   if (!archive) await verifyDirectory();
+ ❯ src/services/native-runtime/retained-provider-pack-source.test.ts:370:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > shares warm-cache verification while a stopped caller leaves another waiter active
+Error: runner_remote_provider_archive_transport_unavailable
+ ❯ uploadVerifiedProviderPack src/services/native-runtime/provider-pack-upload.ts:54:65
+     52|       bypassSession: true, timeoutMs: 10_000,
+     53|     }));
+     54|     if (capability.exitCode !== 0 || capability.timedOut) throw Error(…
+       |                                                                 ^
+     55|   }
+     56|   if (!archive) await verifyDirectory();
+ ❯ src/services/native-runtime/retained-provider-pack-source.test.ts:382:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  |@paperclipai/server| src/services/native-runtime/retained-provider-pack-source.test.ts > rejects a changed cached archive before any remote command or transfer
+Error: runner_remote_provider_archive_transport_unavailable
+ ❯ uploadVerifiedProviderPack src/services/native-runtime/provider-pack-upload.ts:54:65
+     52|       bypassSession: true, timeoutMs: 10_000,
+     53|     }));
+     54|     if (capability.exitCode !== 0 || capability.timedOut) throw Error(…
+       |                                                                 ^
+     55|   }
+     56|   if (!archive) await verifyDirectory();
+ ❯ src/services/native-runtime/retained-provider-pack-source.test.ts:434:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+
+ Test Files  3 failed | 1 passed (4)
+      Tests  9 failed | 9 passed | 85 skipped (103)
+   Start at  02:03:48
+   Duration  54.32s (tests 84%, transform 10%, import 6%)
+

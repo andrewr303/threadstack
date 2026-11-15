@@ -10,6 +10,18 @@
 // that shows none of these controls yields 'unknown', never a guess.
 import type { AgentState } from '../workspace/types.js';
 
+/** Stable known controls still need a heartbeat; unknown controls never prove live run state. */
+export function shouldReportAgentObservation(
+  previous: { state: AgentState; url: string; at: number } | null,
+  next: { state: AgentState; url: string },
+  now: number,
+  heartbeatMs = 10_000
+): boolean {
+  if (!previous) return next.state !== 'unknown';
+  if (next.state !== previous.state || next.url !== previous.url) return true;
+  return next.state !== 'unknown' && now - previous.at >= heartbeatMs;
+}
+
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled', 'paused', 'auth_expired', 'process_exit'] as const;
 type TerminalStatus = (typeof TERMINAL_STATUSES)[number];
 

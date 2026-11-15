@@ -28,6 +28,7 @@ import {
 } from '../../core/ai/claude.js';
 import { CaptureSettings } from './CaptureSettings.js';
 import { AccountsSettings } from './accounts/AccountsSettings.js';
+import { LAUNCH_PROVIDERS } from './workspace/launch.js';
 import { BACKEND_OPTIONS, aiCredentialsReady, aiHostOrigins, backendHost, resolveModelId } from '../../core/ai/backends.js';
 import {
   awsCredentialsReady,
@@ -57,6 +58,7 @@ import { SidebarDockPanel } from './SidebarDock.js';
 import { dockStatusSummary, dockSyncNow, type DockStateView } from './dock.js';
 import { PaperclipSettings, paperclipSectionStatus, usePaperclipSyncState } from './PaperclipSettings.js';
 import type { PaperclipSyncState } from '../../core/paperclip/sync.js';
+import { isModelCredentialLinked } from './PaperclipCredentials.js';
 
 interface Props {
   dialogRef: React.MutableRefObject<HTMLDialogElement | null>;
@@ -352,11 +354,13 @@ function VoyageEndpoint({ settings, onPatch }: Pick<Props, 'onPatch'> & { settin
 function SecretInput({
   value,
   onChange,
+  fromPaperclip = false,
   label,
   placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
+  fromPaperclip?: boolean;
   label: string;
   placeholder?: string;
 }) {
@@ -370,16 +374,17 @@ function SecretInput({
           id={id}
           type={show ? 'text' : 'password'}
           className="tk-input tk-grow"
-          placeholder={placeholder}
           aria-label={label}
           autoComplete="off"
           spellCheck={false}
-          value={value}
-          onChange={(e) => onChange(e.target.value.trim())}
+          value={fromPaperclip ? '' : value}
+          readOnly={fromPaperclip}
+          placeholder={fromPaperclip ? 'From Paperclip' : placeholder}
+          onChange={(e) => { if (!fromPaperclip) onChange(e.target.value.trim()); }}
         />
-        <button type="button" className="tk-btn" aria-label={`${show ? 'Hide' : 'Show'} ${label}`} onClick={() => setShow((v) => !v)}>
+        {!fromPaperclip && <button type="button" className="tk-btn" aria-label={`${show ? 'Hide' : 'Show'} ${label}`} onClick={() => setShow((v) => !v)}>
           {show ? 'Hide' : 'Show'}
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -647,6 +652,37 @@ export function SettingsDialog({
           </div>
         </Section>
         <Section title="Workspace">
+          <div className="tk-field-row">
+            <label className="tk-field">
+              Start page
+              <select
+                className="tk-select"
+                aria-describedby="tk-start-page-hint"
+                value={settings.startPage}
+                onChange={(e) => void onPatch({ startPage: e.target.value })}
+              >
+                <option value="">Where I left off</option>
+                {LAUNCH_PROVIDERS.map((entry) => (
+                  <option key={entry.provider} value={entry.url}>
+                    {PROVIDERS[entry.provider].label}
+                  </option>
+                ))}
+                {settings.startPage !== '' && !LAUNCH_PROVIDERS.some((entry) => entry.url === settings.startPage) && (
+                  <option value={settings.startPage}>{settings.startPage}</option>
+                )}
+              </select>
+            </label>
+          </div>
+          <p id="tk-start-page-hint" className="tk-settings-note">
+            The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat
+            and code.
+          </p>
+          <Toggle
+            checked={settings.embedFullNavigation}
+            onChange={(v) => void onPatch({ embedFullNavigation: v })}
+            label="Show each site’s full navigation"
+            hint="Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
+          />
           <Toggle
             checked={settings.surfaces === 'solid'}
             onChange={(v) => void onPatch({ surfaces: v ? 'solid' : 'glass' })}
@@ -724,6 +760,7 @@ export function SettingsDialog({
               label="Anthropic API key"
               placeholder="sk-ant-…"
               value={settings.anthropicApiKey}
+              fromPaperclip={isModelCredentialLinked(settings, 'anthropicApiKey')}
               onChange={(v) => void onPatch({ anthropicApiKey: v })}
             />
           )}
@@ -758,6 +795,7 @@ export function SettingsDialog({
                     label="Claude Platform on AWS API key"
                     placeholder="Short-term API key"
                     value={settings.awsPlatformApiKey}
+                    fromPaperclip={isModelCredentialLinked(settings, 'awsPlatformApiKey')}
                     onChange={(v) => void onPatch({ awsPlatformApiKey: v })}
                   />
                   <p className="tk-settings-note">
@@ -927,6 +965,7 @@ export function SettingsDialog({
               label="Bedrock API key"
               placeholder="bedrock-api-key-…"
               value={settings.aws.bedrockApiKey}
+              fromPaperclip={isModelCredentialLinked(settings, 'aws.bedrockApiKey')}
               onChange={(v) => void patchAws({ bedrockApiKey: v })}
             />
           ) : (
@@ -939,7 +978,9 @@ export function SettingsDialog({
                     className="tk-input"
                     autoComplete="off"
                     spellCheck={false}
-                    value={settings.aws.accessKeyId}
+                    value={isModelCredentialLinked(settings, 'aws.accessKeyId') ? '' : settings.aws.accessKeyId}
+                    readOnly={isModelCredentialLinked(settings, 'aws.accessKeyId')}
+                    placeholder={isModelCredentialLinked(settings, 'aws.accessKeyId') ? 'From Paperclip' : undefined}
                     onChange={(e) => void patchAws({ accessKeyId: e.target.value.trim() })}
                   />
                 </label>
@@ -947,12 +988,14 @@ export function SettingsDialog({
               <SecretInput
                 label="Secret access key"
                 value={settings.aws.secretAccessKey}
+                fromPaperclip={isModelCredentialLinked(settings, 'aws.secretAccessKey')}
                 onChange={(v) => void patchAws({ secretAccessKey: v })}
               />
               <SecretInput
                 label="Session token (optional)"
                 placeholder="Session token for temporary credentials"
                 value={settings.aws.sessionToken}
+                fromPaperclip={isModelCredentialLinked(settings, 'aws.sessionToken')}
                 onChange={(v) => void patchAws({ sessionToken: v })}
               />
             </>
@@ -1018,7 +1061,7 @@ export function SettingsDialog({
           {settings.embeddingProvider === 'voyage' && (
             <>
               <VoyageEndpoint settings={settings} onPatch={onPatch} />
-              <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+              <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} fromPaperclip={isModelCredentialLinked(settings, 'voyageApiKey')} onChange={(v) => void onPatch({ voyageApiKey: v })} />
               <label className="tk-field">
                 Model
                 <select
@@ -1040,6 +1083,7 @@ export function SettingsDialog({
                 label="Atlas model API key"
                 placeholder="Created in MongoDB Atlas"
                 value={settings.mongodbApiKey}
+                fromPaperclip={isModelCredentialLinked(settings, 'mongodbApiKey')}
                 onChange={(v) => void onPatch({ mongodbApiKey: v })}
               />
               <label className="tk-field">
@@ -1096,7 +1140,7 @@ export function SettingsDialog({
           )}
           {settings.embeddingProvider === 'cohere' && (
             <>
-              <SecretInput label="Cohere API key" placeholder="From dashboard.cohere.com" value={settings.cohereApiKey} onChange={(v) => void onPatch({ cohereApiKey: v })} />
+              <SecretInput label="Cohere API key" placeholder="From dashboard.cohere.com" value={settings.cohereApiKey} fromPaperclip={isModelCredentialLinked(settings, 'cohereApiKey')} onChange={(v) => void onPatch({ cohereApiKey: v })} />
               <div className="tk-field-row">
                 <label className="tk-field">
                   Model
@@ -1176,7 +1220,7 @@ export function SettingsDialog({
           )}
           {settings.embeddingProvider === 'openai' && (
             <>
-              <SecretInput label="OpenAI API key" placeholder="sk-…" value={settings.openaiApiKey} onChange={(v) => void onPatch({ openaiApiKey: v })} />
+              <SecretInput label="OpenAI API key" placeholder="sk-…" value={settings.openaiApiKey} fromPaperclip={isModelCredentialLinked(settings, 'openaiApiKey')} onChange={(v) => void onPatch({ openaiApiKey: v })} />
               <label className="tk-field">
                 Model
                 <select
@@ -1255,6 +1299,7 @@ export function SettingsDialog({
                     label="Atlas model API key"
                     placeholder="Created in MongoDB Atlas"
                     value={settings.mongodbApiKey}
+                    fromPaperclip={isModelCredentialLinked(settings, 'mongodbApiKey')}
                     onChange={(v) => void onPatch({ mongodbApiKey: v })}
                   />
                   <label className="tk-field">
@@ -1292,7 +1337,7 @@ export function SettingsDialog({
           {settings.rerankProvider === 'cohere' && (
             <>
               {settings.embeddingProvider !== 'cohere' && (
-                <SecretInput label="Cohere API key" placeholder="From dashboard.cohere.com" value={settings.cohereApiKey} onChange={(v) => void onPatch({ cohereApiKey: v })} />
+                <SecretInput label="Cohere API key" placeholder="From dashboard.cohere.com" value={settings.cohereApiKey} fromPaperclip={isModelCredentialLinked(settings, 'cohereApiKey')} onChange={(v) => void onPatch({ cohereApiKey: v })} />
               )}
               <label className="tk-field">
                 Model
@@ -1315,7 +1360,7 @@ export function SettingsDialog({
               {settings.embeddingProvider !== 'voyage' && (
                 <>
                   <VoyageEndpoint settings={settings} onPatch={onPatch} />
-                  <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} onChange={(v) => void onPatch({ voyageApiKey: v })} />
+                  <SecretInput label="Voyage API key" placeholder="pa-…" value={settings.voyageApiKey} fromPaperclip={isModelCredentialLinked(settings, 'voyageApiKey')} onChange={(v) => void onPatch({ voyageApiKey: v })} />
                 </>
               )}
               <label className="tk-field">
@@ -1483,7 +1528,7 @@ export function SettingsDialog({
               />
             </label>
           </div>
-          <SecretInput label="Worker bearer token" value={settings.workerBearerToken} onChange={(v) => void onPatch({ workerBearerToken: v })} />
+          <SecretInput label="Worker bearer token" value={settings.workerBearerToken} fromPaperclip={isModelCredentialLinked(settings, 'workerBearerToken')} onChange={(v) => void onPatch({ workerBearerToken: v })} />
         </details>
       </>
     ),

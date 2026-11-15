@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { credentialPresent, resolveModelSettings } from './paperclip/credentials.js';
 import {
   getDisplayTitle,
   STARTER_AREAS,
@@ -59,7 +60,7 @@ export async function checkCloudEligibility(
   if (!s.cloudEnabled) {
     return { allowed: false, reason: 'Cloud enrichment is disabled (local-only mode)' };
   }
-  if (!s.workerEndpointUrl.trim() || !s.workerBearerToken.trim()) {
+  if (!s.workerEndpointUrl.trim() || !credentialPresent(s, 'workerBearerToken')) {
     return { allowed: false, reason: 'Worker endpoint or bearer token not configured' };
   }
   if (conv.cloudExcluded) {
@@ -113,7 +114,8 @@ async function reserveClientBudgetSlot(
     if (!live.cloudEnabled) {
       return { allowed: false, reason: 'Cloud mode is disabled', settings: live };
     }
-    if (!live.workerEndpointUrl.trim() || !live.workerBearerToken.trim()) {
+    // A token linked to Paperclip has no local value; readiness must use the metadata-aware check.
+    if (!live.workerEndpointUrl.trim() || !credentialPresent(live, 'workerBearerToken')) {
       return {
         allowed: false,
         reason: 'Worker endpoint or bearer token not configured',
@@ -268,7 +270,7 @@ export async function requestThreadEnrichment(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.workerBearerToken}`,
+        Authorization: `Bearer ${(await resolveModelSettings(settings, 'cloud enrichment', ['workerBearerToken'])).workerBearerToken}`,
       },
       body: JSON.stringify({
         threadKey: conv.threadKey,
@@ -446,7 +448,7 @@ export async function requestQueryEmbedding(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.workerBearerToken}`,
+        Authorization: `Bearer ${(await resolveModelSettings(settings, 'query embeddings', ['workerBearerToken'])).workerBearerToken}`,
       },
       body: JSON.stringify(
         isContextual
@@ -545,7 +547,7 @@ export async function requestCandidateRerank(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.workerBearerToken}`,
+        Authorization: `Bearer ${(await resolveModelSettings(settings, 'reranking', ['workerBearerToken'])).workerBearerToken}`,
       },
       body: JSON.stringify({
         query,

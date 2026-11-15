@@ -1,0 +1,11 @@
+{
+  "command": [
+    "node",
+    "cli/node_modules/tsx/dist/cli.mjs",
+    "/tmp/threadkeeper-spec-lifecycle-probe.mts"
+  ],
+  "exitCode": 0,
+  "stdout": "{\"lifecycle\":{\"state\":\"unreachable\",\"origin\":\"http://127.0.0.1:3100\",\"reason\":\"not_paperclip\"},\"startRequests\":0,\"readData\":{\"messages\":[{\"text\":\"fixture\"}],\"untrusted\":true}}\n",
+  "stderr": "",
+  "recordedAt": "2026-11-14T06:30:08.019352+00:00"
+}

@@ -27,7 +27,363 @@
             <button type="button" class="tk-icon-btn" aria-label="Dashboard" title="Dashboard">
               <svg class="tk-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                 <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h4A1.5 1.5 0 0 1 11 5.5v13A1.5 1.5 0 0 1 9.5 20h-4A1.5 1.5 0 0 1 4 18.5ZM14 5.5A1.5 1.5 0 0 1 15.5 4h3A1.5 1.5 0 0 1 20 5.5v4A1.5 1.5 0 0 1 18.5 11h-3A1.5 1.5 0 0 1 14 9.5ZM14 15.5a1.5 1.5 0 0 1 1.5-1.5h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3a1.5 1.5 0 0 1-1.5-1.5Z">
-      <div class="tk-rail-scroll">
+          <li>
+            <button type="button" class="tk-icon-btn" aria-label="Paperclip" title="Paperclip">
+              <svg class="tk-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M4.5 5h15A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11A1.5 1.5 0 0 1 4.5 5ZM3 9h18">
+      <div class="tk-rail-scroll" data-thread-index="true" hidden="">
+        <section id="tk-main-list" class="tk-list-pane tk-list-sidebar" aria-label="Sessions">
+          <div class="tk-search-bar" data-filters-open="false">
+            <div class="tk-search-row">
+              <div class="tk-segmented" role="tablist" aria-label="Search or ask">
+                <button type="button" role="tab" aria-selected="true">
+                  "Search"
+                <button type="button" role="tab" aria-selected="false">
+                  "Ask"
+              <button type="button" class="tk-icon-btn tk-thr-filters-toggle" aria-label="Filters" title="Sort, group and filter sessions" aria-expanded="false">
+                <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M4 6.5h16M7 12h10M10 17.5h4">
+              <input type="search" class="tk-input tk-search-input" aria-label="Search conversations, decisions, and messages" placeholder="Search titles, summaries, topics, decisions, messages…" value=""> {value=""}
+            <div class="tk-filter-row">
+              <select class="tk-select" aria-label="View mode"> {value="list"}
+                <option value="list">
+                  "List index"
+                <option value="kanban">
+                  "Kanban by status"
+                <option value="cards">
+                  "Project cards"
+              <select class="tk-select" aria-label="Sort threads"> {value="recent"}
+                <option value="recent">
+                  "Recent activity"
+                <option value="oldest">
+                  "Oldest first"
+                <option value="created">
+                  "Recently created"
+                <option value="title">
+                  "Title A–Z"
+                <option value="messages">
+                  "Most messages"
+              <select class="tk-select" aria-label="Filter by provider"> {value="all"}
+                <option value="all">
+                  "All providers"
+                <option value="chatgpt">
+                  "ChatGPT"
+                <option value="claude">
+                  "Claude"
+              <select class="tk-select" aria-label="Filter by type"> {value="all"}
+                <option value="all">
+                  "All types"
+                <option value="coding">
+                  "Coding sessions"
+                <option value="chats">
+                  "Chats"
+                <option value="bots">
+                  "Bots"
+                <option value="more">
+                  "Other"
+              <select class="tk-select" aria-label="Filter by kind of work"> {value="all"}
+                <option value="all">
+                  "All kinds"
+                <option value="coding">
+                  "Building"
+                <option value="debugging">
+                  "Debugging"
+                <option value="writing">
+                  "Writing"
+                <option value="research">
+                  "Research"
+                <option value="planning">
+                  "Planning"
+                <option value="brainstorming">
+                  "Ideas"
+                <option value="learning">
+                  "Learning"
+                <option value="data">
+                  "Data & analysis"
+                <option value="design">
+                  "Design"
+                <option value="business">
+                  "Business"
+                <option value="personal">
+                  "Personal"
+                <option value="other">
+                  "General"
+              <select class="tk-select" aria-label="Filter by workflow state"> {value="all"}
+                <option value="all">
+                  "All states"
+                <option value="active">
+                  "Active"
+                <option value="needs_review">
+                  "Needs review"
+                <option value="waiting">
+                  "Waiting"
+                <option value="paused">
+                  "Paused"
+                <option value="done">
+                  "Done"
+                <option value="archived">
+                  "Archived"
+              <select class="tk-select" aria-label="Filter by capture coverage"> {value="all"}
+                <option value="all">
+                  "All coverage"
+                <option value="full">
+                  "Full export"
+                <option value="partial">
+                  "Partial DOM"
+                <option value="title_only">
+                  "Title only"
+            <div class="tk-thr-toolbar">
+              <div class="tk-thr-groupby">
+                <span class="tk-thr-label" aria-hidden="true">
+                  "Group by"
+                <select class="tk-select" aria-label="Group by"> {value="none"}
+                  <option value="none">
+                    "None"
+                  <option value="project">
+                    "Project"
+                  <option value="repository">
+                    "Repository"
+                  <option value="provider">
+                    "Provider"
+                  <option value="date">
+                    "Last active"
+                  <option value="status">
+                    "Status"
+              <select class="tk-select" aria-label="Filter by run state"> {value="all"}
+                <option value="all">
+                  "Any run state"
+                <option value="needs_you">
+                  "Needs you"
+                <option value="running">
+                  "Running"
+                <option value="finished">
+                  "Finished"
+          <section class="tk-bulk-bar" aria-label="Select and change several threads" data-active="false">
+            <div class="tk-bulk-head">
+              <label class="tk-inline-check">
+                <input type="checkbox"> {checked=false}
+                "Select all in view"
+          <dialog id="tk-bulk-delete-dialog" class="tk-modal-dialog" aria-label="Delete selected threads">
+            <h2 class="tk-section-h2" style="margin-bottom: 8px;">
+              "Delete"
+              "0 threads"
+              "?"
+            <p class="tk-settings-note" style="margin-top: 0px;">
+              "This removes"
+              "all 0 selected threads"
+              ", with their messages, summaries and vectors, from your library. Each deletion leaves a tombstone, so capture and imports will not bring the thread back. This cannot be undone."
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+              <button type="button" class="tk-btn">
+                "Cancel"
+              <button type="button" class="tk-btn tk-btn-danger" disabled="">
+                "Delete"
+                "0 threads"
+          <ul class="tk-row-list">
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select Daydock / Meridian logo geometry & SVG grid"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="Daydock / Meridian logo geometry & SVG grid" aria-selected="false">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "GP"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "Daydock / Meridian logo geometry & SVG grid"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "ChatGPT"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
+                      <span>
+                        "Active"
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select HypeStake odds engine WebSocket delta compression"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="HypeStake odds engine WebSocket delta compression" aria-selected="false">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "GP"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "HypeStake odds engine WebSocket delta compression"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "ChatGPT"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
+                      <span>
+                        "Active"
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select Velotic / FrameConcepts WebGPU frame cache eviction"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="Velotic / FrameConcepts WebGPU frame cache eviction" aria-selected="false">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "CL"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "Velotic / FrameConcepts WebGPU frame cache eviction"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "Claude"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="waiting" aria-hidden="true">
+                      <span>
+                        "Waiting"
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select Daydock logo wordmark kerning & optical lockup"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="Daydock logo wordmark kerning & optical lockup" aria-selected="false">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "CL"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "Daydock logo wordmark kerning & optical lockup"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "Claude"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="needs_review" aria-hidden="true">
+                      <span>
+                        "Needs review"
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select Daydock homepage research & pricing tier benchmarks"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="Daydock homepage research & pricing tier benchmarks" aria-selected="true" aria-current="true">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "GP"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "Daydock homepage research & pricing tier benchmarks"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "ChatGPT"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
+                      <span>
+                        "Active"
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select Personal Q4 travel & family cabin checklist"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="Personal Q4 travel & family cabin checklist" aria-selected="false">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "GP"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "Personal Q4 travel & family cabin checklist"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "ChatGPT"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
+                      <span>
+                        "Active"
+            <li class="tk-row-item tk-session-index-row" data-checked="false">
+              <label class="tk-row-check">
+                <input type="checkbox" aria-label="Select Daydock / Meridian logo geometry & SVG grid (branch_2)"> {checked=false}
+              <button type="button" class="tk-row-btn tk-session-index-button" title="Daydock / Meridian logo geometry & SVG grid (branch_2)" aria-selected="false">
+                <span class="tk-mark" data-size="md" aria-hidden="true">
+                  "GP"
+                <span class="tk-session-index-text">
+                  <span class="tk-row-title tk-rail-row-title">
+                    "Daydock / Meridian logo geometry & SVG grid (branch_2)"
+                  <span class="tk-rail-row-meta">
+                    <span class="tk-visually-hidden">
+                      "ChatGPT"
+                      ","
+                    <span class="tk-status-pill">
+                      <span class="tk-status-dot" data-state="paused" aria-hidden="true">
+                      <span>
+                        "Paused"
+        <details class="tk-rail-collections"> {open=false}
+          <summary>
+            "Projects & queues"
+          <nav class="tk-nav" aria-label="Projects and resurfacing queues" data-drawer-open="false">
+            <div>
+              <div class="tk-eyebrow">
+                "Projects"
+              <div class="tk-nav-list">
+                <button type="button" class="tk-nav-item" aria-current="true">
+                  <span>
+                    "All threads"
+                  <span class="tk-nav-count">
+                    "7"
+                <button type="button" class="tk-nav-item" aria-current="false" title="Scheduling, workspace architecture, and Daydock / Meridian brand systems">
+                  <span class="tk-ellipsis">
+                    "Daydock / Meridian"
+                  <span class="tk-nav-count">
+                    "3"
+                <button type="button" class="tk-nav-item" aria-current="false" title="Technical explorations, benchmarks, and cross-domain study">
+                  <span class="tk-ellipsis">
+                    "General research"
+                  <span class="tk-nav-count">
+                    "1"
+                <button type="button" class="tk-nav-item" aria-current="false" title="Sports analytics, market pricing, and HypeStake product threads">
+                  <span class="tk-ellipsis">
+                    "HypeStake"
+                  <span class="tk-nav-count">
+                    "1"
+                <button type="button" class="tk-nav-item" aria-current="false" title="Personal planning, notes, and private threads">
+                  <span class="tk-ellipsis">
+                    "Personal"
+                  <span class="tk-nav-count">
+                    "1"
+                <button type="button" class="tk-nav-item" aria-current="false" title="Creative tooling, motion pipelines, and FrameConcepts studio work">
+                  <span class="tk-ellipsis">
+                    "Velotic / FrameConcepts"
+                  <span class="tk-nav-count">
+                    "1"
+                <button type="button" class="tk-nav-item" aria-current="false" title="Captured or imported threads awaiting classification">
+                  <span class="tk-ellipsis">
+                    "Unfiled / Uncertain"
+                  <span class="tk-nav-count">
+                    "0"
+                <button type="button" class="tk-nav-item tk-nav-add">
+                  "+ New project"
+            <div>
+              <div class="tk-eyebrow">
+                "Resurfacing"
+              <div class="tk-nav-list">
+                <button type="button" class="tk-nav-item" aria-current="false">
+                  <span>
+                    "Continue working"
+                  <span class="tk-nav-count">
+                    "6"
+                <button type="button" class="tk-nav-item" aria-current="false">
+                  <span>
+                    "Needs review"
+                  <span class="tk-nav-count">
+                    "4"
+                <button type="button" class="tk-nav-item" aria-current="false">
+                  <span>
+                    "Waiting"
+                  <span class="tk-nav-count">
+                    "1"
+                <button type="button" class="tk-nav-item" aria-current="false">
+                  <span>
+                    "Recently changed"
+                  <span class="tk-nav-count">
+                    "7"
+                <button type="button" class="tk-nav-item" aria-current="false">
+                  <span>
+                    "Unfiled"
+                  <span class="tk-nav-count">
+                    "0"
+                <button type="button" class="tk-nav-item" aria-current="false">
+                  <span>
+                    "Worth revisiting"
+                  <span class="tk-nav-count">
+                    "7"
+      <div class="tk-paperclip-status tk-paperclip-status-compact" data-state="stopped">
+        <p role="status" title="Paperclip is stopped">
+          <span aria-label="Paperclip is stopped">
+            "PC ·"
+            "Offline"
+        <button type="button" class="tk-linklike" aria-label="Paperclip connection settings">
+          "Connect"
       <div class="tk-rail-foot">
         <div class="tk-rail-tools">
           <button type="button" class="tk-icon-btn" aria-label="Add account" title="Add account" aria-haspopup="dialog">
@@ -71,61 +427,61 @@
                   <h2 class="tk-browse-launch-title">
                     "Open a session"
                   <p class="tk-browse-launch-sub">
-                    "Pick a provider and the account to use. Switching to another account of the same provider pauses that provider’s other tabs here."
+                    "Pick a provider and the account to use. Accounts of the same provider stay signed in side by side."
                   <section class="tk-browse-launch-group" aria-label="Coding agents">
                     <h3 class="tk-eyebrow">
                       "Coding agents"
                     <ul class="tk-browse-prov-list">
-                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6j:">
+                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6i:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
                           "CC"
                         <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r6j:">
+                          <div class="tk-browse-prov-name" id=":r6i:">
                             "Claude Code"
+                          <div class="tk-browse-prov-actions">
+                            <button type="button" class="tk-btn">
+                              "Open"
+                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6j:">
+                        <span class="tk-mark" data-size="md" aria-hidden="true">
+                          "CX"
+                        <div class="tk-browse-prov-body">
+                          <div class="tk-browse-prov-name" id=":r6j:">
+                            "Codex"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6k:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "CX"
+                          "CU"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6k:">
-                            "Codex"
+                            "Cursor agents"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6l:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "CU"
+                          "GH"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6l:">
-                            "Cursor agents"
+                            "GitHub Copilot"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6m:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "GH"
+                          "JU"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6m:">
-                            "GitHub Copilot"
+                            "Jules"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6n:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "JU"
-                        <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r6n:">
-                            "Jules"
-                          <div class="tk-browse-prov-actions">
-                            <button type="button" class="tk-btn">
-                              "Open"
-                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6o:">
-                        <span class="tk-mark" data-size="md" aria-hidden="true">
                           "DV"
                         <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r6o:">
+                          <div class="tk-browse-prov-name" id=":r6n:">
                             "Devin"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
@@ -134,83 +490,83 @@
                     <h3 class="tk-eyebrow">
                       "Chats"
                     <ul class="tk-browse-prov-list">
-                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6p:">
+                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6o:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
                           "GP"
                         <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r6p:">
+                          <div class="tk-browse-prov-name" id=":r6o:">
                             "ChatGPT"
+                          <div class="tk-browse-prov-actions">
+                            <button type="button" class="tk-btn">
+                              "Open"
+                      <li class="tk-browse-prov" role="group" aria-labelledby=":r6p:">
+                        <span class="tk-mark" data-size="md" aria-hidden="true">
+                          "CL"
+                        <div class="tk-browse-prov-body">
+                          <div class="tk-browse-prov-name" id=":r6p:">
+                            "Claude"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6q:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "CL"
+                          "GK"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6q:">
-                            "Claude"
+                            "Grok"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6r:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "GK"
+                          "GX"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6r:">
-                            "Grok"
+                            "Grok on X"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6s:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "GX"
+                          "GM"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6s:">
-                            "Grok on X"
+                            "Gemini"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6t:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "GM"
+                          "PX"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6t:">
-                            "Gemini"
+                            "Perplexity"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6u:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "PX"
+                          "DS"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6u:">
-                            "Perplexity"
+                            "DeepSeek"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r6v:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "DS"
+                          "MI"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r6v:">
-                            "DeepSeek"
+                            "Le Chat"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r70:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "MI"
-                        <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r70:">
-                            "Le Chat"
-                          <div class="tk-browse-prov-actions">
-                            <button type="button" class="tk-btn">
-                              "Open"
-                      <li class="tk-browse-prov" role="group" aria-labelledby=":r71:">
-                        <span class="tk-mark" data-size="md" aria-hidden="true">
                           "CP"
                         <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r71:">
+                          <div class="tk-browse-prov-name" id=":r70:">
                             "Copilot"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
@@ -219,38 +575,38 @@
                     <h3 class="tk-eyebrow">
                       "Bots"
                     <ul class="tk-browse-prov-list">
-                      <li class="tk-browse-prov" role="group" aria-labelledby=":r72:">
+                      <li class="tk-browse-prov" role="group" aria-labelledby=":r71:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
                           "XB"
                         <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r72:">
+                          <div class="tk-browse-prov-name" id=":r71:">
                             "Grok Bot"
+                          <div class="tk-browse-prov-actions">
+                            <button type="button" class="tk-btn">
+                              "Open"
+                      <li class="tk-browse-prov" role="group" aria-labelledby=":r72:">
+                        <span class="tk-mark" data-size="md" aria-hidden="true">
+                          "DT"
+                        <div class="tk-browse-prov-body">
+                          <div class="tk-browse-prov-name" id=":r72:">
+                            "ChatGPT dots"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r73:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "DT"
+                          "MU"
                         <div class="tk-browse-prov-body">
                           <div class="tk-browse-prov-name" id=":r73:">
-                            "ChatGPT dots"
+                            "Muse"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
                               "Open"
                       <li class="tk-browse-prov" role="group" aria-labelledby=":r74:">
                         <span class="tk-mark" data-size="md" aria-hidden="true">
-                          "MU"
-                        <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r74:">
-                            "Muse"
-                          <div class="tk-browse-prov-actions">
-                            <button type="button" class="tk-btn">
-                              "Open"
-                      <li class="tk-browse-prov" role="group" aria-labelledby=":r75:">
-                        <span class="tk-mark" data-size="md" aria-hidden="true">
                           "DU"
                         <div class="tk-browse-prov-body">
-                          <div class="tk-browse-prov-name" id=":r75:">
+                          <div class="tk-browse-prov-name" id=":r74:">
                             "Claude Duet"
                           <div class="tk-browse-prov-actions">
                             <button type="button" class="tk-btn">
@@ -440,487 +796,32 @@
             <button type="button" class="tk-btn" data-page-hidden="true" aria-label="Toggle color theme">
               "Light"
         <div class="tk-columns" data-detail-mode="summary">
-          <main id="tk-main-list" class="tk-list-pane" aria-label="Conversation index">
-            <div class="tk-search-bar" data-filters-open="false">
-              <div class="tk-search-row">
-                <div class="tk-segmented" role="tablist" aria-label="Search or ask">
-                  <button type="button" role="tab" aria-selected="true">
-                    "Search"
-                  <button type="button" role="tab" aria-selected="false">
-                    "Ask"
-                <input type="search" class="tk-input tk-search-input" aria-label="Search conversations, decisions, and messages" placeholder="Search titles, summaries, topics, decisions, messages…" value=""> {value=""}
-              <div class="tk-filter-row">
-                <select class="tk-select" aria-label="View mode"> {value="list"}
-                  <option value="list">
-                    "List index"
-                  <option value="kanban">
-                    "Kanban by status"
-                  <option value="cards">
-                    "Project cards"
-                <select class="tk-select" aria-label="Sort threads"> {value="recent"}
-                  <option value="recent">
-                    "Recent activity"
-                  <option value="oldest">
-                    "Oldest first"
-                  <option value="title">
-                    "Title A–Z"
-                  <option value="messages">
-                    "Most messages"
-                <button type="button" class="tk-btn tk-thr-filters-toggle" aria-expanded="false">
-                  "Filters"
-                <select class="tk-select" aria-label="Filter by provider"> {value="all"}
-                  <option value="all">
-                    "All providers"
-                  <option value="chatgpt">
-                    "ChatGPT"
-                  <option value="claude">
-                    "Claude"
-                <select class="tk-select" aria-label="Filter by kind of work"> {value="all"}
-                  <option value="all">
-                    "All kinds"
-                  <option value="coding">
-                    "Building"
-                  <option value="debugging">
-                    "Debugging"
-                  <option value="writing">
-                    "Writing"
-                  <option value="research">
-                    "Research"
-                  <option value="planning">
-                    "Planning"
-                  <option value="brainstorming">
-                    "Ideas"
-                  <option value="learning">
-                    "Learning"
-                  <option value="data">
-                    "Data & analysis"
-                  <option value="design">
-                    "Design"
-                  <option value="business">
-                    "Business"
-                  <option value="personal">
-                    "Personal"
-                  <option value="other">
-                    "General"
-                <select class="tk-select" aria-label="Filter by workflow state"> {value="all"}
-                  <option value="all">
-                    "All states"
-                  <option value="active">
-                    "Active"
-                  <option value="needs_review">
-                    "Needs review"
-                  <option value="waiting">
-                    "Waiting"
-                  <option value="paused">
-                    "Paused"
-                  <option value="done">
-                    "Done"
-                  <option value="archived">
-                    "Archived"
-                <select class="tk-select" aria-label="Filter by capture coverage"> {value="all"}
-                  <option value="all">
-                    "All coverage"
-                  <option value="full">
-                    "Full export"
-                  <option value="partial">
-                    "Partial DOM"
-                  <option value="title_only">
-                    "Title only"
-              <div class="tk-thr-toolbar">
-                <div class="tk-thr-groupby">
-                  <span class="tk-thr-label" aria-hidden="true">
-                    "Group by"
-                  <div class="tk-seg" role="radiogroup" aria-label="Group by" style="--n: 4; --i: 0;">
-                    <span class="tk-seg-thumb" aria-hidden="true">
-                    <button type="button" role="radio" class="tk-seg-item" aria-checked="true" tabindex="0">
-                      <span>
-                        "None"
-                    <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
-                      <span>
-                        "Project"
-                    <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
-                      <span>
-                        "Repository"
-                    <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
-                      <span>
-                        "Account"
-                <select class="tk-select" aria-label="Filter by run state"> {value="all"}
-                  <option value="all">
-                    "Any run state"
-                  <option value="needs_you">
-                    "Needs you"
-                  <option value="running">
-                    "Running"
-                  <option value="finished">
-                    "Finished"
-            <section class="tk-bulk-bar" aria-label="Select and change several threads" data-active="false">
-              <div class="tk-bulk-head">
-                <label class="tk-inline-check">
-                  <input type="checkbox"> {checked=false}
-                  "Select all in view"
-            <dialog id="tk-bulk-delete-dialog" class="tk-modal-dialog" aria-label="Delete selected threads">
-              <h2 class="tk-section-h2" style="margin-bottom: 8px;">
-                "Delete"
-                "0 threads"
-                "?"
-              <p class="tk-settings-note" style="margin-top: 0px;">
-                "This removes"
-                "all 0 selected threads"
-                ", with their messages, summaries and vectors, from your library. Each deletion leaves a tombstone, so capture and imports will not bring the thread back. This cannot be undone."
-              <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
-                <button type="button" class="tk-btn">
-                  "Cancel"
-                <button type="button" class="tk-btn tk-btn-danger" disabled="">
-                  "Delete"
-                  "0 threads"
-            <ul class="tk-row-list">
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select Daydock / Meridian logo geometry & SVG grid"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="false">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "Daydock / Meridian logo geometry & SVG grid"
-                    <div class="tk-row-gist">
-                      "We need to lock the Daydock / Meridian mark geometry before exporting the SVG icon set"
-                    <div class="tk-row-excerpt">
-                      "Locked the 24x24 optical grid (1.75px stroke) and 14-degree meridian tilt; ready to export the monochrome SVG wordmark and verify 16px rendering."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="design">
-                        "Design"
-                      <span class="tk-chip tk-chip-small">
-                        "daydock-meridian"
-                      <span class="tk-chip tk-chip-small">
-                        "svg"
-                      <span class="tk-chip tk-chip-small">
-                        "geometry"
-                      <span>
-                        "Daydock / Meridian"
-                      <span>
-                        "·"
-                      <span>
-                        "ChatGPT"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "4"
-                        "msgs"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: full (3/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                      <span>
-                        "full"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
-                      <span>
-                        "Active"
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select HypeStake odds engine WebSocket delta compression"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="false">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "HypeStake odds engine WebSocket delta compression"
-                    <div class="tk-row-gist">
-                      "Our HypeStake JSON tick payloads spike bandwidth during live NBA quarters"
-                    <div class="tk-row-excerpt">
-                      "You asked \"We will switch live odds feed to sequence-numbered msgpack diffs with 250ms coalesce window, and benchmark p99 fanout memory under 5,000 concurrent m…\" — no reply captured yet."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="other">
-                        "General"
-                      <span class="tk-chip tk-chip-small">
-                        "hypestake"
-                      <span class="tk-chip tk-chip-small">
-                        "msgpack-diffs"
-                      <span class="tk-chip tk-chip-small">
-                        "odds"
-                      <span>
-                        "HypeStake"
-                        "(locked)"
-                      <span>
-                        "·"
-                      <span>
-                        "ChatGPT"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "2"
-                        "msgs"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: full (3/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                      <span>
-                        "full"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
-                      <span>
-                        "Active"
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select Velotic / FrameConcepts WebGPU frame cache eviction"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="false">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "Velotic / FrameConcepts WebGPU frame cache eviction"
-                    <div class="tk-row-gist">
-                      "Cap GPU texture ring buffer at 384MB and pre-decode +/- 12 frames around playhead for FrameConcepts"
-                    <div class="tk-row-excerpt">
-                      "You asked \"Cap GPU texture ring buffer at 384MB and pre-decode +/- 12 frames around playhead for FrameConcepts.\"; Claude replied: Next we should verify zero-copy VideoFrame import on Windows Chromium 130 using importExternalTexture."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="other">
-                        "General"
-                      <span class="tk-chip tk-chip-small">
-                        "frameconcepts"
-                      <span class="tk-chip tk-chip-small">
-                        "velotic"
-                      <span class="tk-chip tk-chip-small">
-                        "webgpu"
-                      <span>
-                        "Velotic / FrameConcepts"
-                      <span>
-                        "·"
-                      <span>
-                        "Claude"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "2"
-                        "msgs"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: partial (2/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="false">
-                      <span>
-                        "partial"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="waiting" aria-hidden="true">
-                      <span>
-                        "Waiting"
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select Daydock logo wordmark kerning & optical lockup"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="false">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "Daydock logo wordmark kerning & optical lockup"
-                    <div class="tk-row-gist">
-                      "Let us tune the Daydock logo wordmark kerning so the D-a-y pair does not feel loose next to the 24x24 mark"
-                    <div class="tk-row-excerpt">
-                      "You asked \"We will set wordmark tracking to -0.018em paired with Newsreader display headers, and next compare optical spacing between Daydock mark and wordmark…\" — no reply captured yet."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="design">
-                        "Design"
-                      <span class="tk-chip tk-chip-small">
-                        "daydock-logo"
-                      <span class="tk-chip tk-chip-small">
-                        "logo-wordmark"
-                      <span class="tk-chip tk-chip-small">
-                        "wordmark-kerning"
-                      <span>
-                        "Daydock / Meridian"
-                      <span>
-                        "·"
-                      <span>
-                        "Claude"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "2"
-                        "msgs"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: partial (2/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="false">
-                      <span>
-                        "partial"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="needs_review" aria-hidden="true">
-                      <span>
-                        "Needs review"
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select Daydock homepage research & pricing tier benchmarks"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="true">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "Daydock homepage research & pricing tier benchmarks"
-                    <div class="tk-row-gist">
-                      "Keep homepage research focused on calendar-first workflow benchmarks rather than visual logo explorations"
-                    <div class="tk-row-excerpt">
-                      "You asked \"Keep homepage research focused on calendar-first workflow benchmarks rather than visual logo explorations.\"; ChatGPT replied: Agreed. Let us audit above-the-fold copy across 5 scheduling tools and document conversion friction."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="research">
-                        "Research"
-                      <span class="tk-chip tk-chip-small">
-                        "homepage-research"
-                      <span class="tk-chip tk-chip-small">
-                        "benchmarks"
-                      <span class="tk-chip tk-chip-small">
-                        "daydock"
-                      <span>
-                        "General research"
-                      <span>
-                        "·"
-                      <span>
-                        "ChatGPT"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "2"
-                        "msgs"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: full (3/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                      <span>
-                        "full"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
-                      <span>
-                        "Active"
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select Personal Q4 travel & family cabin checklist"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="false">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "Personal Q4 travel & family cabin checklist"
-                    <div class="tk-row-gist">
-                      "Private checklist: Book winter tires appointment before November 4 and pack emergency雪 chains"
-                    <div class="tk-row-excerpt">
-                      "You asked \"Private checklist: Book winter tires appointment before November 4 and pack emergency雪 chains.\" — no reply captured yet."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="personal">
-                        "Personal"
-                      <span class="tk-chip tk-chip-small">
-                        "checklist"
-                      <span class="tk-chip tk-chip-small">
-                        "personal"
-                      <span class="tk-chip tk-chip-small">
-                        "travel"
-                      <span>
-                        "Personal"
-                        "(locked)"
-                      <span>
-                        "·"
-                      <span>
-                        "ChatGPT"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "1"
-                        "msgs"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: full (3/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                      <span>
-                        "full"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="active" aria-hidden="true">
-                      <span>
-                        "Active"
-              <li class="tk-row-item" data-checked="false">
-                <label class="tk-row-check">
-                  <input type="checkbox" aria-label="Select Daydock / Meridian logo geometry & SVG grid (branch_2)"> {checked=false}
-                <button type="button" class="tk-row-btn" aria-selected="false">
-                  <div class="tk-row-main">
-                    <div class="tk-row-title">
-                      "Daydock / Meridian logo geometry & SVG grid (branch_2)"
-                    <div class="tk-row-gist">
-                      "We need to lock the Daydock / Meridian mark geometry before exporting the SVG icon set"
-                    <div class="tk-row-excerpt">
-                      "You asked \"What if we tried a heavy 3px brutalist square frame instead of the meridian tilt?\"; ChatGPT replied: A 3px square frame closes up at 16px sizes and loses the horizon metaphor."
-                    <div class="tk-row-meta">
-                      <span class="tk-kind" data-kind="design">
-                        "Design"
-                      <span class="tk-chip tk-chip-small">
-                        "daydock-meridian"
-                      <span class="tk-chip tk-chip-small">
-                        "geometry"
-                      <span class="tk-chip tk-chip-small">
-                        "svg"
-                      <span>
-                        "Daydock / Meridian"
-                      <span>
-                        "·"
-                      <span>
-                        "ChatGPT"
-                      <span>
-                        "·"
-                      <span class="tk-tabular">
-                        "3"
-                        "msgs"
-                      <span>
-                        "·"
-                      <span>
-                        "branch:"
-                        "branch_2"
-                  <div class="tk-row-right">
-                    <span class="tk-tabular" title="<iso-time>">
-                      "<relative-time>"
-                    <span class="tk-coverage-tick" title="Capture coverage: full (3/3)">
-                      <span class="tk-coverage-bars" aria-hidden="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                        <span class="tk-coverage-bar" data-filled="true">
-                      <span>
-                        "full"
-                    <span class="tk-status-pill">
-                      <span class="tk-status-dot" data-state="paused" aria-hidden="true">
-                      <span>
-                        "Paused"
           <section class="tk-detail-pane" aria-label="Conversation context and evidence" data-mobile-hidden="true">
             <div class="tk-detail-header">
               <div class="tk-mobile-back-wrap">
                 <button type="button" class="tk-btn">
                   "← Back to list"
-              <h2 class="tk-detail-title">
-                "Daydock homepage research & pricing tier benchmarks"
-              <div class="tk-thr-modebar">
-                <div class="tk-seg" role="radiogroup" aria-label="Thread view" style="--n: 3; --i: 0;">
-                  <span class="tk-seg-thumb" aria-hidden="true">
-                  <button type="button" role="radio" class="tk-seg-item" aria-checked="true" tabindex="0">
-                    <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                      <path d="M6.5 4h11A1.5 1.5 0 0 1 19 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-13A1.5 1.5 0 0 1 6.5 4ZM8.5 9h7M8.5 12.5h7M8.5 16h4">
-                    <span>
-                      "Summary"
-                  <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
-                    <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                      <path d="M4.5 5h15A1.5 1.5 0 0 1 21 6.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 15.5v-9A1.5 1.5 0 0 1 4.5 5ZM8 20h8M10 9.5l4 2.5-4 2.5Z">
-                    <span>
-                      "Live"
-                  <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
-                    <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                      <path d="M4.5 5h15A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11A1.5 1.5 0 0 1 4.5 5ZM12 5v14">
-                    <span>
-                      "Split"
+              <div class="tk-detail-title-row">
+                <h2 class="tk-detail-title" title="Daydock homepage research & pricing tier benchmarks">
+                  "Daydock homepage research & pricing tier benchmarks"
+                <div class="tk-thr-modebar">
+                  <div class="tk-seg" role="radiogroup" aria-label="Thread view" style="--n: 3; --i: 0;">
+                    <span class="tk-seg-thumb" aria-hidden="true">
+                    <button type="button" role="radio" class="tk-seg-item" aria-checked="true" tabindex="0">
+                      <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M6.5 4h11A1.5 1.5 0 0 1 19 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-13A1.5 1.5 0 0 1 6.5 4ZM8.5 9h7M8.5 12.5h7M8.5 16h4">
+                      <span>
+                        "Summary"
+                    <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
+                      <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M4.5 5h15A1.5 1.5 0 0 1 21 6.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 15.5v-9A1.5 1.5 0 0 1 4.5 5ZM8 20h8M10 9.5l4 2.5-4 2.5Z">
+                      <span>
+                        "Live"
+                    <button type="button" role="radio" class="tk-seg-item" aria-checked="false" tabindex="-1">
+                      <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M4.5 5h15A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11A1.5 1.5 0 0 1 4.5 5ZM12 5v14">
+                      <span>
+                        "Split"
               <div class="tk-detail-meta-strip">
                 <span class="tk-status-pill">
                   <span class="tk-status-dot" data-state="active" aria-hidden="true">
@@ -950,8 +851,11 @@
                 <span title="acct_chatgpt_primary / ws_personal">
                   "updated"
                   "<relative-time>"
-              <div class="tk-filter-row" style="margin-top: 6px;">
-                <select class="tk-select" aria-label="Assign project or area"> {value="General research"}
+              <section class="tk-paperclip-task-links" aria-label="Linked Paperclip tasks">
+                <button type="button" class="tk-btn">
+                  "Link to a task"
+              <div class="tk-detail-controls" role="group" aria-label="Thread controls" tabindex="0">
+                <select class="tk-select tk-detail-category" aria-label="Assign project or area" title="General research"> {value="General research"}
                   <option value="Daydock / Meridian">
                     "Daydock / Meridian"
                   <option value="General research">
@@ -964,10 +868,13 @@
                     "Velotic / FrameConcepts"
                   <option value="Unfiled / Uncertain">
                     "Unfiled / Uncertain"
-                <label class="tk-inline-check">
+                <label class="tk-inline-check tk-detail-lock" title="Lock category">
                   <input type="checkbox"> {checked=false}
-                  "Lock category"
-                <select class="tk-select" aria-label="Change workflow state"> {value="active"}
+                  <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M7.5 11V8.5a4.5 4.5 0 0 1 9 0V11M6.5 11h11A1.5 1.5 0 0 1 19 12.5v6A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-6A1.5 1.5 0 0 1 6.5 11Z">
+                  <span class="tk-visually-hidden">
+                    "Lock category"
+                <select class="tk-select tk-detail-state" aria-label="Change workflow state"> {value="active"}
                   <option value="active">
                     "Active"
                   <option value="needs_review">
@@ -980,20 +887,31 @@
                     "Done"
                   <option value="archived">
                     "Archived"
-                <button type="button" class="tk-btn">
-                  "Open original ↗"
-                <button type="button" class="tk-btn">
-                  "Copy handoff"
-                <button type="button" class="tk-btn tk-thr-action" aria-pressed="false">
+                <button type="button" class="tk-btn tk-thr-action" aria-label="Open original" title="Open original">
+                  <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M13 5h6v6M19 5l-8 8M10 6H6.5A1.5 1.5 0 0 0 5 7.5v10A1.5 1.5 0 0 0 6.5 19h10a1.5 1.5 0 0 0 1.5-1.5V14">
+                  <span class="tk-thr-action-label">
+                    "Original"
+                <button type="button" class="tk-btn tk-thr-action" aria-label="Copy handoff" title="Copy handoff">
+                  <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M8 8h11v12H8ZM5 16H4V4h11v1">
+                  <span class="tk-thr-action-label">
+                    "Handoff"
+                <button type="button" class="tk-btn tk-thr-action" aria-label="Pin to dashboard" title="Pin to dashboard" aria-pressed="false">
                   <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                     <path d="M9 4h6l-1 6 3 3H7l3-3ZM12 13v7">
-                  "Pin to dashboard"
-                <button type="button" class="tk-btn tk-thr-action">
+                  <span class="tk-thr-action-label">
+                    "Pin"
+                <button type="button" class="tk-btn tk-thr-action" aria-label="Open in Browse" title="Open in Browse">
                   <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                     <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5ZM3 9h18M7 6.5h.01">
-                  "Open in Browse"
-                <button type="button" class="tk-btn tk-btn-danger">
-                  "Delete"
+                  <span class="tk-thr-action-label">
+                    "Browse"
+                <button type="button" class="tk-btn tk-btn-danger tk-thr-action" aria-label="Delete" title="Delete">
+                  <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7">
+                  <span class="tk-thr-action-label">
+                    "Delete"
             <div class="tk-section tk-overview" data-evidence-location="overview">
               <div class="tk-overview-head">
                 <h3 class="tk-section-h2">
@@ -1165,6 +1083,11 @@
           <header class="tk-dash-bar tk-glass" aria-label="Dashboard tools">
             <span class="tk-dash-label">
               "Pinned"
+            <button type="button" class="tk-icon-btn tk-org-btn" title="Group, sort and filter" aria-haspopup="menu" aria-expanded="false">
+              <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M4 6.5h16M7 12h10M10 17.5h4">
+              <span class="tk-visually-hidden">
+                "Organize"
             <div class="tk-dash-pins" role="group" aria-label="Pinned sessions">
               <button type="button" class="tk-dash-pin" aria-pressed="false" aria-label="Daydock / Meridian logo geometry & SVG grid, Removed account. Show in the focused pane" title="Daydock / Meridian logo geometry & SVG grid">
                 <span class="tk-mark" data-size="sm" aria-hidden="true">
@@ -1231,6 +1154,7 @@
                         "GP"
                       <span class="tk-ellipsis">
                         "Daydock / Meridian logo geometry & SVG grid"
+      <section class="tk-view tk-view-paperclip" aria-label="Paperclip" hidden="">
   <div class="tk-frame-stage" data-testid="frame-stage">
   <dialog id="tk-organize-dialog" class="tk-modal-dialog tk-modal-wide" aria-label="Organize conversations">
     <h2 class="tk-section-h2" style="margin-bottom: 8px;">
@@ -1461,6 +1385,58 @@
         <section class="tk-settings-section">
           <h3 class="tk-settings-h3">
             "Workspace"
+          <div class="tk-field-row">
+            <label class="tk-field">
+              "Start page"
+              <select class="tk-select" aria-describedby="tk-start-page-hint"> {value="https://claude.ai/code"}
+                <option value="">
+                  "Where I left off"
+                <option value="https://claude.ai/code">
+                  "Claude Code"
+                <option value="https://chatgpt.com/codex">
+                  "Codex"
+                <option value="https://cursor.com/agents">
+                  "Cursor agents"
+                <option value="https://github.com/copilot">
+                  "GitHub Copilot"
+                <option value="https://jules.google.com/">
+                  "Jules"
+                <option value="https://app.devin.ai/">
+                  "Devin"
+                <option value="https://chatgpt.com/">
+                  "ChatGPT"
+                <option value="https://claude.ai/new">
+                  "Claude"
+                <option value="https://grok.com/">
+                  "Grok"
+                <option value="https://x.com/i/grok">
+                  "Grok on X"
+                <option value="https://gemini.google.com/app">
+                  "Gemini"
+                <option value="https://www.perplexity.ai/">
+                  "Perplexity"
+                <option value="https://chat.deepseek.com/">
+                  "DeepSeek"
+                <option value="https://chat.mistral.ai/chat">
+                  "Le Chat"
+                <option value="https://copilot.microsoft.com/">
+                  "Copilot"
+                <option value="https://x.com/i/chat">
+                  "Grok Bot"
+                <option value="https://chatgpt.com/dots">
+                  "ChatGPT dots"
+                <option value="https://muse.ai/">
+                  "Muse"
+                <option value="https://claude.ai/duet">
+                  "Claude Duet"
+          <p id="tk-start-page-hint" class="tk-settings-note">
+            "The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat and code."
+          <label class="tk-toggle">
+            <input type="checkbox" checked=""> {checked=true}
+            <span>
+              "Show each site’s full navigation"
+              <span class="tk-toggle-hint">
+                "Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
           <label class="tk-toggle">
             <input type="checkbox"> {checked=false}
             <span>
@@ -1504,22 +1480,22 @@
           "Cancel"
         <button type="submit" class="tk-btn tk-btn-primary" disabled="">
           "Send 0"
-  <dialog id="tk-add-account-dialog" class="tk-modal-dialog tk-acct-dialog" aria-labelledby=":r77:-title">
+  <dialog id="tk-add-account-dialog" class="tk-modal-dialog tk-acct-dialog" aria-labelledby=":r76:-title">
     <form novalidate="">
       <header class="tk-acct-dialog-head">
         <div>
-          <h2 id=":r77:-title" class="tk-acct-dialog-title">
+          <h2 id=":r76:-title" class="tk-acct-dialog-title">
             "Add account"
           <p class="tk-acct-dialog-lead">
-            "Keep another account of the same sign-in apart from the one you use now."
+            "Use another account of the same sign-in beside the one you use now. Both stay signed in."
         <button type="button" class="tk-icon-btn" aria-label="Close">
           <svg class="tk-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5">
       <div class="tk-acct-dialog-body">
         <div class="tk-acct-field">
-          <label class="tk-acct-flabel" for=":r77:-realm">
+          <label class="tk-acct-flabel" for=":r76:-realm">
             "Sign-in"
-          <select id=":r77:-realm" class="tk-select"> {value="anthropic"}
+          <select id=":r76:-realm" class="tk-select"> {value="anthropic"}
             <option value="anthropic">
               "Claude"
             <option value="openai">
@@ -1533,72 +1509,53 @@
             <option value="meta">
               "Meta AI"
         <div class="tk-acct-field">
-          <label class="tk-acct-flabel" for=":r77:-name">
+          <label class="tk-acct-flabel" for=":r76:-name">
             "Name"
-          <input id=":r77:-name" class="tk-input" type="text" maxlength="40" placeholder="Work" autocomplete="off" required="" aria-required="true" aria-describedby=":r77:-name-help" value=""> {value=""}
-          <p id=":r77:-name-help" class="tk-acct-help">
+          <input id=":r76:-name" class="tk-input" type="text" maxlength="40" placeholder="Work" autocomplete="off" required="" aria-required="true" aria-describedby=":r76:-name-help" value=""> {value=""}
+          <p id=":r76:-name-help" class="tk-acct-help">
             "Shown next to the colour on tabs, panes and threads. Up to"
             "40"
             "characters."
         <div class="tk-acct-field">
-          <span class="tk-acct-flabel" id=":r77:-color">
+          <span class="tk-acct-flabel" id=":r76:-color">
             "Colour"
-          <div role="radiogroup" aria-labelledby=":r77:-color" class="tk-acct-swatches">
+          <div role="radiogroup" aria-labelledby=":r76:-color" class="tk-acct-swatches">
             <label class="tk-acct-opt tk-acct-opt-swatch">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-color" value="teal" checked=""> {checked=true}
+              <input type="radio" class="tk-visually-hidden" name=":r76:-color" value="teal" checked=""> {checked=true}
               <span class="tk-acct-swatch" data-color="teal" aria-hidden="true">
               <span class="tk-acct-opt-title">
                 "Teal"
             <label class="tk-acct-opt tk-acct-opt-swatch">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-color" value="peach"> {checked=false}
+              <input type="radio" class="tk-visually-hidden" name=":r76:-color" value="peach"> {checked=false}
               <span class="tk-acct-swatch" data-color="peach" aria-hidden="true">
               <span class="tk-acct-opt-title">
                 "Peach"
             <label class="tk-acct-opt tk-acct-opt-swatch">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-color" value="violet"> {checked=false}
+              <input type="radio" class="tk-visually-hidden" name=":r76:-color" value="violet"> {checked=false}
               <span class="tk-acct-swatch" data-color="violet" aria-hidden="true">
               <span class="tk-acct-opt-title">
                 "Violet"
             <label class="tk-acct-opt tk-acct-opt-swatch">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-color" value="sage"> {checked=false}
+              <input type="radio" class="tk-visually-hidden" name=":r76:-color" value="sage"> {checked=false}
               <span class="tk-acct-swatch" data-color="sage" aria-hidden="true">
               <span class="tk-acct-opt-title">
                 "Sage"
             <label class="tk-acct-opt tk-acct-opt-swatch">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-color" value="blue"> {checked=false}
+              <input type="radio" class="tk-visually-hidden" name=":r76:-color" value="blue"> {checked=false}
               <span class="tk-acct-swatch" data-color="blue" aria-hidden="true">
               <span class="tk-acct-opt-title">
                 "Blue"
             <label class="tk-acct-opt tk-acct-opt-swatch">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-color" value="gold"> {checked=false}
+              <input type="radio" class="tk-visually-hidden" name=":r76:-color" value="gold"> {checked=false}
               <span class="tk-acct-swatch" data-color="gold" aria-hidden="true">
               <span class="tk-acct-opt-title">
                 "Gold"
-        <div class="tk-acct-field">
-          <span class="tk-acct-flabel" id=":r77:-mode">
-            "Where it runs"
-          <div role="radiogroup" aria-labelledby=":r77:-mode" class="tk-acct-modes">
-            <label class="tk-acct-opt tk-acct-opt-card">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-mode" value="embedded" checked=""> {checked=true}
-              <span class="tk-acct-radio" aria-hidden="true">
-              <span>
-                <span class="tk-acct-opt-title">
-                  "In the workspace"
-                <span class="tk-acct-opt-sub">
-                  "Opens in Browse and on the dashboard. One account per sign-in is signed in at a time."
-            <label class="tk-acct-opt tk-acct-opt-card">
-              <input type="radio" class="tk-visually-hidden" name=":r77:-mode" value="isolated"> {checked=false}
-              <span class="tk-acct-radio" aria-hidden="true">
-              <span>
-                <span class="tk-acct-opt-title">
-                  "In its own Chrome window (Mac helper)"
-                <span class="tk-acct-opt-sub">
-                  "Uses its own Chrome profile, so it stays signed in at the same moment as the others. Needs the Mac helper."
-        <p id=":r77:-note" class="tk-acct-explain">
+        <p id=":r76:-note" class="tk-acct-explain">
+          "Nothing is signed out."
           "Claude"
-          "will be signed out here and in your other Chrome tabs so you can sign in as this account."
+          "opens a tab for the new account, where you sign in to it once: inside Threadkeeper, or in a browser tab when your sign-in uses Google, Apple or a passkey. Its sign-in is then kept on this device, encrypted, and never exported or sent anywhere."
       <footer class="tk-acct-dialog-foot">
         <button type="button" class="tk-btn">
           "Cancel"
-        <button type="submit" class="tk-btn tk-btn-primary tk-acct-submit" aria-describedby=":r77:-note">
+        <button type="submit" class="tk-btn tk-btn-primary tk-acct-submit" aria-describedby=":r76:-note">
           "Add account"

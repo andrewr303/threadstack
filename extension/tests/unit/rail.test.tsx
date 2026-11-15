@@ -13,7 +13,7 @@ import {
   type SessionTab,
   type WorkspaceState,
 } from '../../src/core/workspace/types.js';
-import type { ConversationRecord } from '../../src/core/schema.js';
+import { DEFAULT_SETTINGS, type ConversationRecord, type SettingsRecord } from '../../src/core/schema.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -86,6 +86,8 @@ interface MountOptions {
   accountOf?: (conv: Pick<ConversationRecord, 'provider' | 'accountId'>) => ThreadAccount;
   rail?: Partial<RailProps>;
   children?: React.ReactNode;
+  /** Settings the lens reads its saved group and sort from. */
+  settings?: Partial<SettingsRecord>;
 }
 
 let container: HTMLDivElement;
@@ -93,6 +95,8 @@ let root: Root;
 let dispatch: ReturnType<typeof vi.fn>;
 let openSession: ReturnType<typeof vi.fn>;
 let setView: ReturnType<typeof vi.fn>;
+let showInThreads: ReturnType<typeof vi.fn>;
+let patchSettings: ReturnType<typeof vi.fn>;
 let requestAddAccount: ReturnType<typeof vi.fn>;
 let onViewChange: ReturnType<typeof vi.fn>;
 let onToggleCollapsed: ReturnType<typeof vi.fn>;
@@ -127,8 +131,9 @@ function mount(options: MountOptions = {}) {
   const value = {
     surface: 'page',
     workspace,
-    settings: null,
-    patchSettings: vi.fn(),
+    settings: options.settings ? { ...DEFAULT_SETTINGS, ...options.settings } : null,
+    patchSettings,
+    showInThreads,
     view,
     setView,
     detailMode: 'summary',
@@ -171,6 +176,8 @@ beforeEach(() => {
   dispatch = vi.fn();
   openSession = vi.fn();
   setView = vi.fn();
+  showInThreads = vi.fn();
+  patchSettings = vi.fn(async () => undefined);
   requestAddAccount = vi.fn();
   onViewChange = vi.fn();
   onToggleCollapsed = vi.fn();
@@ -225,7 +232,9 @@ describe('Rail: sessions', () => {
     const showAll = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Show all')!;
     expect(showAll.getAttribute('aria-label')).toBe('Show all 8 coding agents in Threads');
     click(showAll);
-    expect(setView).toHaveBeenCalledWith('threads');
+    // Threads, narrowed to the group's type (the app switches the view itself).
+    expect(showInThreads).toHaveBeenCalledWith({ by: 'kind', key: 'coding' });
+    expect(setView).not.toHaveBeenCalled();
   });
 
   it('does not offer "Show all" when a group fits', () => {
@@ -240,8 +249,10 @@ describe('Rail: sessions', () => {
     expect(coding.getAttribute('aria-expanded')).toBe('true');
     expect(chats.getAttribute('aria-expanded')).toBe('false');
     expect(document.getElementById(chats.getAttribute('aria-controls')!)!.hidden).toBe(true);
+    // Groups are kept by id (`kind:coding`); an entry stored under the old bare spelling is still
+    // the same group, and toggling it removes that entry instead of shadowing it.
     click(coding);
-    expect(dispatch).toHaveBeenCalledWith({ type: 'toggle_group', group: 'coding' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'toggle_group', group: 'kind:coding' });
     click(chats);
     expect(dispatch).toHaveBeenLastCalledWith({ type: 'toggle_group', group: 'chats' });
   });
@@ -322,10 +333,12 @@ describe('Rail: views, tools and the collapsed strip', () => {
     const group = container.querySelector('[role="radiogroup"]')!;
     expect(group.getAttribute('aria-label')).toBe('View');
     const radios = [...group.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
-    expect(radios.map((r) => r.textContent)).toEqual(['Browse', 'Threads', 'Dashboard']);
+    expect(radios.map((r) => r.textContent)).toEqual(['Browse', 'Threads', 'Dashboard', 'Paperclip']);
     expect(radios[0].getAttribute('aria-checked')).toBe('true');
     click(radios[2]);
     expect(onViewChange).toHaveBeenCalledWith('dashboard');
+    click(radios[3]);
+    expect(onViewChange).toHaveBeenCalledWith('paperclip');
     act(() => {
       radios[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     });
@@ -354,13 +367,16 @@ describe('Rail: views, tools and the collapsed strip', () => {
   it('lists a sign-in only when it has more than one account to choose between', () => {
     // One account: nothing to choose, so no row and no heading; "Add account" is still there.
     mount();
-    expect(container.textContent).not.toContain('Signed in');
+    const heading = () => [...container.querySelectorAll('h2')].find((h) => h.textContent === 'Accounts') ?? null;
+    expect(heading()).toBeNull();
     expect(container.querySelectorAll('.tk-rail-realms > li')).toHaveLength(0);
     expect(byName('Add account')).not.toBeNull();
     act(() => root.unmount());
     root = createRoot(container);
     mount({ realms: [{ realm: claudeRealm, accounts: [WORK, PERSONAL], activeAccountId: WORK.id }] });
-    expect(container.textContent).toContain('Signed in');
+    // Every account stays signed in, so the list is "Accounts", not "Signed in".
+    expect(heading()).not.toBeNull();
+    expect(container.textContent).not.toContain('Signed in');
     expect(container.querySelectorAll('.tk-rail-realms > li')).toHaveLength(1);
   });
 
@@ -419,5 +435,266 @@ describe('Rail: views, tools and the collapsed strip', () => {
     });
     expect(rail.getAttribute('data-drawer-open')).toBe('false');
     expect(onCloseDrawer).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// The lens: Organize menu, grouping, filters, hand-off to Threads
+// ---------------------------------------------------------------------------------------------
+
+describe('Rail: organizing sessions', () => {
+  const library = () => [
+    conv('code-1', 'Refactor the importer', 5),
+    conv('code-2', 'Fix the flaky test', 15, { provider: 'codex', accountId: PERSONAL.id }),
+    conv('code-3', 'Trim the bundle', 25),
+    conv('chat-1', 'Release notes', 20, { provider: 'claude' }),
+    conv('chat-2', 'Pricing page copy', 40, { provider: 'chatgpt' }),
+    conv('bot-1', 'Nightly digest', 8, { provider: 'grok_bot' }),
+  ];
+  const both: RealmAccounts[] = [{ realm: claudeRealm, accounts: [WORK, PERSONAL], activeAccountId: WORK.id }];
+  const organize = () =>
+    [...container.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Organize')) ?? null;
+  const menu = () => document.querySelector<HTMLElement>('[role="menu"][aria-label="Organize sessions"]');
+  const menuItem = (name: string) =>
+    [...(menu()?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])].find((el) => el.textContent?.startsWith(name)) ?? null;
+  const section = (label: string) => {
+    const head = [...(menu()?.querySelectorAll<HTMLElement>('.tk-org-head') ?? [])].find((h) => h.textContent === label)!;
+    return [...menu()!.querySelectorAll<HTMLElement>(`[role="group"][aria-labelledby="${head.id}"] > [role="menuitemradio"]`)];
+  };
+  // Group headers only: the Organize button also has aria-expanded and (open) aria-controls.
+  const heads = () => [...container.querySelectorAll<HTMLButtonElement>('.tk-rail-group-head')];
+  const headTexts = () => heads().map((h) => h.textContent);
+  const headNames = () => heads().map((h) => h.querySelector('span')?.textContent);
+
+  it('puts the Organize button beside the Sessions heading, with no count until a filter is on', () => {
+    mount({ conversations: library() });
+    const button = organize()!;
+    expect(button.closest('.tk-rail-heading')?.querySelector('h2')?.textContent).toBe('Sessions');
+    expect(button.textContent).toBe('Organize');
+    expect(button.querySelector('.tk-org-badge')).toBeNull();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    // Closed, it points at nothing; it must not be mistaken for a group header.
+    expect(button.hasAttribute('aria-controls')).toBe(false);
+    expect(groupHeads().includes(button)).toBe(false);
+    // Nothing to organize: no button.
+    mount({ conversations: [] });
+    expect(organize()).toBeNull();
+  });
+
+  it('opens a menu on the page with Group by, Sort by and Show, and shows what is chosen with a check', () => {
+    mount({ conversations: library() });
+    click(organize()!);
+    const popup = menu()!;
+    expect(popup.parentElement).toBe(document.body);
+    expect(organize()!.getAttribute('aria-expanded')).toBe('true');
+    expect(organize()!.getAttribute('aria-controls')).toBe(popup.id);
+    const sections = [...popup.querySelectorAll('[role="group"][aria-labelledby]')].map(
+      (g) => document.getElementById(g.getAttribute('aria-labelledby')!)?.textContent
+    );
+    expect(sections).toEqual(['Group by', 'Sort by', 'Show']);
+    // Account is left out: one account only. Type stays: three kinds are in play.
+    expect(section('Group by').map((r) => r.textContent)).toEqual(['Type', 'Provider', 'Last active', 'Repository', 'None']);
+    expect(section('Group by').map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false', 'false', 'false']);
+    expect(section('Sort by').map((r) => r.textContent)).toEqual([
+      'Recent activity',
+      'Oldest first',
+      'Recently created',
+      'Title A–Z',
+      'Most messages',
+    ]);
+    expect(section('Sort by')[0].getAttribute('aria-checked')).toBe('true');
+    // The check is a drawn mark, not only a colour.
+    expect(section('Group by')[0].querySelector('svg')).not.toBeNull();
+    expect(section('Group by')[1].querySelector('svg')).toBeNull();
+    // Type and Provider with their counts in words; no Account with a single account.
+    expect(menuItem('Coding sessions')!.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(menuItem('Coding sessions')!.textContent).toContain(', 3 sessions');
+    expect(menuItem('Chats')!.textContent).toContain(', 2 sessions');
+    expect(menuItem('Claude Code')!.textContent).toContain(', 2 sessions');
+    expect(menuItem('Claude · Work')).toBeNull();
+    expect(menuItem('Reset')).toBeNull();
+    // Focus moved into the menu.
+    expect(document.activeElement).toBe(section('Group by')[0]);
+  });
+
+  it('closes on Escape and gives focus back to the button; arrow keys move between items', () => {
+    mount({ conversations: library() });
+    const button = organize()!;
+    click(button);
+    const first = document.activeElement as HTMLElement;
+    act(() => {
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    expect(document.activeElement).not.toBe(first);
+    expect(document.activeElement?.getAttribute('role')).toBe('menuitemradio');
+    act(() => {
+      (document.activeElement as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    });
+    expect(document.activeElement?.getAttribute('role')).toBe('menuitemcheckbox');
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('regroups by the chosen dimension and remembers it in the settings', () => {
+    mount({ conversations: library() });
+    click(organize()!);
+    click(menuItem('Provider')!);
+    expect(patchSettings).toHaveBeenCalledWith({ railLens: { groupBy: 'provider', sortBy: 'recent' } });
+    mount({ conversations: library(), settings: { railLens: { groupBy: 'provider', sortBy: 'recent' } } });
+    // Biggest group first (Claude Code has two), then by name; a provider group shows the mark.
+    expect(headTexts()).toEqual(['CCClaude Code2 sessions', 'GPChatGPT1 session', 'CLClaude1 session', 'CXCodex1 session', 'XBGrok Bot1 session']);
+    expect(groupHead('Claude Code')!.querySelector('.tk-mark')).not.toBeNull();
+    // The rows themselves are unchanged.
+    expect(rowTitled('Refactor the importer')!.querySelector('.tk-rail-row-title')?.textContent).toBe('Refactor the importer');
+  });
+
+  it('sorts inside each group by the chosen order and remembers it', () => {
+    mount({ conversations: library() });
+    click(organize()!);
+    click(menuItem('Title A–Z')!);
+    expect(patchSettings).toHaveBeenCalledWith({ railLens: { groupBy: 'kind', sortBy: 'title' } });
+    mount({ conversations: library(), settings: { railLens: { groupBy: 'kind', sortBy: 'title' } } });
+    expect(rowsIn(groupHead('Coding agents')!).map((b) => b.title)).toEqual(['Fix the flaky test', 'Refactor the importer', 'Trim the bundle']);
+  });
+
+  it('falls back to the default for a stored grouping the rail does not offer', () => {
+    mount({ conversations: library(), settings: { railLens: { groupBy: 'status', sortBy: 'sideways' } as never } });
+    expect(headNames()).toEqual(['Coding agents', 'Chats', 'Bots']);
+  });
+
+  it('groups by account as "<Sign-in> · <Account>" in sign-in order, once there are two accounts', () => {
+    mount({ conversations: library(), realms: both, settings: { railLens: { groupBy: 'account', sortBy: 'recent' } } });
+    expect(headTexts()).toEqual(['Claude · Work5 sessions', 'Claude · Personal1 session']);
+    expect(groupHead('Claude · Personal')!.querySelector('.tk-acct')!.getAttribute('data-active')).toBe('false');
+    click(organize()!);
+    expect(menuItem('Account')!.getAttribute('role')).toBe('menuitemradio');
+    expect(menuItem('Claude · Work')!.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(menuItem('Claude · Personal')!.textContent).toContain(', 1 session');
+  });
+
+  it('groups by when it was last active, newest first', () => {
+    const old = new Date(2020, 0, 2, 9).toISOString();
+    const now = new Date().toISOString();
+    const dated = [
+      conv('a', 'Older work', 0, { updatedAt: old, lastCapturedAt: old }),
+      conv('b', 'Fresh work', 0, { updatedAt: now, lastCapturedAt: now }),
+    ];
+    mount({ conversations: dated, settings: { railLens: { groupBy: 'date', sortBy: 'recent' } } });
+    expect(headNames()).toEqual(['Today', 'Older']);
+  });
+
+  it('shows one plain list when not grouped, twelve rows long, with no group headers', () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => conv(`s-${i}`, `Session ${i}`, i));
+    mount({ conversations: twenty, settings: { railLens: { groupBy: 'none', sortBy: 'recent' } } });
+    expect(heads()).toHaveLength(0);
+    expect(container.querySelectorAll('.tk-rail-list > li')).toHaveLength(12);
+    const showAll = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Show all')!;
+    expect(showAll.getAttribute('aria-label')).toBe('Show all 20 sessions in Threads');
+    click(showAll);
+    expect(showInThreads).toHaveBeenCalledWith({ by: 'none', key: null });
+  });
+
+  it('hands a provider, an account or a repository group to Threads', () => {
+    const many = Array.from(
+      { length: 8 },
+      (_, i) => conv(`c-${i}`, `Code ${i}`, i, { repository: 'acme/app' } as Partial<ConversationRecord>)
+    );
+    const more = () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Show all')!;
+    mount({ conversations: many, settings: { railLens: { groupBy: 'provider', sortBy: 'recent' } } });
+    expect(more().getAttribute('aria-label')).toBe('Show all 8 sessions of Claude Code in Threads');
+    click(more());
+    expect(showInThreads).toHaveBeenLastCalledWith({ by: 'provider', key: 'claude_code' });
+    mount({ conversations: many, realms: both, settings: { railLens: { groupBy: 'account', sortBy: 'recent' } } });
+    click(more());
+    expect(showInThreads).toHaveBeenLastCalledWith({ by: 'account', key: WORK.id });
+    mount({ conversations: many, settings: { railLens: { groupBy: 'repository', sortBy: 'recent' } } });
+    expect(groupHead('acme/app')!.querySelector('.tk-rail-mono')?.textContent).toBe('acme/app');
+    click(more());
+    expect(showInThreads).toHaveBeenLastCalledWith({ by: 'repository', key: 'acme/app' });
+  });
+
+  it('keeps the names the rail has always used for its type groups, and the filter names in the menu', () => {
+    mount({ conversations: library() });
+    expect(headNames()).toEqual(['Coding agents', 'Chats', 'Bots']);
+    click(organize()!);
+    expect(menuItem('Coding sessions')).not.toBeNull();
+  });
+
+  it('narrows by a filter, says so in one line, and clears it from the line', () => {
+    mount({ conversations: library() });
+    click(organize()!);
+    click(menuItem('Claude Code')!);
+    expect(menuItem('Claude Code')!.getAttribute('aria-checked')).toBe('true');
+    expect(organize()!.querySelector('.tk-org-badge')?.textContent).toBe('1');
+    expect(organize()!.textContent).toBe('1Organize, 1 filter on');
+    const line = container.querySelector('.tk-rail-filters')!;
+    expect(line.textContent).toBe('Showing only Claude CodeClear');
+    expect(headTexts()).toEqual(['Coding agents2 sessions']);
+    // Reset appears now that something differs.
+    expect(menuItem('Reset')).not.toBeNull();
+    click(byName('Clear session filters')!);
+    expect(container.querySelector('.tk-rail-filters')).toBeNull();
+    expect(headTexts()).toEqual(['Coding agents3 sessions', 'Chats2 sessions', 'Bots1 session']);
+    expect(organize()!.querySelector('.tk-org-badge')).toBeNull();
+  });
+
+  it('ORs values of one dimension, ANDs dimensions, and says when nothing is left', () => {
+    mount({ conversations: library() });
+    click(organize()!);
+    click(menuItem('Chats')!);
+    click(menuItem('Bots')!);
+    expect(container.querySelector('.tk-rail-filters')!.textContent).toBe('Showing only Chats, BotsClear');
+    expect(headTexts()).toEqual(['Chats2 sessions', 'Bots1 session']);
+    click(menuItem('Codex')!);
+    expect(container.querySelector('.tk-rail-filters')!.textContent).toBe('Showing only Chats, Bots, CodexClear');
+    expect(container.querySelector('.tk-rail-empty')?.textContent).toBe('No sessions match these filters.');
+    expect(headTexts()).toEqual([]);
+    expect(byName('Clear session filters')).not.toBeNull();
+  });
+
+  it('resets the grouping, the order and the filters together', () => {
+    mount({ conversations: library(), settings: { railLens: { groupBy: 'provider', sortBy: 'title' } } });
+    click(organize()!);
+    click(menuItem('Chats')!);
+    click(menuItem('Reset')!);
+    expect(patchSettings).toHaveBeenLastCalledWith({ railLens: { groupBy: 'kind', sortBy: 'recent' } });
+    expect(container.querySelector('.tk-rail-filters')).toBeNull();
+  });
+
+  it('keeps the filters when the rail is shown again, and never saves them', () => {
+    mount({ conversations: library() });
+    click(organize()!);
+    click(menuItem('Bots')!);
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(headTexts()).toEqual(['Bots1 session']);
+    // Another view shows (the rail has no sessions for a moment), then the rail comes back.
+    mount({ conversations: library(), rail: { collapsed: true } });
+    expect(container.querySelector('.tk-rail-sessions')).toBeNull();
+    mount({ conversations: library() });
+    expect(headTexts()).toEqual(['Bots1 session']);
+    expect(patchSettings).not.toHaveBeenCalled();
+  });
+
+  it('treats a group collapsed under its old name as the same group', () => {
+    mount({ conversations: library(), state: { collapsedGroups: ['coding', 'kind:bots'] } });
+    expect(groupHead('Coding agents')!.getAttribute('aria-expanded')).toBe('false');
+    expect(groupHead('Bots')!.getAttribute('aria-expanded')).toBe('false');
+    expect(groupHead('Chats')!.getAttribute('aria-expanded')).toBe('true');
+    // Opening a group stored under the old name removes that entry.
+    click(groupHead('Coding agents')!);
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'toggle_group', group: 'coding' });
+    click(groupHead('Bots')!);
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'toggle_group', group: 'kind:bots' });
+  });
+
+  it('stores a collapsed provider group under its own id', () => {
+    mount({ conversations: library(), settings: { railLens: { groupBy: 'provider', sortBy: 'recent' } } });
+    click(groupHead('Codex')!);
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'toggle_group', group: 'provider:codex' });
   });
 });

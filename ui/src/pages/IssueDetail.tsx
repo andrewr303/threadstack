@@ -1,4 +1,5 @@
 import { companyProjectsQuery } from "@/lib/company-projects-query";
+import { IssueDetailTabBar, resolveTaskDetailTab } from "../components/IssueDetailTabBar";
 import { NativeControllerContainmentRecovery } from "../components/IssueRecoveryActionCard";
 import { useIssueIdBatches } from "@/hooks/useIssueIdBatches";
 import { TaskChatLoadingShell } from "@/components/task-chat/TaskChatLoadingShell";
@@ -3311,9 +3312,6 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
   >(null);
   const [fileViewerPromptOpen, setFileViewerPromptOpen] = useState(false);
   const [detailTab, setDetailTab] = useState("chat");
-  // Redesign: the center tab strip is hidden, so chat is the only surface —
-  // deep links that would switch tabs (e.g. #document- hashes) stay on chat.
-  const resolvedDetailTab = taskChatShellEnabled ? "chat" : detailTab;
   const [handoffFocusSignal, setHandoffFocusSignal] = useState(0);
   const [pendingApprovalAction, setPendingApprovalAction] = useState<{
     approvalId: string;
@@ -3882,6 +3880,7 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
   );
   const activePluginTab =
     issuePluginTabItems.find((item) => item.value === detailTab) ?? null;
+  const resolvedDetailTab = resolveTaskDetailTab(detailTab, taskChatShellEnabled, issuePluginTabItems);
   const {
     data: treeControlPreview,
     isFetching: treeControlPreviewLoading,
@@ -8529,32 +8528,7 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
                 : "space-y-3"
             }
           >
-            {/* Redesign: the chat IS the page — the Chat/Activity/Related-work tab
-            strip is hidden and the thread renders as the only surface. */}
-            {taskChatShellEnabled ? null : (
-              <TabsList
-                variant="line"
-                className={cn("w-full justify-start gap-1", shellSectionClass)}
-              >
-                <TabsTrigger value="chat" className="gap-1.5">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  Chat
-                </TabsTrigger>
-                <TabsTrigger value="activity" className="gap-1.5">
-                  <ActivityIcon className="h-3.5 w-3.5" />
-                  Activity
-                </TabsTrigger>
-                <TabsTrigger value="related-work" className="gap-1.5">
-                  <ListTree className="h-3.5 w-3.5" />
-                  Related work
-                </TabsTrigger>
-                {issuePluginTabItems.map((item) => (
-                  <TabsTrigger key={item.value} value={item.value}>
-                    {item.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            )}
+            <IssueDetailTabBar taskChatShellEnabled={taskChatShellEnabled} pluginTabs={issuePluginTabItems} className={shellSectionClass} />
 
             {/* The chat shell keeps the page's responsive 16px/24px gutters so
             thread content and the composer do not touch either sidebar. */}

@@ -1,0 +1,35 @@
+{
+  "errors": [],
+  "gaps": [
+    "cases.pc-native-host-permission: missing inspected evidence types: screenshot, transcript",
+    "Native optional-host-permission consent requires a supported browser-chrome interaction or a manual check.",
+    "This round covers UI/host acceptance only. Real provider sends/starts, model-key transfer, actual login-service registration and live deployment/library continuity are not exercised here. Fused overlay layout is not shipped; this implementation uses the plan's switching fallback."
+  ],
+  "counts": {
+    "pass": 9,
+    "fail": 0,
+    "blocked": 1,
+    "uncertain": 0,
+    "not_run": 0
+  },
+  "verdict": "blocked",
+  "planned": 10,
+  "requirements": 6,
+  "mapped_requirements": 6,
+  "evidence_complete": 9,
+  "effective_statuses": {
+    "pc-connect": "pass",
+    "pc-frame": "pass",
+    "pc-preserve": "pass",
+    "pc-plugin-navigation": "pass",
+    "pc-deep-link": "pass",
+    "pc-message-security": "pass",
+    "pc-session-ui": "pass",
+    "pc-recovery": "pass",
+    "pc-authenticated-frame": "pass",
+    "pc-native-host-permission": "blocked"
+  },
+  "missing_files": [],
+  "contract_valid": true,
+  "note": "Checks declarations and file integrity, not browser execution or evidence semantics."
+}

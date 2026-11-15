@@ -42,7 +42,7 @@ function detectExtensionIds({home=os.homedir(),source=__dirname}={}){
   return [...found].map(([id,where])=>({id,where}));
 }
 
-function install({platform=process.platform,home=os.homedir(),extensionId,extensionIds=[],node=process.execPath,source=__dirname}={}) {
+function install({platform=process.platform,home=os.homedir(),extensionId,extensionIds=[],node=process.execPath,source=__dirname,paperclipRoot}={}) {
   if(platform!=='darwin')throw Error('Run this installer on your Mac.');
   if(Number(process.versions.node.split('.')[0])<22)throw Error('Install Node.js 22 or newer first.');
   const wanted=[...extensionIds,extensionId].filter(Boolean);
@@ -54,8 +54,21 @@ function install({platform=process.platform,home=os.homedir(),extensionId,extens
   const before=readJson(path.join(root,'config.json'))||{};
   const ids=[...new Set([...wanted,...(Array.isArray(before.extensionIds)?before.extensionIds:[]),before.extensionId].filter(id=>EXTENSION_ID.test(id||'')))];
   for(const file of ['core.cjs','host.cjs']) fs.writeFileSync(path.join(root,file),fs.readFileSync(path.join(source,file)),{mode:0o600});
-  fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({extensionIds:ids}),{mode:0o600});
   const quote=s=>"'"+s.replace(/'/g,"'\\''")+"'";
+  const sourceRoot=path.resolve(source,'../..');
+  const candidate=paperclipRoot || (readJson(path.join(sourceRoot,'package.json'))?.name==='paperclip'?sourceRoot:before.paperclip?.root);
+  let paperclip=before.paperclip;
+  if(candidate && (paperclipRoot || readJson(path.join(candidate,'package.json'))?.name==='paperclip')){
+    if(!path.isAbsolute(candidate)||readJson(path.join(candidate,'package.json'))?.name!=='paperclip')throw Error('Choose the Paperclip fork folder.');
+    if(Number(process.versions.node.split('.')[0])<24)throw Error('Paperclip requires Node.js 24.11 or newer.');
+    const cli=path.join(candidate,'cli/src/index.ts'),tsx=path.join(candidate,'cli/node_modules/tsx/dist/cli.mjs');
+    if(!fs.existsSync(cli)||!fs.existsSync(tsx))throw Error('Install the Paperclip fork dependencies before registering it with the helper.');
+    const shim=path.join(root,'paperclip-source');
+    paperclip={root:fs.realpathSync(candidate),node,cli,tsx,shim,instanceId:'default'};
+    fs.writeFileSync(shim,`#!/bin/sh\ncd ${quote(paperclip.root)} || exit 1\nexport PAPERCLIP_SHIM_PATH=${quote(shim)}\nexport PAPERCLIP_THREADKEEPER_EXTENSION_IDS=${quote(ids.join(','))}\nexport PAPERCLIP_BUNDLED_PLUGIN_ROOT=${quote(path.join(paperclip.root,'packages/plugins'))}\nexport PATH=${quote(path.dirname(node)+':/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin')}\nexec ${quote(node)} ${quote(tsx)} ${quote(cli)} "$@"\n`,{mode:0o700});
+    fs.chmodSync(shim,0o700);
+  }
+  fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({extensionIds:ids,...(paperclip?{paperclip}:{})}),{mode:0o600});
   const launcher=path.join(root,'launch-host');
   // The Node.js found at install time first; if it was since removed (nvm, Homebrew upgrades),
   // any other installed Node.js. A browser starts the helper with almost no PATH.
@@ -98,11 +111,15 @@ if(require.main===module){
       uninstall();
       console.log('Helper removed. Account profiles and library backups were kept.');
     }else{
-      const typed=process.argv.slice(2).filter(Boolean);
+      const args=process.argv.slice(2).filter(Boolean);
+      const folderIndex=args.indexOf('--paperclip-root');
+      const paperclipRoot=folderIndex>=0?args.splice(folderIndex,2)[1]:undefined;
+      if(folderIndex>=0&&!paperclipRoot)throw Error('Pass the Paperclip fork folder after --paperclip-root.');
+      const typed=args;
       const detected=typed.length?[]:detectExtensionIds();
       if(!typed.length&&!detected.length)throw Error('Threadkeeper was not found in any browser on this Mac. Load it first, or run this again and paste its extension ID.');
       for(const d of detected)console.log(`Found Threadkeeper ${d.id} (${d.where}).`);
-      const r=install({extensionIds:typed.length?typed:detected.map(d=>d.id)});
+      const r=install({extensionIds:typed.length?typed:detected.map(d=>d.id),paperclipRoot});
       console.log(`\nMac helper installed for: ${r.browsers.join(', ')}.\n\nReturn to Threadkeeper and choose Check connection.\nNo existing browser profiles were changed.`);
     }
   }catch(e){console.error(e.message);process.exitCode=1;}

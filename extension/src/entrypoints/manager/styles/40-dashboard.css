@@ -9,6 +9,25 @@
 .tk-dash-label { font-size: var(--fs-12); font-weight: 600; color: var(--text-3); padding: 0 6px; white-space: nowrap; }
 .tk-dash-pins { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; padding: 1px; }
 .tk-dash-pins::-webkit-scrollbar { display: none; }
+.tk-dash-bar > .tk-org-btn { flex: none; }
+
+/* Pinned sessions in labelled clusters (grouped by type, provider or account). The label is a
+   word, never only a colour; a thin rule sets one cluster off from the next. */
+.tk-dash-cluster { display: flex; align-items: center; gap: 4px; flex: none; }
+.tk-dash-cluster + .tk-dash-cluster { margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--line-2); }
+.tk-dash-cluster-label {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 0 4px;
+  font-size: var(--fs-12); font-weight: 600; color: var(--text-3); white-space: nowrap;
+}
+.tk-dash-cluster-label .tk-tabular { font-weight: 400; }
+
+/* Every pinned session is hidden by the filters: say so, with the way back. */
+.tk-dash-nomatch {
+  display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; padding: 0 6px;
+  font-size: var(--fs-13); color: var(--text-2);
+}
+.tk-dash-nomatch > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-dash-nomatch .tk-btn { flex: none; }
 .tk-dash-pin {
   display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px 0 6px; flex: none; max-width: 240px;
   border: 1px solid transparent; border-radius: var(--r-ctl); background: transparent; color: var(--text-2);

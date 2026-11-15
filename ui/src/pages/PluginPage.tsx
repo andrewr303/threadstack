@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { Link, Navigate, useParams } from "@/lib/router";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/context/CompanyContext";
@@ -13,6 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { NotFoundPage } from "./NotFound";
+import { threadkeeperSlotView } from "@/lib/threadkeeper-host";
+import { isVerifiedThreadkeeperHost, subscribeVerifiedThreadkeeperHost } from "@/lib/threadkeeper-host-state";
+import { ThreadkeeperSlot } from "@/components/ThreadkeeperSlot";
 
 /**
  * Company-context plugin page. Renders a plugin's `page` slot at
@@ -112,8 +115,15 @@ export function PluginPage() {
     return resolveRouteSidebarSlot(flattened, pluginRoutePath) !== null;
   }, [contributions, pluginRoutePath]);
 
+  const verifiedHost = useSyncExternalStore(subscribeVerifiedThreadkeeperHost, isVerifiedThreadkeeperHost, () => false);
+  const fusedView = verifiedHost && pageSlot && !pluginId ? threadkeeperSlotView(pageSlot.pluginKey, pageSlot.routePath) : null;
+
   useEffect(() => {
     if (!pageSlot) return;
+    if (fusedView) {
+      setBreadcrumbs([{ label: pageSlot.displayName }]);
+      return;
+    }
     if (routeSidebarActive) {
       setBreadcrumbs([{ label: resolveRouteSidebarPageTitle(pageSlot, pluginRouteSplat) }]);
       return;
@@ -122,7 +132,7 @@ export function PluginPage() {
       { label: "Plugins", href: "/company/settings/instance/plugins" },
       { label: pageSlot.pluginDisplayName },
     ]);
-  }, [pageSlot, pluginRouteSplat, setBreadcrumbs, routeSidebarActive]);
+  }, [pageSlot, pluginRouteSplat, setBreadcrumbs, routeSidebarActive, fusedView]);
 
   if (!resolvedCompanyId) {
     if (hasInvalidCompanyPrefix) {
@@ -162,6 +172,8 @@ export function PluginPage() {
       : "/company/settings/instance/plugins";
     return <Navigate to={settingsPath} replace />;
   }
+
+  if (fusedView) return <ThreadkeeperSlot view={fusedView} label={pageSlot.displayName} />;
 
   return (
     <div className="space-y-4">

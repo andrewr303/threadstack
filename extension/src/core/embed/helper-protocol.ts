@@ -23,9 +23,16 @@ export const HELPER_PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 export type HelperRequest =
   | { type: 'ping' }
+  | { type: 'paperclip.status' | 'paperclip.start' | 'paperclip.install' }
   | { type: 'open'; profileId: string; url: string };
 
+export type PaperclipHelperResult =
+  | { ok: true; paperclip: { service: 'running' | 'stopped' | 'not_installed' } }
+  | { ok: true; started: true }
+  | { ok: false; error: string };
+
 export type HelperResponse =
+  | PaperclipHelperResult
   | { ok: true; version: string; platform: string }
   | { ok: true; opened: true }
   | { ok: false; error: string };

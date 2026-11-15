@@ -6493,7 +6493,7 @@ rl.on("line", (line) => {
   it.each([1, 2])("wraps plugin tool discovery and execution behind the same gateway policy (%i copies)", async copies => {
     const company = await createCompany(db);
     const agent = await createAgent(db, company.id);
-    const { run, project } = await createIssueAndRun(db, company.id, agent.id);
+    const { run, project, issue } = await createIssueAndRun(db, company.id, agent.id);
     const calls: unknown[] = [];
     const dispatcher: PluginToolDispatcher = {
       initialize: async () => {},
@@ -6559,8 +6559,43 @@ rl.on("line", (line) => {
       expect.objectContaining({
         tool: "demo-plugin:read_status",
         parameters: { id: "1" },
+        runContext: expect.objectContaining({ issueId: issue.id }),
       }),
     ]);
+    await gateway.executeTool({ sessionToken: session.token, tool: "demo-plugin:read_status", parameters: { id: "2" } });
+    expect(calls[1]).toMatchObject({ tool: "demo-plugin:read_status", runContext: { issueId: issue.id } });
+  });
+
+  it("REQ-8 FR-7 / AC-9: a block policy refuses a browser-sessions tool before the plugin handler runs", async () => {
+    const company = await createCompany(db);
+    const agent = await createAgent(db, company.id);
+    const { run, project } = await createIssueAndRun(db, company.id, agent.id);
+    const executeTool = vi.fn(async () => ({ pluginId: "browser-sessions", toolName: "sessions_search", result: { content: "should not run" } }));
+    const dispatcher: PluginToolDispatcher = {
+      initialize: async () => {},
+      teardown: () => {},
+      listToolsForAgent: () => [{ name: "browser-sessions:sessions_search", displayName: "Search sessions", description: "Search shared browser sessions.", parametersSchema: { type: "object" }, pluginId: "browser-sessions" }],
+      getTool: () => null,
+      executeTool,
+      registerPluginTools: () => {},
+      unregisterPluginTools: () => {},
+      toolCount: () => 1,
+      getRegistry: () => { throw new Error("not used"); },
+    };
+    await allowToolsForAgent(db, company.id, agent.id, ["browser-sessions:sessions_search"]);
+    await db.insert(toolPolicies).values({ companyId: company.id, name: "Block session search", policyType: "block",
+      selectors: { agentId: agent.id, toolName: "browser-sessions:sessions_search" }, priority: 2147483647 });
+    const gateway = createTestToolGatewayService(db, { pluginToolDispatcher: dispatcher });
+    await gateway.executePluginTool({
+      actor: { type: "agent", companyId: company.id, agentId: agent.id, runId: run.id },
+      tool: "browser-sessions:sessions_search",
+      parameters: { query: "webhook retries" },
+      runContext: { companyId: company.id, agentId: agent.id, runId: run.id, projectId: project.id },
+    }).then(
+      () => { throw new Error("Expected a blocked plugin tool call to fail"); },
+      (error) => expectGatewayError(error, 403, "deny_policy_block"),
+    );
+    expect(executeTool).not.toHaveBeenCalled();
   });
 
   it("rejects caller-supplied issue context outside the run company", async () => {

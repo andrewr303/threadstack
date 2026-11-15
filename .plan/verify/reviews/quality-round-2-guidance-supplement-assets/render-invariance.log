@@ -1,0 +1,17 @@
+{
+  "beforeSha256": "41ca3e1123dd4b96fdd160ac3c5b64a1387ed45e5cf4ca9c621086d95e75f891",
+  "afterSha256": "982956d519009febb6e627aef3637812634467edf5a3382c35cb392baa36563f",
+  "noBrowserOrServiceCalls": true,
+  "results": [
+    {
+      "state": "stopped",
+      "exactHtmlEqual": true,
+      "renderedHtml": "<div class=\"tk-paperclip-status\" data-state=\"stopped\"><p role=\"status\" title=\"Paperclip is stopped\">Paperclip is stopped</p><button type=\"button\" class=\"tk-btn\">Start</button><p class=\"tk-settings-note\">Run &quot;pnpm paperclipai service start&quot; in the Paperclip folder, or install the Mac helper to start it automatically.</p></div>"
+    },
+    {
+      "state": "start_failed",
+      "exactHtmlEqual": true,
+      "renderedHtml": "<div class=\"tk-paperclip-status\" data-state=\"start_failed\"><p role=\"status\" title=\"Paperclip did not start: fixture start failed\">Paperclip did not start: fixture start failed</p><button type=\"button\" class=\"tk-btn\">Retry</button><p class=\"tk-settings-note\">See &quot;pnpm paperclipai service logs&quot; for details.</p></div>"
+    }
+  ]
+}

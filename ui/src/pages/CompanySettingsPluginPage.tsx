@@ -5,6 +5,7 @@ import { useCompany } from "@/context/CompanyContext";
 import { QueryErrorState } from "@/components/QueryView";
 import { PluginSlotMount, usePluginSlots } from "@/plugins/slots";
 import { NotFoundPage } from "./NotFound";
+import { BrowserSessionCredentialSettings } from "../components/BrowserSessionCredentialSettings";
 
 export function CompanySettingsPluginPage() {
   const params = useParams<{
@@ -83,6 +84,7 @@ export function CompanySettingsPluginPage() {
         className="min-h-(--sz-200px)"
         missingBehavior="placeholder"
       />
+      {pageSlot.pluginKey === "browser-sessions" ? <BrowserSessionCredentialSettings pluginId={pageSlot.pluginId} companyId={resolvedCompanyId} /> : null}
     </div>
   );
 }

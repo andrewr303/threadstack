@@ -10,6 +10,10 @@ const paperclipOff = { enabled: false, serverUrl: 'http://localhost:3100' };
 const paperclipLocal = { enabled: true, serverUrl: 'http://localhost:3100' };
 
 describe('which host access is still in use', () => {
+  it('retains the app and bridge origin independently from library sync', () => {
+    const users = { sites: EMPTY_CUSTOM_SITES, authorizedHosts: DEFAULT_SETTINGS.authorizedHosts, paperclip: { ...paperclipOff, hostEnabled: true } };
+    expect(releasableOrigins(['http://localhost/*'], users)).toEqual([]);
+  });
   it('keeps a loopback grant Paperclip relies on when an added localhost site is removed', () => {
     const users = { sites: EMPTY_CUSTOM_SITES, authorizedHosts: DEFAULT_SETTINGS.authorizedHosts, paperclip: paperclipLocal };
     expect(releasableOrigins(['http://localhost/*'], users)).toEqual([]);

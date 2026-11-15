@@ -7,13 +7,15 @@
 //      X-Frame-Options and CSP frame-ancestors then loads inside the extension page, signed in.
 //   3. Page scripts in the embedded frame can read and write ordinary cookies (the cookie bridge).
 //   4. A session opened inside the frame is captured, with its repository and observed run state.
-//   5. Adding an account signs the sign-in out (device cookies stay), a session captured under
-//      the new account is filed under it, and switching back and forth restores each sign-in.
+//   5. Adding an account signs nothing out; making it the browser's own sign-in signs the browser
+//      out of the first one (device cookies stay), a session captured under the new account is
+//      filed under it, and switching back and forth restores each sign-in.
+//      (Accounts shown side by side inside the workspace: scripts/run-profiles-e2e.mjs.)
 //   6. A provider page framed by some other website is never captured.
 //   7. A link the embedded page opens in a new tab is handed back to the workspace.
 //
 // Nothing here talks to a real provider: every provider host is mapped to 127.0.0.1.
-// Requires `npm run build` first. Screenshots go to evidence/workspace/.
+// Requires a built extension. TK_E2E_OUT redirects screenshots; the default is evidence/workspace/.
 import fs from 'node:fs';
 import https from 'node:https';
 import os from 'node:os';
@@ -25,7 +27,7 @@ import { chromium } from 'playwright';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = process.env.TK_E2E_DIST ? path.resolve(process.env.TK_E2E_DIST) : path.join(root, '.output', 'chrome-mv3');
-const out = path.join(root, 'evidence', 'workspace');
+const out = process.env.TK_E2E_OUT ? path.resolve(process.env.TK_E2E_OUT) : path.join(root, 'evidence', 'workspace');
 fs.mkdirSync(out, { recursive: true });
 
 /**
@@ -286,6 +288,7 @@ async function main() {
     await page.goto(`chrome-extension://${extId}/manager.html?surface=page`);
     const hello = await command(page, { type: 'WORKSPACE_HELLO' });
     check(hello?.ok === true && hello.embedding === true, 'the workspace tab registers and embedding is ready', hello);
+    check(hello.profiles === true, "the worker can follow the cookies of an added account's pages (webRequest)", hello);
     const rules = await sw.evaluate(() => chrome.declarativeNetRequest.getSessionRules());
     check(
       rules.length === 1 && rules[0].condition.tabIds?.length === 1 && rules[0].condition.tabIds[0] === hello.tabId && JSON.stringify(rules[0].condition.resourceTypes) === '["sub_frame"]',
@@ -313,12 +316,17 @@ async function main() {
     check(a2.accountId === 'acct_claude_code_primary' && a2.messages >= 2, 'a session open inside the workspace is captured under the signed-in account', a2);
     await page.screenshot({ path: path.join(out, '01-embedded-signed-in.png') });
 
-    // 5. Accounts: add one (signs the sign-in out, keeps the device cookie), capture under it, switch both ways.
+    // 5. Accounts: add one (nothing is signed out), make it the browser's own sign-in (signs the
+    // browser out of the first, keeps the device cookie), capture under it, switch both ways.
+    const beforeAdd = await cookieMap(sw);
     const added = await command(page, { type: 'ACCOUNTS_ADD', realm: 'anthropic', mode: 'embedded', label: 'Work' });
-    check(added?.ok === true && added.switched === true && added.account?.label === 'Work', 'adding an account answers with the new account and reports the switch', added?.error ?? added?.account);
+    check(added?.ok === true && added.switched === false && added.account?.label === 'Work', 'adding an account answers with the new account and switches nothing', added?.error ?? added?.account);
     const workId = added.account.id;
+    check(JSON.stringify(await cookieMap(sw)) === JSON.stringify(beforeAdd), "adding it leaves the browser's sign-in as it was");
+    const made = await command(page, { type: 'ACCOUNTS_ACTIVATE', accountId: workId });
+    check(made?.ok === true && made.switched === true, "making it the browser's sign-in reports the switch", made?.error);
     const afterAdd = await cookieMap(sw);
-    check(afterAdd.sessionKey === undefined && afterAdd.lastActiveOrg === undefined, 'adding an account signs the sign-in out', Object.keys(afterAdd));
+    check(afterAdd.sessionKey === undefined && afterAdd.lastActiveOrg === undefined, "making it the browser's sign-in signs the browser out of the first one", Object.keys(afterAdd));
     check(afterAdd.cf_clearance === 'device-1', 'the device bot-check cookie is left in place', afterAdd);
     // Right after a switch the worker ignores identity reports for a few seconds (a page loaded
     // before the switch may still be reporting the previous account). A person takes longer

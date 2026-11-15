@@ -5753,3 +5753,42 @@ html:has(.design-proposal-theme) .agent-markdown-name-field [data-slot="input"],
 .secret-value-masked {
   -webkit-text-security: disc;
 }
+
+/* REQ-6 fused mode. Inside the Threadkeeper window the shell lays its view over the content
+   rectangle of the Browse, Threads and Session board pages. The document stays transparent there
+   and the app shell paints its background everywhere else (the hole follows --tk-slot-*, set by
+   lib/threadkeeper-host-slot.ts). Only the verified host ever sets data-threadkeeper-slot. */
+html[data-threadkeeper-slot],
+html[data-threadkeeper-slot] body {
+  background: transparent;
+}
+html[data-threadkeeper-slot] .paperclip-app-shell {
+  background-color: transparent;
+  isolation: isolate;
+}
+html[data-threadkeeper-slot] .paperclip-app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--background);
+  clip-path: polygon(evenodd,
+    0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    var(--tk-slot-x) var(--tk-slot-y),
+    calc(var(--tk-slot-x) + var(--tk-slot-w)) var(--tk-slot-y),
+    calc(var(--tk-slot-x) + var(--tk-slot-w)) calc(var(--tk-slot-y) + var(--tk-slot-h)),
+    var(--tk-slot-x) calc(var(--tk-slot-y) + var(--tk-slot-h)),
+    var(--tk-slot-x) var(--tk-slot-y));
+}
+#main-content:has(.threadkeeper-slot) {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.threadkeeper-slot {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}

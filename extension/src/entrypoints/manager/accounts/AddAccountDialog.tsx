@@ -1,11 +1,11 @@
-// The "Add account" dialog: pick a sign-in, name the account, say where it runs. For an
-// embedded account it says plainly, before the button is pressed, that the sign-in is signed
-// out here and in other Chrome tabs.
+// The "Add account" dialog: pick a sign-in, name the account, give it a colour. The account
+// opens beside the ones already there (nothing is signed out); the person signs in to it once,
+// from the tab that opens for it.
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.js';
 import { useWorkspaceContext } from '../workspace/context.js';
 import { realmById, switchableRealms, type RealmInfo } from '../../../core/workspace/realms.js';
-import type { AccountColor, AccountMode, WorkspaceFailure } from '../../../core/workspace/types.js';
+import type { AccountColor, WorkspaceFailure } from '../../../core/workspace/types.js';
 import { ACCOUNT_COLORS, COLOR_LABELS, MAX_ACCOUNT_NAME, realmHostOrigins, requestOrigins, useMounted } from './common.js';
 
 export interface AddAccountDialogProps {
@@ -23,7 +23,7 @@ function startingRealm(realmId: string | null): string {
 }
 
 export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDialogProps) {
-  const { workspace, setView, announce, openSettings, openInChromeTab } = useWorkspaceContext();
+  const { workspace, setView, announce } = useWorkspaceContext();
   const mounted = useMounted();
   const ids = useId();
   const realms = switchableRealms();
@@ -41,7 +41,6 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
   const [name, setName] = useState('');
   const [color, setColor] = useState<AccountColor>(() => firstFreeColor(startingRealm(realmId)));
   const [colorTouched, setColorTouched] = useState(false);
-  const [mode, setMode] = useState<AccountMode>('embedded');
   const [nameError, setNameError] = useState<string | null>(null);
   const [failure, setFailure] = useState<WorkspaceFailure | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +55,6 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
     setName('');
     setColor(latest.current.firstFreeColor(start));
     setColorTouched(false);
-    setMode('embedded');
     setNameError(null);
     setFailure(null);
     setBusy(false);
@@ -87,8 +85,6 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
   }, [realmId]);
 
   const info: RealmInfo | null = realmById(realm);
-  const entry = workspace.realms.find((r) => r.realm.id === realm);
-  const current = entry?.accounts.find((a) => a.id === entry.activeAccountId) ?? null;
 
   const close = () => dialogRef.current?.close();
 
@@ -97,9 +93,11 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
     const label = name.trim();
     setBusy(true);
     setFailure(null);
-    // Chrome shows a permission prompt only in response to a click, so this comes first.
+    // Chrome shows a permission prompt only in response to a click, so this comes first. Only a
+    // sign-in host on another domain is asked for; the sign-in's own host is held from install,
+    // and a refusal of that comes back as needs_host_access, which offers the wider request.
     if (asking && info.extraHostPatterns.length > 0) await requestOrigins(info.extraHostPatterns);
-    const result = await workspace.addAccount({ realm: info.id, mode, label, color });
+    const result = await workspace.addAccount({ realm: info.id, mode: 'embedded', label, color });
     if (!mounted.current) return;
     setBusy(false);
     if (!result.ok) {
@@ -107,24 +105,14 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
       return;
     }
     close();
-    if (mode === 'isolated') {
-      announce(`${label} was added for ${info.label}. It opens in its own Chrome window: choose Open window in the ${info.label} account menu.`);
+    if (!result.account) {
+      announce(`${label} was added for ${info.label}.`);
       return;
     }
-    if (result.account) {
-      const opened = workspace.openUrl(info.signInUrl, { accountId: result.account.id, title: 'Sign in' });
-      if (opened.ok) {
-        setView('browse');
-        announce(
-          `Sign in to ${info.label} as ${label}. If the sign-in needs a step that cannot run here, use Open in Chrome tab, then reload.`
-        );
-      } else {
-        openInChromeTab(info.signInUrl);
-        announce(`Sign in to ${info.label} as ${label} in the Chrome tab that opened, then come back to Threadkeeper.`);
-      }
-    } else {
-      announce(`${label} was added for ${info.label}.`);
-    }
+    // Its first tab: it shows the two ways to sign in, and after that the account itself.
+    const opened = workspace.openUrl(info.homeUrl, { accountId: result.account.id, title: `${info.label} · ${label}` });
+    if (opened.ok) setView('browse');
+    announce(`${label} was added for ${info.label}. Choose how to sign in to it.`);
   };
 
   const submit = (event: React.FormEvent) => {
@@ -158,7 +146,6 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
   const nameHelpId = `${ids}-name-help`;
   const realmFieldId = `${ids}-realm`;
   const colorLabelId = `${ids}-color`;
-  const modeLabelId = `${ids}-mode`;
   const noteId = `${ids}-note`;
 
   const help = failure ? failureHelp(failure, info) : null;
@@ -180,7 +167,7 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
             <h2 id={titleId} className="tk-acct-dialog-title">
               Add account
             </h2>
-            <p className="tk-acct-dialog-lead">Keep another account of the same sign-in apart from the one you use now.</p>
+            <p className="tk-acct-dialog-lead">Use another account of the same sign-in beside the one you use now. Both stay signed in.</p>
           </div>
           <button type="button" className="tk-icon-btn" aria-label="Close" onClick={close}>
             <Icon name="close" />
@@ -267,61 +254,10 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
             </div>
           </div>
 
-          <div className="tk-acct-field">
-            <span className="tk-acct-flabel" id={modeLabelId}>
-              Where it runs
-            </span>
-            <div role="radiogroup" aria-labelledby={modeLabelId} className="tk-acct-modes">
-              <label className="tk-acct-opt tk-acct-opt-card">
-                <input
-                  type="radio"
-                  className="tk-visually-hidden"
-                  name={`${ids}-mode`}
-                  value="embedded"
-                  checked={mode === 'embedded'}
-                  onChange={() => setMode('embedded')}
-                />
-                <span className="tk-acct-radio" aria-hidden="true" />
-                <span>
-                  <span className="tk-acct-opt-title">In the workspace</span>
-                  <span className="tk-acct-opt-sub">
-                    Opens in Browse and on the dashboard. One account per sign-in is signed in at a time.
-                  </span>
-                </span>
-              </label>
-              <label className="tk-acct-opt tk-acct-opt-card">
-                <input
-                  type="radio"
-                  className="tk-visually-hidden"
-                  name={`${ids}-mode`}
-                  value="isolated"
-                  checked={mode === 'isolated'}
-                  onChange={() => setMode('isolated')}
-                />
-                <span className="tk-acct-radio" aria-hidden="true" />
-                <span>
-                  <span className="tk-acct-opt-title">In its own Chrome window (Mac helper)</span>
-                  <span className="tk-acct-opt-sub">
-                    Uses its own Chrome profile, so it stays signed in at the same moment as the others. Needs the Mac helper.
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-
           <p id={noteId} className="tk-acct-explain">
-            {mode === 'embedded' ? (
-              <>
-                {info?.label ?? 'This sign-in'} will be signed out here and in your other Chrome tabs so you can sign in as this
-                account.
-                {current ? ` The sign-in for ${current.label} is saved and comes back when you switch to it.` : ''}
-              </>
-            ) : (
-              <>
-                Nothing is signed out here. This account signs in inside its own Chrome window, which the Mac helper opens with a
-                separate profile.
-              </>
-            )}
+            Nothing is signed out. {info?.label ?? 'This sign-in'} opens a tab for the new account, where you sign in to it once:
+            inside Threadkeeper, or in a browser tab when your sign-in uses Google, Apple or a passkey. Its sign-in is then
+            kept on this device, encrypted, and never exported or sent anywhere.
           </p>
 
           {failure && help && (
@@ -331,18 +267,6 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
               {help.action === 'allow' && (
                 <button type="button" className="tk-btn" disabled={busy} onClick={() => void allowAndRetry()}>
                   Allow access to {info?.label ?? 'this sign-in'} and retry
-                </button>
-              )}
-              {help.action === 'helper' && (
-                <button
-                  type="button"
-                  className="tk-btn"
-                  onClick={() => {
-                    close();
-                    openSettings('accounts');
-                  }}
-                >
-                  Open Mac helper settings
                 </button>
               )}
             </div>
@@ -365,23 +289,18 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
 function failureHelp(
   failure: WorkspaceFailure,
   info: RealmInfo | null
-): { text: string | null; action: 'allow' | 'helper' | null } {
+): { text: string | null; action: 'allow' | null } {
   const name = info?.label ?? 'this sign-in';
   switch (failure.code) {
     case 'needs_host_access':
       return {
-        text: `Threadkeeper needs your permission to save and restore the ${name} sign-in on this device. Nothing was changed.`,
+        text: `Threadkeeper needs your permission for ${name} before it can show the account's pages and keep its sign-in on this device. Nothing was changed.`,
         action: 'allow',
       };
     case 'not_switchable':
       return {
-        text: `Threadkeeper does not switch accounts for ${name}. Use the site's own account switcher instead.`,
+        text: `Threadkeeper does not keep separate accounts for ${name}. Use the site's own account switcher instead.`,
         action: null,
-      };
-    case 'helper_unavailable':
-      return {
-        text: 'The Mac helper is not reachable. In Settings, Accounts, Mac helper, install it and choose Check connection, then try again.',
-        action: 'helper',
       };
     default:
       return { text: null, action: null };

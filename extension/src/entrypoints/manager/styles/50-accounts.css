@@ -242,6 +242,8 @@
 }
 .tk-acct-confirm p { margin: 0; font-size: var(--fs-13); color: var(--text); }
 .tk-acct-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* What can be done with an added account: sign in through the browser, or make it the browser's own. */
+.tk-acct-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 /* ---------- Mac helper ---------- */
 .tk-acct-helper-check { align-items: center; }

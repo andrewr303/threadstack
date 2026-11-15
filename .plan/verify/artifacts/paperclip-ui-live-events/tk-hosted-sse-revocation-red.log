@@ -1,0 +1,30 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/lib/hosted-live-transport.test.ts (6 tests | 1 failed) 7ms
+   ❯ native company events transport in a verified extension host (6)
+     × releases the HTTP stream when the verified host handshake is withdrawn 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/hosted-live-transport.test.ts > native company events transport in a verified extension host > releases the HTTP stream when the verified host handshake is withdrawn
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+ ❯ src/lib/hosted-live-transport.test.ts:95:28
+     93|     const t = setup(true); t.socket.onerror?.({} as Event); t.stream.o…
+     94|     t.unverify();
+     95|     expect(t.stream.close).toHaveBeenCalledOnce();
+       |                            ^
+     96|     expect(t.callbacks.onLost).toHaveBeenCalledTimes(1);
+     97|     expect(t.callbacks.onClosed).toHaveBeenCalledTimes(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  23:59:17
+   Duration  212ms (transform 62%, tests 11%, setup 10%, import 10%, worker 7%)
+

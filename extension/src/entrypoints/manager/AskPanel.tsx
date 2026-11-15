@@ -217,9 +217,9 @@ export function AskPanel({
           ref={inputRef}
           className="tk-input tk-ask-input"
           aria-label="Ask a question about your past AI conversations"
-          placeholder="e.g. What did I decide about the pricing page headline? Which thread had the Stripe webhook fix?"
+          placeholder="What did I decide about the pricing page?"
           value={question}
-          rows={2}
+          rows={4}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -228,14 +228,17 @@ export function AskPanel({
             }
           }}
         />
-        <button
-          type="button"
-          className="tk-btn tk-btn-primary"
-          disabled={!question.trim() || status === 'retrieving' || status === 'answering'}
-          onClick={() => void ask()}
-        >
-          {canAsk ? 'Ask Claude' : 'Find threads'}
-        </button>
+        <div className="tk-ask-submit">
+          <span className="tk-ask-key-hint">Enter to ask · Shift+Enter for a new line</span>
+          <button
+            type="button"
+            className="tk-btn tk-btn-primary"
+            disabled={!question.trim() || status === 'retrieving' || status === 'answering'}
+            onClick={() => void ask()}
+          >
+            {canAsk ? 'Ask Claude' : 'Find threads'}
+          </button>
+        </div>
       </div>
       {!canAsk && (
         <p className="tk-settings-note">

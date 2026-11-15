@@ -1,0 +1,109 @@
+{
+  "recordedAt": "2026-11-14T08:30:32.165188+00:00",
+  "author": "/root/paperclip_ui",
+  "sourcePath": "extension/scripts/run-paperclip-e2e.mjs",
+  "currentFrozenSha256": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039",
+  "reviewedCheckpointSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+  "postReviewEdit": {
+    "addedLines": 9,
+    "removedLines": 0,
+    "scope": "Optional TK_PAPERCLIP_READ_HOLD block only",
+    "purpose": "Keep a successfully UI-paired owned profile alive for the parent-authorized real process-agent read-tool gateway proof",
+    "recordedDriverFileMtimeUtc": "2026-11-14T07:52:11.838731+00:00",
+    "noProductSourceChange": true,
+    "noDependencyOrBundleChange": true
+  },
+  "reviewScopes": [
+    {
+      "path": ".plan/verify/reviews/spec-round-3.scope.json",
+      "recordedAt": "2026-11-14T07:37:40.743010+00:00",
+      "driverSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e"
+    },
+    {
+      "path": ".plan/verify/reviews/quality-round-2.scope.json",
+      "recordedAt": "2026-11-14T07:48:28.312287+00:00",
+      "driverSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e"
+    }
+  ],
+  "reconstruction": {
+    "isOriginalCapture": false,
+    "method": "Remove the exact single nine-line hold block from current frozen source; resulting bytes independently match both saved review checkpoint SHA-256 values",
+    "reconstructedSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+    "matchesBothReviewedCheckpoints": true
+  },
+  "rounds": [
+    {
+      "round": 13,
+      "executionPath": ".acceptances/paperclip-merge/round-13/assets/attempt-2026-11-14T072435871Z/execution.json",
+      "executionSha256": "b56f75574deb90b578e64e60744bb23c1c4c6c7befde5fa86f082e669be91fd6",
+      "executionStartedAt": "2026-11-14T072435871Z",
+      "executionCompletedAt": "2026-11-14T07:25:22.179Z",
+      "captureTimeDriverSha256": null,
+      "captureTimeHashRecorded": false,
+      "retrospectiveDriverVersion": "pre-hold reviewed version",
+      "retrospectiveReconstructedSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+      "provenanceStatus": "Author edit chronology plus matching later review checkpoint; not a contemporaneous driver-source capture",
+      "holdEventsObserved": [],
+      "sealedProductionHashInventoryContainsDriver": false,
+      "sealedReportEdited": false
+    },
+    {
+      "round": 14,
+      "executionPath": ".acceptances/paperclip-merge/round-14/assets/attempt-2026-11-14T072959983Z/execution.json",
+      "executionSha256": "3db20cab624114d745fcb9803b899b1d9cfc3730e2d077aee97cb620b39dd0a6",
+      "executionStartedAt": "2026-11-14T072959983Z",
+      "executionCompletedAt": "2026-11-14T07:30:47.156Z",
+      "captureTimeDriverSha256": null,
+      "captureTimeHashRecorded": false,
+      "retrospectiveDriverVersion": "pre-hold reviewed version",
+      "retrospectiveReconstructedSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+      "provenanceStatus": "Author edit chronology plus matching later review checkpoint; not a contemporaneous driver-source capture",
+      "holdEventsObserved": [],
+      "sealedProductionHashInventoryContainsDriver": false,
+      "sealedReportEdited": false
+    },
+    {
+      "round": 15,
+      "executionPath": ".acceptances/paperclip-merge/round-15/assets/attempt-2026-11-14T075212078Z/execution.json",
+      "executionSha256": "ba2d4363faa778c1353abc1ad72179ec5d86dbe6870e9fcc6f028354de7ae6cb",
+      "executionStartedAt": "2026-11-14T075212078Z",
+      "executionCompletedAt": "2026-11-14T07:54:02.686Z",
+      "captureTimeDriverSha256": null,
+      "captureTimeHashRecorded": false,
+      "retrospectiveDriverVersion": "current hold-enabled version",
+      "retrospectiveReconstructedSha256": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039",
+      "provenanceStatus": "Author edit chronology plus matching later review checkpoint; not a contemporaneous driver-source capture",
+      "holdEventsObserved": [
+        "ready",
+        "done"
+      ]
+    },
+    {
+      "round": 16,
+      "executionPath": ".acceptances/paperclip-merge/round-16/assets/attempt-2026-11-14T080015342Z/execution.json",
+      "executionSha256": "891fb66028937d01a3b84fcd10558753f9ce86af9986b5d7f7a933298024080f",
+      "executionStartedAt": "2026-11-14T080015342Z",
+      "executionCompletedAt": "2026-11-14T08:00:45.772Z",
+      "captureTimeDriverSha256": null,
+      "captureTimeHashRecorded": false,
+      "retrospectiveDriverVersion": "current hold-enabled version",
+      "retrospectiveReconstructedSha256": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039",
+      "provenanceStatus": "Author edit chronology plus matching later review checkpoint; not a contemporaneous driver-source capture",
+      "holdEventsObserved": [
+        "ready",
+        "done"
+      ]
+    }
+  ],
+  "protectedSealedFilesSha256": {
+    ".acceptances/paperclip-merge/round-13/assets/attempt-2026-11-14T072435871Z/execution.json": "b56f75574deb90b578e64e60744bb23c1c4c6c7befde5fa86f082e669be91fd6",
+    ".acceptances/paperclip-merge/round-13/result.json": "c45257eed2d5c160b99b1c9476c86d9c5f0b108936dc5473063441b3b980a791",
+    ".acceptances/paperclip-merge/round-13/report.md": "4acb4b5b972dcf228103898f27123c4c0ddb9115f6314222bb731e6e7cb99d62",
+    ".acceptances/paperclip-merge/round-13/seal.json": "f4ec379f5842bf95f6fcedc1f3d3251322c185e24349a76c835b7b5fc1cbf8e3",
+    ".acceptances/paperclip-merge/round-14/assets/attempt-2026-11-14T072959983Z/execution.json": "3db20cab624114d745fcb9803b899b1d9cfc3730e2d077aee97cb620b39dd0a6",
+    ".acceptances/paperclip-merge/round-14/result.json": "800a625942b4a9e36e10bdbf2528c34bea328ecc9910be05d05e6e17375af792",
+    ".acceptances/paperclip-merge/round-14/report.md": "33aa776163646826063b9a8f740259d916b3c788312b7780c730829da1b42fef",
+    ".acceptances/paperclip-merge/round-14/seal.json": "e5cd860c1249739ea6a6ad1a40fd075ec95a96052cc9a9f38656cf1d7bf92658"
+  },
+  "sourceEditedByThisTask": false
+}

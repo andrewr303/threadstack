@@ -1,0 +1,129 @@
+--- before/.gitignore
++++ after/.gitignore
+@@ -67,6 +67,7 @@
+ .doc-review-cursor
+ 
+ # Playwright
++/.acceptances/
+ tests/e2e/test-results/
+ tests/e2e/playwright-report/
+ tests/runner-e2e/results/
+--- before/server/src/__tests__/cli-invocation-safety.test.ts
++++ after/server/src/__tests__/cli-invocation-safety.test.ts
+@@ -68,6 +68,8 @@
+   "pnpm paperclipai connect",
+   "pnpm paperclipai migrate",
+   "pnpm paperclipai db:backup",
++  "pnpm paperclipai service start",
++  "pnpm paperclipai service logs",
+   "pnpm paperclipai configure --section server",
+   "pnpm paperclipai configure --section secrets",
+   "pnpm paperclipai configure --section storage",
+@@ -583,6 +585,21 @@
+   // `--bind`, a context-profile value, and worktree path/ref/id/name options,
+   // and a mixed safe/unsafe line hid behind its `npx` mention.
+ 
++  it.each([
++    "pnpm paperclipai service start",
++    "pnpm paperclipai service logs",
++  ])("allows the fully literal lifecycle command %s", command => {
++    expect(scanText("doc/E.md", command)).toHaveLength(0);
++  });
++
++  it.each([
++    "pnpm paperclipai service start --instance example",
++    "pnpm paperclipai service logs --config ./private-config.json",
++    'pnpm paperclipai service start "$INSTANCE"',
++  ])("rejects a content-bearing lifecycle suffix: %s", command => {
++    expect(scanText("doc/E.md", command)).toHaveLength(1);
++  });
++
+   it("flags a value-bearing option that the old flag list omitted", () => {
+     // --config, --data-dir, --instance, and --bind each carry a value.
+     expect(scanText("doc/E.md", "pnpm paperclipai doctor --config ./scratch.json")).toHaveLength(1);
+--- before/extension/src/entrypoints/manager/PaperclipConnection.tsx
++++ after/extension/src/entrypoints/manager/PaperclipConnection.tsx
+@@ -3,6 +3,11 @@
+ import { paperclipPermissionOrigins } from '../../core/host-access.js';
+ import { createPaperclipLifecycle, paperclipLifecycleText, type PaperclipLifecycleSnapshot } from '../../core/paperclip/lifecycle.js';
+ import { workspaceApi } from './workspace/client.js';
++
++const MANUAL_SERVICE_COMMANDS = {
++  start: { command: "pnpm paperclipai service start" },
++  logs: { command: "pnpm paperclipai service logs" },
++} as const;
+ 
+ export interface PaperclipConnection {
+   snapshot: PaperclipLifecycleSnapshot;
+@@ -88,12 +93,12 @@
+       <p role="status" title={text}>{compact ? <span aria-label={text}>PC · {snapshot.state === 'running' ? 'Running' : snapshot.state === 'starting' ? 'Starting…' : 'Offline'}</span> : text}</p>
+       {!compact && !summary && <>
+         {snapshot.state === 'not_installed' && <button type="button" className="tk-btn" onClick={setup}>Set up Paperclip</button>}
+-        {snapshot.state === 'stopped' && <><button type="button" className="tk-btn" onClick={retry}>Start</button><p className="tk-settings-note">Run "pnpm paperclipai service start" in the Paperclip folder, or install the Mac helper to start it automatically.</p></>}
++        {snapshot.state === 'stopped' && <><button type="button" className="tk-btn" onClick={retry}>Start</button><p className="tk-settings-note">{`Run "${MANUAL_SERVICE_COMMANDS.start.command}" in the Paperclip folder, or install the Mac helper to start it automatically.`}</p></>}
+         {(snapshot.state === 'unreachable' || snapshot.state === 'start_failed') && <button type="button" className="tk-btn" onClick={retry}>Retry</button>}
+         {snapshot.state === 'unreachable' && <button type="button" className="tk-btn" onClick={allowAccess}>Allow access</button>}
+         {snapshot.state === 'needs_sign_in' && <button type="button" className="tk-btn" onClick={onConfigure}>Sign in</button>}
+         {snapshot.state === 'setup_pending' && <button type="button" className="tk-btn" onClick={onConfigure}>Open Paperclip</button>}
+-        {snapshot.state === 'start_failed' && <p className="tk-settings-note">See "pnpm paperclipai service logs" for details.</p>}
++        {snapshot.state === 'start_failed' && <p className="tk-settings-note">{`See "${MANUAL_SERVICE_COMMANDS.logs.command}" for details.`}</p>}
+       </>}
+       {(compact || summary) && snapshot.state !== 'running' && onConfigure && <button type="button" className="tk-linklike" onClick={onConfigure} aria-label="Paperclip connection settings">Connect</button>}
+     </div>
+--- before/extension/tests/unit/paperclip-view.test.tsx
++++ after/extension/tests/unit/paperclip-view.test.tsx
+@@ -2,12 +2,26 @@
+ import { createRoot, type Root } from 'react-dom/client';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { PaperclipView } from '../../src/entrypoints/manager/PaperclipView.js';
++import { PaperclipStatus } from '../../src/entrypoints/manager/PaperclipConnection.js';
+ 
+ (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+ let container: HTMLDivElement;
+ let root: Root;
+ beforeEach(() => { container = document.createElement('div'); document.body.append(container); root = createRoot(container); });
+ afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); });
++
++describe('PaperclipStatus literal lifecycle guidance', () => {
++  it.each([
++    { state: 'stopped', status: 'Paperclip is stopped', button: 'Start', copy: 'Run "pnpm paperclipai service start" in the Paperclip folder, or install the Mac helper to start it automatically.' },
++    { state: 'start_failed', status: 'Paperclip did not start: fixture start failed', button: 'Retry', copy: 'See "pnpm paperclipai service logs" for details.' },
++  ] as const)('preserves exact visible status and guidance for $state', ({ state, status, button, copy }) => {
++    const connection = { snapshot: { state, origin: 'http://localhost:3100', reason: 'fixture start failed' }, retry: vi.fn(), setup: vi.fn(), allowAccess: vi.fn() };
++    act(() => root.render(<PaperclipStatus connection={connection} />));
++    expect(container.querySelector('.tk-settings-note')?.textContent).toBe(copy);
++    expect(container.textContent).toBe(status + button + copy);
++    expect(Array.from(container.querySelectorAll('button')).map(element => element.textContent)).toEqual([button]);
++  });
++});
+ 
+ describe('PaperclipView', () => {
+   const options = { origin: 'http://localhost:3100', initialPath: '/ACME/issues/ACME-12', onMessage: vi.fn(), onConfigure: vi.fn() };
+--- before/.plan/context/platform.md
++++ after/.plan/context/platform.md
+@@ -141,7 +141,7 @@
+ - Entry points `[verified: scan]`: `server/src/index.ts` (Express 5 app built in `server/src/app.ts:494`),
+   routes in `server/src/routes/*.ts` mounted under `/api` from `app.ts:709`, UI in `ui/src/main.tsx`,
+   CLI in `cli/src/index.ts`.
+-- From a source checkout the CLI runs as `pnpm paperclipai <command>` `[verified]` `paperclip/package.json:38`.
++- From this source checkout invoke the CLI directly as `node cli/node_modules/tsx/dist/cli.mjs cli/src/index.ts <command>`; `cli/src/index.ts` is the source entry point and the workspace installs its `tsx` runner.
+ - UI assumptions `[verified]`:
+   - API base is the constant `"/api"` (`ui/src/api/client.ts:8`).
+   - Routing is `BrowserRouter` (`ui/src/main.tsx:6`, `:129`).
+--- before/.plan/reqs/REQ-4-paperclip-running-and-connected.md
++++ after/.plan/reqs/REQ-4-paperclip-running-and-connected.md
+@@ -72,12 +72,12 @@
+ |---|---|---|
+ | running | `Paperclip is running` | none |
+ | starting | `Starting Paperclip…` | none |
+-| stopped | `Paperclip is stopped` | `Start` (when the helper is connected); otherwise the line `Run "pnpm paperclipai service start" in the Paperclip folder, or install the Mac helper to start it automatically.` |
++| stopped | `Paperclip is stopped` | `Start` (when the helper is connected); otherwise the line Run "`pnpm paperclipai service start`" in the Paperclip folder, or install the Mac helper to start it automatically. |
+ | not_installed | `Paperclip is not set up on this Mac` | `Set up Paperclip` (installs the background service through the helper) |
+ | needs_sign_in | `Paperclip needs you to sign in` | `Sign in` (opens the existing approval flow) |
+ | setup_pending | `Finish setting up Paperclip` | `Open Paperclip` |
+ | unreachable | `Can't reach Paperclip at {origin}` | `Retry` |
+-| start_failed | `Paperclip did not start: {reason}` | `Retry`, and the line `See "pnpm paperclipai service logs" for details.` |
++| start_failed | `Paperclip did not start: {reason}` | `Retry`, and the line See "`pnpm paperclipai service logs`" for details. |
+ 
+ Loading state: `starting`. Empty state: `not_installed`.
+ 

@@ -9,6 +9,7 @@ import {
   type ThreadVectorRecord,
 } from './schema.js';
 import type { ThreadkeeperDB } from './db.js';
+import { awsModelCredentialsReady, credentialPresent, embeddingCredentialKeys, resolveModelSettings } from './paperclip/credentials.js';
 import {
   AwsRequestError,
   awsCredentialsReady,
@@ -63,7 +64,7 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
   switch (settings.embeddingProvider) {
     case 'voyage':
       // Keep existing legacy vectors intact; Atlas uses a distinct space after migration.
-      return settings.voyageApiKey.trim()
+      return credentialPresent(settings, 'voyageApiKey')
         ? {
             id: settings.voyageEndpoint === 'mongodb' ? `voyage:mongodb:${settings.voyageModel}` : `voyage:${settings.voyageModel}`,
             provider: 'voyage', model: settings.voyageModel, relatedThreshold: 0.55,
@@ -72,7 +73,7 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
     case 'mongodb':
       // Atlas serves the same Voyage models as voyageai.com, but vectors are keyed by their own
       // space: the requested size is part of it, and a different host is a different account.
-      return settings.mongodbApiKey.trim()
+      return credentialPresent(settings, 'mongodbApiKey')
         ? {
             id: `mongodb:${settings.mongodbEmbeddingModel}:${settings.mongodbEmbeddingDimensions}`,
             provider: 'mongodb',
@@ -82,7 +83,7 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
           }
         : null;
     case 'cohere': {
-      if (!settings.cohereApiKey.trim()) return null;
+      if (!credentialPresent(settings, 'cohereApiKey')) return null;
       const info = cohereEmbeddingInfo(settings.cohereEmbeddingModel);
       const dims = cohereEffectiveDimensions(info.id, settings.cohereEmbeddingDimensions);
       // Pro and Fast of one generation share a vector space, so they share an id: index with
@@ -90,7 +91,7 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
       return { id: `cohere:${info.family}:${dims}`, provider: 'cohere', model: info.id, relatedThreshold: 0.5, dimensions: dims };
     }
     case 'openai':
-      return settings.openaiApiKey.trim()
+      return credentialPresent(settings, 'openaiApiKey')
         ? { id: `openai:${settings.openaiEmbeddingModel}`, provider: 'openai', model: settings.openaiEmbeddingModel, relatedThreshold: 0.5 }
         : null;
     case 'ollama':
@@ -99,7 +100,7 @@ export function remoteSpace(settings: SettingsRecord): EmbeddingSpace | null {
         : null;
     case 'bedrock':
       // The output size is part of the space: 256- and 1024-dim vectors never mix.
-      return awsCredentialsReady(settings.aws)
+      return awsModelCredentialsReady(settings)
         ? {
             id: `bedrock:${settings.bedrockEmbeddingModel}:${bedrockEmbeddingDims(settings)}`,
             provider: 'bedrock',
@@ -535,6 +536,8 @@ export async function embedTexts(
 ): Promise<number[][]> {
   if (texts.length === 0) return [];
   if (space.provider === 'local') return texts.map((t) => localHashEmbedding(t));
+  options.signal?.throwIfAborted();
+  settings = await resolveModelSettings(settings, 'embeddings', embeddingCredentialKeys(settings, space.provider));
   options.signal?.throwIfAborted();
   const controller = new AbortController();
   const timeoutMs = options.timeoutMs ?? 30_000;

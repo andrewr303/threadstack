@@ -1,6 +1,5 @@
 import Anthropic, { betaRefusalFallbackMiddleware } from '@anthropic-ai/sdk';
 import {
-  awsCredentialsReady,
   awsHostOrigins,
   awsPlatformBaseUrl,
   bedrockRuntimeAnthropicBaseUrl,
@@ -8,6 +7,7 @@ import {
   isValidAwsRegion,
 } from '../aws.js';
 import type { AiBackend, AiModelId, SettingsRecord } from '../schema.js';
+import { awsModelCredentialsReady, credentialPresent } from '../paperclip/credentials.js';
 
 /**
  * One Anthropic SDK client for three ways of reaching Claude:
@@ -145,16 +145,16 @@ export function aiCredentialsReady(settings: SettingsRecord): boolean {
   if (isOpenAiModel(settings.aiModel) && settings.aiBackend !== 'bedrock') return false;
   switch (settings.aiBackend) {
     case 'bedrock':
-      return awsCredentialsReady(settings.aws);
+      return awsModelCredentialsReady(settings);
     case 'aws_platform': {
       const workspace = /^wrkspc_[A-Za-z0-9]+$/.test(settings.awsPlatformWorkspaceId.trim());
       if (!workspace || !isValidAwsRegion(settings.aws.region)) return false;
       return settings.aws.auth === 'api_key'
-        ? settings.awsPlatformApiKey.trim().length > 0
-        : awsCredentialsReady(settings.aws);
+        ? credentialPresent(settings, 'awsPlatformApiKey')
+        : awsModelCredentialsReady(settings);
     }
     default:
-      return settings.anthropicApiKey.trim().length > 0;
+      return credentialPresent(settings, 'anthropicApiKey');
   }
 }
 

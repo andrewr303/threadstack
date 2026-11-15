@@ -201,6 +201,7 @@ function createBackupSession({ home = os.homedir(), now = () => new Date() } = {
 async function handle(message, options = {}) {
   const platform = options.platform || process.platform;
   if (message?.type === 'ping') return platform === 'darwin' ? { ok: true, version: VERSION, platform: 'macOS', backups: true } : { ok: false, error: 'The account profile helper requires macOS.' };
+  if (['paperclip.status', 'paperclip.start', 'paperclip.install'].includes(message?.type)) return handlePaperclip(message.type, options);
   if (typeof message?.type === 'string' && message.type.startsWith('backup-')) {
     if (platform !== 'darwin') throw Error('The account profile helper requires macOS.');
     const session = options.session || createBackupSession(options);
@@ -216,6 +217,51 @@ async function handle(message, options = {}) {
   const run = options.run || ((cmd, args, opts) => new Promise((resolve, reject) => execFile(cmd, args, opts, e => e ? reject(Error('Chrome could not be opened. Check that Google Chrome is installed and try again.')) : resolve())));
   await run(plan.command, plan.args, plan.options);
   return { ok: true, opened: true };
+}
+
+async function handlePaperclip(type, options) {
+  if ((options.platform || process.platform) !== 'darwin') return { ok: false, error: 'unsupported_platform' };
+  const registration = options.paperclip;
+  if (!registration || !path.isAbsolute(registration.root || '') || !path.isAbsolute(registration.shim || '')
+      || !/^[A-Za-z0-9_-]{1,80}$/.test(registration.instanceId || '')) return { ok: false, error: 'paperclip_not_registered' };
+  const exists = options.exists || fs.existsSync;
+  if (!exists(registration.root) || !exists(registration.shim)) return { ok: false, error: 'paperclip_start_failed' };
+  const run = options.run || ((command, args, opts) => new Promise((resolve, reject) => execFile(command, args, opts,
+    (error, stdout) => error ? reject(error) : resolve({ stdout }))));
+  const env = { HOME: options.home || os.homedir(), PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+    PAPERCLIP_SHIM_PATH: registration.shim };
+  for (const name of ['USER', 'LOGNAME', 'TMPDIR']) if (process.env[name]) env[name] = process.env[name];
+  const invoke = verb => run(registration.shim, ['service', verb, '--json', '--instance', registration.instanceId],
+    { cwd: registration.root, env, timeout: verb === 'install' ? 60_000 : 15_000, maxBuffer: 1024 * 1024, windowsHide: true });
+  try {
+    if (type === 'paperclip.install') {
+      await invoke('install');
+      return { ok: true, started: true };
+    }
+    const result = await invoke('status');
+    const status = JSON.parse(result.stdout);
+    if (typeof status.installed !== 'boolean' || typeof status.active !== 'boolean') throw Error('invalid_status');
+    // An upstream install can use the same instance label. A background auto-start must never
+    // replace its executable; only the explicit Set up Paperclip action may install this fork.
+    // Without a serviceName the label cannot be tied to this registration, so it is not trusted.
+    if (status.installed && typeof status.serviceName !== 'string') { status.installed = false; status.active = false; }
+    if (status.installed) {
+      const name = registration.instanceId === 'default' ? 'ing.paperclip.paperclipai' : `ing.paperclip.paperclipai.${registration.instanceId}`;
+      const definition = path.join(env.HOME, 'Library/LaunchAgents', `${name}.plist`);
+      let executable = null;
+      try {
+        const content = (options.readFile || (file => fs.readFileSync(file, 'utf8')))(definition);
+        const match = content.match(/<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]+)<\/string>/);
+        executable = match?.[1].replace(/&(amp|lt|gt|quot|apos);/g, (_, entity) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" })[entity]);
+      } catch { /* A missing or unreadable definition is not this registered service. */ }
+      if (executable !== registration.shim) { status.installed = false; status.active = false; }
+    }
+    if (type === 'paperclip.status') return { ok: true, paperclip: { service: !status.installed ? 'not_installed' : status.active ? 'running' : 'stopped' } };
+    // Paperclip's start() can install a missing launchd definition. Automatic starts must not.
+    if (!status.installed) return { ok: false, error: 'paperclip_not_registered' };
+    if (!status.active) await invoke('start');
+    return { ok: true, started: true };
+  } catch { return { ok: false, error: 'paperclip_start_failed' }; }
 }
 function frame(value) {
   const body = Buffer.from(JSON.stringify(value), 'utf8'), header = Buffer.alloc(4); header.writeUInt32LE(body.length); return Buffer.concat([header, body]);

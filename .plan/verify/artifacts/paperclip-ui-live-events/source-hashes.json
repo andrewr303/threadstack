@@ -1,0 +1,19 @@
+{
+  "ui/src/main.tsx": "ccf113c564806fd20ee5e0fa1d35b3f6559a740174877dba5117201d20198e37",
+  "ui/src/components/ThreadkeeperHostBridge.tsx": "90810b1d7ffc5eca72d749c3d13ecf915d0c79d1b741f19c32986407734b6149",
+  "ui/src/lib/threadkeeper-host.ts": "5cb16f0336a582868bef89a6d6852be6446089d8506396ff2acb755f3bae2288",
+  "ui/src/lib/threadkeeper-host-state.ts": "181755a86c3071dc644e949705e52c3c6382c3ed6adc83da622bf41d214ef561",
+  "ui/src/lib/threadkeeper-boot-channel.test.ts": "28035995725297a6fb774a75f82c9db93063be4853c4070a903710a242a88701",
+  "ui/src/lib/hosted-live-transport.ts": "0fe886a94f1dace9072afbacb3adde013f1c97c65c116b50f260a8586f0766ce",
+  "ui/src/lib/hosted-live-transport.test.ts": "479bbf8aaf638181ced6f5fd413ee825e22925152d8156808b88ec9817294edc",
+  "ui/src/lib/company-live-connection-events.ts": "f1df66eb898ee372cec215a9ebd077afd1caed822e695e9074e0a94f101d717e",
+  "ui/src/context/LiveUpdatesProvider.tsx": "2efd5c5db60d86285a3a65209ae532e892cad23edb6ae2aa0a5d7e400f49f997",
+  "ui/src/context/LiveUpdatesProvider.recovery.test.tsx": "a49c94fe56b1d34a260cb436f4c881fa4e23c62b70c85067935d17a24d943e6a",
+  "ui/src/components/CoordinatorSidebar.tsx": "fb77d8ee690e751c9ebae85c691dd6b61adc685b995bd38badffef24d8f2d271",
+  "ui/src/components/IssueDetailTabBar.tsx": "cfed42c11ecc5a746c158b6e78a64bc313e9ebad5cc912cc66ce516a95031ade",
+  "ui/src/pages/IssueDetail.tsx": "d002d15fc59e1ec13c3d0efc8eb988a6fde15d857e2db40688bf5db48457c153",
+  "ui/src/components/BrowserSessionCredentialSettings.tsx": "dbfc35d1af30119520a317f59a39aed1c43248711211ef82d2a71b0c03b66e75",
+  "ui/src/pages/Search.tsx": "c5d1789c4a3165daf2d50c9fda0dea57e6a61058f894ea7323d967e82a3569cc",
+  "ui/src/components/CommandPalette.tsx": "41b7b5de5048f519e5f7fb527e18a1d29ec5bf02c23323373fd8f79898c166a5",
+  "extension/scripts/run-paperclip-e2e.mjs": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039"
+}

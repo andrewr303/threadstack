@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseThreadKey, type ConversationRecord } from '../../core/schema.js';
 import { providerLabel } from '../../core/providers.js';
+import { PaperclipTaskLinks } from './PaperclipTaskLinks.js';
 
 export interface SessionLink {
   threadKey: string;
@@ -45,10 +46,10 @@ export function PaperclipLinks({
   onSelect: (threadKey: string) => void;
 }) {
   const { kind, links } = sessionLinks(conv, conversations);
-  if (links.length === 0) return null;
+  if (links.length === 0) return <PaperclipTaskLinks conv={conv} />;
   const missing = links.filter((l) => !l.conv);
   return (
-    <div className="tk-filter-row" style={{ marginTop: 4 }} data-testid="paperclip-links">
+    <><div className="tk-filter-row" style={{ marginTop: 4 }} data-testid="paperclip-links">
       <span className="tk-eyebrow" style={{ padding: 0 }}>
         {kind === 'sessions' ? (links.length === 1 ? 'Linked session:' : 'Linked sessions:') : 'Run by Paperclip:'}
       </span>
@@ -65,6 +66,6 @@ export function PaperclipLinks({
           {missing.length === 1 ? 'it' : 'them'}.
         </span>
       )}
-    </div>
+    </div><PaperclipTaskLinks conv={conv} /></>
   );
 }

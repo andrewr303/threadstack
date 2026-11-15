@@ -366,6 +366,7 @@ export class PaperclipSync {
   async syncIssue(ctx: CompanyContext, issueId: string): Promise<string | null> {
     const issue: PcIssue = await this.client.getIssue(issueId);
     if (!issue?.id) return null;
+    if (issue.companyId !== ctx.company.id) throw new PaperclipError('forbidden', 'Task belongs to another company');
     const account = this.settings.boundAccounts.paperclip;
     const threadKey = paperclipThreadKey(account, issue.id);
     const [comments, runRows, storedMessages, existing] = await Promise.all([
@@ -678,6 +679,58 @@ export function describeSyncResult(state: PaperclipSyncState): string {
   if (r.runsRead > 0) parts.push(`${r.runsRead} run${r.runsRead === 1 ? '' : 's'} read`);
   if (r.skippedDeleted > 0) parts.push(`${r.skippedDeleted} deleted here, left out`);
   return `${parts.join(', ')}${r.partial ? '; more to sync, continuing shortly' : ''}.`;
+}
+
+/** Apply a bounded bridge hint without advancing the periodic sync's cursor or run marks. */
+export async function runPaperclipHintSync(
+  hint: { companyId: string; issueIds: string[]; runIds?: string[] },
+  options: SyncOptions,
+): Promise<string[]> {
+  const settings = options.settings ?? await ensureStarterCollectionsAndSettings(options.db);
+  const pc = settings.paperclip;
+  if (!pc.enabled || !hint.companyId || !Array.isArray(hint.issueIds)) return [];
+  if (pc.companyScope === 'selected' && !pc.companyIds.includes(hint.companyId)) return [];
+  const client = new PaperclipClient({ serverUrl: pc.serverUrl, apiKey: pc.auth === 'board_key' ? pc.apiKey : '', fetch: options.fetch, signal: options.signal, sleep: options.sleep });
+  const company = filterCompanies(await client.listCompanies(), settings).find(c => c.id === hint.companyId);
+  if (!company) return [];
+  const sync = new PaperclipSync(options.db, client, settings, options.now ?? Date.now);
+  const ctx = await sync.loadCompanyContext(company);
+  const validId = (id: unknown): id is string => typeof id === 'string' && id.length > 0 && id.length <= 200;
+  const issueIds = new Set(hint.issueIds.filter(validId));
+  const runIds = [...new Set((hint.runIds ?? []).filter(validId))].slice(0, 100);
+  // One deleted, hidden or foreign task or run is skipped; the rest of the hint still applies (REQ-12 F-3).
+  const skippable = (err: unknown) => err instanceof PaperclipError && (err.kind === 'not_found' || err.kind === 'forbidden');
+  if (runIds.length) {
+    const summaries = await client.listCompanyRuns(company.id);
+    for (const runId of runIds) {
+      const summary = summaries.find(run => run.id === runId);
+      let issueId = summary?.issueId ?? summary?.contextSnapshot?.issueId;
+      if (!issueId) {
+        try {
+          const detail = await client.getRun(runId);
+          if (detail.companyId !== company.id) throw new PaperclipError('forbidden', 'Run belongs to another company');
+          issueId = detail.issueId ?? (typeof detail.contextSnapshot?.issueId === 'string' ? detail.contextSnapshot.issueId : undefined);
+        } catch (err) { if (!skippable(err)) throw err; continue; }
+      }
+      if (validId(issueId)) issueIds.add(issueId);
+    }
+  }
+  for (const id of [...issueIds].slice(0, 100)) {
+    try { await sync.syncIssue(ctx, id); }
+    catch (err) { if (!skippable(err)) throw err; }
+  }
+  if (options.store) {
+    // "Last synced" reflects a hint-driven fetch; cursors, run marks and back-off stay the timer's.
+    const state = await options.store.load();
+    state.lastSyncAt = new Date((options.now ?? Date.now)()).toISOString();
+    await options.store.save(state).catch(() => undefined);
+  }
+  if (sync.storedKeys.length) {
+    if (options.organize) await options.organize(sync.storedKeys, settings);
+    else await processThreadsLocally(options.db, sync.storedKeys, { aiDelaySeconds: settings.autoOrganize.aiDebounceSeconds });
+    await sync.applyWorkflowStates();
+  }
+  return [...sync.storedKeys];
 }
 
 export type { CompanyContext };

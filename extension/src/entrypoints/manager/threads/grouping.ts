@@ -7,6 +7,7 @@ import { providerCategory } from '../../../core/providers.js';
 import { groupByRepository, hasRepositoryOwner, repositoryName, threadRepository } from '../../../core/repository.js';
 import type { ConversationRecord, ThreadsGroupBy } from '../../../core/schema.js';
 import type { SearchHit } from '../../../core/search.js';
+import { groupLens, hitConversation } from '../workspace/lens.js';
 
 export const isCodingProvider = (provider: string): boolean => providerCategory(provider) === 'coding_agent';
 
@@ -64,7 +65,7 @@ export function matchesRepository(group: string | null | undefined, filter: stri
 export interface ThreadGroup {
   /** Stable id: `<groupBy>:<key>`. What is collapsed is remembered by it. */
   id: string;
-  /** Project name, repository, or account id; null for "no repository" / "no account". */
+  /** Project, repository, account id, type, provider id, date bucket or status; null when there is none. */
   key: string | null;
   hits: SearchHit[];
 }
@@ -72,37 +73,26 @@ export interface ThreadGroup {
 export interface GroupKeys {
   repository: (conv: ConversationRecord) => string | null;
   account: (conv: ConversationRecord) => string | null;
+  /** Account ids in sign-in order, then account order (what the rail and menus list). */
+  accountOrder?: readonly string[];
+  /** The moment date groups are measured from; now when not given. */
+  now?: number;
 }
 
 /**
- * Split hits (already in list order) into groups. Projects and accounts appear in the order their
- * first thread does; repositories are ordered like the rail (biggest first, then by name); the
- * group of threads without a repository or account comes last. Inside a group the order is kept.
+ * Split hits (already in list order) into groups with the shared lens rules (workspace/lens.ts):
+ * type, date and status in their own fixed orders, accounts in sign-in order, and providers,
+ * repositories and projects biggest first, then by name. The group of threads with nothing to
+ * group by comes last. Inside a group the order is kept.
  */
 export function groupThreadHits(hits: readonly SearchHit[], groupBy: ThreadsGroupBy, keys: GroupKeys): ThreadGroup[] {
   if (groupBy === 'none') return [];
-  const keyOf = (hit: SearchHit): string | null => {
-    const conv = hit.conversation;
-    if (groupBy === 'project') return conv.project || 'Unassigned';
-    return groupBy === 'repository' ? keys.repository(conv) : keys.account(conv);
-  };
-  const byKey = new Map<string | null, SearchHit[]>();
-  for (const hit of hits) {
-    const key = keyOf(hit);
-    const list = byKey.get(key);
-    if (list) list.push(hit);
-    else byKey.set(key, [hit]);
-  }
-  const groups: ThreadGroup[] = [...byKey.entries()].map(([key, list]) => ({
-    id: `${groupBy}:${key ?? ''}`,
-    key,
-    hits: list,
-  }));
-  if (groupBy === 'repository') {
-    groups.sort((a, b) => b.hits.length - a.hits.length || (a.key ?? '').localeCompare(b.key ?? ''));
-  }
-  // "Nothing to group by" is always last, whatever the order above was.
-  return [...groups.filter((g) => g.key !== null), ...groups.filter((g) => g.key === null)];
+  return groupLens(hits, groupBy, hitConversation, {
+    now: keys.now,
+    accountIdOf: keys.account,
+    accountOrder: keys.accountOrder,
+    repositoryOf: keys.repository,
+  }).map((group) => ({ id: group.id, key: group.key, hits: group.sessions }));
 }
 
 // ---------------------------------------------------------------------------------------------

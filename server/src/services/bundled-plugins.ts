@@ -56,6 +56,8 @@ export interface BundledPluginCatalogEntry {
    * containment when enforcement is on.
    */
   pathOverrideEnvVar?: string;
+  /** First-party self-hosted source package may use the loader's normal autobuild. */
+  allowSourceBuild?: boolean;
 }
 
 /**
@@ -64,6 +66,12 @@ export interface BundledPluginCatalogEntry {
  * regardless of what the managed config document says.
  */
 export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
+  {
+    key: "browser-sessions",
+    pluginKey: "browser-sessions",
+    relativePath: "plugin-browser-sessions",
+    allowSourceBuild: true,
+  },
   {
     key: "boxd",
     pluginKey: "paperclip.boxd-sandbox-provider",
@@ -114,10 +122,11 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
 
 /**
  * Keys ensured on a self-hosted instance (no managed config present).
- * Exactly the pre-refactor behavior: the kubernetes sandbox provider is
- * auto-installed when its bundle is present, nothing else.
+ * This fork bundles its first-party Threadkeeper bridge alongside the existing
+ * Kubernetes provider. Installation remains fail-safe; explicit disable/uninstall
+ * choices are preserved by ensureBundledPlugins on subsequent starts.
  */
-export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = ["kubernetes"];
+export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = ["kubernetes", "browser-sessions"];
 
 export function resolveManagedBundledPluginKeys(
   keys: readonly string[] | null | undefined,
@@ -138,6 +147,7 @@ export interface ResolvedBundledPlugin {
   pluginKey: string;
   /** Absolute path handed to `loader.installPlugin({ localPath })`. */
   localPath: string;
+  allowSourceBuild?: boolean;
   /** Image-owned entries require exact manifest identity/version matching. */
   distribution?: DistributionPlugin;
 }
@@ -211,7 +221,7 @@ export function resolveBundledPluginInstalls(
         `bundled plugin "${key}" resolves to "${localPath}", outside the bundled catalog root "${opts.catalogRoot}"; refusing to start`,
       );
     }
-    resolved.push({ key: entry.key, pluginKey: entry.pluginKey, localPath: opts.enforceCatalogRoot ? canonicalize(localPath) : localPath });
+    resolved.push({ key: entry.key, pluginKey: entry.pluginKey, localPath: opts.enforceCatalogRoot ? canonicalize(localPath) : localPath, ...(entry.allowSourceBuild ? { allowSourceBuild: true } : {}) });
   }
   return resolved;
 }
@@ -255,6 +265,17 @@ export interface BundledPluginProvisionerDeps {
 
 function defaultBundleManifestExists(localPath: string): boolean {
   return fs.existsSync(path.join(localPath, "dist", "manifest.js"));
+}
+
+function hasFirstPartySourcePackage(install: ResolvedBundledPlugin): boolean {
+  if (!install.allowSourceBuild || install.distribution || install.key !== "browser-sessions" || install.pluginKey !== "browser-sessions" || path.basename(install.localPath) !== "plugin-browser-sessions") return false;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(install.localPath, "package.json"), "utf8"));
+    return pkg.name === "@paperclipai/plugin-browser-sessions"
+      && typeof pkg.scripts?.build === "string"
+      && ["./dist/manifest.js", "dist/manifest.js"].includes(pkg.paperclipPlugin?.manifest)
+      && fs.existsSync(path.join(install.localPath, "src", "manifest.ts"));
+  } catch { return false; }
 }
 
 /**
@@ -434,7 +455,8 @@ export async function ensureBundledPlugins(
       }
       // Skip silently when the bundle is absent (e.g. local dev or an image
       // built without the plugin). Not an error condition.
-      if (!verifiedManifest && !bundleManifestExists(install.localPath)) {
+      const sourceBuildAllowed = !opts.reinstallUninstalled && hasFirstPartySourcePackage(install);
+      if (!verifiedManifest && !bundleManifestExists(install.localPath) && !sourceBuildAllowed) {
         deps.logger.info(
           { pluginKey: install.pluginKey, pluginPath: install.localPath },
           "bundled plugin bundle not present; skipping auto-install",

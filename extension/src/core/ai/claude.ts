@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import type { AiModelId, SettingsRecord } from '../schema.js';
+import { aiCredentialKeys, resolveModelSettings } from '../paperclip/credentials.js';
 import { THREAD_KINDS } from '../schema.js';
 import {
   aiCredentialsProblem,
@@ -442,6 +443,7 @@ export async function analyzeThreadWithClaude(
   input: AnalysisInput,
   fetchImpl?: typeof fetch
 ): Promise<{ analysis: ThreadAnalysis; model: string; inputTokens: number; outputTokens: number }> {
+  settings = await resolveModelSettings(settings, 'analysis', aiCredentialKeys(settings));
   const request = buildAnalysisRequest(input);
 
   try {
@@ -555,6 +557,7 @@ export async function planOrganizationWithClaude(
   },
   fetchImpl?: typeof fetch
 ): Promise<OrganizePlan> {
+  settings = await resolveModelSettings(settings, 'organization', aiCredentialKeys(settings));
   const rows = params.threads
     .map(
       (t, i) =>
@@ -631,6 +634,7 @@ export async function askLibraryWithClaude(
   onText?: (delta: string) => void,
   fetchImpl?: typeof fetch
 ): Promise<string> {
+  settings = await resolveModelSettings(settings, 'Ask', aiCredentialKeys(settings));
   const client = createClaudeClient(settings, fetchImpl);
   const context = threads
     .map(
@@ -683,6 +687,8 @@ export async function testClaudeConnection(
   settings: SettingsRecord,
   fetchImpl?: typeof fetch
 ): Promise<{ ok: boolean; message: string }> {
+  try { settings = await resolveModelSettings(settings, 'analysis', aiCredentialKeys(settings)); }
+  catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Paperclip model keys are unavailable.' }; }
   const problem = aiCredentialsProblem(settings);
   if (problem) return { ok: false, message: problem };
   try {
@@ -800,6 +806,7 @@ export async function catchUpBriefWithClaude(
   params: { days: number },
   fetchImpl?: typeof fetch
 ): Promise<{ brief: CatchUpBriefOutput; model: string }> {
+  settings = await resolveModelSettings(settings, 'catch-up brief', aiCredentialKeys(settings));
   const list = (label: string, items: string[]) => (items.length ? `\n${label}: ${items.join(' | ')}` : '');
   const context = rows
     .map(

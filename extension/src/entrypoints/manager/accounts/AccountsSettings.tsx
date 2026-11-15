@@ -1,10 +1,11 @@
-// Settings, Accounts: the accounts of every sign-in, how switching works, and the Mac helper.
+// Settings, Accounts: the accounts of every sign-in, how they work side by side, and the Mac helper.
 // The workspace exists only on the full page; on the side panel and the in-page overlay this
 // panel says where accounts are managed instead.
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.js';
 import { useOptionalWorkspaceContext, type WorkspaceContextValue } from '../workspace/context.js';
 import type { AccountColor, AccountRecord, RealmAccounts } from '../../../core/workspace/types.js';
+import { needsSignIn } from '../workspace/state.js';
 import { ACCOUNT_COLORS, COLOR_LABELS, MAX_ACCOUNT_NAME, openFullPage, useMounted } from './common.js';
 import { HelperPanel } from './HelperPanel.js';
 
@@ -13,10 +14,9 @@ function identityLine(account: AccountRecord): string {
   return account.identity ? 'Signed in, name not shown by the site' : 'Identity not seen yet';
 }
 
-function signedInLine(account: AccountRecord, active: boolean): string {
-  if (account.mode === 'isolated') return 'Signed in inside its own Chrome window';
-  if (active) return 'Signed in now';
-  return account.hasJar ? 'Not signed in now. Its sign-in is saved on this device.' : 'Not signed in now';
+function signedInLine(account: AccountRecord, browser: boolean): string {
+  if (browser) return 'The account this browser is signed in to';
+  return needsSignIn(account) ? 'Not signed in yet' : 'Signed in. Its sign-in is kept on this device, encrypted.';
 }
 
 function AccountRow({
@@ -36,6 +36,7 @@ function AccountRow({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingBrowser, setConfirmingBrowser] = useState(false);
   const removeRef = useRef<HTMLButtonElement>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
@@ -92,6 +93,32 @@ function AccountRow({
       setError(result.error);
       setConfirming(false);
     }
+  };
+
+  const realmEntry = workspace.realms.find((r) => r.realm.id === account.realm);
+  const realmName = realmEntry?.realm.label ?? 'this sign-in';
+  const pendingHere = Boolean(realmEntry?.pendingSignIn);
+  const signedOut = needsSignIn(account);
+
+  const signInWithBrowser = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await workspace.beginBrowserSignIn(account.id);
+    if (!mounted.current) return;
+    setBusy(false);
+    if (result.ok) announce(`Sign in to ${realmName} as ${account.label} in the browser tab that opened.`);
+    else setError(result.error);
+  };
+
+  const makeBrowserAccount = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await workspace.useAsBrowserAccount(account.id);
+    if (!mounted.current) return;
+    setBusy(false);
+    setConfirmingBrowser(false);
+    if (result.ok) announce(`This browser is now signed in to ${realmName} as ${account.label}.`);
+    else setError(result.error);
   };
 
   const nameId = `tk-acct-name-${account.id}`;
@@ -167,11 +194,39 @@ function AccountRow({
           <dd>{signedInLine(account, active)}</dd>
         </div>
         <div>
-          <dt>Runs</dt>
-          <dd>{account.mode === 'isolated' ? 'In its own Chrome window' : 'In the workspace'}</dd>
+          <dt>Used</dt>
+          <dd>{active ? 'In Threadkeeper and in your ordinary tabs' : 'Inside Threadkeeper only'}</dd>
         </div>
       </dl>
       {account.primary && <p className="tk-acct-help">This is the sign-in your browser already had, so it cannot be removed.</p>}
+      {!active && !confirmingBrowser && (
+        <div className="tk-acct-row-actions">
+          <button type="button" className="tk-btn" disabled={busy || pendingHere} onClick={() => void signInWithBrowser()}>
+            {signedOut ? 'Sign in with a browser tab' : 'Sign in again with a browser tab'}
+          </button>
+          {!signedOut && (
+            <button type="button" className="tk-btn tk-btn-quiet" disabled={busy || pendingHere} onClick={() => setConfirmingBrowser(true)}>
+              Make this the browser’s sign-in
+            </button>
+          )}
+        </div>
+      )}
+      {confirmingBrowser && (
+        <div className="tk-acct-confirm" role="group" aria-label={`Make ${account.label} the browser's sign-in`}>
+          <p>
+            Sign this browser in to {realmName} as {account.label}? Every {realmName} tab changes to this account. The account the
+            browser uses now is kept and stays available inside Threadkeeper.
+          </p>
+          <div className="tk-acct-confirm-actions">
+            <button type="button" className="tk-btn" disabled={busy} onClick={() => setConfirmingBrowser(false)}>
+              Keep as it is
+            </button>
+            <button type="button" className="tk-btn tk-btn-primary" disabled={busy} onClick={() => void makeBrowserAccount()}>
+              {busy ? 'Changing…' : 'Change the browser’s sign-in'}
+            </button>
+          </div>
+        </div>
+      )}
       {confirming && (
         <div className="tk-acct-confirm" role="group" aria-label={`Remove ${account.label}`}>
           <p>
@@ -247,17 +302,19 @@ export function AccountsSettings() {
     <>
       <section className="tk-settings-section tk-acct-settings" aria-labelledby="tk-acct-how-h">
         <h3 className="tk-settings-h3" id="tk-acct-how-h">
-          How switching works
+          How accounts work
         </h3>
         <p className="tk-settings-note">
-          Chrome keeps one set of cookies per sign-in, so one account of each sign-in is signed in at a time, in Threadkeeper and
-          in every other Chrome tab. Switching saves the outgoing account's sign-in cookies on this device (encrypted, never
-          exported or sent anywhere), clears them, restores the other account's, and reloads that sign-in's pages.
+          Every sign-in has the account your browser itself is signed in to, plus any accounts you add. An added account is signed
+          in inside Threadkeeper only: its sign-in is kept on this device (encrypted, never exported or sent anywhere) and loaded
+          into a space of its own each time Threadkeeper opens. Nothing is signed out for it, so it works beside your browser’s
+          account, in tabs, in the sidebar and on the dashboard.
         </p>
         <p className="tk-settings-note">
-          Only cookies are swapped. Other data a site stores, such as drafts, is shared between the accounts. Threadkeeper never
-          sees or stores your passwords. An account kept in its own Chrome window uses a separate profile through the Mac helper,
-          which is how two accounts of one sign-in can be signed in at the same moment.
+          Two accounts of one sign-in can be open at the same moment: the browser’s own and one more. A third takes the second
+          place after Threadkeeper reloads its pages. An added account starts with fresh site storage each time Threadkeeper is
+          opened, so drafts a site keeps only in the browser are not carried over, and the browser holds about 10 KB of cookies
+          per site for it. Threadkeeper never sees or stores your passwords.
         </p>
       </section>
 

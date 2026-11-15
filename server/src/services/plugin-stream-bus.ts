@@ -45,6 +45,17 @@ export interface PluginStreamBus {
   ): void;
 }
 
+/** Adapt the worker manager's already company-validated stream notifications. */
+export function pluginStreamNotificationHandler(bus: PluginStreamBus, pluginId: string) {
+  return (method: string, params: Record<string, unknown>) => {
+    const { channel, companyId } = params;
+    if (typeof channel !== "string" || !channel || typeof companyId !== "string" || !companyId) return;
+    if (method === "streams.emit") bus.publish(pluginId, channel, companyId, params.event, "message");
+    else if (method === "streams.open") bus.publish(pluginId, channel, companyId, {}, "open");
+    else if (method === "streams.close") bus.publish(pluginId, channel, companyId, {}, "close");
+  };
+}
+
 /**
  * Create a new PluginStreamBus instance.
  */

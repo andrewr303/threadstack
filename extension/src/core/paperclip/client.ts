@@ -6,8 +6,8 @@
  * Settings → Paperclip. Requests never carry cookies: a local_trusted instance needs no
  * credentials at all, and an authenticated one gets a board API key as a Bearer token.
  *
- * Threadkeeper only reads. The only non-GET calls are the CLI-auth challenge that asks the user
- * to approve a key (auth.ts) and revoking that key again when the user signs out.
+ * This client reads Paperclip tasks and manages its board-key approval. The paired session
+ * integration owns company-scoped writes through its separately validated endpoints.
  */
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -81,11 +81,27 @@ export function isLoopbackServer(serverUrl: string): boolean {
   return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
 }
 
+/**
+ * Secret values (model keys) may travel only where the wire is private: an `https:` origin, or a
+ * loopback host (localhost, 127.0.0.0/8, ::1). A LAN or remote `http:` origin is refused.
+ */
+export function secretTransportAllowed(serverUrl: string): boolean {
+  const origin = normalizeServerUrl(serverUrl);
+  if (!origin) return false;
+  const url = new URL(origin);
+  if (url.protocol === 'https:') return true;
+  const host = url.hostname;
+  return host === 'localhost' || host === '[::1]' || /^127(?:\.\d{1,3}){3}$/.test(host);
+}
+export const SECRET_TRANSPORT_REFUSED = 'Model keys are sent only to Paperclip on this computer or over https.';
+
 export interface PaperclipHealth {
   status: string;
   deploymentMode: 'local_trusted' | 'authenticated' | '';
   deploymentExposure: string;
   version: string;
+  authReady?: boolean;
+  bootstrapStatus?: string;
 }
 
 /** A /api/health body is Paperclip's when it names a deployment mode (every variant of the route does). */
@@ -99,6 +115,8 @@ export function parseHealth(body: unknown): PaperclipHealth | null {
     deploymentMode: mode,
     deploymentExposure: typeof b.deploymentExposure === 'string' ? b.deploymentExposure : '',
     version: typeof b.version === 'string' ? b.version : typeof b.serverVersion === 'string' ? b.serverVersion : '',
+    ...(typeof b.authReady === 'boolean' ? { authReady: b.authReady } : {}),
+    ...(typeof b.bootstrapStatus === 'string' ? { bootstrapStatus: b.bootstrapStatus } : {}),
   };
 }
 
@@ -524,7 +542,7 @@ export class PaperclipClient {
       method: 'POST',
       auth: false,
       body: {
-        command: 'Threadkeeper: read issues, comments and agent runs',
+        command: 'Threadkeeper: sync tasks, manage paired browser sessions and model-key links',
         clientName: 'Threadkeeper',
         requestedAccess: 'board',
         ...(requestedCompanyId ? { requestedCompanyId } : {}),

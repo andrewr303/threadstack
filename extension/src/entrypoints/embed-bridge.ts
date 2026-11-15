@@ -10,7 +10,8 @@
 // them to the page half, and forwards each assignment the page makes (`EMBED_COOKIE_SET`). The
 // events on the document carry only that: the page's own script-visible cookies and the raw
 // strings it assigned, which is why a page script listening to them learns nothing new.
-import { frameMode } from '../core/embed/frame.js';
+import { TOP_LEVEL_MARK, frameMode, inProfileFrame, paneHasFlag, wantsTopLevelView } from '../core/embed/frame.js';
+import { PROFILE_MARK } from '../core/embed/profile-page.js';
 import {
   COOKIE_JAR_EVENT,
   COOKIE_READY_EVENT,
@@ -29,12 +30,18 @@ export interface CookieBridgeEnv {
   doc: Document;
   win: Window;
   storage: Storage | null;
+  /**
+   * This frame is a profile frame (credentialless). Sent with every cookie message, so the worker
+   * knows which jar the frame reads and writes before the page has made a single request.
+   */
+  profile?: boolean;
   /** Best effort. False when the extension is gone; `done` then never runs. */
   send(message: EmbedFrameEvent, done: (response: unknown) => void): boolean;
 }
 
 export function startCookieBridge(env: CookieBridgeEnv): { stop(): void } {
   const { doc, win, storage } = env;
+  const profile = env.profile === true;
   let cached: string | null = null;
   try {
     const value = storage?.getItem(COOKIE_CACHE_KEY);
@@ -75,7 +82,7 @@ export function startCookieBridge(env: CookieBridgeEnv): { stop(): void } {
     if (sending || queue.length === 0) return;
     const item = queue.shift()!;
     sending = true;
-    send({ type: 'EMBED_COOKIE_SET', cookie: item.cookie }, () => {
+    send({ type: 'EMBED_COOKIE_SET', cookie: item.cookie, profile }, () => {
       sending = false;
       // Sent, whatever the worker made of it: the refresh shows what the jar now holds.
       ackSeq = Math.max(ackSeq, item.seq);
@@ -121,7 +128,7 @@ export function startCookieBridge(env: CookieBridgeEnv): { stop(): void } {
     }
     inflight = true;
     const ackAtRequest = ackSeq;
-    send({ type: 'EMBED_COOKIES_GET' }, (response) => {
+    send({ type: 'EMBED_COOKIES_GET', profile }, (response) => {
       inflight = false;
       const r = response as { ok?: unknown; cookie?: unknown } | undefined;
       if (r?.ok === true && typeof r.cookie === 'string' && r.cookie.length <= MAX_JAR_LENGTH) onFresh(r.cookie, ackAtRequest);
@@ -167,6 +174,25 @@ export function startCookieBridge(env: CookieBridgeEnv): { stop(): void } {
   if (cached !== null) deliver(cached, 0);
   refresh();
   return { stop };
+}
+
+/**
+ * Leave the marks the page-world half acts on (embed-cookie-main.ts runs right after this
+ * script, before any script of the page). Only this world knows that the frame sits directly
+ * inside Threadkeeper's own page, so only it may ask for those changes.
+ */
+export function markEmbeddedDocument(
+  doc: Pick<Document, 'documentElement'>,
+  options: { profile: boolean; topLevel: boolean }
+): void {
+  try {
+    const root = doc.documentElement;
+    if (!root) return;
+    if (options.profile) root.setAttribute(PROFILE_MARK, '');
+    if (options.topLevel) root.setAttribute(TOP_LEVEL_MARK, '');
+  } catch {
+    // never disturb the page
+  }
 }
 
 /**
@@ -218,13 +244,19 @@ try {
   const isolated = globalThis as unknown as Record<symbol, boolean>;
   if (!isolated[BRIDGE_GUARD] && frameMode() === 'workspace') {
     isolated[BRIDGE_GUARD] = true;
+    const profile = inProfileFrame(window);
+    markEmbeddedDocument(document, {
+      profile,
+      // The workspace can switch this off for a tab (Settings); the option travels in the frame name.
+      topLevel: wantsTopLevelView(window.location.hostname) && !paneHasFlag('n'),
+    });
     let storage: Storage | null = null;
     try {
       storage = window.sessionStorage;
     } catch {
       // storage blocked for this frame
     }
-    startCookieBridge({ doc: document, win: window, storage, send: sendToExtension });
+    startCookieBridge({ doc: document, win: window, storage, send: sendToExtension, profile });
     // frameMode() checked the parent is this extension's page; its origin is the only target.
     // Built from the parts, as frame.ts does: URL#origin can be "null" for an unregistered scheme.
     const own = new URL(chrome.runtime.getURL(''));

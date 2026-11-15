@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Profile isolation spike",
+  "version": "0.0.1",
+  "description": "Research fixture: measures how a credentialless iframe inside an extension page handles cookies, storage and header rules. Not part of Threadkeeper.",
+  "permissions": [
+    "cookies",
+    "declarativeNetRequestWithHostAccess",
+    "webRequest",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://*.claude.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://*.claude.ai/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://*.claude.ai/*"
+      ],
+      "js": [
+        "main.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+
+ Test Files  4 passed (4)
+      Tests  52 passed (52)
+   Start at  23:25:09
+   Duration  3.22s (transform 42%, environment 27%, import 20%, tests 10%)
+
+  Transform  transforming modules took 3.88s · 42% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

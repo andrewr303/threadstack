@@ -10,6 +10,7 @@ import { Icon, type IconName } from './icons.js';
 import { Segmented, hasOpenPopover } from './primitives.js';
 import { RailAccounts } from './RailAccounts.js';
 import { SessionsNav } from './SessionsNav.js';
+import { PaperclipStatus } from '../PaperclipConnection.js';
 
 export interface RailProps {
   /** Narrow, icon-only rail. */
@@ -25,12 +26,20 @@ export interface RailProps {
   onOpenSettings: (section?: SectionId) => void;
   /** Navigation that belongs to the Threads view (projects and resurfacing queues). */
   children?: React.ReactNode;
+  /** The complete Threads index replaces the recent-session preview in this same sidebar. */
+  sessions?: React.ReactNode;
+  /**
+   * REQ-6 fused mode: Paperclip's sidebar is the only view switch, so this rail draws none and
+   * becomes the left column of the Threadkeeper view (sessions, accounts, Settings).
+   */
+  fused?: boolean;
 }
 
 const VIEWS: ReadonlyArray<{ value: WorkspaceView; label: string; icon: IconName }> = [
   { value: 'browse', label: 'Browse', icon: 'browse' },
   { value: 'threads', label: 'Threads', icon: 'threads' },
   { value: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { value: 'paperclip', label: 'Paperclip', icon: 'window' },
 ];
 
 /** Same width as the `max-width: 899px` rules in styles/10-shell.css. */
@@ -61,6 +70,8 @@ export function Rail({
   onToggleTheme,
   onOpenSettings,
   children,
+  sessions,
+  fused = false,
 }: RailProps) {
   const { workspace } = useWorkspaceContext();
   const narrow = useMediaQuery(NARROW_QUERY);
@@ -138,7 +149,7 @@ export function Rail({
           </button>
         </div>
 
-        {iconOnly ? (
+        {fused ? null : iconOnly ? (
           <nav aria-label="Views">
             <ul className="tk-rail-viewlist">
               {VIEWS.map((option) => (
@@ -177,8 +188,20 @@ export function Rail({
           </p>
         )}
 
-        {/* The session lists and the Threads navigation need words; the icon strip leaves them out. */}
-        {iconOnly ? (
+        {/* Keep the full Threads index mounted across view changes and collapse so an Ask draft,
+            expanded filters and scroll position survive. The preview is used on other views. */}
+        {sessions ? (
+          <>
+            <div className="tk-rail-scroll" data-thread-index="true" hidden={iconOnly || view !== 'threads'}
+              onClick={(event) => {
+                if (event.target instanceof Element && event.target.closest('button.tk-row-btn')) afterChoice();
+              }}>
+              {sessions}
+              {children && <details className="tk-rail-collections"><summary>Projects &amp; queues</summary>{children}</details>}
+            </div>
+            {!iconOnly && view !== 'threads' && <div className="tk-rail-scroll"><SessionsNav onOpened={afterChoice} /></div>}
+          </>
+        ) : iconOnly ? (
           <div className="tk-rail-scroll" />
         ) : (
           <div className="tk-rail-scroll">
@@ -187,6 +210,7 @@ export function Rail({
           </div>
         )}
 
+        <PaperclipStatus compact={iconOnly} summary onConfigure={() => onOpenSettings('paperclip')} />
         <RailAccounts
           collapsed={iconOnly}
           effectiveTheme={effectiveTheme}

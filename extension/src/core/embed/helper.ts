@@ -4,7 +4,9 @@
 //
 // The message format and the checks the helper repeats live in helper-protocol.ts.
 import type { AccountRecord, HelperPingResult, WorkspaceFailure } from '../workspace/types.js';
-import { HELPER_HOST, helperOpenRequest, type HelperRequest } from './helper-protocol.js';
+import { HELPER_HOST, helperOpenRequest, type HelperRequest, type PaperclipHelperResult } from './helper-protocol.js';
+
+export type { PaperclipHelperResult } from './helper-protocol.js';
 
 export interface HelperEnv {
   /** Whether the optional nativeMessaging permission is held right now. */
@@ -60,6 +62,24 @@ export async function helperPing(env: HelperEnv | null): Promise<HelperPingResul
   const platform = boundedString(r?.platform, 40);
   if (!r || r.ok !== true || !version || !platform) return UNAVAILABLE;
   return { ok: true, version, platform };
+}
+
+/** Only fixed lifecycle verbs cross native messaging; callers cannot supply executable paths. */
+export async function helperPaperclip(env: HelperEnv | null, action: 'status' | 'start' | 'install'): Promise<PaperclipHelperResult> {
+  if (!env || !(await env.hasPermission().catch(() => false))) return { ok: false, error: 'helper_unavailable' };
+  try {
+    const reply = await env.send(HELPER_HOST, { type: `paperclip.${action}` });
+    const r = reply as Record<string, unknown> | null;
+    if (r?.ok === true) {
+      const service = (r.paperclip as { service?: unknown } | undefined)?.service;
+      if (action === 'status' && (service === 'running' || service === 'stopped' || service === 'not_installed')) {
+        return { ok: true, paperclip: { service } };
+      }
+      if (action !== 'status' && r.started === true) return { ok: true, started: true };
+    }
+    if (r?.ok === false && typeof r.error === 'string' && /^[a-z_]{1,80}$/.test(r.error)) return { ok: false, error: r.error };
+  } catch { /* An older or missing helper is an unavailable lifecycle service. */ }
+  return { ok: false, error: 'helper_unavailable' };
 }
 
 export async function helperOpen(

@@ -276,6 +276,8 @@ export interface ToolRunContext {
    * has no project. Check the value before you use it as a project ID.
    */
   projectId: string;
+  /** Host-verified task bound to this run. Never taken from tool arguments. */
+  issueId?: string | null;
 }
 
 /**

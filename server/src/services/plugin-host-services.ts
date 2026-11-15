@@ -1,4 +1,5 @@
 import { assertAgentInteraction } from "./agent-interaction-policy.js";
+import { ensureBrowserSessionReadPolicy } from "./browser-session-tool-policy.js";
 import { currentPluginInteractionOrigin } from "./plugin-interaction-context.js";
 import { projectGitAuthorizationService } from "./project-git-authorization.js";
 import { createLiveEventDelivery } from "../realtime/live-event-delivery.js";
@@ -1815,6 +1816,9 @@ export function buildHostServices(
       async log(params) {
         const companyId = ensureCompanyId(params.companyId);
         await ensurePluginAvailableForCompany(companyId);
+        if (pluginKey === "browser-sessions" && params.message === "browser_sessions.sharing_changed" && params.metadata?.shared === true) {
+          await ensureBrowserSessionReadPolicy(db, companyId);
+        }
         await logActivity(db, {
           companyId,
           actorType: "plugin",

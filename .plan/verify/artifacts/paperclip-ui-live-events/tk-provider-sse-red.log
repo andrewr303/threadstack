@@ -1,0 +1,37 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/context/LiveUpdatesProvider.recovery.test.tsx (42 tests | 1 failed) 207ms
+   ❯ LiveUpdatesProvider connection recovery (42)
+     × uses the same company event processor after verified iframe SSE fallback and cleans it up 25ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/context/LiveUpdatesProvider.recovery.test.tsx > LiveUpdatesProvider connection recovery > uses the same company event processor after verified iframe SSE fallback and cleans it up
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/context/LiveUpdatesProvider.recovery.test.tsx:130:35
+    128|     await act(async () => vi.advanceTimersByTimeAsync(1));
+    129|     await act(async () => Socket.instances[0].onerror?.());
+    130|     expect(EventStream.instances).toHaveLength(1);
+       |                                   ^
+    131|     const stream = EventStream.instances[0];
+    132|     expect(stream.url).toBe("/api/companies/company-1/events/stream");…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 41 passed (42)
+   Start at  23:51:52
+   Duration  3.14s (transform 43%, environment 29%, import 22%, tests 7%)
+

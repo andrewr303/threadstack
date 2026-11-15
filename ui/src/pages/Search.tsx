@@ -45,6 +45,7 @@ import { SearchFilterBar, type SearchFilterDataProps } from "../components/searc
 import { SearchFilterChips } from "../components/search/SearchFilterChips";
 import { SearchFilterSheet, SearchFilterSheetTrigger } from "../components/search/SearchFilterSheet";
 import { SearchSortMenu } from "../components/search/SearchSortMenu";
+import { BrowserSessionResults } from "../components/search/BrowserSessionResults";
 import { ZeroResultsRecovery } from "../components/search/ZeroResultsRecovery";
 import { useSidebar } from "../context/SidebarContext";
 import {
@@ -146,6 +147,8 @@ export function Search() {
   const urlSort = useMemo(() => parseSearchSort(searchParams), [searchParams]);
 
   const [draftQuery, setDraftQuery] = useState(urlQuery);
+  const [sessionQuality, setSessionQuality] = useState<"fast" | "best">("fast");
+  const [sessionRequestKey, setSessionRequestKey] = useState(0);
   const [committedQuery, setCommittedQuery] = useState(urlQuery);
   const [scope, setScope] = useState<CompanySearchScope>(urlScope);
   const [sort, setSort] = useState<CompanySearchSort>(urlSort);
@@ -557,10 +560,15 @@ export function Search() {
             ref={inputRef}
             autoFocus
             value={draftQuery}
-            onChange={(event) => setDraftQuery(event.currentTarget.value)}
+            onChange={(event) => { setSessionQuality("fast"); setDraftQuery(event.currentTarget.value); }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
             onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                setCommittedQuery(draftQuery);
+                setSessionQuality("best");
+                setSessionRequestKey((value) => value + 1);
+              }
               if (event.key === "Escape") {
                 if (draftQuery.length > 0) {
                   event.preventDefault();
@@ -669,6 +677,7 @@ export function Search() {
             className="flex h-full min-h-0 flex-col overflow-y-auto"
           >
             {scopeValue === scope ? (
+              <>
               <SearchTabContent
                 showInitialState={showInitialState}
                 isLoading={isLoading}
@@ -693,6 +702,8 @@ export function Search() {
                 isFetching={isFetching && !!data}
                 agentsById={agentsById}
               />
+              <BrowserSessionResults companyId={selectedCompanyId} query={parsedDraftQuery.query} quality={sessionQuality} requestKey={sessionRequestKey} />
+              </>
             ) : null}
           </TabsContent>
         ))}

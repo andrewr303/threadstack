@@ -49,6 +49,19 @@
   display: none !important;
 }
 
+.tk-view-paperclip { position: relative; overflow: hidden; border-radius: var(--r-chrome); background: var(--surface); }
+.tk-paperclip-frame { flex: 1; width: 100%; min-height: 0; border: 0; border-radius: inherit; }
+.tk-paperclip-empty { display: grid; place-items: center; flex: 1; padding: var(--gap); }
+.tk-paperclip-loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--surface); pointer-events: none; }
+.tk-paperclip-status { padding: 8px 12px; color: var(--text-2); font-size: var(--fs-12); overflow-wrap: anywhere; }
+.tk-paperclip-status p { margin: 0 0 6px; }
+.tk-paperclip-status-compact { flex: none; }
+.tk-paperclip-company { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.tk-paperclip-pair-code { font-family: var(--font-mono); letter-spacing: .12em; user-select: all; }
+.tk-paperclip-task-links { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-block: 12px; }
+.tk-paperclip-task-picker { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.tk-paperclip-action pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; }
+
 /* ---------------------------------------------------------------------------------------------
    The rail: a glass island beside the views
    --------------------------------------------------------------------------------------------- */
@@ -133,9 +146,9 @@
   flex-direction: column;
   gap: 2px;
   min-height: 44px;
-  padding: 4px;
+  padding: 4px 1px;
   border-radius: var(--r-row);
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   line-height: 18px;
 }
 
@@ -384,6 +397,171 @@
   padding: 4px 8px;
   font-size: var(--fs-12);
   color: var(--text-3);
+}
+
+/* ---------- Sessions: heading row, Organize button and menu, filter line ---------- */
+.tk-rail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tk-rail-group-head > span:not(.tk-rail-count):not(.tk-acct):not(.tk-mark) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-rail-group-head .tk-mark,
+.tk-rail-group-head .tk-acct {
+  flex: none;
+}
+
+.tk-rail-mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.tk-rail-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px 4px 8px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+.tk-rail-filters-text {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.tk-rail-clear {
+  flex: none;
+  min-height: var(--row-h);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tk-rail-clear:hover {
+  background: var(--ctl-hover);
+}
+
+.tk-rail-clear:active {
+  background: var(--ctl-press);
+}
+
+.tk-rail-clear:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+
+/* The Organize button: an icon button with the number of active filters beside it. The number,
+   not the colour, says that something is filtered. */
+.tk-org-btn {
+  position: relative;
+}
+
+.tk-org-btn[data-active="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-tint);
+  color: var(--text);
+}
+
+.tk-org-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-cap);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* Drawn on the page, outside the glass rail and bars (see AccountMenu); opaque enough to sit over
+   any embedded page. */
+.tk-org-menu {
+  position: fixed;
+  z-index: 100;
+  width: min(288px, calc(100vw - 16px));
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tk-org-menu:focus-visible {
+  outline-offset: -2px;
+}
+
+.tk-org-head {
+  padding: 6px 10px 2px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.tk-org-sub {
+  padding: 6px 10px 0;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.tk-org-item {
+  min-height: var(--row-h);
+  padding-block: 4px;
+}
+
+.tk-org-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.tk-org-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-org-count {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+@media (forced-colors: active) {
+  .tk-org-badge {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .tk-org-btn[data-active="true"] {
+    border-color: Highlight;
+  }
+  .tk-org-item[aria-checked="true"] {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
 }
 
 /* The Threads navigation (projects, queues) the app passes in sits in the rail as plain lists. */
@@ -674,4 +852,291 @@ iframe.tk-frame[data-loaded="false"] {
   .tk-rail-toggle .tk-icon {
     transition: none;
   }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   REQ-6 fused mode (layered variant). Paperclip's frame fills the window under everything and its
+   sidebar is the only view switch. The shell becomes the Threadkeeper view: it is placed (inline
+   left/top/width/height) over the content rectangle Paperclip reports, which Paperclip leaves
+   transparent. Layers: frame 1, views 2, embedded pages 5, rail 10; a blocking Paperclip overlay
+   raises the frame to 50 so the dialog is above the view, which stays visible through the hole.
+   Notices are cut out of the view with clip-path (PaperclipFusion.ts). Nothing here applies to
+   the side panel or the in-page overlay, and without data-fused the layout is unchanged.
+   --------------------------------------------------------------------------------------------- */
+.tk-workbench[data-fused="true"] {
+  position: relative;
+}
+
+.tk-workbench[data-fused="true"] .tk-shell {
+  position: absolute;
+  padding: 0;
+}
+
+.tk-workbench[data-fused="true"] .tk-view-paperclip {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  border-radius: 0;
+  background: transparent;
+}
+
+.tk-workbench[data-fused="true"] .tk-paperclip-frame {
+  border-radius: 0;
+}
+
+.tk-workbench[data-fused-raised="true"] .tk-view-paperclip {
+  z-index: 50;
+}
+
+.tk-workbench[data-fused="true"] .tk-main > .tk-view:not(.tk-view-paperclip),
+.tk-workbench[data-fused="true"] .tk-main > .tk-banner {
+  position: relative;
+  z-index: 2;
+}
+
+/* On a Paperclip page no Threadkeeper view is shown, so nothing of the shell is drawn. */
+.tk-workbench[data-fused="true"] .tk-shell[data-view="paperclip"] > .tk-rail,
+.tk-workbench[data-fused="true"] .tk-shell[data-view="paperclip"] > .tk-rail-scrim,
+.tk-workbench[data-fused="true"] .tk-shell[data-view="paperclip"] .tk-main > .tk-banner {
+  display: none;
+}
+
+/* Threads has one navigation column. Its full index takes the place of the recent-session
+   preview inside the existing rail, leaving the main column entirely for the open chat. */
+.tk-workbench[data-surface="page"] .tk-view-threads .tk-columns[data-detail-mode] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tk-workbench[data-surface="page"] .tk-view-threads .tk-columns .tk-detail-pane[data-mobile-hidden] {
+  position: static;
+  inset: auto;
+  display: flex;
+  z-index: auto;
+}
+
+.tk-workbench[data-surface="page"] .tk-view-threads .tk-mobile-back-wrap {
+  display: none;
+}
+
+.tk-rail-scroll[data-thread-index="true"] {
+  overflow: hidden;
+  gap: var(--gap);
+}
+
+.tk-rail-scroll[hidden] {
+  display: none;
+}
+
+.tk-workbench[data-surface="page"] .tk-rail .tk-list-sidebar {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  container-type: inline-size;
+}
+
+.tk-list-sidebar .tk-search-bar {
+  padding: var(--gap) 2px;
+  max-height: 55%;
+  overflow-y: auto;
+}
+
+.tk-list-sidebar .tk-search-row {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.tk-list-sidebar .tk-search-input {
+  flex-basis: 100%;
+  width: 100%;
+}
+
+.tk-list-sidebar .tk-search-row .tk-thr-filters-toggle {
+  flex: none;
+}
+
+.tk-list-sidebar .tk-search-bar[data-filters-open="false"] .tk-filter-row,
+.tk-list-sidebar .tk-search-bar[data-filters-open="false"] .tk-thr-toolbar {
+  display: none;
+}
+
+.tk-list-sidebar .tk-search-bar[data-filters-open="true"] .tk-filter-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tk-list-sidebar .tk-thr-toolbar > .tk-select,
+.tk-list-sidebar .tk-thr-groupby {
+  width: 100%;
+  min-width: 0;
+}
+
+.tk-list-sidebar .tk-row-list,
+.tk-list-sidebar .tk-thr-groups {
+  padding: 2px;
+}
+
+.tk-list-sidebar .tk-bulk-bar {
+  padding: 4px 2px;
+}
+
+.tk-list-sidebar .tk-bulk-head {
+  min-height: var(--row-h);
+}
+
+.tk-list-sidebar .tk-kanban-grid,
+.tk-list-sidebar .tk-cards-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tk-list-sidebar .tk-session-index-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.tk-list-sidebar .tk-session-index-row > .tk-row-check {
+  position: static;
+  flex: none;
+  align-self: stretch;
+  width: 22px;
+  padding: 0 2px;
+}
+
+.tk-list-sidebar .tk-session-index-row > .tk-session-index-button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 48px;
+  min-width: 0;
+  padding: 6px 4px;
+  gap: var(--gap);
+  flex: 1;
+}
+
+.tk-session-index-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.tk-session-index-text .tk-row-title {
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  margin: 0;
+}
+
+.tk-session-index-text .tk-rail-row-meta {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+
+.tk-session-index-text .tk-status-pill {
+  font-size: var(--fs-11);
+}
+
+.tk-session-index-excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tk-session-index-match {
+  color: var(--text-3);
+  font-size: var(--fs-11);
+}
+
+.tk-rail-collections {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+}
+
+.tk-rail-collections > summary {
+  padding: var(--gap);
+  color: var(--text-2);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* The question owns the full available width. The action and keyboard hint sit below it,
+   including in narrow sidebars where an adjacent button previously squeezed the textarea. */
+.tk-ask .tk-ask-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tk-ask-form .tk-ask-input {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  flex: none;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.tk-ask-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gap);
+}
+
+.tk-ask-key-hint {
+  flex: 1;
+  color: var(--text-3);
+  font-size: var(--fs-11);
+}
+
+.tk-list-sidebar .tk-ask {
+  padding: var(--gap) 2px;
+}
+
+.tk-list-sidebar .tk-ask-submit {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tk-list-sidebar .tk-ask-key-hint {
+  flex: none;
+}
+
+.tk-list-sidebar .tk-ask-answer {
+  padding: var(--gap);
+}
+
+/* Both columns must be bounded: a long account email cannot take width from the provider
+   label or run underneath it. The trigger's accessible name retains the complete identity. */
+.tk-rail:not([data-collapsed="true"]) .tk-rail-realms .tk-acct-menu-btn[data-variant="rail"] {
+  grid-template-columns: minmax(56px, auto) minmax(0, 1fr) 14px;
+  gap: 6px;
+}
+
+.tk-rail-realms .tk-acct-realm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-rail:not([data-collapsed="true"]) .tk-rail-realms .tk-acct-menu-btn .tk-acct {
+  justify-self: stretch;
+  justify-content: flex-end;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tk-rail-realms .tk-acct-menu-btn .tk-acct-name {
+  flex: 1;
+  text-align: right;
 }

@@ -2144,6 +2144,21 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: "/api/companies/{companyId}/events/stream",
+  tags: ["companies"],
+  summary: "Subscribe to viewer-filtered company live events over HTTP",
+  description: "Same-origin SSE alternative using existing HTTP authentication and company access. Messages contain the same LiveEvent JSON as WebSocket; no URL credentials or run-interest negotiation.",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: {
+    200: { description: "Server-sent event stream (text/event-stream)" },
+    401: r.unauthorized,
+    403: r.forbidden,
+    503: { description: "Server draining" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
   path: "/api/companies/{companyId}/artifacts",
   tags: ["companies"],
   summary: "List company artifacts",

@@ -1,0 +1,37 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/components/CoordinatorSidebar.test.tsx (25 tests | 1 failed) 515ms
+   ❯ Coordinator task creation (6)
+     × mounts existing plugin sidebar contributions with the active company boundary 42ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/CoordinatorSidebar.test.tsx > Coordinator task creation > mounts existing plugin sidebar contributions with the active company boundary
+AssertionError: expected undefined to be 'company:COO:sidebar' // Object.is equality
+
+- Expected:
+"company:COO:sidebar"
+
++ Received:
+undefined
+
+ ❯ src/components/CoordinatorSidebar.test.tsx:65:96
+     63|   it("mounts existing plugin sidebar contributions with the active com…
+     64|     await renderSidebar();
+     65|     expect(container.querySelector('[data-testid="coordinator-plugin-s…
+       |                                                                                                ^
+     66|   });
+     67|   it("keeps every recent entry below the section header instead of tru…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 24 passed (25)
+   Start at  22:42:34
+   Duration  2.49s (transform 44%, import 24%, tests 21%, environment 11%)
+

@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PluginPage } from "./PluginPage";
+import { setVerifiedThreadkeeperHost } from "@/lib/threadkeeper-host-state";
+import { currentThreadkeeperSlot } from "@/lib/threadkeeper-host-slot";
 
 const mockPluginsApi = vi.hoisted(() => ({
   listUiContributions: vi.fn(),
@@ -174,6 +176,59 @@ describe("PluginPage", () => {
 
     await act(async () => {
       root.unmount();
+    });
+  });
+
+  describe("Threadkeeper fused slot (REQ-6)", () => {
+    const browserSessions = () => pageContribution({
+      slots: [
+        { type: "page", id: "browser-browse", displayName: "Browse", exportName: "BrowsePage", routePath: "browse" },
+        { type: "page", id: "browser-threads", displayName: "Threads", exportName: "ThreadsPage", routePath: "threads" },
+        { type: "page", id: "browser-session-board", displayName: "Session board", exportName: "BoardPage", routePath: "session-board" },
+      ],
+    });
+    afterEach(() => setVerifiedThreadkeeperHost(false));
+
+    it("keeps the plugin page outside a verified Threadkeeper window", async () => {
+      mockParams.pluginRoutePath = "threads";
+      mockPluginsApi.listUiContributions.mockResolvedValue([{ ...browserSessions(), pluginId: "plugin-bs", pluginKey: "browser-sessions", displayName: "Browser sessions" }]);
+      const root = await renderPage(container);
+      expect(container.querySelector('[data-testid="plugin-slot-mount"]')?.textContent).toBe("Threads");
+      expect(container.querySelector("[data-threadkeeper-slot-view]")).toBeNull();
+      expect(currentThreadkeeperSlot()).toBeNull();
+      await act(async () => root.unmount());
+    });
+
+    it("renders a transparent slot instead of the page body for the verified host and releases it on leaving", async () => {
+      setVerifiedThreadkeeperHost(true);
+      mockParams.pluginRoutePath = "session-board";
+      mockPluginsApi.listUiContributions.mockResolvedValue([{ ...browserSessions(), pluginId: "plugin-bs", pluginKey: "browser-sessions", displayName: "Browser sessions" }]);
+      // F-2: a shell that has not engaged fused mode still switches to the view when it is chosen.
+      const requested: unknown[] = [];
+      const listener = (event: Event) => requested.push((event as CustomEvent).detail);
+      window.addEventListener("paperclip:threadkeeper-open-view", listener);
+      const root = await renderPage(container);
+      window.removeEventListener("paperclip:threadkeeper-open-view", listener);
+      expect(requested).toEqual([{ view: "dashboard" }]);
+      const slot = container.querySelector<HTMLElement>("[data-threadkeeper-slot-view]");
+      expect(slot?.getAttribute("data-threadkeeper-slot-view")).toBe("session-board");
+      expect(slot?.textContent).toBe("");
+      expect(container.querySelector('[data-testid="plugin-slot-mount"]')).toBeNull();
+      expect(container.textContent).not.toContain("Back");
+      expect(currentThreadkeeperSlot()).toEqual({ view: "session-board", element: slot });
+      expect(mockSetBreadcrumbs).toHaveBeenLastCalledWith([{ label: "Session board" }]);
+      await act(async () => root.unmount());
+      expect(currentThreadkeeperSlot()).toBeNull();
+    });
+
+    it("never replaces another plugin's page that uses the same route", async () => {
+      setVerifiedThreadkeeperHost(true);
+      mockParams.pluginRoutePath = "wiki";
+      mockPluginsApi.listUiContributions.mockResolvedValue([pageContribution()]);
+      const root = await renderPage(container);
+      expect(container.querySelector('[data-testid="plugin-slot-mount"]')?.textContent).toBe("Wiki");
+      expect(container.querySelector("[data-threadkeeper-slot-view]")).toBeNull();
+      await act(async () => root.unmount());
     });
   });
 

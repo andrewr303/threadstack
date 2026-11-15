@@ -757,5 +757,6 @@ export function buildIssueThread(input: IssueThreadInput): UpsertThreadInput {
     resumeCommand: resumeCommandFor(resumable && { ...resumable, cwd: resumable.cwd ?? (str(workspace?.cwd) || null) }, company.id),
     agentLabel: label || null,
     linkedThreadKeys: input.linkedThreadKeys ?? [],
+    paperclipCompanyId: issue.companyId === company.id ? company.id : null,
   };
 }

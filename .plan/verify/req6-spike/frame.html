@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><title>REQ-6 cross-origin frame</title><style>
+html,body{margin:0;height:100%;background:transparent;font:16px system-ui}nav{position:fixed;inset:0 auto 0 0;width:200px;background:#eef1f5}header{position:fixed;left:200px;right:0;top:0;height:80px;background:#eef1f5}button{margin:12px}dialog{padding:32px}dialog::backdrop{background:#0006}
+</style></head><body><nav><h2>Frame sidebar</h2><button id="clip">Clip content rectangle</button><button id="overlay">Open overlay</button><button id="outside">Click in frame</button></nav><header>Transparent cross-origin frame stand-in</header><dialog><h2>Dialog stand-in</h2><input aria-label="Dialog input"><button id="close">Close dialog</button></dialog>
+<script>
+const send=data=>parent.postMessage({source:'req6-spike',...data},'{{hostOrigin}}');const dialog=document.querySelector('dialog');
+document.querySelector('#clip').onclick=()=>send({type:'clip',enabled:true});
+document.querySelector('#outside').onclick=()=>send({type:'record',message:'frame click received'});
+document.querySelector('#overlay').onclick=()=>{send({type:'overlay',open:true});requestAnimationFrame(()=>{dialog.showModal();dialog.querySelector('input').focus()})};
+document.querySelector('#close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>send({type:'overlay',open:false}));
+</script></body></html>

@@ -11,7 +11,7 @@ if(!ids.some(id=>process.argv[2]===`chrome-extension://${id}/`)) process.exit(1)
 const session=createBackupSession();
 let chain=Promise.resolve();
 const send=x=>process.stdout.write(frame(x));
-const decoder=createDecoder(msg=>{chain=chain.then(async()=>{try{send(await handle(msg,{session}));}catch(e){send({ok:false,error:e.message});}});},e=>send({ok:false,error:e.message}));
+const decoder=createDecoder(msg=>{chain=chain.then(async()=>{try{send(await handle(msg,{session,paperclip:config.paperclip}));}catch(e){send({ok:false,error:e.message});}});},e=>send({ok:false,error:e.message}));
 process.stdin.on('data',chunk=>decoder.push(chunk));
 // A backup cut off half way (browser closed) leaves nothing behind.
 process.stdin.on('end',()=>{decoder.end();chain.then(()=>session.abort());});

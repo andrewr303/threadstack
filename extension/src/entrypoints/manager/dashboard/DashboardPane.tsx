@@ -18,12 +18,15 @@ export interface DashboardPaneProps {
   pinned: readonly ConversationRecord[];
   /** Thread keys shown in the panes right now, by pane. */
   placed: ReadonlyArray<string | null>;
+  /** Pinned sessions with a page that the Dashboard's filters hide from `pinned`. */
+  hiddenByFilters?: number;
+  onClearFilters?: () => void;
   onFocus: (index: number) => void;
   onPlace: (index: number, conv: ConversationRecord) => void;
   onSwap: (index: number, conv: ConversationRecord) => void;
 }
 
-export function DashboardPane({ index, conv, focused, pinned, placed, onFocus, onPlace, onSwap }: DashboardPaneProps) {
+export function DashboardPane({ index, conv, focused, pinned, placed, hiddenByFilters = 0, onClearFilters, onFocus, onPlace, onSwap }: DashboardPaneProps) {
   const ctx = useWorkspaceContext();
   const number = index + 1;
   const headFocus = (
@@ -57,10 +60,23 @@ export function DashboardPane({ index, conv, focused, pinned, placed, onFocus, o
                     </button>
                   ))}
                 </>
+              ) : hiddenByFilters > 0 && onClearFilters ? (
+                <button type="button" className="tk-btn" onClick={onClearFilters}>
+                  Clear filters
+                </button>
               ) : undefined
             }
           >
-            {spare.length > 0 ? <p>Choose a pinned session to show it here.</p> : <p>Every pinned session is already in a pane.</p>}
+            {spare.length > 0 ? (
+              <p>Choose a pinned session to show it here.</p>
+            ) : hiddenByFilters > 0 ? (
+              <p>
+                {hiddenByFilters === 1 ? 'One more pinned session is' : `${hiddenByFilters} more pinned sessions are`} hidden by the
+                Dashboard filters.
+              </p>
+            ) : (
+              <p>Every pinned session is already in a pane.</p>
+            )}
           </Notice>
         </div>
       </section>

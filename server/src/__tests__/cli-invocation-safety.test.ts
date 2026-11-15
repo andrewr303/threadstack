@@ -68,6 +68,8 @@ const PNPM_ALLOWLIST = new Set<string>([
   "pnpm paperclipai connect",
   "pnpm paperclipai migrate",
   "pnpm paperclipai db:backup",
+  "pnpm paperclipai service start",
+  "pnpm paperclipai service logs",
   "pnpm paperclipai configure --section server",
   "pnpm paperclipai configure --section secrets",
   "pnpm paperclipai configure --section storage",
@@ -582,6 +584,21 @@ describe("paperclipai CLI invocation safety", () => {
   // `npx paperclipai`. So it missed `--config`, `--data-dir`, `--instance`,
   // `--bind`, a context-profile value, and worktree path/ref/id/name options,
   // and a mixed safe/unsafe line hid behind its `npx` mention.
+
+  it.each([
+    "pnpm paperclipai service start",
+    "pnpm paperclipai service logs",
+  ])("allows the fully literal lifecycle command %s", command => {
+    expect(scanText("doc/E.md", command)).toHaveLength(0);
+  });
+
+  it.each([
+    "pnpm paperclipai service start --instance example",
+    "pnpm paperclipai service logs --config ./private-config.json",
+    'pnpm paperclipai service start "$INSTANCE"',
+  ])("rejects a content-bearing lifecycle suffix: %s", command => {
+    expect(scanText("doc/E.md", command)).toHaveLength(1);
+  });
 
   it("flags a value-bearing option that the old flag list omitted", () => {
     // --config, --data-dir, --instance, and --bind each carry a value.

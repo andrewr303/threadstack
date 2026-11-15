@@ -149,7 +149,7 @@ export function Toolbar({
       <AddressField key={tab?.id ?? 'none'} tab={tab} onNotice={onNotice} />
       {tab && (
         <>
-          <AccountMenuButton realmId={tab.realm} variant="toolbar" />
+          <AccountMenuButton realmId={tab.realm} variant="toolbar" accountId={tab.accountId} />
           <button
             type="button"
             className="tk-btn tk-btn-quiet tk-browse-chrome-btn"

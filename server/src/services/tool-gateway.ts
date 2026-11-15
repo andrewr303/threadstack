@@ -13068,6 +13068,7 @@ export function createToolGatewayService(
                     runId: session.runId!,
                     companyId: session.companyId,
                     projectId: session.projectId ?? "",
+                    issueId: session.issueId,
                   },
                 ),
                 executionTimeoutMs,
@@ -13501,7 +13502,7 @@ export function createToolGatewayService(
         const result = await pluginToolDispatcher.executeTool(
           input.tool,
           requestedParameters,
-          input.runContext,
+          { ...input.runContext, issueId: context.issueId, projectId: context.projectId ?? "" },
         );
         const resultValidation = await validateToolContent({
           value: result,

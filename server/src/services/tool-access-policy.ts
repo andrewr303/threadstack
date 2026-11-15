@@ -1,4 +1,5 @@
 import type { ConnectionManagementContext } from "./connection-management.js";
+import { isBrowserSessionReadPolicy } from "./browser-session-policy-identity.js";
 import { createHash } from "node:crypto";
 import { boundRunIssueIdSql } from "./run-task-binding.js";
 import type { ToolApprovalClaim } from "./tool-approval-execution.js";
@@ -1665,6 +1666,11 @@ export function toolAccessPolicyService(db: Pick<Db, "select" | "insert" | "upda
         return decision("require_approval", "requires_approval_policy", policy.description ?? "Tool access requires approval.", effectiveProfileIds, [policy.id], { redactionPlan: redaction.redactionPlan, policyExplanation });
       }
       if (policy.policyType === "allow") {
+        // A board's session-sharing default fills an otherwise empty tool
+        // configuration; it never overrides an explicit restriction or review.
+        if (isBrowserSessionReadPolicy(policy) && (explicitBlock
+          || matchingPolicies.some(({ policy: candidate }) => candidate.policyType === "require_approval")
+          || profileState.profiles.length > 0 && !permittedByProfile)) continue;
         return decision("allow", "allow_policy", "Tool access allowed by policy.", effectiveProfileIds, [policy.id], { redactionPlan: redaction.redactionPlan, policyExplanation });
       }
     }

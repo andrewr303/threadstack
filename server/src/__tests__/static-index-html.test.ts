@@ -4,7 +4,7 @@ import path from "node:path";
 import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readBrandedStaticIndexHtml } from "../static-index-html.js";
+import { applyThreadkeeperHostConfig, readBrandedStaticIndexHtml } from "../static-index-html.js";
 
 describe("static SPA fallback HTML", () => {
   const tempDirs: string[] = [];
@@ -14,6 +14,22 @@ describe("static SPA fallback HTML", () => {
     for (const dir of tempDirs.splice(0)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("serializes only explicit validated extension IDs without script injection", () => {
+    const id = "abcdefghijklmnopabcdefghijklmnop";
+    vi.stubEnv("PAPERCLIP_THREADKEEPER_EXTENSION_IDS", `${id},${id},</script><script>alert(1)</script>,bad`);
+    const html = applyThreadkeeperHostConfig("<html><head></head><body>App</body></html>");
+    expect(html).toContain(`<meta name="paperclip-threadkeeper-extension-ids" content="${id}">`);
+    expect(html).not.toContain("<script>");
+    expect(applyThreadkeeperHostConfig(html).match(/paperclip-threadkeeper-extension-ids/g)).toHaveLength(1);
+  });
+
+  it("has an empty allowlist by default, including after the setting is removed", () => {
+    vi.stubEnv("PAPERCLIP_THREADKEEPER_EXTENSION_IDS", undefined);
+    const html = applyThreadkeeperHostConfig('<head><meta name="paperclip-threadkeeper-extension-ids" content="abcdefghijklmnopabcdefghijklmnop"></head>');
+    expect(html).toContain('content=""');
+    expect(html).not.toContain("abcdefghijklmnop");
   });
 
   it("ignores retired snippet settings in managed and self-hosted static HTML", () => {

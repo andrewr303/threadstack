@@ -28,7 +28,9 @@ vi.mock("@/api/attention", () => ({ attentionApi: { list: fixture.attention, sum
 vi.mock("@/api/instanceSettings", () => ({ instanceSettingsApi: { getExperimental: async () => ({ enableCases: fixture.enableCases }) } }));
 vi.mock("@/api/projects", () => ({ projectsApi: { list: async () => fixture.projects } }));
 vi.mock("./SidebarCompanyMenu", () => ({ SidebarCompanyMenu: () => null }));
+vi.mock("@/plugins/slots", () => ({ PluginSlotOutlet: ({ context, slotTypes }: { context: { companyId: string; companyPrefix: string }; slotTypes: string[] }) => <div data-testid="coordinator-plugin-sidebar">{context.companyId}:{context.companyPrefix}:{slotTypes.join(",")}</div> }));
 vi.mock("@/lib/router", () => ({
+  useActiveCompanyPrefix: () => "COO",
   useLocation: () => ({ pathname: fixture.pathname, search: "" }),
   Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => <a href={to} {...props}>{children}</a>,
   NavLink: ({ to, children, className, state: _state, end: _end, ...props }: {
@@ -58,6 +60,10 @@ beforeEach(() => {
 });
 
 describe("Coordinator task creation", () => {
+  it("mounts existing plugin sidebar contributions with the active company boundary", async () => {
+    await renderSidebar();
+    expect(container.querySelector('[data-testid="coordinator-plugin-sidebar"]')?.textContent).toBe("company:COO:sidebar");
+  });
   it("keeps every recent entry below the section header instead of truncating at twelve", async () => {
     fixture.recentTasks = Array.from({ length: 20 }, (_, index) => ({
       id: `task-${index}`, companyId: "company", identifier: `TASK-${index}`, title: `Recent task ${index}`, status: "todo", recordedAt: index,

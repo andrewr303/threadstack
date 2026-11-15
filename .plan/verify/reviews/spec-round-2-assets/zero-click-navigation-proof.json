@@ -1,0 +1,11 @@
+{
+  "command": [
+    "node",
+    "cli/node_modules/tsx/dist/cli.mjs",
+    "/tmp/threadkeeper-delivery-navigation-proof.mts"
+  ],
+  "exitCode": 0,
+  "stdout": "{\"refused\":true,\"clicks\":0,\"navigatedUrl\":\"https://claude.ai/chat/two\",\"liveUrlSource\":\"Document.defaultView.location.href\"}\n",
+  "stderr": "",
+  "recordedAt": "2026-11-14T06:30:07.760669+00:00"
+}

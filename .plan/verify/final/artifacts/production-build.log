@@ -1,0 +1,947 @@
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> paperclip@ build /Users/andrew/dev/threadkeeper/paperclip
+> pnpm run preflight:workspace-links && pnpm -r build
+
+
+> paperclip@ preflight:workspace-links /Users/andrew/dev/threadkeeper/paperclip
+> node cli/node_modules/tsx/dist/cli.mjs scripts/ensure-workspace-package-links.ts
+
+Scope: 36 of 37 workspace projects
+packages/google-sheets-mcp-server build$ tsc
+packages/paperclip-eval-kernel build$ tsc -p tsconfig.json
+packages/kv-demo-mcp-server build$ tsc
+packages/shared build$ tsc && mkdir -p dist/cliplab && cp src/cliplab/LICENSE src/cliplab/PROVENANCE.md dist/cliplab/
+packages/paperclip-eval-kernel build: Done
+packages/tailscale-https-broker build$ tsc && node scripts/build-native.mjs
+packages/kv-demo-mcp-server build: Done
+packages/teams-catalog build$ pnpm run build:manifest && tsc -p tsconfig.json
+packages/tailscale-https-broker build: [tailscale-https-broker] skipping Linux SO_PEERCRED addon build
+packages/tailscale-https-broker build: Done
+packages/teams-catalog build: > @paperclipai/teams-catalog@0.1.0 build:manifest /Users/andrew/dev/threadkeeper/paperclip/packages/teams-catalog
+packages/teams-catalog build: > node ../../cli/node_modules/tsx/dist/cli.mjs scripts/build-catalog-manifest.ts
+packages/google-sheets-mcp-server build: Done
+packages/teams-catalog build: Wrote 5 teams to generated/catalog.json
+packages/shared build: Done
+packages/teams-catalog build: Done
+packages/adapter-utils build$ tsc
+packages/db build$ pnpm run check:migrations && tsc && rm -rf dist/migrations && mkdir -p dist/migrations/meta && cp src/migrations/*.sql dist/migrations/ && cp src/migrations/meta/_journal.json dist/migrations/meta/
+packages/mcp-server build$ tsc
+packages/paperclip-runner build$ node scripts/record-build-inputs.mjs --begin && pnpm run check:protocol-manifest && pnpm run build:typescript && pnpm run check:capability-contract && pnpm run check:capability-inventory && pnpm run check:protocol-coverage && node scripts/generate-semantic-contracts.mjs --check && node scripts/check-runner-workflow-traceability.mjs && pnpm run build:binary && node scripts/generate-replay-goldens.mjs --check && node scripts/generate-semantic-action-catalog.mjs --check && node scripts/record-build-inputs.mjs --finish
+packages/db build: > @paperclipai/db@0.3.1 check:migrations /Users/andrew/dev/threadkeeper/paperclip/packages/db
+packages/db build: > tsx src/check-migration-numbering.ts && tsx src/check-migration-safety.ts && tsx scripts/migration-compatibility.ts --check
+packages/paperclip-runner build: paperclip.runner-build-inputs.v2 begin: digest=f21282bfc7df files=1726 bytes=25855725
+packages/mcp-server build: Done
+packages/plugins/sdk build$ pnpm --filter @paperclipai/shared build && tsc
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 check:protocol-manifest /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > node scripts/generate-protocol-manifest.mjs --check
+packages/db build: Migration safety check passed: 20 historical finding(s) covered by baseline (1 stale baseline id(s) ignored).
+packages/plugins/sdk build: > @paperclipai/shared@0.3.1 build /Users/andrew/dev/threadkeeper/paperclip/packages/shared
+packages/plugins/sdk build: > tsc && mkdir -p dist/cliplab && cp src/cliplab/LICENSE src/cliplab/PROVENANCE.md dist/cliplab/
+packages/paperclip-runner build: The generated PRP contract manifest matches its sources.
+packages/adapter-utils build: Done
+packages/skills-catalog build$ pnpm run build:manifest && tsc -p tsconfig.json
+packages/db build: migration compatibility: 0 new migration(s) since edb6945ff3f2, none unclassified.
+packages/skills-catalog build: > @paperclipai/skills-catalog@0.3.1 build:manifest /Users/andrew/dev/threadkeeper/paperclip/packages/skills-catalog
+packages/skills-catalog build: > node ../../cli/node_modules/tsx/dist/cli.mjs scripts/build-catalog-manifest.ts
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 build:typescript /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > pnpm run check:acpx-profiles && pnpm run ensure:eval-build-deps && pnpm run check:protocol-types && node ./node_modules/typescript/bin/tsc --version && node ./node_modules/typescript/bin/tsc -p tsconfig.json && node ./node_modules/typescript/bin/tsc -p tsconfig.surfaces.json && node scripts/build-verified-provider-entrypoints.mjs && node scripts/install-copilot-assets.mjs
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 check:acpx-profiles /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > node scripts/generate-acpx-profiles.mjs --check
+packages/paperclip-runner build: TypeScript/Rust ACPX profiles match the release manifest.
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 ensure:eval-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > pnpm --filter @paperclipai/paperclip-eval-kernel build
+packages/plugins/sdk build: Done
+packages/paperclip-runner build: > @paperclipai/paperclip-eval-kernel@0.1.0 build /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-eval-kernel
+packages/paperclip-runner build: > tsc -p tsconfig.json
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 check:protocol-types /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > node scripts/generate-protocol-schema-module.mjs --check && node scripts/generate-acpx-sidecar-contract.mjs --check && node scripts/generate-runtime-context-contract.mjs --check && node scripts/generate-provider-failure-contract.mjs --check
+packages/paperclip-runner build: Generated PRP schema modules match the JSON Schema sources.
+packages/paperclip-runner build: Generated TypeScript/Rust ACPX sidecar contracts match the schema.
+packages/paperclip-runner build: Generated runtime context contract matches the schema.
+packages/paperclip-runner build: Version 7.0.2
+packages/db build: Done
+packages/paperclip-runner build: Copilot runtime assets: verified-existing (darwin-arm64)
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 check:capability-contract /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > node scripts/generate-capability-contract.mjs --check
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 check:capability-inventory /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > node scripts/check-capability-inventory.mjs
+packages/paperclip-runner build: Capability inventory completeness and generated-output checks passed.
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 check:protocol-coverage /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > node scripts/generate-protocol-coverage.mjs --check
+packages/paperclip-runner build: Runner stress traceability passed: 44 findings, 12 workflows, 1 explicit exclusion.
+packages/paperclip-runner build: > @paperclipai/paperclip-runner@0.0.0 build:binary /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner build: > cargo build --release --manifest-path runner/Cargo.toml --locked -p paperclip-runner-core --bin paperclip-runnerd && node scripts/stage-runner-binary.mjs
+packages/paperclip-runner build:    Compiling libc v0.2.189
+packages/paperclip-runner build:    Compiling proc-macro2 v1.0.107
+packages/paperclip-runner build:    Compiling unicode-ident v1.0.24
+packages/paperclip-runner build:    Compiling quote v1.0.47
+packages/paperclip-runner build:    Compiling cfg-if v1.0.4
+packages/paperclip-runner build:    Compiling zeroize v1.9.0
+packages/paperclip-runner build:    Compiling typenum v1.20.1
+packages/paperclip-runner build:    Compiling syn v2.0.119
+packages/paperclip-runner build:    Compiling version_check v0.9.5
+packages/paperclip-runner build:    Compiling getrandom v0.2.17
+packages/paperclip-runner build:    Compiling bytes v1.12.1
+packages/paperclip-runner build:    Compiling itoa v1.0.18
+packages/paperclip-runner build:    Compiling pin-project-lite v0.2.17
+packages/paperclip-runner build:    Compiling generic-array v0.14.7
+packages/paperclip-runner build:    Compiling futures-core v0.3.34
+packages/paperclip-runner build:    Compiling subtle v2.6.1
+packages/paperclip-runner build:    Compiling memchr v2.8.3
+packages/paperclip-runner build:    Compiling syn v3.0.4
+packages/paperclip-runner build:    Compiling once_cell v1.21.4
+packages/paperclip-runner build:    Compiling autocfg v1.5.1
+packages/paperclip-runner build:    Compiling num-traits v0.2.19
+packages/paperclip-runner build:    Compiling rand_core v0.6.4
+packages/paperclip-runner build:    Compiling mio v1.2.2
+packages/paperclip-runner build:    Compiling socket2 v0.6.5
+packages/paperclip-runner build:    Compiling futures-sink v0.3.34
+packages/paperclip-runner build:    Compiling tokio v1.53.1
+packages/paperclip-runner build:    Compiling http v1.5.0
+packages/paperclip-runner build:    Compiling num-integer v0.1.47
+packages/paperclip-runner build:    Compiling crypto-common v0.1.7
+packages/paperclip-runner build:    Compiling fnv v1.0.7
+packages/paperclip-runner build:    Compiling slab v0.4.12
+packages/paperclip-runner build:    Compiling http-body v1.1.0
+packages/paperclip-runner build:    Compiling tokio-util v0.7.19
+packages/skills-catalog build: Wrote generated/catalog.json with 17 catalog skills.
+packages/paperclip-runner build:    Compiling futures-task v0.3.34
+packages/paperclip-runner build:    Compiling futures-io v0.3.34
+packages/paperclip-runner build:    Compiling futures-util v0.3.34
+packages/skills-catalog build: Done
+packages/paperclip-runner build:    Compiling jobserver v0.1.35
+packages/paperclip-runner build:    Compiling tracing-core v0.1.36
+packages/paperclip-runner build:    Compiling tracing-attributes v0.1.31
+packages/paperclip-runner build:    Compiling find-msvc-tools v0.1.11
+packages/paperclip-runner build:    Compiling shlex v2.0.1
+packages/paperclip-runner build:    Compiling cc v1.4.4
+packages/paperclip-runner build:    Compiling tracing v0.1.44
+packages/paperclip-runner build:    Compiling const-oid v0.9.6
+packages/paperclip-runner build:    Compiling vsimd v0.8.0
+packages/paperclip-runner build:    Compiling outref v0.5.2
+packages/paperclip-runner build:    Compiling ryu v1.0.23
+packages/paperclip-runner build:    Compiling http-body-util v0.1.5
+packages/paperclip-runner build:    Compiling http v0.2.12
+packages/paperclip-runner build:    Compiling synstructure v0.13.2
+packages/paperclip-runner build:    Compiling either v1.18.0
+packages/paperclip-runner build:    Compiling powerfmt v0.2.0
+packages/paperclip-runner build:    Compiling deranged v0.5.8
+packages/paperclip-runner build:    Compiling num-conv v0.2.2
+packages/paperclip-runner build:    Compiling time-core v0.1.9
+packages/paperclip-runner build:    Compiling bytes-utils v0.1.4
+packages/paperclip-runner build:    Compiling time v0.3.55
+packages/paperclip-runner build:    Compiling http-body v0.4.6
+packages/paperclip-runner build:    Compiling base64-simd v0.8.0
+packages/paperclip-runner build:    Compiling pin-utils v0.1.0
+packages/paperclip-runner build:    Compiling smallvec v1.15.2
+packages/paperclip-runner build:    Compiling zerofrom-derive v0.1.7
+packages/paperclip-runner build:    Compiling aws-smithy-types v1.6.2
+packages/paperclip-runner build:    Compiling cmake v0.1.58
+packages/paperclip-runner build:    Compiling block-buffer v0.10.4
+packages/paperclip-runner build:    Compiling dunce v1.0.5
+packages/paperclip-runner build:    Compiling fs_extra v1.3.0
+packages/paperclip-runner build:    Compiling percent-encoding v2.3.2
+packages/paperclip-runner build:    Compiling pkg-config v0.3.34
+packages/paperclip-runner build:    Compiling aws-lc-sys v0.45.0
+packages/paperclip-runner build:    Compiling digest v0.10.7
+packages/paperclip-runner build:    Compiling zerofrom v0.1.8
+packages/paperclip-runner build:    Compiling yoke-derive v0.8.2
+packages/paperclip-runner build:    Compiling aws-smithy-async v1.3.0
+packages/paperclip-runner build:    Compiling aws-smithy-runtime-api-macros v1.1.0
+packages/paperclip-runner build:    Compiling allocator-api2 v0.2.21
+packages/paperclip-runner build:    Compiling stable_deref_trait v1.2.1
+packages/paperclip-runner build:    Compiling equivalent v1.0.2
+packages/paperclip-runner build:    Compiling foldhash v0.2.0
+packages/paperclip-runner build:    Compiling yoke v0.8.3
+packages/paperclip-runner build:    Compiling hashbrown v0.17.1
+packages/paperclip-runner build:    Compiling aws-smithy-runtime-api v1.15.0
+packages/paperclip-runner build:    Compiling ring v0.17.14
+packages/paperclip-runner build:    Compiling zerovec-derive v0.11.6
+packages/paperclip-runner build:    Compiling rustls-pki-types v1.15.1
+packages/paperclip-runner build:    Compiling aws-lc-rs v1.18.1
+packages/paperclip-runner build:    Compiling bitflags v2.13.1
+packages/paperclip-runner build:    Compiling zerovec v0.11.8
+packages/paperclip-runner build:    Compiling displaydoc v0.2.7
+packages/paperclip-runner build:    Compiling base64ct v1.8.3
+packages/paperclip-runner build:    Compiling pem-rfc7468 v0.7.0
+packages/paperclip-runner build:    Compiling hybrid-array v0.4.14
+packages/paperclip-runner build:    Compiling cpufeatures v0.2.17
+packages/paperclip-runner build:    Compiling httparse v1.10.1
+packages/paperclip-runner build:    Compiling core-foundation-sys v0.8.7
+packages/paperclip-runner build:    Compiling untrusted v0.9.0
+packages/paperclip-runner build:    Compiling der v0.7.10
+packages/paperclip-runner build:    Compiling indexmap v2.14.1
+packages/paperclip-runner build:    Compiling rustls v0.23.45
+packages/paperclip-runner build:    Compiling cmov v0.5.4
+packages/paperclip-runner build:    Compiling ctutils v0.4.2
+packages/paperclip-runner build:    Compiling spki v0.7.3
+packages/paperclip-runner build:    Compiling security-framework-sys v2.17.0
+packages/paperclip-runner build:    Compiling core-foundation v0.10.1
+packages/paperclip-runner build:    Compiling crypto-common v0.2.2
+packages/paperclip-runner build:    Compiling block-buffer v0.12.1
+packages/paperclip-runner build:    Compiling tinystr v0.8.4
+packages/paperclip-runner build:    Compiling tower-service v0.3.3
+packages/paperclip-runner build:    Compiling litemap v0.8.3
+packages/paperclip-runner build:    Compiling writeable v0.6.4
+packages/paperclip-runner build:    Compiling atomic-waker v1.1.2
+packages/paperclip-runner build:    Compiling crc32fast v1.5.1
+packages/paperclip-runner build:    Compiling serde_core v1.0.229
+packages/paperclip-runner build:    Compiling try-lock v0.2.5
+packages/paperclip-runner build:    Compiling const-oid v0.10.2
+packages/paperclip-runner build:    Compiling digest v0.11.3
+packages/paperclip-runner build:    Compiling want v0.3.1
+packages/paperclip-runner build:    Compiling h2 v0.4.19
+packages/paperclip-runner build:    Compiling icu_locale_core v2.3.0
+packages/paperclip-runner build:    Compiling security-framework v3.7.0
+packages/paperclip-runner build:    Compiling pkcs8 v0.10.2
+packages/paperclip-runner build:    Compiling zerotrie v0.2.5
+packages/paperclip-runner build:    Compiling potential_utf v0.1.6
+packages/paperclip-runner build:    Compiling futures-channel v0.3.34
+packages/paperclip-runner build:    Compiling ff v0.13.1
+packages/paperclip-runner build:    Compiling utf8_iter v1.0.4
+packages/paperclip-runner build:    Compiling icu_properties_data v2.3.0
+packages/paperclip-runner build:    Compiling base16ct v0.2.0
+packages/paperclip-runner build:    Compiling icu_normalizer_data v2.3.0
+packages/paperclip-runner build:    Compiling sec1 v0.7.3
+packages/paperclip-runner build:    Compiling icu_collections v2.3.0
+packages/paperclip-runner build:    Compiling group v0.13.0
+packages/paperclip-runner build:    Compiling hyper v1.11.1
+packages/paperclip-runner build:    Compiling icu_provider v2.3.1
+packages/paperclip-runner build:    Compiling rustls-native-certs v0.8.4
+packages/paperclip-runner build:    Compiling aws-smithy-schema v0.2.0
+packages/paperclip-runner build:    Compiling form_urlencoded v1.2.2
+packages/paperclip-runner build:    Compiling crypto-bigint v0.5.5
+packages/paperclip-runner build:    Compiling sync_wrapper v1.0.2
+packages/paperclip-runner build:    Compiling base64 v0.22.1
+packages/paperclip-runner build:    Compiling getrandom v0.3.4
+packages/paperclip-runner build:    Compiling serde v1.0.229
+packages/paperclip-runner build:    Compiling tower-layer v0.3.3
+packages/paperclip-runner build:    Compiling ipnet v2.12.1
+packages/paperclip-runner build:    Compiling zerocopy v0.8.56
+packages/paperclip-runner build:    Compiling hyper-util v0.1.20
+packages/paperclip-runner build:    Compiling tower v0.5.3
+packages/paperclip-runner build:    Compiling elliptic-curve v0.13.8
+packages/paperclip-runner build:    Compiling aws-smithy-eventstream v0.61.2
+packages/paperclip-runner build:    Compiling webpki-roots v1.0.9
+packages/paperclip-runner build:    Compiling hmac v0.12.1
+packages/paperclip-runner build:    Compiling serde_derive v1.0.229
+packages/paperclip-runner build:    Compiling cpufeatures v0.3.1
+packages/paperclip-runner build:    Compiling semver v1.0.28
+packages/paperclip-runner build:    Compiling rustc_version v0.4.1
+packages/paperclip-runner build:    Compiling rfc6979 v0.4.0
+packages/paperclip-runner build:    Compiling icu_normalizer v2.3.0
+packages/paperclip-runner build:    Compiling icu_properties v2.3.0
+packages/paperclip-runner build:    Compiling aws-smithy-http v0.64.0
+packages/paperclip-runner build:    Compiling signature v2.2.0
+packages/paperclip-runner build:    Compiling getrandom v0.4.3
+packages/paperclip-runner build:    Compiling ecdsa v0.16.9
+packages/paperclip-runner build:    Compiling idna_adapter v1.2.2
+packages/paperclip-runner build:    Compiling aws-types v1.5.0
+packages/paperclip-runner build:    Compiling sha2 v0.11.0
+packages/paperclip-runner build:    Compiling primeorder v0.13.6
+packages/paperclip-runner build:    Compiling sha2 v0.10.9
+packages/paperclip-runner build:    Compiling aws-credential-types v1.3.0
+packages/paperclip-runner build:    Compiling zmij v1.0.23
+packages/paperclip-runner build:    Compiling rustversion v1.0.23
+packages/paperclip-runner build:    Compiling hex v0.4.3
+packages/paperclip-runner build:    Compiling p256 v0.13.2
+packages/paperclip-runner build:    Compiling idna v1.1.0
+packages/paperclip-runner build:    Compiling hmac v0.13.0
+packages/paperclip-runner build:    Compiling aws-smithy-observability v0.3.0
+packages/paperclip-runner build:    Compiling fastrand v2.5.0
+packages/paperclip-runner build:    Compiling serde_json v1.0.151
+packages/paperclip-runner build:    Compiling aws-sigv4 v1.5.1
+packages/paperclip-runner build:    Compiling uuid v1.26.0
+packages/paperclip-runner build:    Compiling num-bigint v0.4.8
+packages/paperclip-runner build:    Compiling ahash v0.8.12
+packages/paperclip-runner build:    Compiling regex-syntax v0.8.11
+packages/paperclip-runner build:    Compiling parking_lot_core v0.9.12
+packages/paperclip-runner build:    Compiling xmlparser v0.13.6
+packages/paperclip-runner build:    Compiling ref-cast v1.0.27
+packages/paperclip-runner build:    Compiling aws-smithy-xml v0.62.0
+packages/paperclip-runner build:    Compiling num-rational v0.4.2
+packages/paperclip-runner build:    Compiling arc-swap v1.9.2
+packages/paperclip-runner build:    Compiling rustls-webpki v0.103.15
+packages/paperclip-runner build:    Compiling url v2.5.8
+packages/paperclip-runner build:    Compiling tokio-rustls v0.26.4
+packages/paperclip-runner build:    Compiling hyper-rustls v0.27.9
+packages/paperclip-runner build:    Compiling aws-smithy-http-client v1.4.0
+packages/paperclip-runner build:    Compiling aws-smithy-runtime v1.14.0
+packages/paperclip-runner build:    Compiling aws-smithy-json v0.63.0
+packages/paperclip-runner build:    Compiling aws-runtime v1.9.1
+packages/paperclip-runner build:    Compiling num-iter v0.1.46
+packages/paperclip-runner build:    Compiling num-complex v0.4.6
+packages/paperclip-runner build:    Compiling ref-cast-impl v1.0.27
+packages/paperclip-runner build:    Compiling inout v0.1.4
+packages/paperclip-runner build:    Compiling aho-corasick v1.1.5
+packages/paperclip-runner build:    Compiling regex-lite v0.1.9
+packages/paperclip-runner build:    Compiling scopeguard v1.2.0
+packages/paperclip-runner build:    Compiling lock_api v0.4.14
+packages/paperclip-runner build:    Compiling regex-automata v0.4.18
+packages/paperclip-runner build:    Compiling cipher v0.4.4
+packages/paperclip-runner build:    Compiling num v0.4.3
+packages/paperclip-runner build:    Compiling ppv-lite86 v0.2.21
+packages/paperclip-runner build:    Compiling rand_core v0.9.5
+packages/paperclip-runner build:    Compiling universal-hash v0.5.1
+packages/paperclip-runner build:    Compiling heck v0.5.0
+packages/paperclip-runner build:    Compiling urlencoding v2.1.3
+packages/paperclip-runner build:    Compiling log v0.4.34
+packages/paperclip-runner build:    Compiling opaque-debug v0.3.1
+packages/paperclip-runner build:    Compiling unicode-general-category v1.1.0
+packages/paperclip-runner build:    Compiling borrow-or-share v0.2.4
+packages/paperclip-runner build:    Compiling thiserror v2.0.20
+packages/paperclip-runner build:    Compiling bit-vec v0.8.0
+packages/paperclip-runner build:    Compiling spin v0.10.1
+packages/paperclip-runner build:    Compiling crc-fast v1.10.0
+packages/paperclip-runner build:    Compiling bit-set v0.8.0
+packages/paperclip-runner build:    Compiling fluent-uri v0.4.1
+packages/paperclip-runner build:    Compiling polyval v0.6.2
+packages/paperclip-runner build:    Compiling aws-smithy-query v0.62.0
+packages/paperclip-runner build:    Compiling strum_macros v0.28.0
+packages/paperclip-runner build:    Compiling rand_chacha v0.9.0
+packages/paperclip-runner build:    Compiling parking_lot v0.12.5
+packages/paperclip-runner build:    Compiling fraction v0.16.0
+packages/paperclip-runner build:    Compiling sha1 v0.11.0
+packages/paperclip-runner build:    Compiling md-5 v0.11.0
+packages/paperclip-runner build:    Compiling thiserror-impl v2.0.20
+packages/paperclip-runner build:    Compiling micromap v0.3.0
+packages/paperclip-runner build:    Compiling rustix v1.1.4
+packages/paperclip-runner build:    Compiling bytecount v0.6.9
+packages/paperclip-runner build:    Compiling num-cmp v0.1.0
+packages/paperclip-runner build:    Compiling data-encoding v2.11.1
+packages/paperclip-runner build:    Compiling same-file v1.0.6
+packages/paperclip-runner build:    Compiling walkdir v2.5.0
+packages/paperclip-runner build:    Compiling jsonschema-value v0.50.1
+packages/paperclip-runner build:    Compiling referencing v0.50.1
+packages/paperclip-runner build:    Compiling aws-smithy-checksums v0.65.0
+packages/paperclip-runner build:    Compiling rand v0.9.5
+packages/paperclip-runner build:    Compiling strum v0.28.0
+packages/paperclip-runner build:    Compiling aws-sdk-sts v1.113.0
+packages/paperclip-runner build:    Compiling ghash v0.5.1
+packages/paperclip-runner build:    Compiling fancy-regex v0.19.0
+packages/paperclip-runner build:    Compiling regex v1.13.1
+packages/paperclip-runner build:    Compiling aes v0.8.4
+packages/paperclip-runner build:    Compiling ctr v0.9.2
+packages/paperclip-runner build:    Compiling tower-http v0.6.11
+packages/paperclip-runner build:    Compiling jsonschema-regex v0.50.1
+packages/paperclip-runner build:    Compiling email_address v0.2.9
+packages/paperclip-runner build:    Compiling serde_urlencoded v0.7.1
+packages/paperclip-runner build:    Compiling sha1 v0.10.7
+packages/paperclip-runner build:    Compiling notify-types v2.1.0
+packages/paperclip-runner build:    Compiling lru v0.18.3
+packages/paperclip-runner build:    Compiling uuid-simd v0.8.0
+packages/paperclip-runner build:    Compiling aead v0.5.2
+packages/paperclip-runner build:    Compiling errno v0.3.14
+packages/paperclip-runner build:    Compiling fsevent-sys v4.1.0
+packages/paperclip-runner build:    Compiling winnow v0.7.15
+packages/paperclip-runner build:    Compiling toml_datetime v0.6.11
+packages/paperclip-runner build:    Compiling toml_write v0.1.2
+packages/paperclip-runner build:    Compiling utf-8 v0.7.6
+packages/paperclip-runner build:    Compiling tungstenite v0.28.0
+packages/paperclip-runner build:    Compiling toml_edit v0.22.27
+packages/paperclip-runner build:    Compiling notify v8.2.0
+packages/paperclip-runner build:    Compiling aes-gcm v0.10.3
+packages/paperclip-runner build:    Compiling jsonschema v0.50.1
+packages/paperclip-runner build:    Compiling aws-sdk-s3 v1.144.0
+packages/paperclip-runner build:    Compiling reqwest v0.12.28
+packages/paperclip-runner build:    Compiling aws-config v1.11.0
+packages/paperclip-runner build:    Compiling aws-sdk-bedrockagentcore v1.65.0
+packages/paperclip-runner build:    Compiling rustls-pemfile v2.2.0
+packages/paperclip-runner build:    Compiling paperclip-process-table v0.0.0 (/Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner/runner/crates/process-table)
+packages/paperclip-runner build:    Compiling paperclip-runner-core v0.0.0 (/Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner/runner/crates/runner-core)
+packages/paperclip-runner build: warning: unused import: `CursorMode`
+packages/paperclip-runner build:   --> crates/runner-core/src/acpx_provider_checkpoint.rs:13:81
+packages/paperclip-runner build:    |
+packages/paperclip-runner build: 13 |     AcpxPermissionMode, AcpxProviderSessionConfig, AcpxProviderSessionIdentity, CursorMode,
+packages/paperclip-runner build:    |                                                                                 ^^^^^^^^^^
+packages/paperclip-runner build:    |
+packages/paperclip-runner build:    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+packages/paperclip-runner build: warning: variable does not need to be mutable
+packages/paperclip-runner build:     --> crates/runner-core/src/durable/state.rs:2022:5
+packages/paperclip-runner build:      |
+packages/paperclip-runner build: 2022 |     mut sanitized: Value,
+packages/paperclip-runner build:      |     ----^^^^^^^^^
+packages/paperclip-runner build:      |     |
+packages/paperclip-runner build:      |     help: remove this `mut`
+packages/paperclip-runner build:      |
+packages/paperclip-runner build:      = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+packages/paperclip-runner build: warning: fields `config` and `system_instructions` are never read
+packages/paperclip-runner build:     --> crates/runner-core/src/claude_managed_provider.rs:1248:5
+packages/paperclip-runner build:      |
+packages/paperclip-runner build: 1232 | pub struct ClaudeManagedProvider {
+packages/paperclip-runner build:      |            --------------------- fields in this struct
+packages/paperclip-runner build: ...
+packages/paperclip-runner build: 1248 |     config: ClaudeManagedProviderConfig,
+packages/paperclip-runner build:      |     ^^^^^^
+packages/paperclip-runner build: 1249 |     system_instructions: String,
+packages/paperclip-runner build:      |     ^^^^^^^^^^^^^^^^^^^
+packages/paperclip-runner build:      |
+packages/paperclip-runner build:      = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+packages/paperclip-runner build: warning: function `receive_plain` is never used
+packages/paperclip-runner build:     --> crates/runner-core/src/durable/transport.rs:1596:4
+packages/paperclip-runner build:      |
+packages/paperclip-runner build: 1596 | fn receive_plain(
+packages/paperclip-runner build:      |    ^^^^^^^^^^^^^
+packages/paperclip-runner build: warning: function `validate_tool_result_contract` is never used
+packages/paperclip-runner build:     --> crates/runner-core/src/provider_bridge.rs:1079:4
+packages/paperclip-runner build:      |
+packages/paperclip-runner build: 1079 | fn validate_tool_result_contract(
+packages/paperclip-runner build:      |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/paperclip-runner build: warning: `paperclip-runner-core` (lib) generated 5 warnings (run `cargo fix --lib -p paperclip-runner-core` to apply 2 suggestions)
+packages/paperclip-runner build:     Finished `release` profile [optimized] target(s) in 3m 13s
+packages/paperclip-runner build: Replay golden snapshots and parity summaries are current.
+packages/paperclip-runner build: paperclip.runner-build-inputs.v2 recorded: digest=f21282bfc7df files=1726 bytes=25855725 outputs=1873 stamp=node_modules/.cache/paperclip-runner-build-inputs.json
+packages/paperclip-runner build: Done
+packages/adapters/claude-local build$ tsc
+packages/adapters/cursor-cloud build$ tsc
+packages/adapters/codex-local build$ tsc && cp src/server/codex-auth-merge-decision.cjs src/server/codex-auth-merge-extract.sh dist/server/
+packages/adapters/cursor-local build$ tsc
+packages/adapters/cursor-local build: Done
+packages/adapters/gemini-local build$ tsc
+packages/adapters/cursor-cloud build: Done
+packages/adapters/grok-local build$ tsc && cp src/server/grok-auth-merge-decision.cjs dist/server/
+packages/adapters/codex-local build: Done
+packages/adapters/hermes build$ tsc
+packages/adapters/claude-local build: Done
+packages/adapters/kimi-local build$ tsc
+packages/adapters/grok-local build: Done
+packages/adapters/openclaw-gateway build$ tsc
+packages/adapters/gemini-local build: Done
+packages/adapters/opencode-local build$ tsc
+packages/adapters/kimi-local build: Done
+packages/adapters/pi-local build$ tsc
+packages/adapters/hermes build: Done
+packages/plugins/create-paperclip-plugin build$ tsc
+packages/plugins/create-paperclip-plugin build: Done
+.../plugin-authoring-smoke-example prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+.../plugin-authoring-smoke-example prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../plugin-authoring-smoke-example prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+packages/adapters/openclaw-gateway build: Done
+.../examples/plugin-file-browser-example prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+packages/adapters/opencode-local build: Done
+.../examples/plugin-hello-world-example prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+packages/adapters/pi-local build: Done
+.../examples/plugin-kitchen-sink-example prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+.../examples/plugin-file-browser-example prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../examples/plugin-file-browser-example prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../examples/plugin-hello-world-example prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../examples/plugin-hello-world-example prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../plugin-authoring-smoke-example prebuild: Done
+.../plugin-authoring-smoke-example build$ node ./esbuild.config.mjs
+.../examples/plugin-kitchen-sink-example prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../examples/plugin-kitchen-sink-example prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../examples/plugin-file-browser-example prebuild: Done
+.../examples/plugin-file-browser-example build$ tsc && node ./scripts/build-ui.mjs
+.../examples/plugin-hello-world-example prebuild: Done
+.../examples/plugin-hello-world-example build$ tsc
+.../plugin-authoring-smoke-example build: Done
+.../paperclip-plugin-fake-sandbox prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+.../examples/plugin-kitchen-sink-example prebuild: Done
+.../examples/plugin-kitchen-sink-example build$ tsc && node ./scripts/build-ui.mjs
+.../paperclip-plugin-fake-sandbox prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../paperclip-plugin-fake-sandbox prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../examples/plugin-hello-world-example build: Done
+packages/plugins/plugin-browser-sessions prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+.../paperclip-plugin-fake-sandbox prebuild: Done
+.../paperclip-plugin-fake-sandbox build$ tsc
+.../examples/plugin-file-browser-example build:   dist/ui/index.js      962.2kb
+.../examples/plugin-file-browser-example build:   dist/ui/index.js.map    2.0mb
+.../examples/plugin-file-browser-example build: ⚡ Done in 34ms
+.../examples/plugin-file-browser-example build: Done
+packages/plugins/plugin-llm-wiki prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+.../examples/plugin-kitchen-sink-example build:   dist/ui/index.js      111.2kb
+.../examples/plugin-kitchen-sink-example build:   dist/ui/index.js.map  176.5kb
+.../examples/plugin-kitchen-sink-example build: ⚡ Done in 7ms
+.../examples/plugin-kitchen-sink-example build: Done
+packages/plugins/plugin-workspace-diff prebuild$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+packages/plugins/plugin-browser-sessions prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+packages/plugins/plugin-browser-sessions prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+packages/plugins/plugin-llm-wiki prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+packages/plugins/plugin-llm-wiki prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+packages/plugins/plugin-browser-sessions prebuild: Done
+packages/plugins/plugin-browser-sessions build$ tsc && node scripts/build-ui.mjs
+packages/plugins/plugin-workspace-diff prebuild: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+packages/plugins/plugin-workspace-diff prebuild: > node ../../../scripts/ensure-plugin-build-deps.mjs
+packages/plugins/plugin-llm-wiki prebuild: Done
+packages/plugins/plugin-llm-wiki build$ node ./esbuild.config.mjs
+.../paperclip-plugin-fake-sandbox build: Done
+packages/plugins/plugin-llm-wiki build: Done
+packages/plugins/plugin-workspace-diff prebuild: Done
+packages/plugins/plugin-workspace-diff build$ tsc && node ./scripts/build-ui.mjs
+packages/plugins/plugin-browser-sessions build:   dist/ui/index.js      20.6kb
+packages/plugins/plugin-browser-sessions build:   dist/ui/index.js.map  33.4kb
+packages/plugins/plugin-browser-sessions build: ⚡ Done in 2ms
+packages/plugins/plugin-browser-sessions build: Done
+packages/plugins/plugin-workspace-diff build:   dist/ui/index.js      10.9mb ⚠️
+packages/plugins/plugin-workspace-diff build:   dist/ui/index.js.map  14.5mb
+packages/plugins/plugin-workspace-diff build: ⚡ Done in 111ms
+packages/plugins/plugin-workspace-diff build: Done
+server build$ pnpm run prepare:runner-vendor && node scripts/verify-runner-vendor-dependencies.mjs && node ../scripts/run-tsc.mjs && mkdir -p dist/onboarding-assets dist/built-ins dist/services/scripts dist/vendor/paperclip-runner && cp -R src/onboarding-assets/. dist/onboarding-assets/ && cp -R src/built-ins/. dist/built-ins/ && cp -R src/services/scripts/. dist/services/scripts/ && cp -Rf ../packages/paperclip-runner/dist/. dist/vendor/paperclip-runner/ && cp ../packages/paperclip-runner/scripts/install-copilot-assets.mjs ../packages/paperclip-runner/scripts/materialize-copilot-binary.mjs ../packages/paperclip-runner/scripts/copilot-inner-distribution.mjs dist/ && node dist/install-copilot-assets.mjs && node scripts/write-build-stamp.mjs
+ui build$ vite build
+packages/adapters/hermes-gateway build$ tsc
+server build: > @paperclipai/server@0.3.1 prepare:runner-vendor /Users/andrew/dev/threadkeeper/paperclip/server
+server build: > node scripts/prepare-runner-vendor.mjs
+server build: prepare:runner-vendor: reusing the current Runner build (inputs unchanged since the build recorded at 2026-11-14T08:56:37.368Z; 1726 files and 1873 outputs checked)
+server build: paperclip.runner-vendor.timing.v1,action:reuse,reason:inputs_unchanged,check_ms:68,build_ms:0
+ui build: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+ui build:   - `__dirname` (vite.config.ts:16:30). Use `import.meta.dirname` instead
+ui build:   - import "./src/lib/vite-watch" without a file extension (vite.config.ts:5:41). Add the file extension
+ui build:   - import "./src/lib/vite-api-proxy" without a file extension (vite.config.ts:6:32). Add the file extension
+ui build:   - import "./src/lib/vite-sw-build-id" without a file extension (vite.config.ts:7:44). Add the file extension
+ui build:   - import "./src/lib/vite-build-commit" without a file extension (vite.config.ts:8:40). Add the file extension
+ui build:   - import "./src/lib/vite-issue-detail-preload" without a file extension (vite.config.ts:9:36). Add the file extension
+ui build:   - import "./issue-detail-preload-events" without a file extension (src/lib/vite-issue-detail-preload.ts:2:76). Add the file extension
+ui build: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+ui build: Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{
+ui build:   keepNames: true,
+ui build:   drop: [ 'console', 'debugger' ],
+ui build:   legalComments: 'none'
+ui build: }`
+ui build: vite v8.2.2 building client environment for production...
+packages/adapters/hermes-gateway build: Done
+ui build: transforming...
+ui build: Found 4 warnings while optimizing generated CSS:
+ui build: Issue #1:
+ui build: [2m│   background-color: var(--streamlined-task-detail-bg);[22m
+ui build: [2m│ }[22m
+ui build: [2m│[22m ::highlight(paperclip-doc-annotation-open) {
+ui build: [2m┆[22m             [33m[2m^--[22m 'highlight' is not recognized as a valid pseudo-element. Did you mean ':highlight' (pseudo-class) or is this a typo?[39m
+ui build: [2m┆[22m
+ui build: [2m│   background-color: transparent;[22m
+ui build: [2m│   color: inherit;[22m
+ui build: Issue #2:
+ui build: [2m│   color: inherit;[22m
+ui build: [2m│ }[22m
+ui build: [2m│[22m ::highlight(paperclip-doc-annotation-focused) {
+ui build: [2m┆[22m             [33m[2m^--[22m 'highlight' is not recognized as a valid pseudo-element. Did you mean ':highlight' (pseudo-class) or is this a typo?[39m
+ui build: [2m┆[22m
+ui build: [2m│   background-color: transparent;[22m
+ui build: [2m│   color: inherit;[22m
+ui build: Issue #3:
+ui build: [2m│   color: inherit;[22m
+ui build: [2m│ }[22m
+ui build: [2m│[22m ::highlight(paperclip-doc-annotation-stale) {
+ui build: [2m┆[22m             [33m[2m^--[22m 'highlight' is not recognized as a valid pseudo-element. Did you mean ':highlight' (pseudo-class) or is this a typo?[39m
+ui build: [2m┆[22m
+ui build: [2m│   background-color: transparent;[22m
+ui build: [2m│   color: inherit;[22m
+ui build: Issue #4:
+ui build: [2m│   color: inherit;[22m
+ui build: [2m│ }[22m
+ui build: [2m│[22m ::highlight(paperclip-doc-annotation-resolved) {
+ui build: [2m┆[22m             [33m[2m^--[22m 'highlight' is not recognized as a valid pseudo-element. Did you mean ':highlight' (pseudo-class) or is this a typo?[39m
+ui build: [2m┆[22m
+ui build: [2m│   background-color: transparent;[22m
+ui build: [2m│   color: inherit;[22m
+ui build: ✓ 8722 modules transformed.
+ui build: rendering chunks...
+ui build: computing gzip size...
+ui build: dist/index.html                                           8.62 kB │ gzip:     2.97 kB
+ui build: dist/assets/CompanyEnvironments-BrP-ENHg.css              3.93 kB │ gzip:     1.01 kB
+ui build: dist/assets/index-rlSdETVa.css                          687.58 kB │ gzip:   100.48 kB
+ui build: dist/assets/CompanyActivity.production-CDQTsVGe.js        0.09 kB │ gzip:     0.08 kB
+ui build: dist/assets/treemap-SAJKECNS-DfouCoLP.js                  0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/pie-XZMESJXO-Cco5BU8o.js                      0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/info-OHQRW6UA-DOe-J1wv.js                     0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/radar-ABXABTNO-qg9gJVdL.js                    0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/packet-JDAUHWVQ-CAEIG4VR.js                   0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/cynefin-EF2NZ3EQ-CgmKlwlY.js                  0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/wardley-7MLQ67FV-iz6_C5ro.js                  0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/gitGraph-VSP46ZUC-bpMMXaGe.js                 0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/railroad-I3PHUGI6-DC333TL3.js                 0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/treeView-D4JQ5SDB-kLQw_nF8.js                 0.12 kB │ gzip:     0.13 kB
+ui build: dist/assets/railroad-peg-JR7BVNR7-fPlNHsyV.js             0.13 kB │ gzip:     0.13 kB
+ui build: dist/assets/architecture-WOLXFQ4H-DBrG7kOo.js             0.13 kB │ gzip:     0.13 kB
+ui build: dist/assets/railroad-abnf-LNEFI6M7-BWEnIH4G.js            0.13 kB │ gzip:     0.13 kB
+ui build: dist/assets/railroad-ebnf-DWYD2UWJ-DZHUGTJr.js            0.13 kB │ gzip:     0.13 kB
+ui build: dist/assets/eventmodeling-K75KTNOO-BgOm41wQ.js            0.13 kB │ gzip:     0.13 kB
+ui build: dist/assets/arrow-down-left-Biz-9SZu.js                   0.19 kB │ gzip:     0.17 kB
+ui build: dist/assets/power-ZSYvN3Bb.js                             0.20 kB │ gzip:     0.18 kB
+ui build: dist/assets/channel-txC-DzXC.js                           0.20 kB │ gzip:     0.19 kB
+ui build: dist/assets/array-CL5Tisss.js                             0.21 kB │ gzip:     0.18 kB
+ui build: dist/assets/circle-slash-1DOouLdO.js                      0.22 kB │ gzip:     0.19 kB
+ui build: dist/assets/list-filter-CfmJqTMY.js                       0.22 kB │ gzip:     0.18 kB
+ui build: dist/assets/configuration-warnings-CZKSfHJv.js            0.23 kB │ gzip:     0.19 kB
+ui build: dist/assets/init-BXPE0p7i.js                              0.23 kB │ gzip:     0.19 kB
+ui build: dist/assets/chunk-Y2CYZVJY-OvsAdhaO.js                    0.26 kB │ gzip:     0.17 kB
+ui build: dist/assets/log-in-Tdxzf8wy.js                            0.26 kB │ gzip:     0.20 kB
+ui build: dist/assets/chunk-XXDRQBXY-BdWplhUD.js                    0.26 kB │ gzip:     0.23 kB
+ui build: dist/assets/link-gHvqI_Fv.js                              0.28 kB │ gzip:     0.21 kB
+ui build: dist/assets/chunk-2Q5K7J3B-CkPHWFj-.js                    0.30 kB │ gzip:     0.22 kB
+ui build: dist/assets/coins-8KvBjdpI.js                             0.31 kB │ gzip:     0.24 kB
+ui build: dist/assets/pen-line-DDPmYBeS.js                          0.32 kB │ gzip:     0.25 kB
+ui build: dist/assets/chunk-JWPE2WC7--HEGjv3t.js                    0.33 kB │ gzip:     0.23 kB
+ui build: dist/assets/folder-plus-CH2KpF72.js                       0.33 kB │ gzip:     0.24 kB
+ui build: dist/assets/chunk-5VM5RSS4-2H3r6wq0.js                    0.36 kB │ gzip:     0.27 kB
+ui build: dist/assets/goals-Fa1uzVKW.js                             0.38 kB │ gzip:     0.25 kB
+ui build: dist/assets/diff-C60bAYOU.js                              0.39 kB │ gzip:     0.29 kB
+ui build: dist/assets/budgets-B16ymM_u.js                           0.41 kB │ gzip:     0.27 kB
+ui build: dist/assets/building-complex-D6JQt4YA.js                  0.44 kB │ gzip:     0.27 kB
+ui build: dist/assets/CaseStatus-Cc4kQlEx.js                        0.48 kB │ gzip:     0.33 kB
+ui build: dist/assets/AgentIdentityChip-B4IbMgCl.js                 0.50 kB │ gzip:     0.37 kB
+ui build: dist/assets/onboarding-state-C5_mIw3o.js                  0.52 kB │ gzip:     0.33 kB
+ui build: dist/assets/flowDiagram-OXPTDLAJ-DdKVuk-O.js              0.57 kB │ gzip:     0.31 kB
+ui build: dist/assets/chunk-KQW6MTUR-B-dOrc6k.js                    0.58 kB │ gzip:     0.40 kB
+ui build: dist/assets/chunk-J5ZVWO5B-ClU583ja.js                    0.64 kB │ gzip:     0.44 kB
+ui build: dist/assets/infoDiagram-5W2HQ5XZ-B9FJWC_t.js              0.65 kB │ gzip:     0.42 kB
+ui build: dist/assets/TaskSummaryList-C3ejioFW.js                   0.66 kB │ gzip:     0.44 kB
+ui build: dist/assets/MissingPluginTabPlaceholder-Cf1oF-_s.js       0.67 kB │ gzip:     0.44 kB
+ui build: dist/assets/invite-memory-BKdqfr5K.js                     0.69 kB │ gzip:     0.37 kB
+ui build: dist/assets/brainfuck-NEHkmXMc.js                         0.70 kB │ gzip:     0.38 kB
+ui build: dist/assets/palette-tokens-CL5ZDrEd.js                    0.76 kB │ gzip:     0.41 kB
+ui build: dist/assets/properties-BKTTDgau.js                        0.77 kB │ gzip:     0.40 kB
+ui build: dist/assets/skill-source-connect-return-eFTeuj7y.js       0.81 kB │ gzip:     0.45 kB
+ui build: dist/assets/swimlanesDiagram-K3J5GTZL-4ccWAwPi.js         0.83 kB │ gzip:     0.48 kB
+ui build: dist/assets/NewAgentDialog-CGqm5P3Q.js                    0.84 kB │ gzip:     0.51 kB
+ui build: dist/assets/chunk-DUW6YSOI-slPglwIh.js                    0.89 kB │ gzip:     0.47 kB
+ui build: dist/assets/SkillsNavigationTabs-CjtnOk8D.js              0.91 kB │ gzip:     0.52 kB
+ui build: dist/assets/cmake-koz-qBlo.js                             0.92 kB │ gzip:     0.54 kB
+ui build: dist/assets/asciiarmor-DFLNSgns.js                        0.92 kB │ gzip:     0.48 kB
+ui build: dist/assets/protobuf-UWh8gh_j.js                          0.97 kB │ gzip:     0.59 kB
+ui build: dist/assets/SkillBinaryFile-DVx4s4uD.js                   0.99 kB │ gzip:     0.60 kB
+ui build: dist/assets/definition-DxwMBXnu.js                        1.00 kB │ gzip:     0.59 kB
+ui build: dist/assets/AppsReview-UyOtZlAn.js                        1.02 kB │ gzip:     0.60 kB
+ui build: dist/assets/solr-Dj8ahEwG.js                              1.06 kB │ gzip:     0.55 kB
+ui build: dist/assets/ArtifactEmptyGraphic-D67itJ9M.js              1.07 kB │ gzip:     0.65 kB
+ui build: dist/assets/line-PKcyNrBh.js                              1.08 kB │ gzip:     0.55 kB
+ui build: dist/assets/MembershipAction-BEAfNRUu.js                  1.08 kB │ gzip:     0.67 kB
+ui build: dist/assets/sizeCapture-INFHLROL-XURNLuv_.js              1.09 kB │ gzip:     0.58 kB
+ui build: dist/assets/troff-Lns35Xcq.js                             1.09 kB │ gzip:     0.51 kB
+ui build: dist/assets/http-0jwMmfWP.js                              1.12 kB │ gzip:     0.55 kB
+ui build: dist/assets/spreadsheet-B8doD_pL.js                       1.24 kB │ gzip:     0.59 kB
+ui build: dist/assets/toml-Civ2fTsu.js                              1.24 kB │ gzip:     0.60 kB
+ui build: dist/assets/OnboardingPrimitives-CalhEqB6.js              1.25 kB │ gzip:     0.67 kB
+ui build: dist/assets/AnimatedDialogContent-rE1aqZC7.js             1.26 kB │ gzip:     0.76 kB
+ui build: dist/assets/useFastResponsesEnabled-DznDpOvT.js           1.26 kB │ gzip:     0.55 kB
+ui build: dist/assets/useAuthorizationWindow-BYLSoTgt.js            1.26 kB │ gzip:     0.73 kB
+ui build: dist/assets/MetricCard-D8TZEf_g.js                        1.27 kB │ gzip:     0.66 kB
+ui build: dist/assets/connection-owner-B5W0CMvX.js                  1.29 kB │ gzip:     0.73 kB
+ui build: dist/assets/rolldown-runtime-DhZMWcEn.js                  1.33 kB │ gzip:     0.72 kB
+ui build: dist/assets/ordinal-BJyFM1v8.js                           1.39 kB │ gzip:     0.67 kB
+ui build: dist/assets/Goals-BdLHzCLp.js                             1.41 kB │ gzip:     0.82 kB
+ui build: dist/assets/ProjectRepositoryInput-FJfP7mHh.js            1.43 kB │ gzip:     0.77 kB
+ui build: dist/assets/QuotaBar--llRhx16.js                          1.44 kB │ gzip:     0.72 kB
+ui build: dist/assets/chunk-DBDB3WZW-BCMdYlLE.js                    1.53 kB │ gzip:     0.86 kB
+ui build: dist/assets/mbox-JGl1Fgvq.js                              1.54 kB │ gzip:     0.74 kB
+ui build: dist/assets/routine-variables-CzIFRXlW.js                 1.55 kB │ gzip:     0.85 kB
+ui build: dist/assets/factor-CM3-9V3b.js                            1.67 kB │ gzip:     0.61 kB
+ui build: dist/assets/railroadDiagram-SM67HX2B-Df4IsJeE.js          1.67 kB │ gzip:     0.77 kB
+ui build: dist/assets/rpm-Csj9nLHl.js                               1.71 kB │ gzip:     0.88 kB
+ui build: dist/assets/ToolsAdminGate-C45XCRzU.js                    1.80 kB │ gzip:     0.90 kB
+ui build: dist/assets/sieve-CcvsXPZo.js                             1.83 kB │ gzip:     0.87 kB
+ui build: dist/assets/EntityRow-BTe24X5C.js                         1.85 kB │ gzip:     0.83 kB
+ui build: dist/assets/z80-CB2cGLew.js                               1.85 kB │ gzip:     0.88 kB
+ui build: dist/assets/abnfDiagram-YUKMZFIV-CTkVqffa.js              1.87 kB │ gzip:     0.90 kB
+ui build: dist/assets/GoalTree-DPC8d55o.js                          1.87 kB │ gzip:     0.93 kB
+ui build: dist/assets/CompanyActivity-Ci8q10OK.js                   1.89 kB │ gzip:     0.85 kB
+ui build: dist/assets/dockerfile-BttNdtK0.js                        1.93 kB │ gzip:     0.65 kB
+ui build: dist/assets/chunk-4EA7E6EY-BvBmUeY5.js                    1.97 kB │ gzip:     0.96 kB
+ui build: dist/assets/eiffel-DuLnr4-r.js                            1.97 kB │ gzip:     1.02 kB
+ui build: dist/assets/chunk-7TKQ45FW-CEuwbIJi.js                    1.99 kB │ gzip:     0.90 kB
+ui build: dist/assets/DashboardLive-YOSTSrFU.js                     2.01 kB │ gzip:     1.04 kB
+ui build: dist/assets/pegDiagram-BGZESJAR-xIzOlPAp.js               2.03 kB │ gzip:     0.94 kB
+ui build: dist/assets/mathematica-CE9SaVsW.js                       2.07 kB │ gzip:     0.90 kB
+ui build: dist/assets/ebnf-bm-I2WIh.js                              2.08 kB │ gzip:     0.86 kB
+ui build: dist/assets/ebnfDiagram-VR2GEFS7-Di6IT0wy.js              2.08 kB │ gzip:     0.90 kB
+ui build: dist/assets/dist-v2aqwoJh.js                              2.09 kB │ gzip:     1.32 kB
+ui build: dist/assets/elm-njbaCU-L.js                               2.12 kB │ gzip:     0.95 kB
+ui build: dist/assets/turtle-DTIS1YQ7.js                            2.17 kB │ gzip:     1.01 kB
+ui build: dist/assets/mumps-C7oS353s.js                             2.20 kB │ gzip:     1.07 kB
+ui build: dist/assets/ntriples-5ckCopnn.js                          2.22 kB │ gzip:     0.81 kB
+ui build: dist/assets/PaperclipCloudOAuthHandoff-pmhLLhc6.js        2.22 kB │ gzip:     1.05 kB
+ui build: dist/assets/smalltalk-Cmg-4mjQ.js                         2.24 kB │ gzip:     0.96 kB
+ui build: dist/assets/dtd-CCVZU5Da.js                               2.26 kB │ gzip:     0.98 kB
+ui build: dist/assets/fcl-nWsMJ92o.js                               2.27 kB │ gzip:     1.04 kB
+ui build: dist/assets/yacas-BG9ha7tU.js                             2.35 kB │ gzip:     1.19 kB
+ui build: dist/assets/dist-CTlCK4Pe.js                              2.39 kB │ gzip:     1.09 kB
+ui build: dist/assets/apl-MHzTCvfx.js                               2.41 kB │ gzip:     1.30 kB
+ui build: dist/assets/octave-D1J2QQNt.js                            2.48 kB │ gzip:     1.20 kB
+ui build: dist/assets/commonlisp-C4OOCwkD.js                        2.49 kB │ gzip:     1.20 kB
+ui build: dist/assets/pascal-B-I6JP0Y.js                            2.50 kB │ gzip:     1.29 kB
+ui build: dist/assets/simple-mode-B79cVo-x.js                       2.52 kB │ gzip:     1.22 kB
+ui build: dist/assets/path-D6mommQw.js                              2.53 kB │ gzip:     1.14 kB
+ui build: dist/assets/tcl-RZa1cqc-.js                               2.56 kB │ gzip:     1.33 kB
+ui build: dist/assets/profile-summary-teavRF9-.js                   2.63 kB │ gzip:     1.21 kB
+ui build: dist/assets/webidl-ChvzbZ5-.js                            2.64 kB │ gzip:     1.32 kB
+ui build: dist/assets/forth-BQ9HrCVY.js                             2.68 kB │ gzip:     1.41 kB
+ui build: dist/assets/puppet-BAHVzCkO.js                            2.69 kB │ gzip:     1.28 kB
+ui build: dist/assets/pig-FQI0W3S3.js                               2.70 kB │ gzip:     1.48 kB
+ui build: dist/assets/dist-DJlOGBx0.js                              2.71 kB │ gzip:     1.56 kB
+ui build: dist/assets/EmailConnectionAccess-CdAaR1f9.js             2.73 kB │ gzip:     1.21 kB
+ui build: dist/assets/shell-BSKClwid.js                             2.80 kB │ gzip:     1.33 kB
+ui build: dist/assets/WebhookUrlWarning-CairzkoC.js                 2.87 kB │ gzip:     1.46 kB
+ui build: dist/assets/velocity-BIIn-Nl2.js                          2.88 kB │ gzip:     1.22 kB
+ui build: dist/assets/smoke-lab-matrix-TGf88LHF.js                  2.94 kB │ gzip:     1.37 kB
+ui build: dist/assets/EnforcementBanner-795u2b6O.js                 2.94 kB │ gzip:     1.32 kB
+ui build: dist/assets/tiddlywiki-C9bm_Oju.js                        3.04 kB │ gzip:     1.20 kB
+ui build: dist/assets/modelica-5XCgKQt8.js                          3.04 kB │ gzip:     1.41 kB
+ui build: dist/assets/company-skill-routes-D5LJ1l8M.js              3.08 kB │ gzip:     1.18 kB
+ui build: dist/assets/shared-DkhVyzvW.js                            3.09 kB │ gzip:     1.27 kB
+ui build: dist/assets/AgentChat-BbZQnQn4.js                         3.10 kB │ gzip:     1.45 kB
+ui build: dist/assets/SkillCardIcon-CIINXeRP.js                     3.14 kB │ gzip:     1.56 kB
+ui build: dist/assets/r-CktBKya9.js                                 3.14 kB │ gzip:     1.47 kB
+ui build: dist/assets/oz-CPsllMDD.js                                3.17 kB │ gzip:     1.42 kB
+ui build: dist/assets/Approvals-DFDW99an.js                         3.18 kB │ gzip:     1.41 kB
+ui build: dist/assets/SpekoProviderSetup-D-2Cfk52.js                3.28 kB │ gzip:     1.49 kB
+ui build: dist/assets/BoardClaim-BHb6C2Lc.js                        3.33 kB │ gzip:     1.23 kB
+ui build: dist/assets/stex-CW6K5Nmu.js                              3.44 kB │ gzip:     1.36 kB
+ui build: dist/assets/dist-DAlNfLSn.js                              3.45 kB │ gzip:     1.77 kB
+ui build: dist/assets/RoutineActivityRow-CjIg2n4h.js                3.46 kB │ gzip:     1.52 kB
+ui build: dist/assets/vhdl-Cn8cC8Yb.js                              3.60 kB │ gzip:     1.63 kB
+ui build: dist/assets/lua-Vher-70I.js                               3.61 kB │ gzip:     1.56 kB
+ui build: dist/assets/tiki-DJOT-rFT.js                              3.63 kB │ gzip:     1.45 kB
+ui build: dist/assets/mscgen-mVFg19ri.js                            3.71 kB │ gzip:     1.09 kB
+ui build: dist/assets/cypher-z2oFsVv2.js                            3.73 kB │ gzip:     1.63 kB
+ui build: dist/assets/PluginPage-DpzyhRhJ.js                        3.75 kB │ gzip:     1.69 kB
+ui build: dist/assets/arc-Dnq9Aszq.js                               3.75 kB │ gzip:     1.62 kB
+ui build: dist/assets/sparql-LAJYmgfk.js                            3.77 kB │ gzip:     1.76 kB
+ui build: dist/assets/chat-channels-B73Yt7b9.js                     3.87 kB │ gzip:     1.65 kB
+ui build: dist/assets/d-Dkt6y7AQ.js                                 3.97 kB │ gzip:     1.82 kB
+ui build: dist/assets/CompanySettingsPluginPage-D5u_Z4fy.js         3.98 kB │ gzip:     1.78 kB
+ui build: dist/assets/coffeescript-CXYzYf-Y.js                      4.09 kB │ gzip:     1.81 kB
+ui build: dist/assets/vb-BO8UacKu.js                                4.15 kB │ gzip:     1.93 kB
+ui build: dist/assets/asn1-CfPVWRYE.js                              4.20 kB │ gzip:     2.08 kB
+ui build: dist/assets/swift-BD82LMDK.js                             4.22 kB │ gzip:     1.93 kB
+ui build: dist/assets/livescript-DSHsJPcD.js                        4.22 kB │ gzip:     1.70 kB
+ui build: dist/assets/dylan-3pmV5wzs.js                             4.23 kB │ gzip:     1.75 kB
+ui build: dist/assets/AppsConnect-DqTEiZ9Z.js                       4.25 kB │ gzip:     1.87 kB
+ui build: dist/assets/q-Cooe-Nh8.js                                 4.31 kB │ gzip:     1.84 kB
+ui build: dist/assets/ttcn-cfg-B8qhhp6o.js                          4.31 kB │ gzip:     1.84 kB
+ui build: dist/assets/haskell-CHSpCNOy.js                           4.38 kB │ gzip:     2.03 kB
+ui build: dist/assets/groovy-ByXGF8cx.js                            4.47 kB │ gzip:     1.94 kB
+ui build: dist/assets/diagram-UMYRVEAY-v-xb_OIn.js                  4.51 kB │ gzip:     1.99 kB
+ui build: dist/assets/asterisk-CJ4OeA7Y.js                          4.58 kB │ gzip:     1.85 kB
+ui build: dist/assets/search-CY7EREVU.js                            4.61 kB │ gzip:     1.50 kB
+ui build: dist/assets/Workspaces-a9wSCcX7.js                        4.64 kB │ gzip:     1.87 kB
+ui build: dist/assets/model-DL5biheO.js                             4.74 kB │ gzip:     2.19 kB
+ui build: dist/assets/gas-ByO0qYMr.js                               4.74 kB │ gzip:     1.39 kB
+ui build: dist/assets/fortran-DHJe28ev.js                           4.80 kB │ gzip:     2.12 kB
+ui build: dist/assets/useSummaryDraftStream-B5CUOct6.js             4.86 kB │ gzip:     2.36 kB
+ui build: dist/assets/ConfigureBuiltInAgentModal-CmehKIvj.js        4.96 kB │ gzip:     2.21 kB
+ui build: dist/assets/mllike-DuNQsEw8.js                            5.02 kB │ gzip:     1.67 kB
+ui build: dist/assets/ttcn-7vlxVTUK.js                              5.09 kB │ gzip:     2.26 kB
+ui build: dist/assets/RepositoryEditor-BOOtNwMp.js                  5.13 kB │ gzip:     1.84 kB
+ui build: dist/assets/dist-ryGTnatW.js                              5.14 kB │ gzip:     2.46 kB
+ui build: dist/assets/defaultLocale-C2Bpu8Ih.js                     5.21 kB │ gzip:     2.42 kB
+ui build: dist/assets/NewProjectDialog-XLjMW8UR.js                  5.23 kB │ gzip:     2.19 kB
+ui build: dist/assets/ecl-BIv3PrZb.js                               5.38 kB │ gzip:     2.44 kB
+ui build: dist/assets/crystal-BlJXQDvy.js                           5.42 kB │ gzip:     2.22 kB
+ui build: dist/assets/ruby-bGx9eo-K.js                              5.50 kB │ gzip:     2.32 kB
+ui build: dist/assets/julia-KVJvUu_F.js                             5.69 kB │ gzip:     2.30 kB
+ui build: dist/assets/ReviewQueueCard-a0h0jupV.js                   5.74 kB │ gzip:     2.02 kB
+ui build: dist/assets/NewGoalDialog-C4BuC9Yw.js                     5.87 kB │ gzip:     2.07 kB
+ui build: dist/assets/ChatIdentityConfirm-lRxHnENI.js               5.87 kB │ gzip:     2.08 kB
+ui build: dist/assets/vbscript-DWLru3lT.js                          6.03 kB │ gzip:     2.71 kB
+ui build: dist/assets/chunk-HTAEGDNF-Ep4FFYj5.js                    6.06 kB │ gzip:     2.73 kB
+ui build: dist/assets/mirc-BGWbO906.js                              6.11 kB │ gzip:     2.82 kB
+ui build: dist/assets/CliAuth-DiS_TjRc.js                           6.17 kB │ gzip:     2.01 kB
+ui build: dist/assets/portable-files-CloN_vbk.js                    6.17 kB │ gzip:     2.67 kB
+ui build: dist/assets/diagram-YEKJPTXX-DKMT_SGZ.js                  6.31 kB │ gzip:     2.71 kB
+ui build: dist/assets/JoinRequestQueue-CO7Y7Jhu.js                  6.36 kB │ gzip:     2.13 kB
+ui build: dist/assets/cobol-Bo8Zw9gB.js                             6.38 kB │ gzip:     3.08 kB
+ui build: dist/assets/linear-BRQgexd0.js                            6.42 kB │ gzip:     2.69 kB
+ui build: dist/assets/chunk-HJ2JQQFS-DmPI2Jkr.js                    6.44 kB │ gzip:     3.01 kB
+ui build: dist/assets/ActiveAgentsPanel-EtvGUEuF.js                 6.48 kB │ gzip:     2.81 kB
+ui build: dist/assets/SkillSourceTree-D4O2a-yu.js                   6.53 kB │ gzip:     2.76 kB
+ui build: dist/assets/pieDiagram-CAPJLFHJ-D_NQaPAC.js               6.54 kB │ gzip:     2.77 kB
+ui build: dist/assets/scheme-DcjG9bAf.js                            6.67 kB │ gzip:     2.55 kB
+ui build: dist/assets/Projects-Cd1VluNL.js                          6.68 kB │ gzip:     2.72 kB
+ui build: dist/assets/python-C2DOnsac.js                            6.84 kB │ gzip:     2.91 kB
+ui build: dist/assets/GoalDetail-BvlHXMQJ.js                        6.88 kB │ gzip:     2.58 kB
+ui build: dist/assets/Companies-CIh9NFRC.js                         6.92 kB │ gzip:     2.37 kB
+ui build: dist/assets/nsis-KFC6hioG.js                              7.06 kB │ gzip:     3.08 kB
+ui build: dist/assets/InstanceAccess-bLgTU3hq.js                    7.06 kB │ gzip:     2.28 kB
+ui build: dist/assets/xquery-BKN7qEbU.js                            7.07 kB │ gzip:     2.80 kB
+ui build: dist/assets/textile-C-BY_OGF.js                           7.29 kB │ gzip:     2.63 kB
+ui build: dist/assets/ResponsibleUserDenialUxLab-5PLKbKVe.js        7.46 kB │ gzip:     1.95 kB
+ui build: dist/assets/pug-C20tNwmy.js                               7.53 kB │ gzip:     2.34 kB
+ui build: dist/assets/nginx-DXVlpyCz.js                             7.56 kB │ gzip:     2.84 kB
+ui build: dist/assets/useProfilesData-BdUU86p3.js                   7.62 kB │ gzip:     2.62 kB
+ui build: dist/assets/AppNotConnected-Dl0v3S_J.js                   7.66 kB │ gzip:     2.88 kB
+ui build: dist/assets/CrossIssueCollaborationUxLab-B0z4Pf5m.js      7.70 kB │ gzip:     2.75 kB
+ui build: dist/assets/TrustPresetSection-ActG9lAW.js                8.11 kB │ gzip:     2.93 kB
+ui build: dist/assets/powershell-BAu6x78A.js                        8.18 kB │ gzip:     3.48 kB
+ui build: dist/assets/CopyableGatewayUrl-ChcwcPHY.js                8.31 kB │ gzip:     3.56 kB
+ui build: dist/assets/diagram-PFPMY2P6-DTETstQY.js                  8.57 kB │ gzip:     3.81 kB
+ui build: dist/assets/erlang-CuhOC2I8.js                            8.57 kB │ gzip:     3.16 kB
+ui build: dist/assets/useDateRange-izd5WhWx.js                      8.65 kB │ gzip:     3.15 kB
+ui build: dist/assets/haxe-P2jh68ck.js                              8.80 kB │ gzip:     3.38 kB
+ui build: dist/assets/verilog-BVYlmXGg.js                           8.82 kB │ gzip:     3.74 kB
+ui build: dist/assets/BootstrapSetupUxLab-B9ZNzOVj.js               8.84 kB │ gzip:     2.37 kB
+ui build: dist/assets/GatewaysList-2NCKrV_I.js                      8.97 kB │ gzip:     3.04 kB
+ui build: dist/assets/dist-sTKqu6dE.js                              8.97 kB │ gzip:     3.90 kB
+ui build: dist/assets/ApprovalDetail-EasRLFlS.js                    9.32 kB │ gzip:     2.98 kB
+ui build: dist/assets/sas-Drou_EQ9.js                               9.46 kB │ gzip:     4.19 kB
+ui build: dist/assets/DecisionQueuePage-Ct_dx9PU.js                 9.81 kB │ gzip:     3.66 kB
+ui build: dist/assets/Artifacts-CmtYTI4l.js                         9.93 kB │ gzip:     3.68 kB
+ui build: dist/assets/IssueChatLongThreadPerf-zWobgJh6.js           9.96 kB │ gzip:     3.79 kB
+ui build: dist/assets/perl-CI8WIWBi.js                              9.97 kB │ gzip:     3.63 kB
+ui build: dist/assets/ProjectWorkspacesContent-C6z94Rjr.js         10.18 kB │ gzip:     2.84 kB
+ui build: dist/assets/gherkin-CwOmHL5K.js                          10.26 kB │ gzip:     5.17 kB
+ui build: dist/assets/cynefinDiagram-3GCD6N5R-D7bqjFtc.js          10.41 kB │ gzip:     3.73 kB
+ui build: dist/assets/Auth-C3BCOAV5.js                             10.52 kB │ gzip:     4.20 kB
+ui build: dist/assets/OrgChart.production-C_b-OevX.js              10.55 kB │ gzip:     4.00 kB
+ui build: dist/assets/AgentBulkSettingsSheet-Beb5_bEg.js           10.57 kB │ gzip:     3.93 kB
+ui build: dist/assets/BudgetPolicyCard-BNUe1yJT.js                 10.76 kB │ gzip:     3.38 kB
+ui build: dist/assets/RoutineRunVariablesDialog-zhB4USVZ.js        11.00 kB │ gzip:     3.47 kB
+ui build: dist/assets/clojure-DFaIEz5O.js                          11.00 kB │ gzip:     4.19 kB
+ui build: dist/assets/chunk-FVRAUYC3-DC1KtXRu.js                   11.14 kB │ gzip:     4.54 kB
+ui build: dist/assets/ProfileSettings-wRzQNCaU.js                  11.37 kB │ gzip:     4.03 kB
+ui build: dist/assets/idl-DTVVj6r5.js                              11.75 kB │ gzip:     4.73 kB
+ui build: dist/assets/diagram-ZIFT7M5P-NrBYpdU3.js                 11.84 kB │ gzip:     4.48 kB
+ui build: dist/assets/UserProfile-B_phMAHk.js                      12.25 kB │ gzip:     3.48 kB
+ui build: dist/assets/AgentRosterFilters-Bi8r_9vK.js               12.62 kB │ gzip:     4.76 kB
+ui build: dist/assets/Cases-vws_Uhaw.js                            12.73 kB │ gzip:     4.58 kB
+ui build: dist/assets/dist-BKtUeebg.js                             12.84 kB │ gzip:     5.75 kB
+ui build: dist/assets/Agents.production-Bw1J82_z.js                13.42 kB │ gzip:     4.69 kB
+ui build: dist/assets/AuditHub-CHX6s_XW.js                         13.88 kB │ gzip:     4.81 kB
+ui build: dist/assets/McpConnect-D_vR7X4q.js                       13.88 kB │ gzip:     4.30 kB
+ui build: dist/assets/PluginManager-CotzXl2y.js                    13.89 kB │ gzip:     3.79 kB
+ui build: dist/assets/AgentActionButtons-BcdMim2g.js               14.55 kB │ gzip:     4.31 kB
+ui build: dist/assets/dist-DwamUpLL.js                             15.01 kB │ gzip:     6.13 kB
+ui build: dist/assets/chunk-NTY3LDVX-B3ZGrP8n.js                   15.09 kB │ gzip:     4.21 kB
+ui build: dist/assets/AdapterManager-DaS_TvbJ.js                   15.25 kB │ gzip:     4.36 kB
+ui build: dist/assets/chunk-AW2ZBBNX-xWsfyJfs.js                   15.90 kB │ gzip:     4.49 kB
+ui build: dist/assets/AssistantConnection-CGRtT6RM.js              16.01 kB │ gzip:     5.59 kB
+ui build: dist/assets/dist-B5iM3byn.js                             16.38 kB │ gzip:     7.56 kB
+ui build: dist/assets/diagram-OVF4WLC6-D9OCBcyS.js                 16.80 kB │ gzip:     6.02 kB
+ui build: dist/assets/FolderControls-ncIg9Erf.js                   17.52 kB │ gzip:     5.53 kB
+ui build: dist/assets/ishikawaDiagram-K3B6WC7H-2GjLYW4o.js         17.94 kB │ gzip:     6.82 kB
+ui build: dist/assets/mermaid-parser.core-DXln6ADD.js              18.39 kB │ gzip:     4.19 kB
+ui build: dist/assets/javascript-Cblpdx44.js                       19.01 kB │ gzip:     6.65 kB
+ui build: dist/assets/GitHubConnectionRecovery-BvBVEMh3.js         19.37 kB │ gzip:     6.06 kB
+ui build: dist/assets/SpekoPhoneCallback-BB_cC9uK.js               19.48 kB │ gzip:     5.65 kB
+ui build: dist/assets/ProjectWorkspaceDetail-CC6B7oSo.js           19.85 kB │ gzip:     6.00 kB
+ui build: dist/assets/InviteLanding-BuXFnIP7.js                    19.94 kB │ gzip:     5.46 kB
+ui build: dist/assets/SummarySlotCard-NKWm2apK.js                  20.46 kB │ gzip:     5.89 kB
+ui build: dist/assets/kanban-definition-P3RFRI5V-atLUo9wc.js       20.88 kB │ gzip:     7.44 kB
+ui build: dist/assets/dist-BGfgT8Ut.js                             21.08 kB │ gzip:     9.56 kB
+ui build: dist/assets/dist-BB8YTLBd.js                             21.35 kB │ gzip:     9.90 kB
+ui build: dist/assets/dist-DEqlz1e9.js                             23.21 kB │ gzip:    10.54 kB
+ui build: dist/assets/clike-CIx9nZSv.js                            23.27 kB │ gzip:     8.28 kB
+ui build: dist/assets/ProfileDetailRoute-D-pJaNUf.js               23.61 kB │ gzip:     6.70 kB
+ui build: dist/assets/TaskChatLab-BT72NMEk.js                      23.73 kB │ gzip:     7.45 kB
+ui build: dist/assets/journeyDiagram-COXZFDF6-jCcs3qu6.js          24.08 kB │ gzip:     8.49 kB
+ui build: dist/assets/mindmap-definition-LZFPQGKD-A23GbZol.js      24.09 kB │ gzip:     8.24 kB
+ui build: dist/assets/CompanyExport-BhypOVKT.js                    24.58 kB │ gzip:     8.68 kB
+ui build: dist/assets/sankeyDiagram-UM26HJRW-MoxJXLv0.js           24.76 kB │ gzip:     9.19 kB
+ui build: dist/assets/character-CguPM7IG.js                        24.98 kB │ gzip:     2.50 kB
+ui build: dist/assets/AuditRuns-BRrMSGfE.js                        25.26 kB │ gzip:     7.53 kB
+ui build: dist/assets/ProfileWizardRoute-DctVAsdX.js               25.67 kB │ gzip:     8.01 kB
+ui build: dist/assets/CompanyConnections-BHmynfRz.js               25.69 kB │ gzip:     6.92 kB
+ui build: dist/assets/Dashboard-DdQHCSTW.js                        25.94 kB │ gzip:     8.39 kB
+ui build: dist/assets/wardleyDiagram-YMQ3BMBF-LiHtIo8O.js          26.03 kB │ gzip:     6.96 kB
+ui build: dist/assets/stylus-BS-Ienrc.js                           26.36 kB │ gzip:     8.97 kB
+ui build: dist/assets/dist-BPS5nhJd.js                             26.49 kB │ gzip:     8.96 kB
+ui build: dist/assets/graphlib-DHhK3saS.js                         26.69 kB │ gzip:     9.56 kB
+ui build: dist/assets/css-DEZwfVpY.js                              27.41 kB │ gzip:     8.70 kB
+ui build: dist/assets/CompanyAccess-CVrijR6P.js                    27.42 kB │ gzip:     7.39 kB
+ui build: dist/assets/PluginSettings-DmM2ZGQP.js                   28.09 kB │ gzip:     7.13 kB
+ui build: dist/assets/rough.esm-DnC5Tr1g.js                        28.63 kB │ gzip:     9.68 kB
+ui build: dist/assets/dist-KMwWlAUn.js                             28.70 kB │ gzip:    13.08 kB
+ui build: dist/assets/EmailEndpointSetup-DMLqCCN5.js               28.91 kB │ gzip:     8.57 kB
+ui build: dist/assets/dist-C2hhqftT.js                             29.23 kB │ gzip:    12.00 kB
+ui build: dist/assets/ExternalAgentInviteDialog-CpMtV-ZI.js        29.34 kB │ gzip:    10.06 kB
+ui build: dist/assets/gitGraphDiagram-XJZIOB7I-KdbnWvMp.js         29.58 kB │ gzip:     8.80 kB
+ui build: dist/assets/Routines.production-CAuelQ6U.js              29.83 kB │ gzip:     8.73 kB
+ui build: dist/assets/InstanceExperimentalSettings-BW0DR_g0.js     29.86 kB │ gzip:     8.07 kB
+ui build: dist/assets/CaseDetail-BTDds45D.js                       30.24 kB │ gzip:     8.76 kB
+ui build: dist/assets/Routines-BN4ynDZA.js                         30.91 kB │ gzip:     9.18 kB
+ui build: dist/assets/dist-DayNq3gU.js                             30.99 kB │ gzip:    12.89 kB
+ui build: dist/assets/DesignSandboxTaskThread-CPZxPsrc.js          31.09 kB │ gzip:    10.68 kB
+ui build: dist/assets/erDiagram-O2IAPWRE-E5zZ4I-K.js               31.47 kB │ gzip:    10.92 kB
+ui build: dist/assets/timeline-definition-YOQAKGHF-BOjeSaYw.js     31.62 kB │ gzip:    10.50 kB
+ui build: dist/assets/requirementDiagram-X7JNWC4A-CEy_c56Q.js      31.81 kB │ gzip:    10.12 kB
+ui build: dist/assets/Agents-Co3TkxFt.js                           32.04 kB │ gzip:    11.73 kB
+ui build: dist/assets/Timeline-DXqyIUBs.js                         32.79 kB │ gzip:    11.60 kB
+ui build: dist/assets/dist-Bqr4spns.js                             33.12 kB │ gzip:    13.54 kB
+ui build: dist/assets/chunk-3YJQHVM4-CZd-w97z.js                   33.97 kB │ gzip:     9.39 kB
+ui build: dist/assets/quadrantDiagram-GDMTTRAM-DrTTqYBA.js         34.83 kB │ gzip:    10.13 kB
+ui build: dist/assets/ManagedAiConnectionDetails-DbZBPglR.js       35.68 kB │ gzip:    11.19 kB
+ui build: dist/assets/FilterBar-BthzmvwS.js                        35.95 kB │ gzip:    12.43 kB
+ui build: dist/assets/sql-C3kWxFGw.js                              37.23 kB │ gzip:    11.10 kB
+ui build: dist/assets/NewAgent-fmrxF8DL.js                         37.54 kB │ gzip:    12.01 kB
+ui build: dist/assets/chunk-2BW5OAIV-LAo69Mvo.js                   38.56 kB │ gzip:     8.44 kB
+ui build: dist/assets/CompanySettings-DPa_kSe3.js                  40.20 kB │ gzip:    11.80 kB
+ui build: dist/assets/dist-DUKGGYmP.js                             40.85 kB │ gzip:    17.03 kB
+ui build: dist/assets/BoardChat-Dvv45ghz.js                        42.18 kB │ gzip:    13.14 kB
+ui build: dist/assets/stateDiagram-v2-TBUQTH76-CcJ3jHuR.js         42.55 kB │ gzip:    14.34 kB
+ui build: dist/assets/RoutineDetail.production-DeoXBMFT.js         42.73 kB │ gzip:    12.05 kB
+ui build: dist/assets/vennDiagram-BLWOH2XV-B0iOTahg.js             43.76 kB │ gzip:    16.51 kB
+ui build: dist/assets/blockDiagram-E7TT5TSB-C_xPHc_F.js            43.88 kB │ gzip:    14.39 kB
+ui build: dist/assets/GatewayDetail-CdGL7QUL.js                    45.16 kB │ gzip:    11.14 kB
+ui build: dist/assets/dist-B1qn9EH3.js                             45.52 kB │ gzip:    19.65 kB
+ui build: dist/assets/CompanyImport-BBPcj51G.js                    45.78 kB │ gzip:    13.78 kB
+ui build: dist/assets/dist-CuUDORnn.js                             45.82 kB │ gzip:    16.14 kB
+ui build: dist/assets/xychartDiagram-TAQBALBS-CYBMfsrM.js          46.50 kB │ gzip:    13.01 kB
+ui build: dist/assets/Search-DfNGVRN2.js                           47.87 kB │ gzip:    13.80 kB
+ui build: dist/assets/ExecutionWorkspaceDetail-Y0IQf3kg.js         48.86 kB │ gzip:    13.29 kB
+ui build: dist/assets/StatusCards-DFmSBTdH.js                      49.35 kB │ gzip:    13.36 kB
+ui build: dist/assets/classDiagram-v2-K4WV4PDN-CRd1eJMc.js         50.63 kB │ gzip:    16.54 kB
+ui build: dist/assets/SkillSources-D1fvvyim.js                     50.94 kB │ gzip:    14.54 kB
+ui build: dist/assets/dagre-W4DXFKR2-CV4IO2Vc.js                   52.59 kB │ gzip:    19.41 kB
+ui build: dist/assets/src-DYjgETqR.js                              53.03 kB │ gzip:    18.78 kB
+ui build: dist/assets/chunk-E2ZNV5FY-BYzA04Ym.js                   53.37 kB │ gzip:    17.42 kB
+ui build: dist/assets/SkillFolderTree-DIAr0xLF.js                  56.09 kB │ gzip:    15.73 kB
+ui build: dist/assets/operate-sections-CS44IHvO.js                 57.16 kB │ gzip:    16.41 kB
+ui build: dist/assets/Browse-rmTV76jJ.js                           57.46 kB │ gzip:    17.10 kB
+ui build: dist/assets/DecisionDateChips-MEIjyjJF.js                58.10 kB │ gzip:    15.66 kB
+ui build: dist/assets/ProjectDetail-CIP85431.js                    58.69 kB │ gzip:    15.88 kB
+ui build: dist/assets/Layout.production-BFwn2_m8.js                60.33 kB │ gzip:    18.02 kB
+ui build: dist/assets/WhatNeedsMe-Dcpb5mH7.js                      60.68 kB │ gzip:    18.82 kB
+ui build: dist/assets/OnboardingWizard-BL_p8Q6T.js                 62.51 kB │ gzip:    22.22 kB
+ui build: dist/assets/chunk-EU5HNXII-BtxtHA0V.js                   63.85 kB │ gzip:    20.84 kB
+ui build: dist/assets/AdvancedToolsRoute-CcjOoMGF.js               65.36 kB │ gzip:    17.34 kB
+ui build: dist/assets/c4Diagram-CRA5TL53-CQKJAgHn.js               66.42 kB │ gzip:    19.22 kB
+ui build: dist/assets/AppDetail-BGCAQjPb.js                        68.11 kB │ gzip:    19.19 kB
+ui build: dist/assets/dist-CNxinntf.js                             70.95 kB │ gzip:    26.20 kB
+ui build: dist/assets/RoutineDetail-C6kYaloV.js                    71.46 kB │ gzip:    20.21 kB
+ui build: dist/assets/ganttDiagram-R7TSEDQI-BlqLVDEs.js            74.62 kB │ gzip:    25.21 kB
+ui build: dist/assets/diagram-2UJZ2QOL-B1gNwzVp.js                 81.97 kB │ gzip:    25.80 kB
+ui build: dist/assets/cose-bilkent-JH36ORCC-DFyVDb92.js            84.22 kB │ gzip:    23.22 kB
+ui build: dist/assets/dist-B8DG8cDq.js                             85.31 kB │ gzip:    34.06 kB
+ui build: dist/assets/sdk-B0D7PKaU.js                              85.42 kB │ gzip:    28.06 kB
+ui build: dist/assets/Costs-CRtVFDBZ.js                            86.12 kB │ gzip:    20.91 kB
+ui build: dist/assets/mermaid.core-a2owfgm7.js                     90.61 kB │ gzip:    31.24 kB
+ui build: dist/assets/dist-BqOBIczY.js                             98.48 kB │ gzip:    28.96 kB
+ui build: dist/assets/SkillStudio-Cf066zeW.js                     101.52 kB │ gzip:    27.94 kB
+ui build: dist/assets/ChatEndpointDetail-ycmP9bj5.js              102.50 kB │ gzip:    26.82 kB
+ui build: dist/assets/dist-DoLMZZbB.js                            104.06 kB │ gzip:    34.86 kB
+ui build: dist/assets/CompanySkills.production-CMqkSIYK.js        111.79 kB │ gzip:    28.22 kB
+ui build: dist/assets/ChatEndpointSetup-Czdke5Ft.js               113.45 kB │ gzip:    31.37 kB
+ui build: dist/assets/CompanySkills-BoIFjdks.js                   114.26 kB │ gzip:    29.37 kB
+ui build: dist/assets/swimlanes-N4OXWK64-CE3dyCZn.js              115.65 kB │ gzip:    41.72 kB
+ui build: dist/assets/chunk-XC4XBNZT-BpXVR9wb.js                  119.65 kB │ gzip:    30.65 kB
+ui build: dist/assets/sequenceDiagram-ZO4K6R2Y-DXsUyVB_.js        119.77 kB │ gzip:    32.36 kB
+ui build: dist/assets/Secrets-CjGkCd49.js                         151.73 kB │ gzip:    39.23 kB
+ui build: dist/assets/architectureDiagram-47P4ROYG-BeejkMOU.js    155.07 kB │ gzip:    44.35 kB
+ui build: dist/assets/DesignGuide-Dd76LJ25.js                     158.03 kB │ gzip:    41.87 kB
+ui build: dist/assets/usecaseDiagram-VIAY4XPW-COavLJWC.js         195.69 kB │ gzip:    52.89 kB
+ui build: dist/assets/collections-BLqf00SN.js                     201.12 kB │ gzip:    58.39 kB
+ui build: dist/assets/AgentAdvancedTab-0Z7dTEci.js                214.29 kB │ gzip:    61.23 kB
+ui build: dist/assets/chunk-VPRB5NB3-BzpNB5h9.js                  246.89 kB │ gzip:    42.33 kB
+ui build: dist/assets/AgentDetailPage-CBczGGUZ.js                 263.45 kB │ gzip:    72.07 kB
+ui build: dist/assets/katex-Du_FPwxl.js                           264.40 kB │ gzip:    79.45 kB
+ui build: dist/assets/CompanyEnvironments-CU_PeWnY.js             402.27 kB │ gzip:   104.57 kB
+ui build: dist/assets/cytoscape.esm-C2vp4vBx.js                   465.72 kB │ gzip:   149.67 kB
+ui build: dist/assets/prod-C6Q7tISe.js                            493.71 kB │ gzip:   166.56 kB
+ui build: dist/assets/runtime-IAg0vdY9.js                         578.56 kB │ gzip:   151.24 kB
+ui build: dist/assets/dist-Cd7wdKYE.js                            591.36 kB │ gzip:   157.91 kB
+ui build: dist/assets/chunk-NGNAAXSQ-e5XI1hSt.js                  659.17 kB │ gzip:   137.38 kB
+ui build: dist/assets/elk-IJKZMXRS-BkrXMY_m.js                  1,597.05 kB │ gzip:   512.12 kB
+ui build: dist/assets/issue-detail-BQ346a3v.js                  2,962.90 kB │ gzip:   838.37 kB
+ui build: dist/assets/index-o1xT5gh6.js                         3,837.60 kB │ gzip: 1,175.36 kB
+ui build: ✓ built in 3.00s
+ui build: [33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/components/MarkdownEditor.tsx is dynamically imported by src/plugins/bridge-init.ts but also statically imported by src/components/AgentConfigForm.tsx, src/components/InlineEditor.tsx, src/components/IssueChatThread.tsx, src/components/IssueDocumentsSection.tsx, src/components/NewGoalDialog.tsx, ..., dynamic import will not move module into another chunk.
+ui build: [plugin builtin:vite-reporter] 
+ui build: (!) Some chunks are larger than 500 kB after minification. Consider:
+ui build: - Using dynamic import() to code-split the application
+ui build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+ui build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+ui build: Done
+server build: Copilot runtime assets: installed (darwin-arm64)
+server build: [build-stamp] wrote /Users/andrew/dev/threadkeeper/paperclip/server/dist/build-info.json commit=79589c00e99453352b0aafe1c8b5582af42284ba
+server build: Done
+cli build$ node --input-type=module -e "import esbuild from 'esbuild'; import config from './esbuild.config.mjs'; await esbuild.build(config);" && chmod +x dist/index.js
+cli build: Done

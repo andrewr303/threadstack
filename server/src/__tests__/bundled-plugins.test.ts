@@ -47,6 +47,10 @@ describe("managed bundled plugin selection", () => {
 });
 
 describe("resolveBundledPluginInstalls", () => {
+  it("provisions the first-party Threadkeeper bridge in this fork", () => {
+    expect(SELF_HOSTED_AUTO_INSTALL_KEYS).toContain("browser-sessions");
+    expect(resolveBundledPluginInstalls(["browser-sessions"], { catalogRoot: CATALOG_ROOT, env: {}, enforceCatalogRoot: true })).toEqual([{ key: "browser-sessions", pluginKey: "browser-sessions", localPath: path.join(CATALOG_ROOT, "plugin-browser-sessions"), allowSourceBuild: true }]);
+  });
   it("resolves the optional CreateOS sandbox provider without making it a self-hosted default", () => {
     expect(resolveBundledPluginInstalls(["createos"], {
       catalogRoot: CATALOG_ROOT,
@@ -194,14 +198,14 @@ describe("resolveBundledPluginInstalls", () => {
     expect(resolved).toHaveLength(1);
   });
 
-  it("keeps the self-hosted default list to exactly the kubernetes bundle", () => {
-    expect(SELF_HOSTED_AUTO_INSTALL_KEYS).toEqual(["kubernetes"]);
+  it("keeps the fork's self-hosted bridge beside the existing kubernetes default", () => {
+    expect(SELF_HOSTED_AUTO_INSTALL_KEYS).toEqual(["kubernetes", "browser-sessions"]);
     const [entry] = resolveBundledPluginInstalls(SELF_HOSTED_AUTO_INSTALL_KEYS, {
       catalogRoot: resolveBundledCatalogRoot({}),
       env: {},
       enforceCatalogRoot: false,
     });
-    // Exactly the pre-refactor default path.
+    // Existing Kubernetes resolution is preserved beside the new bridge.
     expect(entry).toEqual({
       key: "kubernetes",
       pluginKey: "paperclip.kubernetes-sandbox-provider",
@@ -320,6 +324,32 @@ const DAYTONA: ResolvedBundledPlugin = {
 };
 
 describe("ensureBundledPlugins", () => {
+  it("hands a fresh first-party source checkout with no dist to the normal loader autobuild and activation path", async () => {
+    const root = makeTempDir("browser-session-source-"); const localPath = path.join(root, "plugin-browser-sessions"); mkdirSync(path.join(localPath, "src"), { recursive: true });
+    writeFileSync(path.join(localPath, "package.json"), JSON.stringify({ name: "@paperclipai/plugin-browser-sessions", scripts: { build: "tsc" }, paperclipPlugin: { manifest: "./dist/manifest.js" } }));
+    writeFileSync(path.join(localPath, "src/manifest.ts"), "export default {};\n");
+    const { deps, installPlugin } = makeDeps({ bundleManifestExists: () => false });
+    const install: ResolvedBundledPlugin = { key: "browser-sessions", pluginKey: "browser-sessions", localPath, allowSourceBuild: true };
+    await ensureBundledPlugins([install], deps, { reinstallUninstalled: false });
+    expect(installPlugin).toHaveBeenCalledExactlyOnceWith({ localPath });
+    expect(deps.lifecycle.load).toHaveBeenCalledExactlyOnceWith("id-browser-sessions");
+  });
+  it("does not source-build a missing distribution, unknown package or operator-disabled first-party plugin", async () => {
+    const root = makeTempDir("browser-session-guard-"); const localPath = path.join(root, "plugin-browser-sessions"); mkdirSync(path.join(localPath, "src"), { recursive: true });
+    writeFileSync(path.join(localPath, "package.json"), JSON.stringify({ name: "@paperclipai/plugin-browser-sessions", scripts: { build: "tsc" }, paperclipPlugin: { manifest: "./dist/manifest.js" } })); writeFileSync(path.join(localPath, "src/manifest.ts"), "export default {};\n");
+    const install: ResolvedBundledPlugin = { key: "browser-sessions", pluginKey: "browser-sessions", localPath, allowSourceBuild: true };
+    const cases: Array<{ install: ResolvedBundledPlugin; managed: boolean; rows: Record<string, LooseRow | null> }> = [
+      { install, managed: true, rows: {} },
+      { install: { ...install, key: "other", pluginKey: "other" }, managed: false, rows: {} },
+      { install, managed: false, rows: { "browser-sessions": { id: "disabled", pluginKey: "browser-sessions", status: "disabled" } } },
+      { install, managed: false, rows: { "browser-sessions": { id: "uninstalled", pluginKey: "browser-sessions", status: "uninstalled" } } },
+    ];
+    for (const test of cases) {
+      const { deps, installPlugin } = makeDeps({ bundleManifestExists: () => false, rows: test.rows });
+      await ensureBundledPlugins([test.install], deps, { reinstallUninstalled: test.managed });
+      expect(installPlugin).not.toHaveBeenCalled(); expect(deps.lifecycle.load).not.toHaveBeenCalled();
+    }
+  });
   it("installs and loads a missing bundled plugin", async () => {
     const { deps, installPlugin } = makeDeps();
     await ensureBundledPlugins([K8S], deps, { reinstallUninstalled: true });

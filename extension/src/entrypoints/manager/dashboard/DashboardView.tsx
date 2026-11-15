@@ -4,12 +4,14 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ConversationRecord } from '../../../core/schema.js';
 import { DASHBOARD_LAYOUTS, type DashboardLayout } from '../../../core/workspace/types.js';
-import { AccountChip, Notice, ProviderMark, RunState, Segmented, type SegmentOption } from '../shell/primitives.js';
+import { OrganizeMenu, useLensUniverse, useSurfaceLens } from '../shell/OrganizeMenu.js';
+import { AccountChip, Notice, ProviderMark, RunState, Segmented, providerName, type SegmentOption } from '../shell/primitives.js';
 import { useWorkspaceContext } from '../workspace/context.js';
+import { EMPTY_LENS_FILTERS, SESSION_KIND_LABELS, isLensFiltered, lensGroupLabel, type LensGroup } from '../workspace/lens.js';
 import { threadTabId } from '../workspace/state.js';
 import { AGENT_STATE_LABELS } from '../../../core/workspace/types.js';
 import { DashboardPane } from './DashboardPane.js';
-import { hasWebPage, pinnedSessions, sessionTitle } from './shared.js';
+import { hasWebPage, organizePinned, pinnedSessions, sessionTitle } from './shared.js';
 
 const LAYOUT_OPTIONS: ReadonlyArray<SegmentOption<DashboardLayout>> = DASHBOARD_LAYOUTS.map((n) => ({
   value: n,
@@ -25,6 +27,37 @@ export function DashboardView() {
   const pinned = useMemo(() => pinnedSessions(conversations), [conversations]);
   const pinnedKeys = useMemo(() => new Set(pinned.map((c) => c.threadKey)), [pinned]);
   const shown = useMemo(() => Array.from({ length: layout }, (_, i) => panes[i] ?? null), [panes, layout]);
+
+  // The lens: filters narrow which pinned sessions the bar offers, sort orders them, group puts
+  // them in labelled clusters. A session already in a pane keeps its pane whatever they say.
+  const lens = useSurfaceLens('dashboard');
+  const universe = useLensUniverse(pinned);
+  const { groupBy, sortBy, filters } = lens;
+  const filtering = isLensFiltered(filters);
+  const organized = useMemo(
+    () =>
+      organizePinned(
+        pinned,
+        { filters, sortBy, groupBy },
+        { accountIdOf: universe.accountIdOf, accountOrder: universe.accountOrder, now: Date.now() }
+      ),
+    [pinned, filters, sortBy, groupBy, universe.accountIdOf, universe.accountOrder]
+  );
+  const offered = useMemo(() => {
+    if (!filtering) return organized.visible;
+    const visibleKeys = new Set(organized.visible.map((c) => c.threadKey));
+    return [...organized.visible, ...pinned.filter((c) => shown.includes(c.threadKey) && !visibleKeys.has(c.threadKey))];
+  }, [filtering, organized.visible, pinned, shown]);
+  // Pinned sessions an empty pane could take but the filters hide, so it can say so.
+  const hiddenByFilters = useMemo(() => {
+    if (!filtering) return 0;
+    const offeredKeys = new Set(offered.map((c) => c.threadKey));
+    return pinned.filter((c) => !offeredKeys.has(c.threadKey) && hasWebPage(c)).length;
+  }, [filtering, offered, pinned]);
+  const clearFilters = () => {
+    lens.setFilters(EMPTY_LENS_FILTERS);
+    ctx.announce('Dashboard filters cleared.');
+  };
 
   // Latest controller and context for effects that must not re-run on every render.
   const live = useRef({ workspace, ctx });
@@ -108,6 +141,71 @@ export function DashboardView() {
     return () => window.removeEventListener('keydown', onKey);
   }, [view, layout, shown, conversationByKey, focusPane]);
 
+  const renderPin = (conv: ConversationRecord) => {
+    const slot = shown.indexOf(conv.threadKey);
+    const owner = ctx.accountOfThread(conv);
+    const web = hasWebPage(conv);
+    const title = sessionTitle(conv);
+    const state = conv.agentState && conv.agentState !== 'unknown' ? AGENT_STATE_LABELS[conv.agentState] : null;
+    const label = [title, owner.account?.label ?? 'Removed account', state, slot >= 0 ? `in pane ${slot + 1}` : null]
+      .filter(Boolean)
+      .join(', ');
+    return (
+      <button
+        key={conv.threadKey}
+        type="button"
+        className="tk-dash-pin"
+        aria-pressed={slot >= 0 && slot === focusedPane}
+        aria-label={`${label}. ${web ? 'Show in the focused pane' : 'Open in Threads'}`}
+        title={web ? title : `${title}: this session has no web page to show here. Pressing it opens it in Threads.`}
+        onClick={() => pressPinned(conv)}
+      >
+        <ProviderMark provider={conv.provider} size="sm" />
+        <span className="tk-dash-pin-label tk-ellipsis">{title}</span>
+        <AccountChip account={owner.account} active={owner.active} showName={false} />
+        <RunState state={conv.agentState} observedAt={conv.agentStateAt} compact />
+        {slot >= 0 && <span className="tk-dash-slot tk-tabular" aria-hidden="true">{slot + 1}</span>}
+      </button>
+    );
+  };
+
+  /** The label of a cluster of pinned sessions: type, provider or account. */
+  const clusterTitle = (group: LensGroup<ConversationRecord>): { node: React.ReactNode; name: string } => {
+    if (groupBy === 'kind') {
+      const name = lensGroupLabel('kind', group.key, SESSION_KIND_LABELS);
+      return { node: <span>{name}</span>, name };
+    }
+    if (groupBy === 'provider' && group.key) {
+      const name = providerName(group.key);
+      return {
+        node: (
+          <>
+            <ProviderMark provider={group.key} size="sm" />
+            <span>{name}</span>
+          </>
+        ),
+        name,
+      };
+    }
+    const owner = groupBy === 'account' && group.key ? ctx.accountOfThread(group.sessions[0]) : null;
+    if (owner?.account) {
+      const name = `${owner.realm ? `${owner.realm.label} · ` : ''}${owner.account.label}`;
+      return {
+        node: (
+          <>
+            <span className="tk-acct" data-color={owner.account.color} data-active={owner.active ? 'true' : 'false'}>
+              <span className="tk-acct-dot" aria-hidden="true" />
+            </span>
+            <span>{name}</span>
+          </>
+        ),
+        name,
+      };
+    }
+    const name = lensGroupLabel(groupBy, group.key);
+    return { node: <span>{name}</span>, name };
+  };
+
   if (pinned.length === 0) {
     return (
       <div className="tk-dash tk-dash-none">
@@ -130,39 +228,42 @@ export function DashboardView() {
     <div className="tk-dash" ref={root}>
       <header className="tk-dash-bar tk-glass" aria-label="Dashboard tools">
         <span className="tk-dash-label">Pinned</span>
+        <OrganizeMenu
+          surface="dashboard"
+          universe={universe}
+          groupBy={groupBy}
+          sortBy={sortBy}
+          filters={filters}
+          onGroupBy={lens.setGroupBy}
+          onSortBy={lens.setSortBy}
+          onFilters={lens.setFilters}
+          onReset={lens.reset}
+        />
         <div className="tk-dash-pins" role="group" aria-label="Pinned sessions">
-          {pinned.map((conv) => {
-            const slot = shown.indexOf(conv.threadKey);
-            const owner = ctx.accountOfThread(conv);
-            const web = hasWebPage(conv);
-            const title = sessionTitle(conv);
-            const state = conv.agentState && conv.agentState !== 'unknown' ? AGENT_STATE_LABELS[conv.agentState] : null;
-            const label = [
-              title,
-              owner.account?.label ?? 'Removed account',
-              state,
-              slot >= 0 ? `in pane ${slot + 1}` : null,
-            ]
-              .filter(Boolean)
-              .join(', ');
-            return (
-              <button
-                key={conv.threadKey}
-                type="button"
-                className="tk-dash-pin"
-                aria-pressed={slot >= 0 && slot === focusedPane}
-                aria-label={`${label}. ${web ? 'Show in the focused pane' : 'Open in Threads'}`}
-                title={web ? title : `${title}: this session has no web page to show here. Pressing it opens it in Threads.`}
-                onClick={() => pressPinned(conv)}
-              >
-                <ProviderMark provider={conv.provider} size="sm" />
-                <span className="tk-dash-pin-label tk-ellipsis">{title}</span>
-                <AccountChip account={owner.account} active={owner.active} showName={false} />
-                <RunState state={conv.agentState} observedAt={conv.agentStateAt} compact />
-                {slot >= 0 && <span className="tk-dash-slot tk-tabular" aria-hidden="true">{slot + 1}</span>}
+          {organized.visible.length === 0 ? (
+            <p className="tk-dash-nomatch" role="status">
+              <span>No pinned sessions match {universe.describeFilters(filters).join(', ') || 'the filters'}.</span>
+              <button type="button" className="tk-btn tk-btn-quiet" onClick={clearFilters}>
+                Clear
               </button>
-            );
-          })}
+            </p>
+          ) : groupBy === 'none' ? (
+            organized.visible.map(renderPin)
+          ) : (
+            organized.groups.map((group) => {
+              const { node, name } = clusterTitle(group);
+              const n = group.sessions.length;
+              return (
+                <div className="tk-dash-cluster" role="group" aria-label={`${name}, ${n} ${n === 1 ? 'session' : 'sessions'}`} key={group.id}>
+                  <span className="tk-dash-cluster-label" aria-hidden="true">
+                    {node}
+                    <span className="tk-tabular">{n}</span>
+                  </span>
+                  {group.sessions.map(renderPin)}
+                </div>
+              );
+            })
+          )}
         </div>
         <span className="tk-dash-label">Panes</span>
         <Segmented
@@ -181,8 +282,10 @@ export function DashboardView() {
               index={i}
               conv={conv && pinnedKeys.has(conv.threadKey) ? conv : null}
               focused={i === focusedPane}
-              pinned={pinned}
+              pinned={offered}
               placed={shown}
+              hiddenByFilters={hiddenByFilters}
+              onClearFilters={clearFilters}
               onFocus={focusPane}
               onPlace={place}
               onSwap={swap}

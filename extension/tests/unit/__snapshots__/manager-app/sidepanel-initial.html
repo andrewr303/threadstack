@@ -150,6 +150,8 @@
               "Recent activity"
             <option value="oldest">
               "Oldest first"
+            <option value="created">
+              "Recently created"
             <option value="title">
               "Title A–Z"
             <option value="messages">
@@ -551,8 +553,9 @@
         <div class="tk-mobile-back-wrap">
           <button type="button" class="tk-btn">
             "← Back to list"
-        <h2 class="tk-detail-title">
-          "Daydock homepage research & pricing tier benchmarks"
+        <div class="tk-detail-title-row">
+          <h2 class="tk-detail-title" title="Daydock homepage research & pricing tier benchmarks">
+            "Daydock homepage research & pricing tier benchmarks"
         <div class="tk-detail-meta-strip">
           <span class="tk-status-pill">
             <span class="tk-status-dot" data-state="active" aria-hidden="true">
@@ -582,8 +585,8 @@
           <span title="acct_chatgpt_primary / ws_personal">
             "updated"
             "<relative-time>"
-        <div class="tk-filter-row" style="margin-top: 6px;">
-          <select class="tk-select" aria-label="Assign project or area"> {value="General research"}
+        <div class="tk-detail-controls" role="group" aria-label="Thread controls" tabindex="0">
+          <select class="tk-select tk-detail-category" aria-label="Assign project or area" title="General research"> {value="General research"}
             <option value="Daydock / Meridian">
               "Daydock / Meridian"
             <option value="General research">
@@ -596,10 +599,13 @@
               "Velotic / FrameConcepts"
             <option value="Unfiled / Uncertain">
               "Unfiled / Uncertain"
-          <label class="tk-inline-check">
+          <label class="tk-inline-check tk-detail-lock" title="Lock category">
             <input type="checkbox"> {checked=false}
-            "Lock category"
-          <select class="tk-select" aria-label="Change workflow state"> {value="active"}
+            <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M7.5 11V8.5a4.5 4.5 0 0 1 9 0V11M6.5 11h11A1.5 1.5 0 0 1 19 12.5v6A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-6A1.5 1.5 0 0 1 6.5 11Z">
+            <span class="tk-visually-hidden">
+              "Lock category"
+          <select class="tk-select tk-detail-state" aria-label="Change workflow state"> {value="active"}
             <option value="active">
               "Active"
             <option value="needs_review">
@@ -612,12 +618,21 @@
               "Done"
             <option value="archived">
               "Archived"
-          <button type="button" class="tk-btn">
-            "Open original ↗"
-          <button type="button" class="tk-btn">
-            "Copy handoff"
-          <button type="button" class="tk-btn tk-btn-danger">
-            "Delete"
+          <button type="button" class="tk-btn tk-thr-action" aria-label="Open original" title="Open original">
+            <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M13 5h6v6M19 5l-8 8M10 6H6.5A1.5 1.5 0 0 0 5 7.5v10A1.5 1.5 0 0 0 6.5 19h10a1.5 1.5 0 0 0 1.5-1.5V14">
+            <span class="tk-thr-action-label">
+              "Original"
+          <button type="button" class="tk-btn tk-thr-action" aria-label="Copy handoff" title="Copy handoff">
+            <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M8 8h11v12H8ZM5 16H4V4h11v1">
+            <span class="tk-thr-action-label">
+              "Handoff"
+          <button type="button" class="tk-btn tk-btn-danger tk-thr-action" aria-label="Delete" title="Delete">
+            <svg class="tk-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7">
+            <span class="tk-thr-action-label">
+              "Delete"
       <div class="tk-section tk-overview" data-evidence-location="overview">
         <div class="tk-overview-head">
           <h3 class="tk-section-h2">
@@ -1012,6 +1027,58 @@
         <section class="tk-settings-section">
           <h3 class="tk-settings-h3">
             "Workspace"
+          <div class="tk-field-row">
+            <label class="tk-field">
+              "Start page"
+              <select class="tk-select" aria-describedby="tk-start-page-hint"> {value="https://claude.ai/code"}
+                <option value="">
+                  "Where I left off"
+                <option value="https://claude.ai/code">
+                  "Claude Code"
+                <option value="https://chatgpt.com/codex">
+                  "Codex"
+                <option value="https://cursor.com/agents">
+                  "Cursor agents"
+                <option value="https://github.com/copilot">
+                  "GitHub Copilot"
+                <option value="https://jules.google.com/">
+                  "Jules"
+                <option value="https://app.devin.ai/">
+                  "Devin"
+                <option value="https://chatgpt.com/">
+                  "ChatGPT"
+                <option value="https://claude.ai/new">
+                  "Claude"
+                <option value="https://grok.com/">
+                  "Grok"
+                <option value="https://x.com/i/grok">
+                  "Grok on X"
+                <option value="https://gemini.google.com/app">
+                  "Gemini"
+                <option value="https://www.perplexity.ai/">
+                  "Perplexity"
+                <option value="https://chat.deepseek.com/">
+                  "DeepSeek"
+                <option value="https://chat.mistral.ai/chat">
+                  "Le Chat"
+                <option value="https://copilot.microsoft.com/">
+                  "Copilot"
+                <option value="https://x.com/i/chat">
+                  "Grok Bot"
+                <option value="https://chatgpt.com/dots">
+                  "ChatGPT dots"
+                <option value="https://muse.ai/">
+                  "Muse"
+                <option value="https://claude.ai/duet">
+                  "Claude Duet"
+          <p id="tk-start-page-hint" class="tk-settings-note">
+            "The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat and code."
+          <label class="tk-toggle">
+            <input type="checkbox" checked=""> {checked=true}
+            <span>
+              "Show each site’s full navigation"
+              <span class="tk-toggle-hint">
+                "Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
           <label class="tk-toggle">
             <input type="checkbox"> {checked=false}
             <span>

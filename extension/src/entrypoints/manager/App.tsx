@@ -26,9 +26,10 @@ import { StaleBuildBanner, useDiagnostics } from './Diagnostics.js';
 import { RestoreOfferBanner } from './accounts/RestoreOfferBanner.js';
 import { SendToStillDialog, type SendRequest } from './SidebarDock.js';
 import { configureDockClient, dockSyncNow, useDockState } from './dock.js';
-import { isRemoteAllowed } from '../../core/privacy.js';
+import { isRemoteAllowed, localOnlyProjectNames } from '../../core/privacy.js';
 import type { SectionId } from './SettingsDialog.js';
 import { selectRange, type ThreadSortMode } from './BulkActions.js';
+import { SESSION_KINDS, sanitizeSort, type SessionKind, type ShowInThreadsRequest } from './workspace/lens.js';
 import { useAnalysisRunner } from './hooks/useAnalysisRunner.js';
 import { useLibraryData } from './hooks/useLibraryData.js';
 import { useOrganize } from './hooks/useOrganize.js';
@@ -44,15 +45,25 @@ import type { EvidenceView } from './threads/claims.js';
 import type { RunFilter } from './threads/filters.js';
 import { WORKSPACE_VIEWS, type WorkspaceView } from '../../core/workspace/types.js';
 import { AddAccountDialog } from './accounts/AddAccountDialog.js';
+import { PendingSignInBanner } from './accounts/PendingSignInBanner.js';
 import { BrowseView } from './browse/BrowseView.js';
 import { DashboardView } from './dashboard/DashboardView.js';
 import { Rail } from './shell/Rail.js';
 import { FrameStage } from './workspace/FrameStage.js';
 import { WorkspaceProvider, type ThreadAccount, type WorkspaceContextValue } from './workspace/context.js';
-import { accountForThread, embedTargetFor, threadTabId } from './workspace/state.js';
+import { accountForThread, embedTargetFor, needsSignIn, threadTabId } from './workspace/state.js';
 import { useWorkspace } from './workspace/useWorkspace.js';
+import { PaperclipView, type PaperclipFrameControl, type PaperclipNavigation } from './PaperclipView.js';
+import { INITIAL_FUSION, fusedRoute, fusionReducer, usePaperclipFusionDom, type FusionAction } from './PaperclipFusion.js';
+import { PaperclipConnectionContext, usePaperclipConnection } from './PaperclipConnection.js';
+import { normalizeServerUrl } from '../../core/paperclip/client.js';
+import { paperclipPageAddress, paperclipPath, paperclipPathForUrl, type PaperclipHostMessage } from '../../core/paperclip/host.js';
+import { usePaperclipManagerActions } from './paperclip-actions.js';
 
 type Surface = 'overlay' | 'page' | 'sidepanel';
+
+/** sessionStorage: this browser tab has already landed on the start page once. */
+const LANDED_KEY = 'threadkeeper.landed';
 
 function useEffectiveTheme(theme: SettingsRecord['theme'] | undefined): 'light' | 'dark' {
   const query = useMemo(
@@ -118,11 +129,11 @@ export function App() {
   const [activeTabThreadKey, setActiveTabThreadKey] = useState<string | null>(null);
   // Checked rows for bulk actions; separate from the opened thread (selectedThreadKey).
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
-  const [sortMode, setSortMode] = useState<ThreadSortMode>('recent');
   // Workspace filters of the Threads list (full page).
   const [repositoryFilter, setRepositoryFilter] = useState<string | null>(null);
   const [accountFilter, setAccountFilter] = useState<string | null>(null);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<SessionKind | 'all'>('all');
 
   const [titleDraft, setTitleDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
@@ -137,6 +148,7 @@ export function App() {
   const [addAccountRealm, setAddAccountRealm] = useState<string | null>(null);
   const [sendStillRequest, setSendStillRequest] = useState<SendRequest | null>(null);
   const [settingsSection, setSettingsSection] = useState<SectionId | null>(null);
+  const [paperclipNavigation, setPaperclipNavigation] = useState<PaperclipNavigation>({ path: paperclipPath(urlParams.get('pc')) ?? '/', request: 0 });
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const checkAnchorRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -303,6 +315,7 @@ export function App() {
       'cloudExcludedProviders',
       'sidebarDock',
       'paperclip',
+      'paperclipCredentials',
     ].some((k) => k in patch);
     if (affectsBackground) notifyBackground({ type: 'SETTINGS_CHANGED' });
   }, [surface]);
@@ -310,6 +323,68 @@ export function App() {
   // ---- Workspace (the full page only): views, embedded session tabs, accounts ----
   const isPage = surface === 'page';
   const view: WorkspaceView = isPage ? settings?.activeView ?? 'threads' : 'threads';
+  const paperclipOrigin = normalizeServerUrl(settings?.paperclip.serverUrl ?? '') ?? 'http://127.0.0.1:3100';
+  // REQ-6 fused mode: Paperclip's frame lays out the window and the views sit over its content
+  // rectangle. The state lives in a ref too, so back-to-back messages see each other's effect.
+  const fusionRef = useRef(INITIAL_FUSION);
+  const [fusion, setFusion] = useState(INITIAL_FUSION);
+  const fuse = useCallback((action: FusionAction) => {
+    fusionRef.current = fusionReducer(fusionRef.current, action);
+    setFusion(fusionRef.current);
+    return fusionRef.current;
+  }, []);
+  const paperclipConnection = usePaperclipConnection(settings?.paperclip, isPage && settings !== null, view === 'paperclip' || fusion.engaged);
+  const paperclipRunning = paperclipConnection.snapshot.state === 'running';
+  const fused = isPage && fusion.engaged && paperclipRunning;
+  const paperclipControl = useRef<PaperclipFrameControl | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const paperclipRouteRef = useRef(paperclipPath(urlParams.get('pc')) ?? '/');
+  /** The view Paperclip's page last asked for, or the one the shell already sent it to. */
+  const fusedViewRef = useRef<WorkspaceView | null>(null);
+  // Eager loading starts on Paperclip's home route. Keep the shell's requested entry until
+  // its matching slot arrives; old home-page slots may still be queued during navigation.
+  const fusedEntryRef = useRef<Exclude<WorkspaceView, 'paperclip'> | null>(null);
+  // Without the server the shell shows its own rail and view switch (FR-6); a new `ready` resumes.
+  useEffect(() => { if (!paperclipRunning) fuse({ type: 'offline' }); }, [paperclipRunning, fuse]);
+  usePaperclipFusionDom({
+    fused,
+    state: fusion,
+    shellRef,
+    control: paperclipControl,
+    onStaleOverlay: () => {
+      paperclipControl.current?.post({ type: 'overlay-query' });
+      fuse({ type: 'queried', at: Date.now() });
+    },
+  });
+  useEffect(() => {
+    // Hosting Paperclip (its view or the fused window) keeps its host grant when sync is off.
+    if (isPage && (view === 'paperclip' || fused) && settings && !settings.paperclip.hostEnabled) {
+      void persistSettingPatch({ paperclip: { ...settings.paperclip, hostEnabled: true } });
+    }
+  }, [isPage, view, fused, settings?.paperclip.hostEnabled, persistSettingPatch]);
+  const originalPaperclipOrigin = useRef<string | null>(null);
+  if (settings && !originalPaperclipOrigin.current) originalPaperclipOrigin.current = paperclipOrigin;
+  const lastPaperclipOrigin = useRef<string | null>(null);
+  useEffect(() => {
+    if (!settings) return;
+    if (lastPaperclipOrigin.current === null) {
+      // Hydrating the configured server is the initial baseline, not a founder change.
+      lastPaperclipOrigin.current = paperclipOrigin;
+      return;
+    }
+    if (lastPaperclipOrigin.current === paperclipOrigin) return;
+    lastPaperclipOrigin.current = paperclipOrigin;
+    fuse({ type: 'offline' });
+    fusedEntryRef.current = null;
+    paperclipRouteRef.current = '/';
+    setPaperclipNavigation((previous) => ({ path: '/', request: previous.request + 1 }));
+    if (view === 'paperclip') window.history.replaceState(null, '', paperclipPageAddress(window.location.href, '/'));
+    else {
+      const address = new URL(window.location.href);
+      address.searchParams.delete('pc');
+      window.history.replaceState(null, '', address.href);
+    }
+  }, [paperclipOrigin, Boolean(settings)]);
   const detailMode: DetailMode = isPage ? settings?.detailMode ?? 'summary' : 'summary';
   // Set after the selection is known (the selection depends on the search below).
   const [liveThreadKey, setLiveThreadKey] = useState<string | null>(null);
@@ -320,15 +395,22 @@ export function App() {
       const owner = accountForThread(conv, workspace.realms, settings?.boundAccounts[conv.provider]?.accountId);
       if (!owner) return { realm: null, account: null, active: true, switchable: false };
       const entry = workspace.realms.find((r) => r.realm.id === owner.realm.id);
-      // Until the accounts are known, and for sign-ins Threadkeeper does not switch, the
-      // browser's own login is the only one there is.
-      const active = !entry || !owner.realm.switchable || !entry.activeAccountId || entry.activeAccountId === owner.accountId;
+      // Until the accounts are known, and for sign-ins Threadkeeper keeps no accounts for, the
+      // browser's own login is the only one there is. Otherwise an account is signed in when it
+      // is the browser's own, or an added one with a saved sign-in.
+      const active =
+        !entry || !owner.realm.switchable || !entry.activeAccountId || entry.activeAccountId === owner.accountId || !needsSignIn(owner.account);
       return { realm: owner.realm, account: owner.account, active, switchable: owner.realm.switchable };
     },
     [workspace.realms, settings?.boundAccounts]
   );
 
   const accountIdOf = useCallback((conv: ConversationRecord) => accountOfThread(conv).account?.id ?? null, [accountOfThread]);
+  const accountOrder = useMemo(() => workspace.realms.flatMap((r) => r.accounts.map((a) => a.id)), [workspace.realms]);
+
+  // The Threads order is remembered across reloads (the filters are not).
+  const sortMode: ThreadSortMode = sanitizeSort(settings?.threadsSort);
+  const setSortMode = useCallback((mode: ThreadSortMode) => void persistSettingPatch({ threadsSort: mode }), [persistSettingPatch]);
 
   const {
     rerankNote,
@@ -359,7 +441,9 @@ export function App() {
     repositoryFilter,
     accountFilter,
     runFilter,
+    typeFilter,
     accountIdOf,
+    accountOrder,
   });
 
   // Drop checked threads that no longer exist (deleted here or elsewhere).
@@ -608,12 +692,72 @@ export function App() {
 
   const conversationByKey = useMemo(() => new Map(conversations.map((c) => [c.threadKey, c])), [conversations]);
 
+  // ---- Landing: the start page, once per browser tab ----
+  // Opening Threadkeeper lands on the person's start page (Claude Code unless changed in
+  // Settings; "where I left off" skips this). A link that names a thread, a view or a search is
+  // followed instead, and a reload of the page (which the workspace does to change accounts)
+  // stays where it was.
+  const landed = useRef(false);
+  const openStartPage = workspace.openStartPage;
+  useEffect(() => {
+    if (!isPage || landed.current || !settings || !workspace.ready || !workspace.embedding) return;
+    landed.current = true;
+    let seenBefore = false;
+    try {
+      seenBefore = window.sessionStorage.getItem(LANDED_KEY) === '1';
+      window.sessionStorage.setItem(LANDED_KEY, '1');
+    } catch {
+      // storage blocked: land every time
+    }
+    const linked = urlParams.has('threadKey') || urlParams.has('view') || urlParams.has('q');
+    if (seenBefore || linked || !settings.startPage) return;
+    if (openStartPage(settings.startPage).ok) void persistSettingPatch({ activeView: 'browse' });
+  }, [isPage, settings, workspace.ready, workspace.embedding, openStartPage, urlParams, persistSettingPatch]);
+
   const setView = useCallback(
     (next: WorkspaceView) => {
       setMobileDrawerOpen(false);
       void persistSettingPatch({ activeView: next });
+      const address = new URL(window.location.href);
+      address.searchParams.set('view', next);
+      window.history.replaceState(null, '', address.href);
     },
     [persistSettingPatch]
+  );
+  // Fused: a view the shell chose itself (opening a session, a link, a Paperclip open-view)
+  // takes Paperclip to that page, so its content rectangle and the shown view stay one place.
+  useEffect(() => {
+    if (!fused || view === 'paperclip' || fusedViewRef.current === view) return;
+    const path = fusedRoute(view, paperclipRouteRef.current);
+    if (!path) return;
+    fusedViewRef.current = view;
+    setPaperclipNavigation((previous) => ({ path, request: previous.request + 1 }));
+  }, [fused, view]);
+  // After the view is laid over the rectangle, tell the page; only then does it turn transparent
+  // there. Until this acknowledgement it keeps its own background (REQ-6 UI Layout "Loading").
+  useEffect(() => {
+    if (!fused) return;
+    const placedView = fusion.slotView === 'dashboard' ? 'session-board' : fusion.slotView;
+    paperclipControl.current?.post({ type: 'placed', view: placedView });
+  }, [fused, fusion.slotSeq]); // slotSeq: batched ready+slot or slot null+slot view keep slotView equal
+  // "Show all" in the side navigation: Threads, narrowed to the group it was pressed on.
+  const showInThreads = useCallback(
+    (request: ShowInThreadsRequest) => {
+      setTypeFilter('all');
+      setProviderFilter('all');
+      setAccountFilter(null);
+      setRepositoryFilter(null);
+      setRunFilter('all');
+      const { by, key } = request;
+      if (key) {
+        if (by === 'kind' && (SESSION_KINDS as readonly string[]).includes(key)) setTypeFilter(key as SessionKind);
+        else if (by === 'provider' && (PROVIDER_IDS as readonly string[]).includes(key)) setProviderFilter(key as ProviderId);
+        else if (by === 'account') setAccountFilter(key);
+        else if (by === 'repository') setRepositoryFilter(key);
+      }
+      setView('threads');
+    },
+    [setView]
   );
   const setDetailMode = useCallback(
     (mode: DetailMode) => {
@@ -629,6 +773,15 @@ export function App() {
   }, []);
 
   const openSession = (conv: ConversationRecord, where?: WorkspaceView) => {
+    if (isPage && conv.provider === 'paperclip') {
+      const path = paperclipPathForUrl(conv.canonicalUrl, paperclipOrigin);
+      if (path) {
+        setPaperclipNavigation((previous) => ({ path, request: previous.request + 1 }));
+        window.history.replaceState(null, '', paperclipPageAddress(window.location.href, path));
+        setView('paperclip');
+      } else openInChromeTab(conv.canonicalUrl);
+      return;
+    }
     const target = where ?? view;
     if (where && where !== view) setView(where);
     if (target === 'threads') {
@@ -657,6 +810,26 @@ export function App() {
     setStatusAnnouncement(conv.pinned ? 'Unpinned from the dashboard.' : 'Pinned to the dashboard.');
   };
 
+  usePaperclipManagerActions({
+    enabled: isPage,
+    workspace: () => workspace,
+    settings: () => settings,
+    readThread: (threadKey) => sharedDb.conversations.get(threadKey),
+    mayShare: async (conv) => {
+      const currentSettings = await sharedDb.settings.get('default');
+      return currentSettings ? isRemoteAllowed(conv, currentSettings, await localOnlyProjectNames(sharedDb)) : false;
+    },
+    showBrowse: () => setView('browse'),
+    openThread: async (threadKey) => {
+      const conv = await sharedDb.conversations.get(threadKey);
+      if (!conv || conv.provider === 'paperclip') return false;
+      const result = workspace.openThread(conv, { activate: true });
+      if (!result.ok) return false;
+      setView('browse');
+      return true;
+    },
+  });
+
   const workspaceContext: WorkspaceContextValue = {
     surface,
     workspace,
@@ -673,6 +846,14 @@ export function App() {
     selectedThreadKey: selectedConversation?.threadKey ?? null,
     accountOfThread,
     openSession,
+    openPaperclip: (path) => {
+      const safe = paperclipPath(path);
+      if (!safe || !isPage) return;
+      setPaperclipNavigation((previous) => ({ path: safe, request: previous.request + 1 }));
+      window.history.replaceState(null, '', paperclipPageAddress(window.location.href, safe));
+      setView('paperclip');
+    },
+    showInThreads,
     togglePinned,
     openInChromeTab,
     requestAddAccount: (realmId) => {
@@ -696,6 +877,29 @@ export function App() {
     }
   };
 
+  const searchFocusPending = useRef(false);
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0);
+  const focusThreadSearch = () => {
+    setListMode('search');
+    if (isPage && view !== 'threads') setView('threads');
+    searchFocusPending.current = true;
+    setSearchFocusRequest((request) => request + 1);
+    if (!isPage) return;
+    const narrow = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 899px)').matches : window.innerWidth < 900;
+    if (narrow) setMobileDrawerOpen(true);
+    else if (settings?.sidebarCollapsed) void persistSettingPatch({ sidebarCollapsed: false });
+  };
+  useEffect(() => {
+    if (!searchFocusPending.current) return;
+    // The search box is now in navigation. Wait for its drawer/expanded rail to be visible
+    // before focusing it; the shortcut's immediate focus may still target the hidden box.
+    if (isPage && (view !== 'threads' || document.querySelector('.tk-rail')?.getAttribute('data-collapsed') === 'true')) return;
+    if (!searchInputRef.current) return;
+    searchInputRef.current.focus();
+    searchFocusPending.current = false;
+  }, [searchFocusRequest, listMode, settings?.sidebarCollapsed, mobileDrawerOpen, isPage, view]);
+
   useWorkbenchKeyboard({
     surface,
     handshakeToken,
@@ -707,7 +911,7 @@ export function App() {
     searchInputRef,
     selectAllRef,
     rowRefs,
-    onFocusSearch: () => setListMode('search'),
+    onFocusSearch: focusThreadSearch,
     onSelectThread: handleSelectThread,
     onClearChecked: () => {
       setCheckedKeys(new Set());
@@ -857,9 +1061,12 @@ export function App() {
 
   const listPane = (
     <ListPane
+      placement={isPage ? 'sidebar' : 'main'}
       repositoryFilter={repositoryFilter}
       accountFilter={accountFilter}
       runFilter={runFilter}
+      typeFilter={typeFilter}
+      onTypeFilterChange={setTypeFilter}
       onRepositoryFilterChange={setRepositoryFilter}
       onAccountFilterChange={setAccountFilter}
       onRunFilterChange={setRunFilter}
@@ -952,11 +1159,18 @@ export function App() {
         setMobileDetailVisible(false);
         if (selectedConversation) rowRefs.current.get(selectedConversation.threadKey)?.focus();
       }}
-      onSelectThread={handleSelectThread}
+      onSelectThread={(threadKey) => {
+        const target = conversationByKey.get(threadKey);
+        if (isPage && target?.provider === 'paperclip') openSession(target, 'paperclip');
+        else handleSelectThread(threadKey);
+      }}
       onProjectChange={actions.changeProject}
       onToggleLock={actions.toggleLock}
       onWorkflowStateChange={actions.changeWorkflowState}
-      onOpenOriginal={actions.openOriginal}
+      onOpenOriginal={() => {
+        if (isPage && selectedConversation?.provider === 'paperclip') openSession(selectedConversation, 'paperclip');
+        else actions.openOriginal();
+      }}
       onCopy={copyText}
       onSendToStill={openSendToStill}
       onDelete={actions.deleteSelected}
@@ -967,11 +1181,72 @@ export function App() {
     />
   );
 
+  const onPaperclipMessage = (message: PaperclipHostMessage) => {
+    if (message.type === 'route') {
+      paperclipRouteRef.current = message.path;
+      const entry = fusedEntryRef.current;
+      const path = entry && fusedRoute(entry, message.path);
+      if (path && fusedViewRef.current !== entry) {
+        fusedViewRef.current = entry;
+        setPaperclipNavigation((previous) => ({ path, request: previous.request + 1 }));
+      }
+      if (fused) {
+        // Fused: the shell view follows the page, so only the Paperclip route is remembered.
+        const address = new URL(window.location.href);
+        address.searchParams.set('pc', message.path);
+        window.history.replaceState(null, '', address.href);
+      } else if (view === 'paperclip') window.history.replaceState(null, '', paperclipPageAddress(window.location.href, message.path));
+    } else if (message.type === 'ready') fuse({ type: 'ready', mode: message.mode, at: Date.now() });
+    else if (message.type === 'slot') {
+      const firstSlot = !fusionRef.current.engaged;
+      const state = fuse({ type: 'slot', view: message.view, rect: message.rect, at: Date.now() });
+      if (state.engaged) {
+        if (firstSlot && view !== 'paperclip' && message.view !== view) {
+          fusedEntryRef.current = view;
+          // The fused-view effect sends navigation once a company prefix is known. If
+          // the first route was '/', the route handler sends it when that prefix arrives.
+          fusedViewRef.current = null;
+        }
+        if (fusedEntryRef.current && message.view !== fusedEntryRef.current) return;
+        fusedEntryRef.current = null;
+        // The route usually arrives before the first slot engages fused mode; remember it now.
+        const address = new URL(window.location.href);
+        address.searchParams.set('pc', paperclipRouteRef.current);
+        window.history.replaceState(null, '', address.href);
+        const target: WorkspaceView = message.view ?? 'paperclip';
+        fusedViewRef.current = target;
+        if (target !== view) setView(target);
+      }
+    } else if (message.type === 'overlay') fuse({ type: 'overlay', open: message.open, regions: message.regions, at: Date.now() });
+    else if (message.type === 'open-view') setView(message.view);
+    else if (message.type === 'open-session') {
+      const thread = conversationByKey.get(message.threadKey);
+      if (thread) openSession(thread, 'browse');
+      else setStatusAnnouncement('That session is no longer in this library.');
+    } else if (message.type === 'open-link') {
+      if (embedTargetFor(message.url)) {
+        const result = workspace.openUrl(message.url, { activate: true });
+        if (result.ok) setView('browse');
+        else setStatusAnnouncement(result.message);
+      } else openInChromeTab(message.url);
+    }
+  };
+
   return (
+    <PaperclipConnectionContext.Provider value={paperclipConnection}>
     <WorkspaceProvider value={workspaceContext}>
-      <div className="tk-workbench" data-surface={surface} data-view={isPage ? view : undefined}>
+      <div
+        className="tk-workbench"
+        data-surface={surface}
+        data-view={isPage ? view : undefined}
+        data-fused={fused ? 'true' : undefined}
+        data-fused-raised={fused && fusion.overlayOpen ? 'true' : undefined}
+      >
         {surface === 'page' && (
-          <a href="#tk-main-list" className="tk-skip-link">
+          <a href="#tk-main-list" className="tk-skip-link" onClick={(event) => {
+            event.preventDefault();
+            focusThreadSearch();
+          }}>
             Skip to conversation list
           </a>
         )}
@@ -984,10 +1259,18 @@ export function App() {
           // The full page is the workspace: a rail and three views over the same sessions. Every
           // view stays mounted so its state survives a switch, and the embedded pages live in
           // the stage, outside the views, so no switch ever reloads one.
-          <FrameStage workspace={workspace}>
-            <div className="tk-shell" data-rail-collapsed={Boolean(settings?.sidebarCollapsed)} data-view={view}>
+          <FrameStage workspace={workspace} fullNavigation={settings?.embedFullNavigation !== false}>
+            <div
+              ref={shellRef}
+              className="tk-shell"
+              data-rail-collapsed={(!fused && view === 'paperclip') || Boolean(settings?.sidebarCollapsed)}
+              data-view={view}
+              // Fused: the shell is the Threadkeeper view, placed over Paperclip's content rectangle.
+              style={fused && fusion.rect ? { left: fusion.rect.x, top: fusion.rect.y, width: fusion.rect.width, height: fusion.rect.height } : undefined}
+            >
               <Rail
-                collapsed={Boolean(settings?.sidebarCollapsed)}
+                fused={fused}
+                collapsed={(!fused && view === 'paperclip') || Boolean(settings?.sidebarCollapsed)}
                 drawerOpen={mobileDrawerOpen}
                 view={view}
                 effectiveTheme={effectiveTheme}
@@ -996,25 +1279,47 @@ export function App() {
                 onCloseDrawer={() => setMobileDrawerOpen(false)}
                 onToggleTheme={() => void persistSettingPatch({ theme: effectiveTheme === 'dark' ? 'light' : 'dark' })}
                 onOpenSettings={workspaceContext.openSettings}
+                sessions={listPane}
               >
-                {view === 'threads' && navRail}
+                {navRail}
               </Rail>
               <div className="tk-main">
                 <StaleBuildBanner snapshot={diagnostics.snapshot} />
                 <RestoreOfferBanner threads={counts ? counts.totalThreads : null} />
+                <PendingSignInBanner />
                 <section className="tk-view tk-view-browse" aria-label="Browse" hidden={view !== 'browse'}>
                   <BrowseView />
                 </section>
                 <section className="tk-view tk-view-threads" aria-label="Threads" hidden={view !== 'threads'}>
                   {headerBar}
                   <div className="tk-columns" data-detail-mode={detailMode}>
-                    {listPane}
                     {detailPane}
                   </div>
                 </section>
                 <section className="tk-view tk-view-dashboard" aria-label="Dashboard" hidden={view !== 'dashboard'}>
                   <DashboardView />
                 </section>
+                <PaperclipView
+                  key={paperclipOrigin}
+                  origin={paperclipOrigin}
+                  initialPath={originalPaperclipOrigin.current === paperclipOrigin ? paperclipPath(urlParams.get('pc')) ?? '/' : '/'}
+                  active={view === 'paperclip' || fused}
+                  // REQ-6 FR-6: whenever the configured Paperclip runs (which already requires its
+                  // host permission), its frame loads so its sidebar becomes the window's sidebar.
+                  eager
+                  controlRef={paperclipControl}
+                  connection={paperclipConnection}
+                  navigation={paperclipNavigation}
+                  onMessage={onPaperclipMessage}
+                  onConfigure={() => {
+                    if (paperclipConnection.snapshot.state === 'setup_pending') {
+                      openInChromeTab(paperclipOrigin);
+                      return;
+                    }
+                    setSettingsSection('paperclip');
+                    openModal(settingsDialogRef);
+                  }}
+                />
               </div>
             </div>
           </FrameStage>
@@ -1114,5 +1419,6 @@ export function App() {
         )}
       </div>
     </WorkspaceProvider>
+    </PaperclipConnectionContext.Provider>
   );
 }

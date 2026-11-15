@@ -7,6 +7,13 @@ import {
 } from "../middleware/http-log-policy.js";
 
 describe("isPrivateWebhookHttpRequest", () => {
+  it("treats paired browser protocol bodies as private even when rejected", () => {
+    for (const plugin of ["browser-sessions", "11111111-1111-4111-8111-111111111111"]) for (const operation of ["bridge/results", "bridge/secret", "pair/start", "pair/poll"]) for (const method of ["GET", "POST", "DELETE"]) {
+      const url = `/api/plugins/${plugin}/api/${operation}`;
+      expect(isPrivateWebhookHttpRequest(method, url)).toBe(true);
+      expect(isSecretSensitiveHttpRequest(method, `https://board.example${url}`)).toBe(true);
+    }
+  });
   it("protects the native webhook namespace, including rejected methods and query data", () => {
     for (const provider of [
       "slack",

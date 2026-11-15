@@ -25,6 +25,9 @@ const SENSITIVE_KEYS = new Set<string>([
   "manager_token",
   "configurationtoken",
   "configuration_token",
+  "bridgetoken",
+  "polltoken",
+  "x-threadkeeper-bridge-token",
   "credential",
   "credentials",
   // The app-connect/reconnect envelope. Its keys are caller-chosen provider

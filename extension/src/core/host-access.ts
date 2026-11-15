@@ -19,7 +19,7 @@ export interface HostAccessUsers {
   sites: CustomSitesState;
   /** Capture on/off per provider, as it will be after the change. */
   authorizedHosts: Partial<Record<CaptureProviderId, boolean>>;
-  paperclip: { enabled: boolean; serverUrl: string };
+  paperclip: { enabled: boolean; serverUrl: string; hostEnabled?: boolean };
 }
 
 /** Every optional origin pattern some feature still needs. */
@@ -37,7 +37,7 @@ export function originsInUse(users: HostAccessUsers): string[] {
       for (const o of runtimePermissionOrigins(id)) out.add(o);
     }
   }
-  if (users.paperclip.enabled) for (const o of paperclipPermissionOrigins(users.paperclip.serverUrl)) out.add(o);
+  if (users.paperclip.enabled || users.paperclip.hostEnabled) for (const o of paperclipPermissionOrigins(users.paperclip.serverUrl)) out.add(o);
   return Array.from(out);
 }
 

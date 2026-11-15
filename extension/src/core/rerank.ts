@@ -6,9 +6,9 @@ import {
   type SettingsRecord,
 } from './schema.js';
 import type { ThreadkeeperDB } from './db.js';
+import { awsModelCredentialsReady, credentialPresent, rerankCredentialKeys, resolveModelSettings } from './paperclip/credentials.js';
 import {
   AwsRequestError,
-  awsCredentialsReady,
   awsHostOrigins,
   awsPostJson,
   bedrockAgentRuntimeUrl,
@@ -86,16 +86,16 @@ export function rerankModelLabel(settings: SettingsRecord): string {
 export function rerankProblem(settings: SettingsRecord): string | null {
   switch (settings.rerankProvider) {
     case 'voyage':
-      return settings.voyageApiKey.trim() ? null : 'Add a Voyage API key to rerank with Voyage.';
+      return credentialPresent(settings, 'voyageApiKey') ? null : 'Add a Voyage API key to rerank with Voyage.';
     case 'mongodb':
-      return settings.mongodbApiKey.trim() ? null : 'Add a MongoDB Atlas model API key to rerank with Atlas.';
+      return credentialPresent(settings, 'mongodbApiKey') ? null : 'Add a MongoDB Atlas model API key to rerank with Atlas.';
     case 'cohere':
-      return settings.cohereApiKey.trim() ? null : 'Add a Cohere API key to rerank with Cohere.';
+      return credentialPresent(settings, 'cohereApiKey') ? null : 'Add a Cohere API key to rerank with Cohere.';
     case 'bedrock': {
       const { aws } = settings;
       const region = aws.region.trim();
       if (!isValidAwsRegion(region)) return 'Enter an AWS region such as us-west-2.';
-      if (!awsCredentialsReady(aws)) {
+      if (!awsModelCredentialsReady(settings)) {
         return aws.auth === 'api_key' ? 'Add a Bedrock API key.' : 'Add an AWS access key ID and secret access key.';
       }
       const model = settings.bedrockRerankModel;
@@ -370,6 +370,7 @@ export async function rerankDocuments(
   fetchImpl: typeof fetch = fetch,
   options: RerankOptions = {}
 ): Promise<RerankResult[]> {
+  settings = await resolveModelSettings(settings, 'reranking', rerankCredentialKeys(settings));
   const problem = rerankProblem(settings);
   if (problem) throw new RerankError(problem);
   const q = query.trim().slice(0, RERANK_MAX_QUERY_CHARS);

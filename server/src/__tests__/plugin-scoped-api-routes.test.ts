@@ -3,6 +3,8 @@ import { createServer, request as httpRequest, type Server } from "node:http";
 import { once } from "node:events";
 import { WebSocket, WebSocketServer } from "ws";
 import { setupPluginApiWebSocketServer } from "../realtime/plugin-api-ws.js";
+import { createPluginStreamBus, pluginStreamNotificationHandler, type PluginStreamBus } from "../services/plugin-stream-bus.js";
+import { createPluginWorkerHandle } from "../services/plugin-worker-manager.js";
 
 // Keep a real upstream WebSocket and byte stream; only TLS is replaced locally.
 vi.mock("node:https", () => ({ request: (url: URL, options: object) => {
@@ -72,6 +74,8 @@ async function createApp(input: {
   workerRunning?: boolean;
   workerResult?: unknown;
   db?: unknown;
+  streamBus?: PluginStreamBus;
+  toolDeps?: unknown;
 }) {
   const [{ pluginRoutes }, { errorHandler }] = await Promise.all([
     import("../routes/plugins.js"),
@@ -87,7 +91,7 @@ async function createApp(input: {
   mockRegistry.getByKey.mockResolvedValue(input.plugin ?? null);
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "5mb" }));
   app.use((req, _res, next) => {
     req.actor = input.actor as typeof req.actor;
     next();
@@ -99,8 +103,8 @@ async function createApp(input: {
       { installPlugin: vi.fn() } as never,
       undefined,
       undefined,
-      undefined,
-      { workerManager } as never,
+      input.toolDeps as never,
+      { workerManager, streamBus: input.streamBus } as never,
     ),
   );
   app.use(errorHandler);
@@ -126,6 +130,66 @@ describe("plugin scoped API routes", () => {
       checkoutRunId: runId,
       adoptedFromRunId: null,
     });
+  });
+
+  it("delivers a real child worker's validated change notification over the authenticated SSE route", async () => {
+    const streamBus = createPluginStreamBus();
+    const apiRoutes = manifest([]);
+    const { app } = await createApp({ actor: { type: "board", source: "local_implicit", userId: "board", isInstanceAdmin: true }, plugin: { id: pluginId, pluginKey: apiRoutes.id, status: "ready", manifestJson: apiRoutes }, streamBus });
+    const worker = createPluginWorkerHandle(pluginId, { entrypointPath: new URL("./fixtures/plugin-worker-stream.cjs", import.meta.url).pathname, manifest: apiRoutes, config: {}, instanceInfo: { instanceId: "fixture", hostVersion: "1" }, apiVersion: 1, hostHandlers: {}, onStreamNotification: pluginStreamNotificationHandler(streamBus, pluginId) });
+    const server = createServer(app); server.listen(0, "127.0.0.1"); await once(server, "listening");
+    const address = server.address() as { port: number }; const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+      await worker.start();
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/plugins/${pluginId}/bridge/stream/sessions?companyId=${companyId}`, { signal: controller.signal });
+      expect(response.status).toBe(200); expect(response.headers.get("content-type")).toBe("text/event-stream"); reader = response.body!.getReader();
+      await reader.read();
+      await worker.call("getData", { key: "emit", companyId, params: { companyId } });
+      let text = "";
+      while (!text.includes("real-child-process")) { const chunk = await reader.read(); if (chunk.done) break; text += new TextDecoder().decode(chunk.value); }
+      expect(text).toContain('"type":"changed"'); expect(text).not.toContain("forged");
+    } finally { controller.abort(); await reader?.cancel().catch(() => undefined); await worker.stop(); server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); }
+  }, 30_000);
+
+  it("REQ-9 F14 / REQ-11 F-11: the direct tool route takes the task from the verified run, never from the request", async () => {
+    const rows = [[{ companyId }], [{ companyId, agentId, issueId }]];
+    const db = { select: () => ({ from: () => ({ where: () => ({ limit: async () => rows.shift() ?? [] }) }) }) };
+    const executeTool = vi.fn().mockResolvedValue({ content: "ok" });
+    const { app } = await createApp({ actor: { type: "board", source: "local_implicit", userId: "board", isInstanceAdmin: true }, db, toolDeps: { toolDispatcher: { listToolsForAgent: vi.fn(), getTool: vi.fn(() => ({ name: "browser-sessions:session_send" })), executeTool } } });
+    const forged = "66666666-6666-4666-8666-666666666666";
+    const res = await request(app).post("/api/plugins/tools/execute").send({ tool: "browser-sessions:session_send", parameters: {}, runContext: { agentId, runId, companyId, issueId: forged } });
+    expect(res.status).toBe(200);
+    expect(executeTool).toHaveBeenCalledTimes(1);
+    expect(executeTool.mock.calls[0]![2]).toEqual({ agentId, runId, companyId, projectId: "", issueId });
+  });
+
+  it("forwards the browser pairing credential only to its owner and refuses agent credentials before dispatch", async () => {
+    const apiRoutes = manifest([{ routeKey: "bridge", method: "POST", path: "/bridge/connect", auth: "board", capability: "api.routes.register", companyResolution: { from: "body", key: "companyId" } }]);
+    apiRoutes.id = "browser-sessions";
+    const plugin = { id: pluginId, pluginKey: "browser-sessions", status: "ready", manifestJson: apiRoutes };
+    const board = await createApp({ actor: { type: "board", source: "local_implicit", userId: "board", isInstanceAdmin: true }, plugin });
+    expect((await request(board.app).post(`/api/plugins/${pluginId}/api/bridge/connect`).set("x-threadkeeper-bridge-token", "paired-fixture").set("Authorization", "Bearer board-fixture").send({ companyId })).status).toBe(200);
+    expect(board.workerManager.call.mock.calls[0]?.[2].headers).toMatchObject({ "x-threadkeeper-bridge-token": "paired-fixture" });
+    expect(board.workerManager.call.mock.calls[0]?.[2].headers.authorization).toBeUndefined();
+    const agent = await createApp({ actor: { type: "agent", agentId, companyId }, plugin });
+    expect((await request(agent.app).post(`/api/plugins/${pluginId}/api/bridge/connect`).send({ companyId })).status).toBe(403);
+    expect(agent.workerManager.call).not.toHaveBeenCalled();
+    const other = await createApp({ actor: { type: "board", source: "local_implicit", userId: "board", isInstanceAdmin: true }, plugin: { ...plugin, pluginKey: "other-plugin" } });
+    await request(other.app).post(`/api/plugins/${pluginId}/api/bridge/connect`).set("x-threadkeeper-bridge-token", "paired-fixture").send({ companyId });
+    expect(other.workerManager.call.mock.calls[0]?.[2].headers["x-threadkeeper-bridge-token"]).toBeUndefined();
+  });
+
+  it("accepts bounded four-MiB bridge messages without widening other plugin limits", async () => {
+    const apiRoutes = manifest([{ routeKey: "inventory", method: "POST", path: "/bridge/inventory", auth: "board", capability: "api.routes.register", companyResolution: { from: "body", key: "companyId" } }]);
+    const body = { companyId, fixture: "x".repeat(1_100_000) };
+    const base = { id: pluginId, status: "ready", manifestJson: apiRoutes };
+    const actor = { type: "board", source: "local_implicit", userId: "board", isInstanceAdmin: true };
+    const browser = await createApp({ actor, plugin: { ...base, pluginKey: "browser-sessions" } });
+    expect((await request(browser.app).post(`/api/plugins/${pluginId}/api/bridge/inventory`).send(body)).status).toBe(200);
+    const other = await createApp({ actor, plugin: { ...base, pluginKey: "other-plugin" } });
+    expect((await request(other.app).post(`/api/plugins/${pluginId}/api/bridge/inventory`).send(body)).status).toBe(413);
+    expect(other.workerManager.call).not.toHaveBeenCalled();
   });
 
   it("dispatches a board GET route with params, query, actor, and company context", async () => {

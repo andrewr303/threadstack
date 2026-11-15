@@ -239,6 +239,7 @@ export interface UpsertThreadInput {
   projectSource?: ProjectSource;
   agentLabel?: string | null;
   linkedThreadKeys?: string[];
+  paperclipCompanyId?: string | null;
   repository?: string | null;
   pullRequestUrl?: string | null;
   agentState?: AgentState | null;
@@ -510,6 +511,8 @@ export async function upsertThread(
       if (agentLabel) record.agentLabel = agentLabel;
       const linkedThreadKeys = input.linkedThreadKeys ?? existing?.linkedThreadKeys;
       if (linkedThreadKeys?.length) record.linkedThreadKeys = linkedThreadKeys;
+      const paperclipCompanyId = input.paperclipCompanyId ?? existing?.paperclipCompanyId;
+      if (record.provider === 'paperclip' && typeof paperclipCompanyId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(paperclipCompanyId)) record.paperclipCompanyId = paperclipCompanyId;
       const repository = input.repository ?? existing?.repository;
       if (repository) record.repository = repository;
       const pullRequestUrl = input.pullRequestUrl ?? existing?.pullRequestUrl;

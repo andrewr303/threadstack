@@ -431,6 +431,40 @@ describe("InviteLandingPage", () => {
     });
   });
 
+  it("waits for invite data when a signed-in session is ready before the bootstrap invite query", async () => {
+    const session = { session: { id: "session-1", userId: "user-1" }, user: {
+      id: "user-1", name: "Fixture user", email: "fixture@example.test", image: null,
+    } };
+    getSessionMock.mockResolvedValue(session);
+    let resolveInvite!: (value: object) => void;
+    getInviteMock.mockReturnValue(new Promise<object>((resolve) => { resolveInvite = resolve; }));
+    acceptInviteMock.mockResolvedValue({ bootstrapAccepted: true });
+    const root = createRoot(container);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(queryKeys.auth.session, session);
+    try {
+      await act(async () => { renderInviteLanding(root, queryClient); });
+      await flushReact(); await flushReact();
+      expect(queryClient.getQueryState(queryKeys.access.invite("pcp_invite_test"))?.status).toBe("pending");
+      await act(async () => {
+        resolveInvite({ id: "bootstrap-1", companyId: null, inviteType: "bootstrap_ceo",
+          allowedJoinTypes: "human", expiresAt: "2027-03-07T00:10:00.000Z" });
+      });
+      await flushReact(); await flushReact();
+      expect(container.textContent).not.toContain("Invite not found");
+      expect(acceptInviteMock).not.toHaveBeenCalled();
+      const accept = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Accept invite");
+      expect(accept).toBeTruthy();
+      await act(async () => { accept!.click(); });
+      await flushReact(); await flushReact();
+      expect(acceptInviteMock).toHaveBeenCalledWith("pcp_invite_test", { requestType: "human" });
+      expect(container.textContent).toContain("Bootstrap complete");
+    } finally {
+      await act(async () => { root.unmount(); });
+      queryClient.clear();
+    }
+  });
+
   it("auto-accepts the invite after account creation and redirects into the company", async () => {
     getSessionMock.mockResolvedValueOnce(null);
     getSessionMock.mockResolvedValue({

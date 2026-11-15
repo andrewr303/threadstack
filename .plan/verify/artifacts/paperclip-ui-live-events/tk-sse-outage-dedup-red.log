@@ -1,0 +1,34 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/context/LiveUpdatesProvider.recovery.test.tsx (43 tests | 1 failed) 448ms
+   ❯ LiveUpdatesProvider connection recovery (43)
+     × notifies the verified host once across terminal stream retries until recovery 30ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/context/LiveUpdatesProvider.recovery.test.tsx > LiveUpdatesProvider connection recovery > notifies the verified host once across terminal stream retries until recovery
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+ ❯ src/context/LiveUpdatesProvider.recovery.test.tsx:154:20
+    152|       const retry = EventStream.instances.at(-1)!; retry.readyState = …
+    153|       await act(async () => retry.onerror?.());
+    154|       expect(lost).toHaveBeenCalledTimes(1);
+       |                    ^
+    155|     } finally { window.removeEventListener("paperclip:company-live-dis…
+    156|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 42 passed (43)
+   Start at  23:55:08
+   Duration  5.12s (transform 42%, environment 34%, import 15%, tests 9%)
+
+  Transform  transforming modules took 2.03s · 42% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

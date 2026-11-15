@@ -8,6 +8,7 @@ import { nativeRunMcpRoutes } from "./routes/native-run-mcp.js";
 import { connectionEventWakeRoutes } from "./routes/connection-event-wake.js";
 import { registerGitHubReviewProjectionWork } from "./services/chat-channels/github/review-projection-work.js";
 import { finishServiceShutdown } from "./shutdown.js";
+import { createCompanyLiveEventStreams } from "./routes/company-live-events-stream.js";
 import { promptInjectionPreventionRoutes } from "./routes/prompt-injection-prevention.js";
 import { voiceSessionRoutes, voiceWebhookRoutes } from "./routes/voice-sessions.js";
 import { eq } from "drizzle-orm";
@@ -191,7 +192,7 @@ import { adapterRoutes } from "./routes/adapters.js";
 import { managedAgentProfileRoutes } from "./routes/managed-agent-profiles.js";
 import { remoteAgentProfileRoutes } from "./routes/remote-agent-profiles.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
-import { readBrandedStaticIndexHtml } from "./static-index-html.js";
+import { applyThreadkeeperHostConfig, readBrandedStaticIndexHtml } from "./static-index-html.js";
 import { staticUiCacheControl } from "./static-ui-cache.js";
 import { staticUiCompression } from "./middleware/static-ui-compression.js";
 import { applyUiBranding } from "./ui-branding.js";
@@ -216,6 +217,7 @@ import {
   type PluginWorkerManager,
 } from "./services/plugin-worker-manager.js";
 import { createPluginJobScheduler } from "./services/plugin-job-scheduler.js";
+import { createPluginStreamBus } from "./services/plugin-stream-bus.js";
 import { pluginJobStore } from "./services/plugin-job-store.js";
 import { createPluginToolDispatcher } from "./services/plugin-tool-dispatcher.js";
 import { createToolGatewayService } from "./services/tool-gateway.js";
@@ -574,6 +576,7 @@ export async function createApp(
   // company data. Unclaimed probes bypass session resolution as well as SQL.
   app.use(cloudWarmStandbyMiddleware(isWarmStandby, health, staticUi));
   const workerManager = opts.pluginWorkerManager ?? createPluginWorkerManager();
+  const pluginStreamBus = createPluginStreamBus();
   app.use("/api/customer-success/v1", customerSuccessRoutes(db, opts.storageService, {
     pluginWorkerManager: workerManager,
   }));
@@ -712,6 +715,9 @@ export async function createApp(
   api.use(openApiRoutes());
   api.use("/cloud", cloudRoutes());
   api.use("/companies", companyRoutes(db, opts.storageService));
+  const companyLiveStreams = createCompanyLiveEventStreams(db);
+  app.locals.closeCompanyLiveStreams = () => companyLiveStreams.close();
+  api.use(companyLiveStreams.router);
   api.use(llmRoutes(db));
   api.use(folderRoutes(db));
   api.use(companySkillRoutes(db, { pluginWorkerManager: workerManager }));
@@ -979,6 +985,7 @@ export async function createApp(
     {
       workerManager,
       eventBus,
+      streamBus: pluginStreamBus,
       jobScheduler: scheduler,
       jobStore,
       toolDispatcher,
@@ -1030,7 +1037,7 @@ export async function createApp(
       { scheduler, jobStore },
       { workerManager },
       { toolDispatcher },
-      { workerManager },
+      { workerManager, streamBus: pluginStreamBus },
       { toolGateway },
     ),
   );
@@ -1234,7 +1241,7 @@ export async function createApp(
     viteHtmlRenderer = createCachedViteHtmlRenderer({
       vite,
       uiRoot,
-      brandHtml: applyUiBranding,
+      brandHtml: (html) => applyThreadkeeperHostConfig(applyUiBranding(html)),
     });
     const renderViteHtml = viteHtmlRenderer;
 
@@ -1416,6 +1423,7 @@ export async function createApp(
   // instead of starting a second teardown.
   let appServicesShutdown: Promise<void> | null = null;
   const shutdownAppServices = (): Promise<void> => {
+    companyLiveStreams.close();
     if (appServicesShutdown) return appServicesShutdown;
     appServicesShutdown = finishServiceShutdown(() => scheduler.stop(), async () => {
       await loader.stopActivationTimeoutRecovery();

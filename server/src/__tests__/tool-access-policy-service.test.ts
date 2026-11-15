@@ -30,6 +30,7 @@ import {
   startEmbeddedPostgresTestDatabase,
 } from "./helpers/embedded-postgres.js";
 import { toolAccessPolicyService } from "../services/tool-access-policy.js";
+import { ensureBrowserSessionReadPolicy } from "../services/browser-session-tool-policy.js";
 import { toolAccessService } from "../services/tool-access.js";
 import { createToolGatewayService, ToolGatewayHttpError } from "../services/tool-gateway.js";
 import { canonicalToolArguments, signToolArguments } from "../services/tool-content-guards.js";
@@ -251,6 +252,34 @@ describeEmbeddedPostgres("tool access policy service", () => {
   afterAll(async () => {
     await db?.$client.end({ timeout: 1 });
     await tempDb?.cleanup();
+  });
+
+  it("shares browser session read tools only within the granted company", async () => {
+    const company = await createCompany(db); const agent = await createAgent(db, company.id);
+    const otherCompany = await createCompany(db); const otherAgent = await createAgent(db, otherCompany.id);
+    await ensureBrowserSessionReadPolicy(db, company.id); await ensureBrowserSessionReadPolicy(db, company.id);
+    expect(await toolAccessPolicyService(db).listPolicies(company.id)).toHaveLength(1);
+    const decision = (companyId: string, agentId: string, toolName: string) => toolAccessPolicyService(db).decide({ companyId, actor: { actorType: "agent", actorId: agentId, agentId }, request: { toolName, providerType: "paperclip_plugin" } });
+    expect(await decision(company.id, agent.id, "browser-sessions:sessions_list")).toMatchObject({ allowed: true, reasonCode: "allow_policy" });
+    expect(await decision(company.id, agent.id, "browser-sessions:session_send")).toMatchObject({ allowed: false });
+    expect(await decision(otherCompany.id, otherAgent.id, "browser-sessions:sessions_list")).toMatchObject({ allowed: false });
+    expect(await decision(company.id, otherAgent.id, "browser-sessions:sessions_list")).toMatchObject({ allowed: false });
+  });
+
+  it("shares browser sessions without overriding explicit blocks, reviews or restrictive profiles", async () => {
+    const company = await createCompany(db); const agent = await createAgent(db, company.id);
+    await ensureBrowserSessionReadPolicy(db, company.id);
+    const input = { companyId: company.id, actor: { actorType: "agent" as const, actorId: agent.id, agentId: agent.id }, request: { toolName: "browser-sessions:sessions_search", providerType: "paperclip_plugin" } };
+    const svc = toolAccessPolicyService(db);
+    const block = await svc.createPolicy(company.id, { name: "Explicit session block", policyType: "block", enabled: true, priority: 2147483647, selectors: { agentId: agent.id, toolName: input.request.toolName } });
+    expect(await svc.decide(input)).toMatchObject({ allowed: false, reasonCode: "deny_policy_block" });
+    await db.delete(toolPolicies).where(eq(toolPolicies.id, block.id));
+    const review = await svc.createPolicy(company.id, { name: "Review session reads", policyType: "require_approval", enabled: true, priority: 2147483647, selectors: { toolName: input.request.toolName } });
+    expect(await svc.decide(input)).toMatchObject({ decision: "require_approval" });
+    await db.delete(toolPolicies).where(eq(toolPolicies.id, review.id));
+    const [profile] = await db.insert(toolProfiles).values({ companyId: company.id, profileKey: "restrictive", name: "Restricted tools", defaultAction: "deny" }).returning();
+    await db.insert(toolProfileBindings).values({ companyId: company.id, profileId: profile!.id, targetType: "agent", targetId: agent.id });
+    expect(await svc.decide(input)).toMatchObject({ allowed: false, reasonCode: "deny_default" });
   });
 
   it("denies direct execution without an effective profile or grant", async () => {

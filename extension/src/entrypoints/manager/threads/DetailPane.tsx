@@ -17,8 +17,9 @@ import { PaperclipLinks } from '../PaperclipLinks.js';
 import { SemanticNeighbors, ThreadOverview, type RelatedThread } from '../ThreadOverview.js';
 import { InStillBadge } from '../SidebarDock.js';
 import { useOptionalWorkspaceContext } from '../workspace/context.js';
+import { Icon } from '../shell/icons.js';
 import { evidenceLabel, renderClaims, renderEvidencePassage, type EvidenceView } from './claims.js';
-import { LivePage, ThreadFacts, ThreadModeBar, ThreadWorkspaceActions, hasEmbeddablePage } from './DetailWorkspace.js';
+import { LivePage, ThreadFacts, ThreadModeBar, ThreadPageNote, ThreadWorkspaceActions, hasEmbeddablePage } from './DetailWorkspace.js';
 
 const TRANSCRIPT_PAGE = 80;
 
@@ -357,7 +358,10 @@ export function DetailPane({
               </button>
             </div>
 
-            <h2 className="tk-detail-title">{getSmartTitle(conversation, insight)}</h2>
+            <div className="tk-detail-title-row">
+              <h2 className="tk-detail-title" title={getSmartTitle(conversation, insight)}>{getSmartTitle(conversation, insight)}</h2>
+              {onPage && <ThreadModeBar conversation={conversation} />}
+            </div>
             {insight && getSmartTitle(conversation, insight) !== getDisplayTitle(conversation) && (
               <div className="tk-muted" style={{ fontSize: 12 }}>
                 Original title: {getDisplayTitle(conversation)}
@@ -365,7 +369,7 @@ export function DetailPane({
             )}
 
             {onPage && (
-              <ThreadModeBar
+              <ThreadPageNote
                 conversation={conversation}
                 onCopyResume={(command) => onCopy(command, 'Resume command')}
                 resumeShownElsewhere={
@@ -427,10 +431,11 @@ export function DetailPane({
 
             <PaperclipLinks conv={conversation} conversations={conversations} onSelect={onSelectThread} />
 
-            <div className="tk-filter-row" style={{ marginTop: 6 }}>
+            <div className="tk-detail-controls" role="group" aria-label="Thread controls" tabIndex={0}>
               <select
-                className="tk-select"
+                className="tk-select tk-detail-category"
                 aria-label="Assign project or area"
+                title={conversation.project}
                 value={conversation.project}
                 onChange={(e) => void onProjectChange(e.target.value)}
               >
@@ -440,16 +445,17 @@ export function DetailPane({
                   </option>
                 ))}
               </select>
-              <label className="tk-inline-check">
+              <label className="tk-inline-check tk-detail-lock" title="Lock category">
                 <input
                   type="checkbox"
                   checked={conversation.categoryLocked}
                   onChange={(e) => void onToggleLock(e.target.checked)}
                 />
-                Lock category
+                <Icon name="lock" size={14} />
+                <span className="tk-visually-hidden">Lock category</span>
               </label>
               <select
-                className="tk-select"
+                className="tk-select tk-detail-state"
                 aria-label="Change workflow state"
                 value={conversation.workflowState}
                 onChange={(e) => void onWorkflowStateChange(e.target.value as WorkflowState)}
@@ -465,23 +471,31 @@ export function DetailPane({
               (conversation.provider === 'paperclip' && /^http:\/\//.test(conversation.canonicalUrl)) ? (
                 <button
                   type="button"
-                  className="tk-btn"
+                  className="tk-btn tk-thr-action"
+                  aria-label="Open original"
+                  title="Open original"
                   onClick={onOpenOriginal}
                 >
-                  Open original ↗
+                  <Icon name="external" size={14} />
+                  <span className="tk-thr-action-label">Original</span>
                 </button>
               ) : conversation.resumeCommand ? (
                 <button
                   type="button"
-                  className="tk-btn"
+                  className="tk-btn tk-thr-action"
+                  aria-label="Copy resume command"
+                  title="Copy resume command"
                   onClick={() => onCopy(conversation.resumeCommand!, 'Resume command')}
                 >
-                  Copy resume command
+                  <Icon name="copy" size={14} />
+                  <span className="tk-thr-action-label">Copy resume command</span>
                 </button>
               ) : null}
               <button
                 type="button"
-                className="tk-btn"
+                className="tk-btn tk-thr-action"
+                aria-label="Copy handoff"
+                title="Copy handoff"
                 onClick={() =>
                   onCopy(
                     exportThreadToMarkdown(conversation, messages, summary, insight),
@@ -489,12 +503,14 @@ export function DetailPane({
                   )
                 }
               >
-                Copy handoff
+                <Icon name="copy" size={14} />
+                <span className="tk-thr-action-label">Handoff</span>
               </button>
               {stillPaired && (
                 <button
                   type="button"
-                  className="tk-btn"
+                  className="tk-btn tk-thr-action"
+                  aria-label="Send to Still"
                   disabled={!mayShare(conversation)}
                   title={
                     mayShare(conversation)
@@ -503,12 +519,14 @@ export function DetailPane({
                   }
                   onClick={() => onSendToStill([conversation.threadKey], 'this thread')}
                 >
-                  Send to Still…
+                  <Icon name="external" size={14} />
+                  <span className="tk-thr-action-label">Send to Still…</span>
                 </button>
               )}
               {onPage && <ThreadWorkspaceActions conversation={conversation} />}
-              <button type="button" className="tk-btn tk-btn-danger" onClick={() => void onDelete()}>
-                Delete
+              <button type="button" className="tk-btn tk-btn-danger tk-thr-action" aria-label="Delete" title="Delete" onClick={() => void onDelete()}>
+                <Icon name="trash" size={14} />
+                <span className="tk-thr-action-label">Delete</span>
               </button>
             </div>
           </div>

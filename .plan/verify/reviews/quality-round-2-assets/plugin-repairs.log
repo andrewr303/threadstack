@@ -1,0 +1,9 @@
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/plugin-browser-sessions
+
+
+ Test Files  1 passed (1)
+      Tests  8 passed | 33 skipped (41)
+   Start at  00:43:31
+   Duration  268ms (tests 63%, transform 28%, import 7%, worker 1%)
+

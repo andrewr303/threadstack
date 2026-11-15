@@ -50,6 +50,7 @@ const mockInstanceSettingsApi = vi.hoisted(() => ({
 const mockAuthApi = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
+const mockBrowserSessionsApi = vi.hoisted(() => ({ search: vi.fn(), open: vi.fn() }));
 
 vi.mock("../context/CompanyContext", () => ({
   useCompany: () => companyState,
@@ -95,6 +96,10 @@ vi.mock("../api/instanceSettings", () => ({
 vi.mock("../api/auth", () => ({
   authApi: mockAuthApi,
 }));
+vi.mock("../api/browser-sessions", async () => {
+  const actual = await vi.importActual<typeof import("../api/browser-sessions")>("../api/browser-sessions");
+  return { ...actual, browserSessionsApi: mockBrowserSessionsApi };
+});
 
 vi.mock("./Identity", () => ({
   Identity: ({ name }: { name: string }) => <span>{name}</span>,
@@ -204,6 +209,10 @@ describe("CommandPalette", () => {
     mockProjectsApi.list.mockReset();
     mockInstanceSettingsApi.getExperimental.mockReset();
     mockAuthApi.getSession.mockReset();
+    mockBrowserSessionsApi.search.mockReset();
+    mockBrowserSessionsApi.open.mockReset();
+    mockBrowserSessionsApi.search.mockResolvedValue({ sessions: [], nextCursor: null });
+    mockBrowserSessionsApi.open.mockResolvedValue({ opened: true });
     navigateState.navigate.mockReset();
     locationState.location.pathname = "/";
     locationState.location.search = "";
@@ -247,6 +256,19 @@ describe("CommandPalette", () => {
     act(() => {
       root.unmount();
     });
+  });
+
+  it("shows at most five session matches and revalidates before opening", async () => {
+    mockBrowserSessionsApi.search.mockResolvedValue({ sessions: Array.from({ length: 6 }, (_, i) => ({ threadKey: `claude:${i}`, title: `Session ${i}`, provider: "claude", providerLabel: "Claude" })), nextCursor: null });
+    const { root } = renderWithQueryClient(<CommandPalette />, container);
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true })); });
+    act(() => { container.querySelector<HTMLButtonElement>('button[aria-label="Set query"]')!.click(); });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await waitForAssertion(() => { expect(container.querySelectorAll('[data-testid="command-session-result"]')).toHaveLength(5); });
+    expect(mockBrowserSessionsApi.search).toHaveBeenCalledWith("company-1", "pull/3303", "fast", expect.objectContaining({ limit: 5 }));
+    act(() => { container.querySelector<HTMLButtonElement>('[data-testid="command-session-result"]')!.click(); });
+    await waitForAssertion(() => { expect(mockBrowserSessionsApi.open).toHaveBeenCalledWith("company-1", "claude:0", expect.any(AbortSignal)); });
+    act(() => root.unmount());
   });
 
   it("hides the issue file viewer command by default", async () => {

@@ -91,36 +91,25 @@ export function ThreadFacts({ conversation }: { conversation: ConversationRecord
 /** "Pin to dashboard" and, when the session has a page to show, "Open in Browse". */
 export function ThreadWorkspaceActions({ conversation }: { conversation: ConversationRecord }) {
   const { togglePinned, openSession } = useWorkspaceContext();
+  const pinLabel = conversation.pinned ? 'Unpin from dashboard' : 'Pin to dashboard';
   return (
     <>
-      <button type="button" className="tk-btn tk-thr-action" aria-pressed={conversation.pinned} onClick={() => void togglePinned(conversation)}>
+      <button type="button" className="tk-btn tk-thr-action" aria-label={pinLabel} title={pinLabel} aria-pressed={conversation.pinned} onClick={() => void togglePinned(conversation)}>
         <Icon name={conversation.pinned ? 'unpin' : 'pin'} size={14} />
-        {conversation.pinned ? 'Unpin from dashboard' : 'Pin to dashboard'}
+        <span className="tk-thr-action-label">{conversation.pinned ? 'Unpin' : 'Pin'}</span>
       </button>
       {hasEmbeddablePage(conversation) && (
-        <button type="button" className="tk-btn tk-thr-action" onClick={() => openSession(conversation, 'browse')}>
+        <button type="button" className="tk-btn tk-thr-action" aria-label="Open in Browse" title="Open in Browse" onClick={() => openSession(conversation, 'browse')}>
           <Icon name="browse" size={14} />
-          Open in Browse
+          <span className="tk-thr-action-label">Browse</span>
         </button>
       )}
     </>
   );
 }
 
-/**
- * Summary / Live / Split. A session with no web page (a terminal session, an import) can only be
- * read as a summary, so Live and Split are off and the line below says why.
- */
-export function ThreadModeBar({
-  conversation,
-  onCopyResume,
-  resumeShownElsewhere,
-}: {
-  conversation: ConversationRecord;
-  onCopyResume: (command: string) => void;
-  /** The header already offers "Copy resume command", so the note does not repeat the button. */
-  resumeShownElsewhere: boolean;
-}) {
+/** Summary / Live / Split. A session with no web page can only be read as a summary. */
+export function ThreadModeBar({ conversation }: { conversation: ConversationRecord }) {
   const { detailMode, setDetailMode, announce } = useWorkspaceContext();
   const embeddable = hasEmbeddablePage(conversation);
   const value: DetailMode = embeddable ? detailMode : 'summary';
@@ -140,21 +129,35 @@ export function ThreadModeBar({
           announce(mode === 'summary' ? 'Showing the summary.' : mode === 'live' ? 'Showing the live page.' : 'Showing the summary beside the live page.');
         }}
       />
-      {!embeddable && (
-        <p className="tk-thr-nopage tk-muted">
-          This session has no web page, so Live and Split are off.
-          {conversation.resumeCommand ? ' Copy its resume command to pick it up in a terminal.' : ''}
-          {conversation.resumeCommand && !resumeShownElsewhere && (
-            <>
-              {' '}
-              <button type="button" className="tk-btn" onClick={() => onCopyResume(conversation.resumeCommand!)}>
-                Copy resume command
-              </button>
-            </>
-          )}
-        </p>
-      )}
     </div>
+  );
+}
+
+/** Keep the explanation below the compact title row for sessions without a live page. */
+export function ThreadPageNote({
+  conversation,
+  onCopyResume,
+  resumeShownElsewhere,
+}: {
+  conversation: ConversationRecord;
+  onCopyResume: (command: string) => void;
+  /** The controls row already offers "Copy resume command". */
+  resumeShownElsewhere: boolean;
+}) {
+  if (hasEmbeddablePage(conversation)) return null;
+  return (
+    <p className="tk-thr-nopage tk-muted">
+      This session has no web page, so Live and Split are off.
+      {conversation.resumeCommand ? ' Copy its resume command to pick it up in a terminal.' : ''}
+      {conversation.resumeCommand && !resumeShownElsewhere && (
+        <>
+          {' '}
+          <button type="button" className="tk-btn" onClick={() => onCopyResume(conversation.resumeCommand!)}>
+            Copy resume command
+          </button>
+        </>
+      )}
+    </p>
   );
 }
 
