@@ -50,8 +50,8 @@ does not substitute a fabricated rectangle.
 
 Chromium can send the first post-Escape click to the closed frame's old compositor hit-test
 surface. Accepted palette closes and validated overlay closes commit synchronously. A narrow
-`slot-activate` message additionally recovers session-row selection for a real primary,
-unmodified click in the empty, placed Threads slot within 250 ms of an observed blocking-overlay
+`slot-activate` message additionally recovers session-row selection for a trusted exclusive primary-mouse press
+in the empty, placed Threads slot within 250 ms of an observed blocking-overlay
 close. Both sides require fused mode and bounded coordinates; the shell accepts one connected,
 registered row from its current library only. This channel never invokes arbitrary DOM controls
 or agent/provider actions. Open overlays, untrusted or modified events, stale windows, different

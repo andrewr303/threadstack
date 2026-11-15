@@ -7,10 +7,10 @@ export function openPaperclipPalette(doc: Document): void {
   doc.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true, cancelable: true }));
 }
 
-type SlotClick = Pick<MouseEvent, "isTrusted" | "button" | "detail" | "defaultPrevented" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target" | "clientX" | "clientY">;
+type SlotPointerDown = Pick<PointerEvent, "type" | "pointerType" | "isPrimary" | "isTrusted" | "button" | "buttons" | "defaultPrevented" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target" | "clientX" | "clientY">;
 
 /** Classifies native slot input, never an instruction to activate arbitrary DOM controls. */
-export function classifyThreadkeeperSlotActivation(event: SlotClick, context: {
+export function classifyThreadkeeperSlotActivation(event: SlotPointerDown, context: {
   slot: ReturnType<typeof currentThreadkeeperSlot>;
   closedSlot: HTMLElement | null;
   placed: boolean;
@@ -20,7 +20,8 @@ export function classifyThreadkeeperSlotActivation(event: SlotClick, context: {
   now: number;
 }): ThreadkeeperSlotActivation | null {
   const { slot, bounds, closedAt, now } = context;
-  if (!event.isTrusted || event.button !== 0 || event.detail <= 0 || event.defaultPrevented
+  if (event.type !== "pointerdown" || event.pointerType !== "mouse" || !event.isPrimary
+    || !event.isTrusted || event.button !== 0 || event.buttons !== 1 || event.defaultPrevented
     || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey
     || context.overlayOpen || !context.placed || closedAt === null || now < closedAt
     || now - closedAt > SLOT_ACTIVATION_WINDOW_MS || slot?.view !== "threads"
@@ -92,8 +93,8 @@ export function connectThreadkeeperFusion(options: {
     },
     /** The shell's `placed` acknowledgement. */
     placed(view: ThreadkeeperSlotView | null) { slots.acknowledge(view); },
-    /** Recover only a real click misrouted to the empty slot during Chromium's close hit-test lag. */
-    activateSlot(event: SlotClick): boolean {
+    /** Recover a primary mouse press before down/up can land in different documents and lose click. */
+    activateSlot(event: SlotPointerDown): boolean {
       if (disposed || host.mode?.() !== "fused") return false;
       const state = freshOverlays(); // may observe the semantic close before its mutation callback
       const slot = currentThreadkeeperSlot();

@@ -66,8 +66,8 @@ export function ThreadkeeperHostBridge() {
     const openView = (event: Event) => {
       if (event instanceof CustomEvent) host.openView(event.detail?.view);
     };
+    const pointerDown = (event: PointerEvent) => { fusion?.activateSlot(event); };
     const click = (event: MouseEvent) => {
-      if (fusion?.activateSlot(event)) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!anchor || anchor.hasAttribute("download")) return;
@@ -84,11 +84,13 @@ export function ThreadkeeperHostBridge() {
     title.observe(document.head, { childList: true, subtree: true, characterData: true });
     if (!earlyHostMessages) window.addEventListener("message", message);
     window.addEventListener("paperclip:threadkeeper-open-view", openView);
+    document.addEventListener("pointerdown", pointerDown, true);
     document.addEventListener("click", click, true);
     return () => {
       if (!earlyHostMessages) window.removeEventListener("message", message);
       detachMessages?.();
       window.removeEventListener("paperclip:threadkeeper-open-view", openView);
+      document.removeEventListener("pointerdown", pointerDown, true);
       document.removeEventListener("click", click, true);
       title.disconnect();
       stopLiveObserver();

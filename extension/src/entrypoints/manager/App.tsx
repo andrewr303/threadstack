@@ -1239,8 +1239,9 @@ export function App() {
       // Chromium may deliver the first post-Escape click to the old OOPIF hit-test surface.
       // Recover only an existing session-row selection, never a generic toolbar/DOM action.
       const state = fusionRef.current;
+      const closeAge = Date.now() - fusedOverlayClosedAt.current;
       if (!fused || view !== 'threads' || state.slotView !== 'threads' || state.overlayOpen
-        || Date.now() - fusedOverlayClosedAt.current > SLOT_ACTIVATION_WINDOW_MS) return;
+        || closeAge < 0 || closeAge > SLOT_ACTIVATION_WINDOW_MS) return;
       const frame = paperclipControl.current?.frame();
       const box = frame?.getBoundingClientRect();
       const slot = state.rect;

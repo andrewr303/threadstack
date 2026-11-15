@@ -436,6 +436,9 @@ describe('fused window (real App)', () => {
       await fromPaperclip({ type: 'overlay', open: false, regions: [] });
       await activate(); // Repeated closed reports cannot renew an expired close window.
       expect(next.getAttribute('aria-selected')).toBe('false');
+      clock.mockReturnValue(now - 1);
+      await activate(); // A backward wall-clock adjustment cannot reopen the window either.
+      expect(next.getAttribute('aria-selected')).toBe('false');
     } finally {
       clock.mockRestore();
       if (previous) Object.defineProperty(document, 'elementFromPoint', previous);

@@ -68,13 +68,13 @@ evidence is required after the change; the earlier spike and rounds are historic
 Rounds 24 and 25 captured a native click arriving in the closed Paperclip slot even after the
 parent's DOM had lowered the frame. This is Chromium's cross-process hit-test propagation delay;
 waiting in the test would conceal it. The accepted-close handlers now commit synchronously, and
-the following additive message preserves an existing session-selection intent:
+a controlled split-gesture probe (round 35) also showed mouse-down in the old frame and mouse-up in the shell, with no click generated in either document. This probe delayed a captured close packet; it does not establish the cause of the earlier intermittent Edge miss. The following additive message preserves an existing session-selection intent:
 
 `{ source: "paperclip-ui", v: 1, type: "slot-activate", view: "threads", x, y }`
 
 Coordinates use the Paperclip frame's viewport. The page requires the verified fused host, a
-trusted primary unmodified native click on its current empty acknowledged Threads slot, a fresh
-scan showing no blocking overlay, and an observed close within 250 ms. The shell repeats its
+trusted exclusive primary-mouse pointer-down on its current empty acknowledged Threads slot, a fresh
+scan showing no blocking overlay, and an observed close within 250 ms. Pointer type must be mouse, the pointer must be primary, and button/buttons must be 0/1. Modifier keys, prevented events, keyboard activation, touch and pen are excluded from this recovery path. The listener runs before outside-pointer dismissal, so a still-open overlay consumes its own dismissing gesture. The shell repeats its
 origin/source, fused-view, recent-close and coordinate checks, then resolves only a connected
 registered session-row button under that point. It selects that existing conversation and
 consumes the close window. It never dispatches an arbitrary click or activates a toolbar,

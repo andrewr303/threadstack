@@ -154,7 +154,7 @@ describe("Threadkeeper fusion wiring", () => {
     fusion.dispose();
   });
 
-  it("hands a trusted primary click on the placed empty Threads slot to session selection only just after a real overlay close", async () => {
+  it("hands a trusted primary mouse press on the placed empty Threads slot to session selection only just after a real overlay close", async () => {
     const { root, host, fusion } = setup();
     const slot = document.createElement("div");
     root.append(slot);
@@ -168,19 +168,21 @@ describe("Threadkeeper fusion wiring", () => {
       fusion.placed("threads");
       dialog.setAttribute("data-state", "closed");
       // Explicit classifier input; this does not manufacture a browser-trusted event.
-      const click = { isTrusted: true, button: 0, detail: 1, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: slot, clientX: 300, clientY: 100 };
+      const click = { type: "pointerdown", pointerType: "mouse", isPrimary: true, isTrusted: true, button: 0, buttons: 1, detail: 0, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: slot, clientX: 300, clientY: 100 };
       expect(fusion.activateSlot?.(click)).toBe(true); // may beat the queued MutationObserver
       expect(host.reportSlotActivation).toHaveBeenCalledExactlyOnceWith({ view: "threads", x: 300, y: 100 });
+      expect(host.reportOverlay).toHaveBeenLastCalledWith({ open: false, regions: [] });
+      expect(host.reportOverlay.mock.invocationCallOrder.at(-1)!).toBeLessThan(host.reportSlotActivation.mock.invocationCallOrder[0]!);
     } finally { release(); fusion.dispose(); dialog.remove(); }
   });
 
   it("classifies only unmodified trusted slot input within the bounded accepted-close window", () => {
     const element = document.createElement("div");
     document.body.append(element);
-    const event = { isTrusted: true, button: 0, detail: 1, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: element, clientX: 300, clientY: 100 };
+    const event = { type: "pointerdown", pointerType: "mouse", isPrimary: true, isTrusted: true, button: 0, buttons: 1, detail: 0, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: element, clientX: 300, clientY: 100 };
     const context = { slot: { view: "threads" as const, element }, closedSlot: element, placed: true, bounds: { x: 240, y: 48, width: 800, height: 600 }, overlayOpen: false, closedAt: 1000, now: 1250 };
     expect(classifyThreadkeeperSlotActivation(event, context)).toEqual({ view: "threads", x: 300, y: 100 });
-    for (const patch of [{ isTrusted: false }, { button: 1 }, { detail: 0 }, { defaultPrevented: true }, { metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { target: document.body }, { clientX: NaN }, { clientY: Infinity }, { clientX: 239 }, { clientY: 648 }]) {
+    for (const patch of [{ isTrusted: false }, { button: 1 }, { type: "click", detail: 1 }, { type: "pointerup" }, { pointerType: "touch" }, { pointerType: "pen" }, { pointerType: "" }, { isPrimary: false }, { buttons: 0 }, { buttons: 3 }, { defaultPrevented: true }, { metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { target: document.body }, { clientX: NaN }, { clientY: Infinity }, { clientX: 239 }, { clientY: 648 }]) {
       expect(classifyThreadkeeperSlotActivation({ ...event, ...patch }, context)).toBeNull();
     }
     for (const patch of [{ overlayOpen: true }, { placed: false }, { closedAt: null }, { now: 999 }, { now: 1251 }, { closedSlot: null }, { bounds: null }, { slot: null }, { slot: { view: "browse" as const, element } }]) {
@@ -201,7 +203,7 @@ describe("Threadkeeper fusion wiring", () => {
     const slot = document.createElement("div"); root.append(slot);
     const release = registerThreadkeeperSlot("threads", slot);
     const dialog = document.createElement("div"); dialog.setAttribute("role", "dialog"); dialog.setAttribute("data-state", "open"); document.body.append(dialog);
-    const click = { isTrusted: true, button: 0, detail: 1, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: slot, clientX: 300, clientY: 100 };
+    const click = { type: "pointerdown", pointerType: "mouse", isPrimary: true, isTrusted: true, button: 0, buttons: 1, detail: 0, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: slot, clientX: 300, clientY: 100 };
     try {
       fusion.refresh(); fusion.placed("threads");
       expect(fusion.activateSlot(click)).toBe(false);
