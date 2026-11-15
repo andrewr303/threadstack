@@ -680,7 +680,7 @@ test("default chat isolation leaves explicit groups and shared databases unchang
   assert.equal(dryRunJson(["--mode", "serialized"], { PAPERCLIP_TEST_DATABASE_URL: "" }).chatVitestShards, null);
 });
 
-function defaultLauncher({ shared = false, failureIndex = null } = {}) {
+function defaultLauncher({ shared = false, failureIndex = null, args = ["--mode", "general"] } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), "default-chat-launch-"));
   const file = path.join(repoRoot, chatSuitePath);
   const lines = readFileSync(file, "utf8").split("\n")
@@ -720,7 +720,7 @@ function defaultLauncher({ shared = false, failureIndex = null } = {}) {
       }
     `);
     chmodSync(fakePnpm, 0o755);
-    const result = spawnSync(process.execPath, [script, "--mode", "general"], {
+    const result = spawnSync(process.execPath, [script, ...args], {
       cwd: repoRoot, encoding: "utf8", timeout: 30_000,
       env: workflowEnv({ GITHUB_WORKFLOW: "PR", PATH: `${directory}${path.delimiter}${process.env.PATH}`,
         PAPERCLIP_TEST_DATABASE_URL: shared ? "postgresql://shared/test" : "", PAPERCLIP_CI_PROFILE: "false" }),
@@ -731,6 +731,20 @@ function defaultLauncher({ shared = false, failureIndex = null } = {}) {
     rmSync(directory, { recursive: true, force: true });
   }
 }
+
+for (const [label, args] of [
+  ["default", []],
+  ["general", ["--mode", "general"]],
+  ["workspace-b", ["--mode", "general", "--group", "general-workspaces-b"]],
+]) test(`browser-sessions runs exactly once through ${label} dispatch`, { skip: process.platform === "win32" }, () => {
+  const { result, events } = defaultLauncher({ args });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const pluginStarts = events.filter(event => event.edge === "begin"
+    && event.args[event.args.indexOf("--project") + 1] === "@paperclipai/plugin-browser-sessions");
+  assert.equal(pluginStarts.length, 1, "the browser-sessions project must actually run exactly once");
+  assert.deepEqual(pluginStarts[0].args.slice(0, 3), ["exec", "vitest", "run"]);
+  assert.ok(!pluginStarts[0].args.some(arg => arg.startsWith("--shard")), "workspace-b must remain unsharded");
+});
 
 test("default chat isolation executes every partition sequentially before other groups", { skip: process.platform === "win32" }, () => {
   const { result, events, lines } = defaultLauncher();

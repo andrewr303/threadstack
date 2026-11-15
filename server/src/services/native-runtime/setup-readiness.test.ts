@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readlink, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { appendFile, chmod, lstat, mkdir, mkdtemp, readFile, readlink, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { ADAPTER_AUTH_MISSING_CHECK_CODE } from "@paperclipai/shared";
@@ -8,12 +8,69 @@ import * as codexCredentials from "@paperclipai/adapter-codex-local/server";
 const { prepareIsolatedCodexHome } = await import(new URL("../../../../packages/paperclip-runner/src/drivers/runtime-context-materializer.ts", import.meta.url).href);
 const { execute, nativeProbe, selectedRunner, selectedRemoteRunner, sshExecute, sshRunner, nativeArtifacts, remoteLauncher, registerPrp, ingressConnect } = vi.hoisted(() => ({ execute: vi.fn(), nativeProbe: vi.fn(), selectedRunner: vi.fn(), selectedRemoteRunner: vi.fn(), sshExecute: vi.fn(), sshRunner: vi.fn(), nativeArtifacts: vi.fn(), remoteLauncher: vi.fn(), registerPrp: vi.fn(), ingressConnect: vi.fn() }));
 const nativeProbeRuntimeDirectories = vi.hoisted(() => [] as string[]);
+const credentialIo = vi.hoisted(() => ({
+  roots: new Set<string>(),
+  attempts: [] as Array<{ operation: string; path: string; blocked: boolean }>,
+  expectedDenials: 0,
+  registerRoot: async (_directory: string): Promise<void> => {},
+  assertCredentialPath: (_operation: string, _value: unknown): void => {},
+}));
 vi.mock("node:fs/promises", async original => {
   const filesystem = await original<typeof import("node:fs/promises")>();
-  return { ...filesystem, mkdtemp: async (...args: Parameters<typeof filesystem.mkdtemp>) => {
+  const paths = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const sensitive = (filename: string) => /(?:^|[/\\])(?:\.?auth\.json(?:[.-]|$)|config\.toml(?:[.-]|$)|account(?:-store)?\.json(?:[.-]|$))/.test(filename);
+  credentialIo.assertCredentialPath = (operation: string, value: unknown) => {
+    const filename = typeof value === "string" ? value : value instanceof URL ? fileURLToPath(value) : null;
+    if (!filename) throw new Error("setup-readiness requires a credential fixture path");
+    const normalized = paths.resolve(filename);
+    const owned = [...credentialIo.roots].some(root => normalized === root || normalized.startsWith(root + paths.sep));
+    credentialIo.attempts.push({ operation, path: paths.basename(filename), blocked: !owned });
+    if (!owned) throw new Error("setup-readiness credential I/O must stay inside owned test fixtures");
+  };
+  const assertFixture = (operation: string, value: unknown) => {
+    const filename = typeof value === "string" ? value : value instanceof URL ? fileURLToPath(value) : null;
+    // Linux confined opens traverse already-authorized descriptors; the canonical source was
+    // checked by lstat/realpath/stat before the credential reader enters that implementation.
+    if (!filename || !sensitive(filename) || filename.startsWith("/proc/self/fd/")) return;
+    credentialIo.assertCredentialPath(operation, filename);
+  };
+  const guarded = <T extends (...args: never[]) => unknown>(operation: string, target: T): T => new Proxy(target, {
+    apply(fn, receiver, args: unknown[]) {
+      assertFixture(operation, args[0]);
+      if (operation === "rename" || operation === "symlink") assertFixture(operation, args[1]);
+      return Reflect.apply(fn, receiver, args);
+    },
+  });
+  credentialIo.registerRoot = async directory => {
+    credentialIo.roots.add(paths.resolve(directory));
+    credentialIo.roots.add(await filesystem.realpath(directory));
+  };
+  return { ...filesystem,
+    open: guarded("open", filesystem.open), readFile: guarded("readFile", filesystem.readFile),
+    lstat: guarded("lstat", filesystem.lstat), stat: guarded("stat", filesystem.stat),
+    realpath: guarded("realpath", filesystem.realpath), readlink: guarded("readlink", filesystem.readlink),
+    writeFile: guarded("writeFile", filesystem.writeFile), rename: guarded("rename", filesystem.rename),
+    rm: guarded("rm", filesystem.rm), symlink: guarded("symlink", filesystem.symlink),
+    mkdtemp: async (...args: Parameters<typeof filesystem.mkdtemp>) => {
     const directory = await filesystem.mkdtemp(...args);
+    if (typeof directory === "string") await credentialIo.registerRoot(directory);
     if (typeof args[0] === "string" && args[0].endsWith("paperclip-native-setup-") && typeof directory === "string") nativeProbeRuntimeDirectories.push(directory);
     return directory;
+  } };
+});
+vi.mock("../local-ai-credential-file.js", async original => {
+  const credentials = await original<typeof import("../local-ai-credential-file.js")>();
+  return { ...credentials, readLocalAiCredentialFile: async (filename: string) => {
+    credentialIo.assertCredentialPath("readLocalAiCredentialFile", filename);
+    return credentials.readLocalAiCredentialFile(filename);
+  } };
+});
+vi.mock("@paperclipai/adapter-codex-local/server", async original => {
+  const credentials = await original<typeof import("@paperclipai/adapter-codex-local/server")>();
+  return { ...credentials, copyBackCodexAuth: async (input: Parameters<typeof credentials.copyBackCodexAuth>[0]) => {
+    credentialIo.assertCredentialPath("copyBackCodexAuth", input.hostAuthPath);
+    return credentials.copyBackCodexAuth(input);
   } };
 });
 vi.mock("@paperclipai/adapter-utils/execution-target", () => ({ runAdapterExecutionTargetShellCommand: execute }));
@@ -28,9 +85,15 @@ const context = {
   companyId: "company", adapterType: "paperclip_runner", config: { externallySandboxed: false, env: { PAPERCLIP_RUNNER_EXTERNAL_SANDBOX: "false" } },
   executionTarget: { kind: "remote" as const, transport: "sandbox" as const, providerKey: "test", remoteCwd: "/workspace", runner: { execute: vi.fn() } },
 };
+const defaultCodexTestHome = process.env.CODEX_HOME;
 describe("Codex selected native account verification", () => {
   const receipt = (provider: "codex", model: string | null) => ({ provider, effectiveModel: model, providerDriver: "codex_app_server", helloProbePassed: true, cleanupConfirmed: true });
-  beforeEach(() => {
+  beforeEach(async () => {
+    credentialIo.roots.clear(); credentialIo.attempts.splice(0); credentialIo.expectedDenials = 0;
+    // Shared setup always creates this owned synthetic account; never whitelist an arbitrary
+    // inherited provider home. Individual source-precedence cases create their own temp roots.
+    expect(defaultCodexTestHome?.startsWith(join(tmpdir(), "paperclip-vitest-home-"))).toBe(true);
+    await credentialIo.registerRoot(defaultCodexTestHome!);
     execute.mockReset(); nativeProbe.mockReset(); nativeProbeRuntimeDirectories.splice(0);
     sshExecute.mockReset().mockResolvedValue({ exitCode: 0, timedOut: false, stdout: "", stderr: "" });
     sshRunner.mockReset().mockReturnValue({ execute: sshExecute });
@@ -47,9 +110,26 @@ describe("Codex selected native account verification", () => {
     vi.stubEnv("PAPERCLIP_RUNNER_REMOTE_BINARY_PATH", "");
   });
   afterEach(async () => {
+    expect(credentialIo.attempts.filter(attempt => attempt.blocked)).toHaveLength(credentialIo.expectedDenials);
+    const audit = process.env.PAPERCLIP_TEST_CREDENTIAL_IO_AUDIT;
+    if (audit) await appendFile(audit, JSON.stringify({ test: expect.getState().currentTestName, attempts: credentialIo.attempts }) + "\n");
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     for (const root of nativeProbeRuntimeDirectories) await rm(root, { recursive: true, force: true });
+  });
+  it("refuses an unowned credential path before filesystem I/O", async () => {
+    credentialIo.expectedDenials = 1;
+    expect(() => readFile("/paperclip-unowned-credential-canary/auth.json", "utf8")).toThrow("credential I/O must stay inside owned test fixtures");
+    expect(credentialIo.attempts).toEqual([{ operation: "readFile", path: "auth.json", blocked: true }]);
+    expect(nativeProbe).not.toHaveBeenCalled();
+  });
+  it("confines credential readers and copyback before they can read or start a merge", async () => {
+    credentialIo.expectedDenials = 2;
+    const outside = "/paperclip-unowned-credential-canary/opaque-store";
+    await expect(localCredentialFile.readLocalAiCredentialFile(outside)).rejects.toThrow("credential I/O must stay inside owned test fixtures");
+    const readSandboxAuth = vi.fn();
+    await expect(codexCredentials.copyBackCodexAuth({ hostAuthPath: outside, readSandboxAuth, log: async () => {} })).rejects.toThrow("credential I/O must stay inside owned test fixtures");
+    expect(readSandboxAuth).not.toHaveBeenCalled();
   });
   it.each([["codex", "gpt-6.1-sol", "OPENAI_API_KEY"]] as const)("requires the native %s host and only the selected credential", async (provider, model, key) => {
     vi.stubEnv(key, "ambient-account");
@@ -108,18 +188,22 @@ describe("Codex selected native account verification", () => {
     } finally { await rm(home, { recursive: true, force: true }); }
   });
   it.each(["host-home", "host-codex-home", "configured-home", "managed-home"] as const)("reuses the task's authorized local Codex home before isolation (%s)", async mode => {
-    vi.stubEnv("HOME", "/host-home");
-    vi.stubEnv("CODEX_HOME", mode === "host-home" ? "" : "/host-codex");
+    const root = await mkdtemp(join(tmpdir(), "native-source-precedence-"));
+    const hostHome = join(root, "host-home"), hostCodex = join(root, "host-codex"), configuredHome = join(root, "configured-codex"), managedHome = join(root, "managed-codex");
+    try {
+    vi.stubEnv("HOME", hostHome);
+    vi.stubEnv("CODEX_HOME", mode === "host-home" ? "" : hostCodex);
     vi.stubEnv("OPENAI_API_KEY", "ambient-key-is-not-authorized");
     nativeProbe.mockResolvedValue(receipt("codex", "observed-model"));
-    const config = mode === "configured-home" || mode === "managed-home" ? { env: { CODEX_HOME: "/configured-codex" } } : {};
+    const config = mode === "configured-home" || mode === "managed-home" ? { env: { CODEX_HOME: configuredHome } } : {};
     expect((await testNativeRunnerAuthentication({ companyId: "company", adapterType: "paperclip_runner", config,
-      ...(mode === "managed-home" ? { managedAiCredentialHome: "/managed-codex" } : {}) }, "codex", null)).status).toBe("pass");
+      ...(mode === "managed-home" ? { managedAiCredentialHome: managedHome } : {}) }, "codex", null)).status).toBe("pass");
     const input = nativeProbe.mock.calls[0][0];
-    expect(input.transportOptions.sourceCodexHome).toBe({ "host-home": "/host-home/.codex", "host-codex-home": "/host-codex", "configured-home": "/configured-codex", "managed-home": "/managed-codex" }[mode]);
+    expect(input.transportOptions.sourceCodexHome).toBe({ "host-home": join(hostHome, ".codex"), "host-codex-home": hostCodex, "configured-home": configuredHome, "managed-home": managedHome }[mode]);
     expect(input.environment.OPENAI_API_KEY).toBeUndefined();
     expect(input.environment.HOME).toBeUndefined();
-    expect(input.runtimeDirectory).not.toContain("host-home");
+    expect(input.runtimeDirectory).not.toContain(root);
+    } finally { await rm(root, { recursive: true, force: true }); }
   });
   it.each(["same-account", "another-account", "bound-key", "invalid-handoff"] as const)("preserves the server-selected login refresh before local cleanup (%s)", async mode => {
     const home = await realpath(await mkdtemp(join(tmpdir(), "native-local-login-")));

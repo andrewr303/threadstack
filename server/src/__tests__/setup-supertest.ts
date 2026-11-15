@@ -38,11 +38,12 @@ process.once("exit", cleanupPaperclipTestHome);
 const require = createRequire(import.meta.url);
 const SupertestTest = require("supertest/lib/test.js") as SupertestTestConstructor;
 
-if (!process.env.CODEX_HOME) {
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-vitest-codex-home-"));
-  fs.writeFileSync(path.join(codexHome, "auth.json"), '{"OPENAI_API_KEY":"sk-vitest"}\n', { mode: 0o600 });
-  process.env.CODEX_HOME = codexHome;
-}
+// An inherited CODEX_HOME can contain a developer's subscription credentials. Every worker
+// starts from its own synthetic account; tests for another source opt in with vi.stubEnv.
+const { home: codexTestHome, cleanup: cleanupCodexTestHome } = createIsolatedTestHome();
+fs.writeFileSync(path.join(codexTestHome, "auth.json"), '{"OPENAI_API_KEY":"sk-vitest"}\n', { mode: 0o600 });
+process.env.CODEX_HOME = codexTestHome;
+process.once("exit", cleanupCodexTestHome);
 
 // The automatic Tailscale HTTPS default (PAP-17158) probes for a real host
 // broker socket, so leaving it enabled would make every test that starts a
