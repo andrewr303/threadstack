@@ -1,0 +1,2421 @@
+{
+  "completedAt": "2026-11-15T09:36:02.220Z",
+  "browser": {
+    "executablePath": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "version": "157.0.4341.46"
+  },
+  "origin": "http://127.0.0.1:3217",
+  "extensionId": "offhmjmiccalfahcdkdhcddbnealijkm",
+  "build": {
+    "version": "0.5.0",
+    "versionName": "0.5.0 (build 20261115.054541-a44541df70)",
+    "buildId": "20261115.054541-a44541df70",
+    "builtAt": "2026-11-15T05:45:41.421Z"
+  },
+  "middlewareSha256": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+  "middlewareUnchangedDuringRun": true,
+  "manifestRestored": true,
+  "credentialCapturePolicy": "No videos, DOM dumps, request headers or pairing values; snapshots only after transient pairing code is gone.",
+  "cases": [
+    {
+      "id": "AUTH-I1",
+      "name": "Legitimate browser connects to the real local-trusted app",
+      "startedAt": "2026-11-15T09:35:46.438Z",
+      "evidence": [
+        {
+          "path": "assets/AUTH-I1-connected.png",
+          "capturedAt": "2026-11-15T09:35:49.654Z",
+          "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot"
+        }
+      ],
+      "observation": "Real extension Settings Connect reached running status and the actual company sidebar rendered. No provider account or credential was injected.",
+      "status": "pass",
+      "completedAt": "2026-11-15T09:35:49.779Z"
+    },
+    {
+      "id": "AUTH-I2",
+      "name": "Legitimate company task and settings navigation is authorized",
+      "startedAt": "2026-11-15T09:35:49.780Z",
+      "evidence": [
+        {
+          "path": "assets/AUTH-I2-company-tasks.png",
+          "capturedAt": "2026-11-15T09:35:51.513Z",
+          "url": "http://127.0.0.1:3217/THR/issues?view=all",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot"
+        },
+        {
+          "path": "assets/AUTH-I2-browser-settings.png",
+          "capturedAt": "2026-11-15T09:35:53.151Z",
+          "url": "http://127.0.0.1:3217/THR/company/settings/browser-sessions",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot"
+        }
+      ],
+      "observation": "The actual company Tasks list includes the owned THR-1 fixture, and its Browser sessions settings region renders through normal browser ingress.",
+      "status": "pass",
+      "completedAt": "2026-11-15T09:35:53.195Z"
+    },
+    {
+      "id": "AUTH-I3",
+      "name": "Pair and read a shared synthetic session while excluding its private control",
+      "startedAt": "2026-11-15T09:35:53.196Z",
+      "evidence": [
+        {
+          "path": "assets/AUTH-I3-shared-read.png",
+          "capturedAt": "2026-11-15T09:35:59.324Z",
+          "url": "http://127.0.0.1:3217/THR/search?q=authfallback",
+          "viewport": {
+            "width": 1280,
+            "height": 900
+          },
+          "type": "screenshot"
+        }
+      ],
+      "observation": "Real board/extension pairing and explicit sharing succeeded. Company search read the seeded message excerpt and excluded its private control. The disposable pairing was then disconnected. Pairing code and tokens were never captured.",
+      "status": "pass",
+      "completedAt": "2026-11-15T09:36:00.709Z"
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-11-15T09:35:48.141Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.201Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.286Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/browser-sessions/api/actions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.296Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.637Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:48.800Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:48.847Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:48.901Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.923Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.939Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:48.986Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.148Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.213Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.294Z",
+      "kind": "served-asset",
+      "path": "/assets/Dashboard-DnG-qzfc.js",
+      "sha256": "eba38f9851b0260353a559c9191c72c2cf53cfa756721c7240943290f1a998f4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.296Z",
+      "kind": "served-asset",
+      "path": "/assets/MetricCard-BsFvF7YV.js",
+      "sha256": "55cabacaa000ec921f1091b594009ecb2508b088a65777c7abc697ab458215df",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.302Z",
+      "kind": "served-asset",
+      "path": "/assets/ActiveAgentsPanel-vSFNYDX8.js",
+      "sha256": "bba4b59cc13ba5940db7fb05a8e7c6d78457770e9727070efac4281563197e27",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.302Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.302Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.304Z",
+      "kind": "served-asset",
+      "path": "/assets/Dashboard-DnG-qzfc.js",
+      "sha256": "eba38f9851b0260353a559c9191c72c2cf53cfa756721c7240943290f1a998f4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.304Z",
+      "kind": "served-asset",
+      "path": "/assets/MetricCard-BsFvF7YV.js",
+      "sha256": "55cabacaa000ec921f1091b594009ecb2508b088a65777c7abc697ab458215df",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.304Z",
+      "kind": "served-asset",
+      "path": "/assets/ActiveAgentsPanel-vSFNYDX8.js",
+      "sha256": "bba4b59cc13ba5940db7fb05a8e7c6d78457770e9727070efac4281563197e27",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.319Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/sidebar-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.384Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginPage-C-82GLTk.js",
+      "sha256": "e6bfee3fe9cc1b70f558592515bb4bad6056b1ca5a7311c7062ef446d7820f52",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.389Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.389Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginPage-C-82GLTk.js",
+      "sha256": "e6bfee3fe9cc1b70f558592515bb4bad6056b1ca5a7311c7062ef446d7820f52",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.419Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.430Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.447Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.448Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.480Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.481Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.483Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.499Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.552Z",
+      "kind": "served-asset",
+      "path": "/assets/onboarding-state-C5_mIw3o.js",
+      "sha256": "802837310cf2b6713936b8c69cd94cc1573043c2bd7d1a36e3336fd186066a5c",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.556Z",
+      "kind": "served-asset",
+      "path": "/assets/TaskSummaryList-JM2ap5sZ.js",
+      "sha256": "a6bdb3c6a532ed1e1ddcbc79423e79466f054fa8330dbd3b8cfe73e3073cdf04",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.556Z",
+      "kind": "served-asset",
+      "path": "/assets/smoke-lab-matrix-B8rIOvyF.js",
+      "sha256": "75a1b44c9ecbda828b7395e9c70cbe254eedd3887b0a83d38f726ab3a4f0b043",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.563Z",
+      "kind": "served-asset",
+      "path": "/assets/onboarding-state-C5_mIw3o.js",
+      "sha256": "802837310cf2b6713936b8c69cd94cc1573043c2bd7d1a36e3336fd186066a5c",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.578Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.578Z",
+      "kind": "served-asset",
+      "path": "/assets/TaskSummaryList-JM2ap5sZ.js",
+      "sha256": "a6bdb3c6a532ed1e1ddcbc79423e79466f054fa8330dbd3b8cfe73e3073cdf04",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.578Z",
+      "kind": "served-asset",
+      "path": "/assets/smoke-lab-matrix-B8rIOvyF.js",
+      "sha256": "75a1b44c9ecbda828b7395e9c70cbe254eedd3887b0a83d38f726ab3a4f0b043",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.579Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/projects",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.588Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.768Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.907Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.908Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/attention/summary",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:49.969Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:49.981Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.015Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.053Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.231Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.520Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.564Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/sidebar-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.564Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.578Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.595Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:50.765Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.771Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.772Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.772Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.778Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.782Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.793Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.800Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/projects",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.801Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.801Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.819Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.829Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/live-runs",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.835Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/labels",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.836Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.836Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/user-directory",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.845Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:50.934Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.134Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.179Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.196Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.213Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.221Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.221Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.225Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/labels",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.230Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.231Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/projects",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.368Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.370Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/user-directory",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.370Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/live-runs",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.370Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/attention/summary",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.370Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.370Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:51.511Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.641Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.687Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.790Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.794Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.836Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:51.866Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.054Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.255Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.272Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.274Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.275Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.276Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.293Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.298Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.298Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.315Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.315Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.319Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.319Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.351Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.355Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.356Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.373Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.384Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.385Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.385Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.503Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.506Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.523Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/2026-09-14-connectors/image",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.645Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.695Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.723Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:52.771Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/bridge/stream/sessions%3A5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.781Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.782Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.783Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.844Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.847Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.853Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.854Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.859Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.861Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.872Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.877Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.878Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.887Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.898Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.911Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:52.961Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.231Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.234Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.264Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.293Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.450Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.641Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.664Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.665Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.667Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.668Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.675Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.685Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:53.694Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.702Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.711Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.711Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.945Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.961Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.970Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.981Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.994Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:53.996Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.010Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.013Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.038Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.038Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.040Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.133Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:54.135Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.270Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:54.272Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/bridge/stream/sessions%3A5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.272Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.272Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.272Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.304Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.347Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.349Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.350Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.359Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.360Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.364Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.366Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.383Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.384Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.391Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.391Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.464Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.764Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.769Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/actions/disconnect",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:54.874Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.180Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "browser-pairing-route",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.217Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.340Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.342Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.375Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.404Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.562Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.754Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.784Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.786Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.792Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.793Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:55.797Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.818Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.819Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.835Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.841Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.843Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.852Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.854Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.865Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.866Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.876Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.879Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.900Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:55.900Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.005Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:56.006Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.138Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:56.169Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:56.170Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:56.196Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/bridge/stream/sessions%3A5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.196Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.199Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.202Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.260Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.265Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.265Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.275Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.275Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.279Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.284Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.289Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.302Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.304Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.305Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.339Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.340Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.731Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "browser-pairing-route",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:56.748Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.054Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.204Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "browser-pairing-route",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.238Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.240Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/browser-sessions/api/bridge/connect",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.262Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/browser-sessions/api/bridge/inventory",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.283Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:57.577Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:57.579Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:57.611Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:57.640Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:57.811Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.004Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.031Z",
+      "kind": "served-asset",
+      "path": "/assets/Search-mWrup4cm.js",
+      "sha256": "308be2cb10e4effd2d6f3ca79d8ab3b78b7e3347d830b9ff28f1ae0d013172c9",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.032Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.040Z",
+      "kind": "served-asset",
+      "path": "/assets/Search-mWrup4cm.js",
+      "sha256": "308be2cb10e4effd2d6f3ca79d8ab3b78b7e3347d830b9ff28f1ae0d013172c9",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.042Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.043Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.043Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.043Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.047Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/projects",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.047Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.049Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/sidebar-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.226Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.226Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.227Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.236Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.247Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.248Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.275Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.277Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.402Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.402Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/attention/summary",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.560Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:58.560Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/labels",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.560Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.561Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/search",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.581Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.584Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.586Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.589Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/projects",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.589Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.592Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.593Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.599Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.603Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/labels",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.638Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/search",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.834Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/attention/summary",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.916Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/browser-sessions/api/bridge/poll",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:58.962Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/browser-sessions/api/bridge/results",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.053Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.053Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/browser-sessions/api/search",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.396Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.398Z",
+      "kind": "served-asset",
+      "path": "/assets/rolldown-runtime-DhZMWcEn.js",
+      "sha256": "b14e08db0a61a4bef917ae7c78a90a1e0415c16e7055b2ffec585a6439338fe2",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.433Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.463Z",
+      "kind": "served-asset",
+      "path": "/assets/index-CBlFNahG.css",
+      "sha256": "8f3d1c66acaf70adf0e74e9c8e1e3c698946f8342d78c3351ff586d385840e73",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.635Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.834Z",
+      "kind": "served-asset",
+      "path": "/assets/index-DROBaJgb.js",
+      "sha256": "f44547864639b63f5229e99aa464bca53ab2fd54b7e0a5d825e8c8553e3fd27d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.858Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.860Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.862Z",
+      "kind": "served-asset",
+      "path": "/assets/CompanySettingsPluginPage-HEtUJEBC.js",
+      "sha256": "cb9827bfd63304c9929a52ea11e6597e8f458d99e17ed1f50a71ed35c911af1d",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.864Z",
+      "kind": "served-asset",
+      "path": "/assets/PluginSettings-B0XDR_B8.js",
+      "sha256": "a313d6204c44e42be7f1106bb386b3cd2c9183507a04f6980eb1652415d658b4",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.872Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.872Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.873Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.887Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.898Z",
+      "kind": "served-asset",
+      "path": "/assets/collections-DHobUZD7.js",
+      "sha256": "b757d49d25cffb4f57589d45efabb5938f586f817c7d1054abd81465d1089b29",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:35:59.898Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/ui-contributions",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.898Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/instance/settings/experimental",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.902Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/workspace-preferences/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.906Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.910Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/health",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.916Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.920Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.922Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.942Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.942Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.944Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/announcements/current",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:35:59.983Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.054Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:36:00.185Z",
+      "kind": "served-asset",
+      "path": "/assets/issue-detail-BDuHo1f1.js",
+      "sha256": "c17ee5253a1487c145d2a973a136cb71cdf84f397a73596603275bae5592706a",
+      "matchesDisk": true
+    },
+    {
+      "at": "2026-11-15T09:36:00.213Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/agents",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.217Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.241Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.244Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/chats",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.244Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/primary-agent/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.247Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.253Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/cli-auth/me",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.260Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.261Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/issues",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.265Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/secrets",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.267Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/bridge/stream/sessions%3A5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.268Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/config",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.306Z",
+      "kind": "response",
+      "method": "GET",
+      "operation": "/api/companies/5652b79c-bee1-424f-8603-5dcc5d4e8fa1/sidebar-badges",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.440Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/677d82dd-7a31-425c-9a53-c0a7d4f61fc4/data/settings",
+      "status": 200
+    },
+    {
+      "at": "2026-11-15T09:36:00.753Z",
+      "kind": "response",
+      "method": "POST",
+      "operation": "/api/plugins/browser-sessions/api/bridge/poll",
+      "status": 401
+    }
+  ],
+  "counts": {
+    "pass": 3,
+    "fail": 0
+  }
+}

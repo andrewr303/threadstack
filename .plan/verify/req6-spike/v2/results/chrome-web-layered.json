@@ -1,0 +1,128 @@
+{
+  "target": "chrome-web",
+  "variant": "layered",
+  "executablePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "startedAt": "2026-11-14T18:24:37.058Z",
+  "checks": {
+    "l1": {
+      "name": "Steady state: the view above the transparent frame takes clicks, wheel and gesture scrolling; the frame keeps its sidebar",
+      "pass": true,
+      "steps": {
+        "viewClickable": true,
+        "frameSidebarClickable": true,
+        "frameContentCoveredByView": true,
+        "wheelScrollsView": true,
+        "wheelScrollTop": 400,
+        "gestureScrollsView": true,
+        "nestedProviderFrameReceivesInput": true,
+        "viewVisible": true
+      }
+    },
+    "l2": {
+      "name": "Blocking overlay: raising the frame shows the overlay over the still-visible view, moves focus in and back, with no frame lacking both",
+      "pass": true,
+      "note": "opaqueControl is the negative control (an opaque content area must be detected as a violation); its step results are not gated.",
+      "detectorProvenByNegativeControl": true,
+      "normal": {
+        "query": {},
+        "steps": {
+          "frameRaised": true,
+          "dialogVisible": true,
+          "viewVisibleBeneathOverlay": true,
+          "hostActiveIsFrame": true,
+          "dialogReceivedTyping": true,
+          "viewDoesNotScrollUnderModal": true,
+          "frameLowered": true,
+          "focusReturnedToViewEditor": true,
+          "viewEditorTypedAfterClose": true
+        },
+        "flash": {
+          "framesCaptured": 31,
+          "framesWithDialog": 8,
+          "framesWithoutDialog": 23,
+          "violations": 0
+        }
+      },
+      "delayed": {
+        "query": {
+          "restoreDelay": "150"
+        },
+        "steps": {
+          "frameRaised": true,
+          "dialogVisible": true,
+          "viewVisibleBeneathOverlay": true,
+          "hostActiveIsFrame": true,
+          "dialogReceivedTyping": true,
+          "viewDoesNotScrollUnderModal": true,
+          "frameLowered": true,
+          "focusReturnedToViewEditor": true,
+          "viewEditorTypedAfterClose": true
+        },
+        "flash": {
+          "framesCaptured": 33,
+          "framesWithDialog": 8,
+          "framesWithoutDialog": 25,
+          "violations": 0
+        }
+      },
+      "opaqueControl": {
+        "flash": {
+          "framesCaptured": 33,
+          "framesWithDialog": 8,
+          "framesWithoutDialog": 25,
+          "violations": 8
+        },
+        "viewVisibleBeneathOverlay": false
+      }
+    },
+    "l3": {
+      "name": "Notice: visible and clickable through a hole in the view while the rest of the view stays clickable and scrollable",
+      "pass": true,
+      "steps": {
+        "frameNotRaisedForNotice": true,
+        "noticeVisibleThroughHole": true,
+        "viewVisibleAroundNotice": true,
+        "viewClickableWhileNoticeShows": true,
+        "viewScrollsWhileNoticeShows": true,
+        "noticeActionClickable": true,
+        "holeClosedAfterNotice": true
+      }
+    },
+    "l4": {
+      "name": "Input follows a raise or lower within two frames at 60 Hz (33 ms)",
+      "pass": true,
+      "viewTakesClickMsAfterLower": {
+        "0": "1/6",
+        "4": "6/6",
+        "8": "6/6",
+        "16": "6/6",
+        "33": "6/6",
+        "50": "6/6",
+        "100": "6/6"
+      },
+      "frameTakesClickMsAfterRaise": {
+        "0": "6/6",
+        "4": "6/6",
+        "8": "6/6",
+        "16": "6/6",
+        "33": "6/6",
+        "50": "6/6",
+        "100": "6/6"
+      }
+    },
+    "l5": {
+      "name": "Placement within 1 CSS pixel after sidebar and window resize; bad rectangles ignored",
+      "pass": true,
+      "maxEdgeDeltaPx": {
+        "initial": 0,
+        "afterSidebarResize": 0,
+        "afterWindowResize": 0
+      },
+      "badRectanglesIgnored": 3
+    }
+  },
+  "errors": [],
+  "browserVersion": "157.0.8103.51",
+  "finishedAt": "2026-11-14T18:25:33.711Z",
+  "pass": true
+}

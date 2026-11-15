@@ -1,0 +1,19 @@
+{"topLevelPassages":[],"leakedPrivate":true}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Removed session must not survive in nested context payload
+
+true !== false
+
+    at <anonymous> (/private/tmp/threadkeeper-quality-context-probe.mts:13:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.22.1

@@ -1,0 +1,63 @@
+{
+  "head": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "sourceHashes": {
+    "server/src/services/native-runtime/native-safe-replacement.test.ts": "e121a47c697207fc5f0d0004f71984792ecc4fccc95640a592dd0d39bf3ba3f8",
+    "server/src/__tests__/git-workspace-expiration.test.ts": "c31bc151e9985fbef3dd1cafb850e4b66caf25351298071d75ef2e7be6dda3f9"
+  },
+  "sourceUnchanged": true,
+  "unmodifiedNative": {
+    "assertionsPassed": 70,
+    "afterAllTimeoutMs": 30000,
+    "exitCode": 1,
+    "signals": []
+  },
+  "unmodifiedGit": {
+    "assertionsPassed": 96,
+    "afterAllTimeoutMs": 30000,
+    "exitCode": 1,
+    "signals": []
+  },
+  "diagnostic": {
+    "registeredClientCloseMs": 10,
+    "postgresOwnerStopMs": 5008,
+    "ownedDirectoryRemovalMs": 9531,
+    "totalCleanupMs": 14549,
+    "diagnosticFileAssertionsPassed": 70,
+    "diagnosticExitCode": 0,
+    "qualificationBoundary": "runtime-only transformed diagnostic; not substituted for final unmodified quiet recheck"
+  },
+  "interruptedCombined": {
+    "observedAt": "2026-11-15T09:46:21.887317+00:00",
+    "toolExitCode": 143,
+    "finalVitestSummary": false,
+    "wrapperMetadataStatus": "running",
+    "terminationInitiatedByThisWorker": false,
+    "cause": "unknown external SIGTERM; no product or hook conclusion",
+    "ownedProcessSnapshot": "owned-process-snapshot.json"
+  },
+  "state": "final unmodified quiet qualification passed",
+  "noSourceEditsOrTimeoutChanges": true,
+  "quietQualification": {
+    "passed": 166,
+    "failed": 0,
+    "skipped": 0,
+    "files": 2,
+    "exitCode": 0,
+    "durationSeconds": 207.29,
+    "sourceHashes": {
+      "server/src/services/native-runtime/native-safe-replacement.test.ts": "e121a47c697207fc5f0d0004f71984792ecc4fccc95640a592dd0d39bf3ba3f8",
+      "server/src/__tests__/git-workspace-expiration.test.ts": "c31bc151e9985fbef3dd1cafb850e4b66caf25351298071d75ef2e7be6dda3f9"
+    },
+    "matchesTaskBaseline": true,
+    "serverConfigUnchanged": true,
+    "rootConfigUnchanged": true,
+    "runtimeInstrumentationMarkers": 0,
+    "receivedSignals": [],
+    "isolatedChildSession": true,
+    "runtime": "Node24.22.2, same credential-denying sandbox and environment scrub, original maxWorkers1/server30s hook budget",
+    "log": "general-hooks-quiet-final-node24.log",
+    "metadata": "general-hooks-quiet-final-node24.json",
+    "ownedCleanupCheck": "quiet-cleanup-check.json",
+    "causeBoundary": "Earlier loaded afterAll failures remain preserved; exact cause unproven. No source fix or timeout expansion."
+  }
+}

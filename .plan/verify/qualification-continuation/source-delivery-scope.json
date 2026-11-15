@@ -1,0 +1,308 @@
+{
+  "capturedAt": "2026-11-15T10:22:21.631431+00:00",
+  "capturePhase": "Prepublication: parent will separately verify final commit/push/PR readback.",
+  "sourceHead": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "localDeliveryHead": "d29108f16304eaed1d21a9366a78484ff6ff046e",
+  "publishedPrHeadAtParentSnapshot": "aba793728056fd80dc0057f5220af0accde9836c",
+  "publishedHeadProvenance": "Parent remote snapshot; no remote query by this documentation task.",
+  "sourceHeadIntentionallyUnmoved": true,
+  "excludedUnrelatedBinaryMetadata": [
+    "extension/.DS_Store",
+    "extension/evidence/workspace/01-embedded-signed-in.png",
+    "extension/evidence/workspace/02-embedded-second-account.png"
+  ],
+  "files": [
+    {
+      "path": "cli/src/__tests__/company-import-export-e2e.test.ts",
+      "sourceWorkingSha256": "05c785be3434c9080bf954e632fbe125480ecca71b0ce8a471d22b814f733c1d",
+      "deliveryWorkingSha256": "05c785be3434c9080bf954e632fbe125480ecca71b0ce8a471d22b814f733c1d",
+      "localCommitSha256": "05c785be3434c9080bf954e632fbe125480ecca71b0ce8a471d22b814f733c1d",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "cli/src/__tests__/doctor.test.ts",
+      "sourceWorkingSha256": "101006573dd5ea239f40730587ec3103baa14e2e1b667255da3246b2d8a9fda9",
+      "deliveryWorkingSha256": "101006573dd5ea239f40730587ec3103baa14e2e1b667255da3246b2d8a9fda9",
+      "localCommitSha256": "101006573dd5ea239f40730587ec3103baa14e2e1b667255da3246b2d8a9fda9",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "extension/scripts/run-paperclip-ingress-e2e.mjs",
+      "sourceWorkingSha256": "85d8cfa8cc35b25f081f67b40a65536b1dcd7fba296dbd82b6ed792ec7bbcf46",
+      "deliveryWorkingSha256": "85d8cfa8cc35b25f081f67b40a65536b1dcd7fba296dbd82b6ed792ec7bbcf46",
+      "localCommitSha256": "85d8cfa8cc35b25f081f67b40a65536b1dcd7fba296dbd82b6ed792ec7bbcf46",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapter-utils/src/github-launcher-environment.test.ts",
+      "sourceWorkingSha256": "e1fba02cc40f239efc7f6117f040d01b58db1fd59a2e1f46cb65b67a489353d3",
+      "deliveryWorkingSha256": "e1fba02cc40f239efc7f6117f040d01b58db1fd59a2e1f46cb65b67a489353d3",
+      "localCommitSha256": "e1fba02cc40f239efc7f6117f040d01b58db1fd59a2e1f46cb65b67a489353d3",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapters/claude-local/src/server/acp.test.ts",
+      "sourceWorkingSha256": "85f2c65c7867a1daa846309b7808b77f5eef752aa02469570de847b860ac97a8",
+      "deliveryWorkingSha256": "85f2c65c7867a1daa846309b7808b77f5eef752aa02469570de847b860ac97a8",
+      "localCommitSha256": "85f2c65c7867a1daa846309b7808b77f5eef752aa02469570de847b860ac97a8",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapters/claude-local/src/server/test.probe.test.ts",
+      "sourceWorkingSha256": "39dabdbd874ee569926f4b0b902b3b4c445e35fd6b25f25808f6bbf8a78a76cf",
+      "deliveryWorkingSha256": "39dabdbd874ee569926f4b0b902b3b4c445e35fd6b25f25808f6bbf8a78a76cf",
+      "localCommitSha256": "39dabdbd874ee569926f4b0b902b3b4c445e35fd6b25f25808f6bbf8a78a76cf",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapters/claude-local/src/server/test.remote.test.ts",
+      "sourceWorkingSha256": "ec159ac9be820e98d8c2713811ab7240873b0e8a8c7a562104a9d30b30a75496",
+      "deliveryWorkingSha256": "ec159ac9be820e98d8c2713811ab7240873b0e8a8c7a562104a9d30b30a75496",
+      "localCommitSha256": "ec159ac9be820e98d8c2713811ab7240873b0e8a8c7a562104a9d30b30a75496",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapters/gemini-local/src/server/acp.test.ts",
+      "sourceWorkingSha256": "2130d042878bd59fec3cce443dd9c40ebc24fea544426e1b155e16770f364953",
+      "deliveryWorkingSha256": "2130d042878bd59fec3cce443dd9c40ebc24fea544426e1b155e16770f364953",
+      "localCommitSha256": "2130d042878bd59fec3cce443dd9c40ebc24fea544426e1b155e16770f364953",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapters/opencode-local/src/server/execute.test.ts",
+      "sourceWorkingSha256": "2e550d2118ca0117a9946f6049089a15706c09f23b02050f032999b393ec4614",
+      "deliveryWorkingSha256": "2e550d2118ca0117a9946f6049089a15706c09f23b02050f032999b393ec4614",
+      "localCommitSha256": "2e550d2118ca0117a9946f6049089a15706c09f23b02050f032999b393ec4614",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "packages/adapters/opencode-local/src/server/execute.timeout.test.ts",
+      "sourceWorkingSha256": "ddb90c2c1250155644a5b2ed5e922812014b9d9a74a5b1fd3ca18122b5977e85",
+      "deliveryWorkingSha256": "ddb90c2c1250155644a5b2ed5e922812014b9d9a74a5b1fd3ca18122b5977e85",
+      "localCommitSha256": "ddb90c2c1250155644a5b2ed5e922812014b9d9a74a5b1fd3ca18122b5977e85",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "scripts/__tests__/run-vitest-stable-shard.test.mjs",
+      "sourceWorkingSha256": "904679f9800d1f52148d227cc494188ce92c4771d6834986a237b9ad0ee2eb5c",
+      "deliveryWorkingSha256": "904679f9800d1f52148d227cc494188ce92c4771d6834986a237b9ad0ee2eb5c",
+      "localCommitSha256": "904679f9800d1f52148d227cc494188ce92c4771d6834986a237b9ad0ee2eb5c",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "scripts/run-vitest-stable.mjs",
+      "sourceWorkingSha256": "44f1745005f8c7296f46fca2f6a53afd743eea31bb85280d0a9b766d9da27d9e",
+      "deliveryWorkingSha256": "44f1745005f8c7296f46fca2f6a53afd743eea31bb85280d0a9b766d9da27d9e",
+      "localCommitSha256": "44f1745005f8c7296f46fca2f6a53afd743eea31bb85280d0a9b766d9da27d9e",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/adapter-cost-failure-paths.test.ts",
+      "sourceWorkingSha256": "182f518d09add5ec191ccd481598fbdfd960b3664823e49e9aca5606a9ff24cb",
+      "deliveryWorkingSha256": "182f518d09add5ec191ccd481598fbdfd960b3664823e49e9aca5606a9ff24cb",
+      "localCommitSha256": "182f518d09add5ec191ccd481598fbdfd960b3664823e49e9aca5606a9ff24cb",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/agent-configuration-save.test.ts",
+      "sourceWorkingSha256": "c06b0f9f54267883cf233ffccf2ee3995d816a8dff50a85556e89208d26137f3",
+      "deliveryWorkingSha256": "c06b0f9f54267883cf233ffccf2ee3995d816a8dff50a85556e89208d26137f3",
+      "localCommitSha256": "c06b0f9f54267883cf233ffccf2ee3995d816a8dff50a85556e89208d26137f3",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/agent-hire-ai-connections.test.ts",
+      "sourceWorkingSha256": "565807c73031179c88fa6778f92ea48bba43feaa66c15f708ac79a7ed1a6a28d",
+      "deliveryWorkingSha256": "565807c73031179c88fa6778f92ea48bba43feaa66c15f708ac79a7ed1a6a28d",
+      "localCommitSha256": "565807c73031179c88fa6778f92ea48bba43feaa66c15f708ac79a7ed1a6a28d",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/ai-connection-router.test.ts",
+      "sourceWorkingSha256": "d186966830cf8c9096049a1badcb627a0da0c72f5872a629fd05b45f2cf886a4",
+      "deliveryWorkingSha256": "d186966830cf8c9096049a1badcb627a0da0c72f5872a629fd05b45f2cf886a4",
+      "localCommitSha256": "d186966830cf8c9096049a1badcb627a0da0c72f5872a629fd05b45f2cf886a4",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/ai-connections.test.ts",
+      "sourceWorkingSha256": "0b7f9ae80027ad1381ca4af9b6f1c5d7c3d45e39e570ecbefd310ef3d715cb99",
+      "deliveryWorkingSha256": "0b7f9ae80027ad1381ca4af9b6f1c5d7c3d45e39e570ecbefd310ef3d715cb99",
+      "localCommitSha256": "0b7f9ae80027ad1381ca4af9b6f1c5d7c3d45e39e570ecbefd310ef3d715cb99",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/ai-legacy-compatibility.test.ts",
+      "sourceWorkingSha256": "51e0298ff806824d631cc6346ccd2e23e687fe53940f3fd3bfff39e834d64067",
+      "deliveryWorkingSha256": "51e0298ff806824d631cc6346ccd2e23e687fe53940f3fd3bfff39e834d64067",
+      "localCommitSha256": "51e0298ff806824d631cc6346ccd2e23e687fe53940f3fd3bfff39e834d64067",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/bundled-plugin-package.test.ts",
+      "sourceWorkingSha256": "23ed9769ed5da83356dcac4b0315791a80cee9f95f43dae99e6ab8cb92e79d65",
+      "deliveryWorkingSha256": "23ed9769ed5da83356dcac4b0315791a80cee9f95f43dae99e6ab8cb92e79d65",
+      "localCommitSha256": "23ed9769ed5da83356dcac4b0315791a80cee9f95f43dae99e6ab8cb92e79d65",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/claude-local-adapter-environment.test.ts",
+      "sourceWorkingSha256": "8831597eddab5bd88b070a2cb379c23038e025a870548be84ec13eb5d42b9141",
+      "deliveryWorkingSha256": "8831597eddab5bd88b070a2cb379c23038e025a870548be84ec13eb5d42b9141",
+      "localCommitSha256": "8831597eddab5bd88b070a2cb379c23038e025a870548be84ec13eb5d42b9141",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/file-resources-git-scan-load.test.ts",
+      "sourceWorkingSha256": "c335137751459da0d4c127d146e6a49596ef7b7d1f30439b8a785fe442df2052",
+      "deliveryWorkingSha256": "c335137751459da0d4c127d146e6a49596ef7b7d1f30439b8a785fe442df2052",
+      "localCommitSha256": "142de69f93e9e565d022add48d1178c275e1ebc758822725a8b5617d89c53649",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": false
+    },
+    {
+      "path": "server/src/__tests__/heartbeat-execution-configuration.test.ts",
+      "sourceWorkingSha256": "260e8ed68f6d5d8a1d82cbf16b41f026a0a22cbd7c020bec0887d7cf5b9ec010",
+      "deliveryWorkingSha256": "260e8ed68f6d5d8a1d82cbf16b41f026a0a22cbd7c020bec0887d7cf5b9ec010",
+      "localCommitSha256": "260e8ed68f6d5d8a1d82cbf16b41f026a0a22cbd7c020bec0887d7cf5b9ec010",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/heartbeat-process-recovery.test.ts",
+      "sourceWorkingSha256": "5a0927b060fd8f8f87281e0220a6602b029b74b7669c78f3e9dc8d573c0e589b",
+      "deliveryWorkingSha256": "5a0927b060fd8f8f87281e0220a6602b029b74b7669c78f3e9dc8d573c0e589b",
+      "localCommitSha256": "5a0927b060fd8f8f87281e0220a6602b029b74b7669c78f3e9dc8d573c0e589b",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/heartbeat-session-preparation.test.ts",
+      "sourceWorkingSha256": "a26e4faf2c46385eccaf816720d180fbb45de51e3cab03b1be0cef8be7ee2384",
+      "deliveryWorkingSha256": "a26e4faf2c46385eccaf816720d180fbb45de51e3cab03b1be0cef8be7ee2384",
+      "localCommitSha256": "a26e4faf2c46385eccaf816720d180fbb45de51e3cab03b1be0cef8be7ee2384",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/issue-confirm-run-stopped-routes.test.ts",
+      "sourceWorkingSha256": "278b896ad2c53e8eba4bb343e7fcb6a3e0a7b0f8ff86f2e33fedc6583dcb8f32",
+      "deliveryWorkingSha256": "278b896ad2c53e8eba4bb343e7fcb6a3e0a7b0f8ff86f2e33fedc6583dcb8f32",
+      "localCommitSha256": "278b896ad2c53e8eba4bb343e7fcb6a3e0a7b0f8ff86f2e33fedc6583dcb8f32",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/local-agent-process-boundary.test.ts",
+      "sourceWorkingSha256": "266a52c98c3972af17846e5aa094889061a2be4bc2b05cba6e4f0029c726e6dd",
+      "deliveryWorkingSha256": "266a52c98c3972af17846e5aa094889061a2be4bc2b05cba6e4f0029c726e6dd",
+      "localCommitSha256": "266a52c98c3972af17846e5aa094889061a2be4bc2b05cba6e4f0029c726e6dd",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/openapi-routes.test.ts",
+      "sourceWorkingSha256": "9271984c45b86c03ccedb5b6ba76fc8c10f1230017ed40793a3e96d5028a3f56",
+      "deliveryWorkingSha256": "9271984c45b86c03ccedb5b6ba76fc8c10f1230017ed40793a3e96d5028a3f56",
+      "localCommitSha256": "9271984c45b86c03ccedb5b6ba76fc8c10f1230017ed40793a3e96d5028a3f56",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/plugin-task-credential-writeback.test.ts",
+      "sourceWorkingSha256": "adc9b8d2dcae0581ddc058111541e636f47d355cd5bbb0d1566071ad2e573184",
+      "deliveryWorkingSha256": "adc9b8d2dcae0581ddc058111541e636f47d355cd5bbb0d1566071ad2e573184",
+      "localCommitSha256": "adc9b8d2dcae0581ddc058111541e636f47d355cd5bbb0d1566071ad2e573184",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/setup-codex-home-isolation.test.ts",
+      "sourceWorkingSha256": "2040333823fc917be71266259262651c9a226922d044e0ed18a9fc5b3d188ebb",
+      "deliveryWorkingSha256": "2040333823fc917be71266259262651c9a226922d044e0ed18a9fc5b3d188ebb",
+      "localCommitSha256": "2040333823fc917be71266259262651c9a226922d044e0ed18a9fc5b3d188ebb",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/setup-supertest.ts",
+      "sourceWorkingSha256": "13361bf71771f0ade4b41f1c025b8604607b614d151d2019cfaa71eb0a15b417",
+      "deliveryWorkingSha256": "13361bf71771f0ade4b41f1c025b8604607b614d151d2019cfaa71eb0a15b417",
+      "localCommitSha256": "13361bf71771f0ade4b41f1c025b8604607b614d151d2019cfaa71eb0a15b417",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/__tests__/workspace-instance-cleanup.test.ts",
+      "sourceWorkingSha256": "836d86a56137810faeb6cf4f386a5d3656c97f3ece1b0417f2221e29930e5763",
+      "deliveryWorkingSha256": "836d86a56137810faeb6cf4f386a5d3656c97f3ece1b0417f2221e29930e5763",
+      "localCommitSha256": "836d86a56137810faeb6cf4f386a5d3656c97f3ece1b0417f2221e29930e5763",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/middleware/local-agent-process-boundary.ts",
+      "sourceWorkingSha256": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+      "deliveryWorkingSha256": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+      "localCommitSha256": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/services/native-runtime/native-ingress-bootstrap-retry.integration.test.ts",
+      "sourceWorkingSha256": "aa11a0b853b8bc418eecfd8d7e03b33067e9ec9ffe35e5fec865c219998c25eb",
+      "deliveryWorkingSha256": "aa11a0b853b8bc418eecfd8d7e03b33067e9ec9ffe35e5fec865c219998c25eb",
+      "localCommitSha256": "aa11a0b853b8bc418eecfd8d7e03b33067e9ec9ffe35e5fec865c219998c25eb",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/services/native-runtime/native-session-resume.test.ts",
+      "sourceWorkingSha256": "a41e97469f095f089ffd3f05797d0f61bbb3bf990c1e7421abae2d497fb97c27",
+      "deliveryWorkingSha256": "a41e97469f095f089ffd3f05797d0f61bbb3bf990c1e7421abae2d497fb97c27",
+      "localCommitSha256": "a41e97469f095f089ffd3f05797d0f61bbb3bf990c1e7421abae2d497fb97c27",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "server/src/services/native-runtime/setup-readiness.test.ts",
+      "sourceWorkingSha256": "80a2ff45d15d0820d13c051f1e3208f875e3d3a29870ef0962224b963375c319",
+      "deliveryWorkingSha256": "80a2ff45d15d0820d13c051f1e3208f875e3d3a29870ef0962224b963375c319",
+      "localCommitSha256": "80a2ff45d15d0820d13c051f1e3208f875e3d3a29870ef0962224b963375c319",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    },
+    {
+      "path": "ui/src/pages/AgentAdvancedTab.test.tsx",
+      "sourceWorkingSha256": "f21471c786f8165a6c0041b4d40fae44929cfece38cbbad256a412f8ea054699",
+      "deliveryWorkingSha256": "f21471c786f8165a6c0041b4d40fae44929cfece38cbbad256a412f8ea054699",
+      "localCommitSha256": "f21471c786f8165a6c0041b4d40fae44929cfece38cbbad256a412f8ea054699",
+      "matchesDeliveryWorking": true,
+      "matchesLocalCommit": true
+    }
+  ],
+  "pendingCommit": [
+    "server/src/__tests__/file-resources-git-scan-load.test.ts"
+  ],
+  "deliveryWorkingMismatches": []
+}

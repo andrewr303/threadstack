@@ -1,0 +1,95 @@
+{
+  "id": "sidebar-ask-layout",
+  "name": "Ask has a full-width multiline question field and an accessible action below it",
+  "acs": [
+    "UI-ask"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:52:04.989Z",
+  "completedAt": "2026-11-15T05:52:05.814Z",
+  "observation": "The Ask question field spans the Sessions sidebar at desktop and narrow widths, keeps four readable lines without a scrollbar for the two-line draft, and places its enabled action below the field.",
+  "detail": {
+    "layouts": [
+      {
+        "width": 1280,
+        "form": {
+          "x": 239,
+          "y": 174,
+          "width": 246,
+          "height": 161.9375,
+          "top": 174,
+          "right": 485,
+          "bottom": 335.9375,
+          "left": 239
+        },
+        "input": {
+          "x": 239,
+          "y": 174,
+          "width": 246,
+          "height": 98,
+          "top": 174,
+          "right": 485,
+          "bottom": 272,
+          "left": 239
+        },
+        "action": {
+          "x": 239,
+          "y": 303.9375,
+          "width": 246,
+          "height": 32,
+          "top": 303.9375,
+          "right": 485,
+          "bottom": 335.9375,
+          "left": 239
+        },
+        "rows": 4,
+        "value": "Research workspace decisions\nKeep the sources local.",
+        "horizontalOverflow": false,
+        "textFits": true,
+        "actionEnabled": true
+      },
+      {
+        "width": 700,
+        "form": {
+          "x": 17,
+          "y": 122,
+          "width": 246,
+          "height": 161.9375,
+          "top": 122,
+          "right": 263,
+          "bottom": 283.9375,
+          "left": 17
+        },
+        "input": {
+          "x": 17,
+          "y": 122,
+          "width": 246,
+          "height": 98,
+          "top": 122,
+          "right": 263,
+          "bottom": 220,
+          "left": 17
+        },
+        "action": {
+          "x": 17,
+          "y": 251.9375,
+          "width": 246,
+          "height": 32,
+          "top": 251.9375,
+          "right": 263,
+          "bottom": 283.9375,
+          "left": 17
+        },
+        "rows": 4,
+        "value": "Research workspace decisions\nKeep the sources local.",
+        "horizontalOverflow": false,
+        "textFits": true,
+        "actionEnabled": true
+      }
+    ]
+  },
+  "evidence": [
+    "sidebar-ask-layout-1280.png",
+    "sidebar-ask-layout-700.png"
+  ]
+}

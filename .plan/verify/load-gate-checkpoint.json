@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "errors": [
+    "REQ-1: readiness must be 4 or 5"
+  ],
+  "task": "REQ-1/TASK-1",
+  "phase": "load",
+  "limitation": "Checks freshness and declared identities, not independent process provenance or truthful evidence."
+}

@@ -1,0 +1,120 @@
+{
+  "recordedAt": "2026-11-14T09:26:24.803520+00:00",
+  "sourceFrozen": true,
+  "sourceFiles": [
+    {
+      "path": ".gitignore",
+      "beforeSha256": "56de2543f346c356272cd88673aade9ddd89277b3b5b27aa78d5af21df09a0e9",
+      "afterSha256": "318d906e99d1b0bf27ad9d63224fe4646a7b9a7d60244c78cad3e06ac00ea4b2",
+      "beforeProvenance": "Git base bytes verified against production-build-before source inventory",
+      "matchesFrozenProductionInventory": true
+    },
+    {
+      "path": "server/src/__tests__/cli-invocation-safety.test.ts",
+      "beforeSha256": "592bbf34f59dd970258fe1779240d34c17fd369817a78b131d5a0b7b072c48b5",
+      "afterSha256": "7cc3f7fbfd45de2ef56ddce92f7f77cbb6f7c1a7bf72df358eec71c818b51045",
+      "beforeProvenance": "Git base bytes verified against production-build-before source inventory",
+      "matchesFrozenProductionInventory": true
+    },
+    {
+      "path": "extension/src/entrypoints/manager/PaperclipConnection.tsx",
+      "beforeSha256": "41ca3e1123dd4b96fdd160ac3c5b64a1387ed45e5cf4ca9c621086d95e75f891",
+      "afterSha256": "982956d519009febb6e627aef3637812634467edf5a3382c35cb392baa36563f",
+      "beforeProvenance": "Observed pre-representation source copy",
+      "matchesFrozenProductionInventory": true
+    },
+    {
+      "path": "extension/tests/unit/paperclip-view.test.tsx",
+      "beforeSha256": "a64849dbe10a46979c0f0630999ee9769ce9e61de772a4275d590d9ab32442b3",
+      "afterSha256": "703d097ead1731efd496502c2225e36d68fa60f47f9ddb8466585e0f79b48184",
+      "beforeProvenance": "Observed pre-representation source copy",
+      "matchesFrozenProductionInventory": true
+    },
+    {
+      "path": ".plan/context/platform.md",
+      "beforeSha256": "6d6eaace59e6f83d45510392f8038109d8a0779f129088b3379b9d27bc443470",
+      "afterSha256": "7181ed042434fa569eb761a16c4e6ccebcb490eeaf1eb6c83339b44d3ffec698",
+      "beforeProvenance": "Reconstructed from single authorized active-reference line replacement; planning file absent from application inventory",
+      "matchesFrozenProductionInventory": null
+    },
+    {
+      "path": ".plan/reqs/REQ-4-paperclip-running-and-connected.md",
+      "beforeSha256": "ee7537fa97236824f440a2ee45b0c8a9cbd2627afbe5feed61568736c7f2a282",
+      "afterSha256": "ca39389ed6fa2759007ccfd8b60a1a1554df0a5c74fdfdcc0b8e5234caae1448",
+      "beforeProvenance": "Observed pre-representation source copy",
+      "matchesFrozenProductionInventory": null
+    }
+  ],
+  "guardImplementationUnchanged": true,
+  "REQ4AcceptanceCriteriaUnchanged": true,
+  "REQ4VisibleWordingUnchanged": true,
+  "guidanceTests": {
+    "passed": 45,
+    "log": "/tmp/threadkeeper-guidance-lifecycle-final-green.log",
+    "currentOffenders": 0
+  },
+  "renderChecks": {
+    "beforeRepresentationPassed": 2,
+    "afterFullViewSuitePassed": 8,
+    "beforeLog": "/tmp/threadkeeper-guidance-render-before.log",
+    "afterLog": "/tmp/threadkeeper-guidance-render-after.log"
+  },
+  "typechecks": {
+    "serverOwningTestTree0": "/tmp/threadkeeper-guidance-lifecycle-types.log",
+    "extension": "/tmp/threadkeeper-guidance-extension-types.log",
+    "exitCodes": [
+      0,
+      0
+    ]
+  },
+  "sealedCaptureFilesChecked": 8,
+  "sealFilesChecked": 3,
+  "allSealedFilesUnchanged": true,
+  "preservationChecks": [
+    {
+      "path": ".acceptances/paperclip-merge/round-10/assets/attempt-2026-11-14T064245185Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-11/assets/attempt-2026-11-14T070849431Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-13/assets/attempt-2026-11-14T072435871Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-14/assets/attempt-2026-11-14T072959983Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-3/assets/attempt-2026-11-14T054302477Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-4/assets/attempt-2026-11-14T055621353Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-6/assets/attempt-2026-11-14T061515925Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-7/assets/attempt-2026-11-14T062547199Z/pc-recovery-offline.dom.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-1/seal.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-13/seal.json",
+      "unchanged": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-14/seal.json",
+      "unchanged": true
+    }
+  ],
+  "patch": "/tmp/threadkeeper-guidance-supplement.patch"
+}

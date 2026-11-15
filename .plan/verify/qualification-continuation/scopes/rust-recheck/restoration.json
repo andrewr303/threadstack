@@ -1,0 +1,433 @@
+{
+  "completedAt": "2026-11-15T09:49:20.447184+00:00",
+  "originalExecutablesVerified": 70,
+  "executablesRestored": 0,
+  "entries": [
+    {
+      "relative": "release/paperclip-runnerd",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libstrum_macros-ca193eb5b458b412.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libcrc_fast-4bdf96e724bf3a05.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libtracing_attributes-81e24e668d593885.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libdisplaydoc-67300d33598738da.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libref_cast_impl-d08df4c382fc5b65.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/paperclip_runnerd-fcdaa1578b2e9313",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libserde_derive-d4a6d3414d2cfe44.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libthiserror_impl-f1453e365a003921.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/librustversion-48556bfa8bcac0c1.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libzerovec_derive-f04bdef495a3220a.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libzerofrom_derive-358ee9fbe39a0821.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libaws_smithy_runtime_api_macros-19d7de011b36180f.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/deps/libyoke_derive-e134318f5151a7b4.dylib",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/icu_normalizer_data-1a73670c0e193e20/build_script_build-1a73670c0e193e20",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/icu_normalizer_data-1a73670c0e193e20/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/quote-73e4d4b15706b085/build_script_build-73e4d4b15706b085",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/quote-73e4d4b15706b085/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/crc32fast-253118bcf17fcd2b/build_script_build-253118bcf17fcd2b",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/crc32fast-253118bcf17fcd2b/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/getrandom-173207ec5b3d2d49/build_script_build-173207ec5b3d2d49",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/getrandom-173207ec5b3d2d49/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/proc-macro2-a3d2c6c072d59324/build_script_build-a3d2c6c072d59324",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/proc-macro2-a3d2c6c072d59324/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/rustls-38e1c563cbaa5ece/build_script_build-38e1c563cbaa5ece",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/rustls-38e1c563cbaa5ece/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/serde_core-9d7376f1ac5a1994/build_script_build-9d7376f1ac5a1994",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/serde_core-9d7376f1ac5a1994/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/icu_properties_data-f57f4e5df8f5bace/build_script_build-f57f4e5df8f5bace",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/icu_properties_data-f57f4e5df8f5bace/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/zmij-7308fab9626bb41d/build_script_build-7308fab9626bb41d",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/zmij-7308fab9626bb41d/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/parking_lot_core-40de9478e84310c1/build_script_build-40de9478e84310c1",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/parking_lot_core-40de9478e84310c1/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/aws-types-7a8caa6d6d73347b/build_script_build-7a8caa6d6d73347b",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/aws-types-7a8caa6d6d73347b/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/getrandom-166c85fa7566a5f5/build_script_build-166c85fa7566a5f5",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/getrandom-166c85fa7566a5f5/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/ring-bc16369826da6554/build_script_build-bc16369826da6554",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/ring-bc16369826da6554/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/ahash-156d1c39f9efd95b/build_script_build-156d1c39f9efd95b",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/ahash-156d1c39f9efd95b/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/libc-29dbd09a6d678128/build_script_build-29dbd09a6d678128",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/libc-29dbd09a6d678128/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/thiserror-6072e1ea461e9980/build_script_build-6072e1ea461e9980",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/thiserror-6072e1ea461e9980/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/generic-array-ff52a00418ea6826/build_script_build-ff52a00418ea6826",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/generic-array-ff52a00418ea6826/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/aws-lc-rs-7045c305ad127c9a/build_script_build-7045c305ad127c9a",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/aws-lc-rs-7045c305ad127c9a/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/zerocopy-35efba2cf86f23a8/build_script_build-35efba2cf86f23a8",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/zerocopy-35efba2cf86f23a8/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/httparse-fd6d4e8fa220b1c7/build_script_build-fd6d4e8fa220b1c7",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/httparse-fd6d4e8fa220b1c7/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/aws-lc-sys-0249e29ff1a83eff/build-script-main",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/aws-lc-sys-0249e29ff1a83eff/build_script_main-0249e29ff1a83eff",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/num-traits-74ce88ff8aa3abbc/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/num-traits-74ce88ff8aa3abbc/build_script_build-74ce88ff8aa3abbc",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/ref-cast-9ac9dfd6121ac6e9/build_script_build-9ac9dfd6121ac6e9",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/ref-cast-9ac9dfd6121ac6e9/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/rustversion-a740666aac1ecc30/build_script_build-a740666aac1ecc30",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/rustversion-a740666aac1ecc30/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/serde_json-b6da70f105635ee0/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/serde_json-b6da70f105635ee0/build_script_build-b6da70f105635ee0",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/serde-e5d2ab9a22da38cf/build_script_build-e5d2ab9a22da38cf",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/serde-e5d2ab9a22da38cf/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/unicode-general-category-89775c12e41f4e00/build_script_build-89775c12e41f4e00",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/unicode-general-category-89775c12e41f4e00/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/rustix-6628e74b08992995/build_script_build-6628e74b08992995",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    },
+    {
+      "relative": "release/build/rustix-6628e74b08992995/build-script-build",
+      "neededRestoration": false,
+      "originalSha256Verified": true,
+      "originalModeVerified": true
+    }
+  ],
+  "originalRunnerdCodesignExitCode": 0,
+  "newIgnoredTestArtifactsRetained": [
+    "release/fake-codex-app-server",
+    "debug/examples/recovery-fixture"
+  ],
+  "repositorySourcesEdited": false
+}

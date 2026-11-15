@@ -1,0 +1,4 @@
+{
+  "server/src/__tests__/heartbeat-session-preparation.test.ts": "48e20fee744b0055701191eb01ecca6e1c64a9210b5296bfc46559975d40bcf2",
+  "server/src/__tests__/adapter-cost-failure-paths.test.ts": "7c2b7e895a15b4241f3ca959eb3e4385b98221a8386155e1110c5b4d4d9dfc40"
+}

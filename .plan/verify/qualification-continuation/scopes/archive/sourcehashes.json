@@ -1,0 +1,19 @@
+{
+  "head": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "sha256": {
+    "server/src/services/remote-workspace-snapshot-archive.test.ts": "1a1bfe8a8ed326c0612f210a38fd38b686e4408ea98f3f7bf77eadd16b761510",
+    "server/src/services/remote-workspace-snapshot-archive.ts": "f361eb151e9c1e6c56e47f62601ebcedfdd09acda15c8a407b13ad2149c0a9a0",
+    "server/src/services/remote-workspace-migration.test.ts": "b992bdc8baabcd26c15dfe3d6cf3414bc983af97e0e59752737a6c63b37a84bd",
+    "server/src/services/remote-workspace-migration.ts": "c8ca5161982cd425fc876b459b5016d8d08f8a626af671b5520f8167d73a08b1",
+    "server/src/services/native-runtime/provider-pack-extraction.ts": "df836001c8cd6b41705a57ec29c02b11c1afc3696faf8a42ac27b78356c3d430",
+    "server/src/services/native-runtime/provider-pack-upload.ts": "243cc3fd0626db806fee961f98a6a37d0023eaaf32709aec8e0f9cfa0009890c",
+    "server/src/services/native-runtime/retained-provider-pack-source.test.ts": "141a920550bcb0e20e960324b515d24d5f5d6954199230240721d4a1fe68d183",
+    "server/src/services/native-runtime/native-skill-library-tools.integration.test.ts": "bb26db8ee1522081ca4abb643e1294dc2b32fc078f0b183f929edecef20d6312",
+    "server/src/services/skill-package-files.ts": "f2445fb6fda5516d93c268e4fc696b815d0ccec69202088c8384e2bdcb44622c",
+    "server/src/services/skill-package-store.ts": "bf73a3b0f15a3c566f6f25e69fb87f5efd8d2bb6a1e9d0dcf59791f6703d39b0",
+    "server/src/__tests__/setup-supertest.ts": "13361bf71771f0ade4b41f1c025b8604607b614d151d2019cfaa71eb0a15b417",
+    "server/vitest.config.ts": "96d0da9fc89e4052476086787b0d39922c8b65973798b8e232b6cc35453c03fa",
+    "vitest.config.ts": "b956c72a196e1dd3e79f9460b32ef32816e520361c2f7b8879cbf9e7d2f4fee2",
+    "pnpm-lock.yaml": "2e78848e16d0b2fb93ea0a01b92285cb083b12329884da758fd61e122d014737"
+  }
+}

@@ -1,0 +1,47 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/lib/threadkeeper-host.test.ts (6 tests | 1 failed) 12ms
+   ❯ Threadkeeper host boundary (6)
+     × reports a lost native connection only after the exact allowed-parent handshake 2ms
+ ❯ src/context/LiveUpdatesProvider.recovery.test.tsx (41 tests | 2 failed) 97ms
+   ❯ LiveUpdatesProvider connection recovery (41)
+     × reports native socket error once for the optional application host 17ms
+     × reports native socket close once for the optional application host 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/context/LiveUpdatesProvider.recovery.test.tsx > LiveUpdatesProvider connection recovery > reports native socket error once for the optional application host
+ FAIL  src/context/LiveUpdatesProvider.recovery.test.tsx > LiveUpdatesProvider connection recovery > reports native socket close once for the optional application host
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/context/LiveUpdatesProvider.recovery.test.tsx:118:20
+    116|       await act(async () => socket.onopen?.());
+    117|       await act(async () => { if (kind === "error") socket.onerror?.()…
+    118|       expect(lost).toHaveBeenCalledTimes(1);
+       |                    ^
+    119|       expect(lost.mock.calls[0][0].detail).toEqual({ companyId: "compa…
+    120|     } finally { window.removeEventListener("paperclip:company-live-dis…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/lib/threadkeeper-host.test.ts > Threadkeeper host boundary > reports a lost native connection only after the exact allowed-parent handshake
+TypeError: host.reportDisconnected is not a function
+ ❯ src/lib/threadkeeper-host.test.ts:63:17
+     61|     const postMessage = vi.fn(); const parent = { postMessage } as unk…
+     62|     const host = createThreadkeeperHost({ extensionIds: [id], parent, …
+     63|     expect(host.reportDisconnected()).toBe(false);
+       |                 ^
+     64|     host.handleMessage({ origin: `chrome-extension://${id}`, source: p…
+     65|     expect(host.reportDisconnected()).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed | 44 passed (47)
+   Start at  22:47:56
+   Duration  1.68s (environment 48%, transform 32%, import 14%, tests 5%)
+

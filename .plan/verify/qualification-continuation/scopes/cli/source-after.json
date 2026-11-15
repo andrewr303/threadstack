@@ -1,0 +1,7 @@
+{
+  "cli/src/__tests__/worktree.test.ts": "eb8c9d66260fd26fec3dfa390fb09e06d0c1eea28b43031602cd15a01f424769",
+  "cli/src/__tests__/company-import-export-e2e.test.ts": "05c785be3434c9080bf954e632fbe125480ecca71b0ce8a471d22b814f733c1d",
+  "cli/src/__tests__/doctor.test.ts": "101006573dd5ea239f40730587ec3103baa14e2e1b667255da3246b2d8a9fda9",
+  "packages/shared/src/worktree-port-registry.ts": "9c6a9cc048b0b683063289611bef810e49342394c08e235bc7fc02e45562c88d",
+  "server/src/middleware/local-agent-process-boundary.ts": "b3f2692b3507105b06496a8721a0a97bf81b07d70483d90a3d4a4c048c639f1d"
+}

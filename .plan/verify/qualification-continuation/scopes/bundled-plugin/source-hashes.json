@@ -1,0 +1,20 @@
+{
+  "before": {
+    "server/src/__tests__/bundled-plugin-package.test.ts": "1548a574ae14f1d807de327fb726dbd786b7ea9d23e4dad3efa8108626970491",
+    "server/src/services/bundled-plugins.ts": "5f08390aef5d9473831220853367dbf0c652f6e9f61bd9fa62114de68183104c",
+    "packages/plugins/plugin-browser-sessions/src/manifest.ts": "28f8dba9504e09a79060a22ee3ba7980899bebde5518426f07b62f10d250cfb2",
+    "packages/plugins/plugin-browser-sessions/src/contracts.ts": "b8f57536cca8a468ab420eddd31702c3905f29b8b6124ed56245fbe90c9f24f4",
+    "packages/plugins/plugin-browser-sessions/package.json": "eac95bfd7479be8f45d632686e6293660274cd6dad6ab4cd7000a6481f3038b9"
+  },
+  "nodeVersion": "v24.22.2",
+  "after": {
+    "server/src/__tests__/bundled-plugin-package.test.ts": "23ed9769ed5da83356dcac4b0315791a80cee9f95f43dae99e6ab8cb92e79d65",
+    "server/src/services/bundled-plugins.ts": "5f08390aef5d9473831220853367dbf0c652f6e9f61bd9fa62114de68183104c",
+    "packages/plugins/plugin-browser-sessions/src/manifest.ts": "28f8dba9504e09a79060a22ee3ba7980899bebde5518426f07b62f10d250cfb2",
+    "packages/plugins/plugin-browser-sessions/src/contracts.ts": "b8f57536cca8a468ab420eddd31702c3905f29b8b6124ed56245fbe90c9f24f4",
+    "packages/plugins/plugin-browser-sessions/package.json": "eac95bfd7479be8f45d632686e6293660274cd6dad6ab4cd7000a6481f3038b9"
+  },
+  "changedFiles": [
+    "server/src/__tests__/bundled-plugin-package.test.ts"
+  ]
+}

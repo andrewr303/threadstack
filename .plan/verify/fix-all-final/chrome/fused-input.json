@@ -1,0 +1,43 @@
+{
+  "id": "fused-input",
+  "name": "Real pointer input: row click, wheel scroll, Paperclip sidebar click",
+  "acs": [],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:52:02.456Z",
+  "completedAt": "2026-11-15T05:52:02.870Z",
+  "observation": "Row click selected \"Fused seed thread 4\" (index 3); wheel scrolled the list 0 -> 700; sidebar click reached Paperclip (/THR/issues).",
+  "detail": {
+    "rowHit": {
+      "tag": "SPAN",
+      "title": null,
+      "cls": "tk-session-index-text",
+      "inThreadsView": true,
+      "inShell": true,
+      "inFrame": false
+    },
+    "selection": {
+      "before": 28,
+      "target": 3,
+      "after": 3,
+      "title": "Fused seed thread 4"
+    },
+    "wheel": {
+      "before": 0,
+      "after": 700
+    },
+    "sidebarClick": {
+      "hit": {
+        "tag": "IFRAME",
+        "title": "Paperclip",
+        "cls": "tk-paperclip-frame",
+        "inThreadsView": false,
+        "inShell": true,
+        "inFrame": true
+      },
+      "framePath": "/THR/issues"
+    }
+  },
+  "evidence": [
+    "fused-input-on-tasks.png"
+  ]
+}

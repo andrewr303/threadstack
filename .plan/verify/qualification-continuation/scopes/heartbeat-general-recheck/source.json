@@ -1,0 +1,10 @@
+{
+  "recordedAt": "2026-11-15T09:40:42.008651+00:00",
+  "head": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "files": {
+    "server/src/__tests__/heartbeat-project-repositories.test.ts": "023a8e7594f2eda3f43065eafba38b14966dcb17d7cc9cb801d275e0a752edcc",
+    "server/src/__tests__/heartbeat-execution-configuration.test.ts": "dc8c30d9a9d6b230027b709711ea84d36b8fa6188642a060bda078eba976947b",
+    "server/src/services/heartbeat/queue.test.ts": "a481e61806d3e65d3843b7f75f42fa41f0e65b1598307e46dba94bacd8fa4208",
+    "server/src/services/heartbeat/run-completion.test.ts": "6fb61c28e724c215c9f79fecdeebc7efe36284d6526e50de1ccac1c0d27690a7"
+  }
+}

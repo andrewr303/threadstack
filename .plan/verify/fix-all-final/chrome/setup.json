@@ -1,0 +1,17 @@
+{
+  "id": "setup",
+  "name": "Connect through Settings, seed synthetic threads, enter the fused window",
+  "acs": [
+    "setup"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:51:43.463Z",
+  "completedAt": "2026-11-15T05:51:44.480Z",
+  "observation": "Connected to http://127.0.0.1:3217 through Settings; 40 synthetic threads seeded.",
+  "detail": {
+    "extensionId": "offhmjmiccalfahcdkdhcddbnealijkm"
+  },
+  "evidence": [
+    "setup.png"
+  ]
+}

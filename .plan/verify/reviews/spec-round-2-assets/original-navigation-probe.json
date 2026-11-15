@@ -1,0 +1,11 @@
+{
+  "command": [
+    "node",
+    "cli/node_modules/tsx/dist/cli.mjs",
+    "/tmp/threadkeeper-spec-navigation-probe.mts"
+  ],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "/Users/andrew/dev/threadkeeper/paperclip/extension/src/core/embed/session-delivery.ts:52\n    if (!isCurrentSession()) throw new BridgeActionError('denied', 'The loaded page is no longer the requested session.');\n                                   ^\n\nBridgeActionError: The loaded page is no longer the requested session.\n    at checkSession (/Users/andrew/dev/threadkeeper/paperclip/extension/src/core/embed/session-delivery.ts:52:36)\n    at deliverProviderMessage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/core/embed/session-delivery.ts:89:7)\n    at async <anonymous> (/private/tmp/threadkeeper-spec-navigation-probe.mts:9:17) {\n  code: 'denied'\n}\n\nNode.js v24.22.1\n",
+  "recordedAt": "2026-11-14T06:30:07.209386+00:00"
+}

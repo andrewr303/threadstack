@@ -1,0 +1,38 @@
+{
+  "id": "fused-in-place",
+  "name": "Threads view inside the content rectangle; one switch; no reload",
+  "acs": [
+    "AC-3",
+    "AC-7"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:51:53.976Z",
+  "completedAt": "2026-11-15T05:51:54.240Z",
+  "observation": "Threads view lies inside the slot with Paperclip sidebar on top at its entries; one switch group (Paperclip nav) and none in the shell; same view node and same frame timeOrigin after Tasks and back.",
+  "detail": {
+    "switches": {
+      "shellGroups": [],
+      "shellNamed": [],
+      "paperclipNavGroups": 1
+    },
+    "onPaperclipPage": {
+      "path": "/THR/issues",
+      "workbench": {
+        "surface": "page",
+        "view": "threads",
+        "fused": "true"
+      },
+      "threadsViewVisible": true,
+      "nodeStillConnected": true
+    },
+    "roundTrip": {
+      "timeOrigin": 1794721912575.5,
+      "timeOriginAfter": 1794721912575.5,
+      "sameNode": true
+    }
+  },
+  "evidence": [
+    "fused-in-place-threads.png",
+    "fused-in-place-paperclip-page.png"
+  ]
+}

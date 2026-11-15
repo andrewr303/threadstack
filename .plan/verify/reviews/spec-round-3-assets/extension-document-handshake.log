@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/andrew/dev/threadkeeper/paperclip/extension
+
+ ✓ tests/unit/paperclip-view.test.tsx (6 tests) 46ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  00:32:51
+   Duration  699ms (transform 106ms, setup 0ms, collect 175ms, tests 46ms, environment 221ms, prepare 50ms)
+

@@ -1,0 +1,18 @@
+{
+  "movedAt": "2026-11-14T09:43:44.705529+00:00",
+  "reason": "Historical test-name/offender records are verification output, not authored CLI guidance. Move only task-owned unsealed copies into ignored acceptance evidence; preserve every byte and original /tmp files.",
+  "artifacts": [
+    {
+      "from": ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json",
+      "to": ".acceptances/paperclip-merge/supporting-quality/threadkeeper-native-cli-current-classification.json",
+      "sha256": "7cc8d86fd9ec56c526068379d81be0f6c2f498331ac2f8c8d5c2902d1e8bd3b1"
+    },
+    {
+      "from": ".plan/verify/final/artifacts/threadkeeper-native-cli-current-selected.json",
+      "to": ".acceptances/paperclip-merge/supporting-quality/threadkeeper-native-cli-current-selected.json",
+      "sha256": "1e83c745f0526c5a6296b1f3fc53668dd1060ce47b737eb101ef703971ef027d"
+    }
+  ],
+  "parserOrScannerChanged": false,
+  "sealedEvidenceChanged": false
+}

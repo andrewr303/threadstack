@@ -1,0 +1,41 @@
+{
+  "capturedAt": "2026-11-14T07:02:37.388Z",
+  "target": "http://127.0.0.1:3217",
+  "syntheticFixture": true,
+  "noCredentialsRetained": true,
+  "cases": [
+    {
+      "store": "MemoryStore",
+      "case": "expired-id-session-minute",
+      "passed": true
+    },
+    {
+      "store": "MemoryStore",
+      "case": "expired-id-hour-after-501-rows",
+      "passed": true
+    },
+    {
+      "store": "MemoryStore",
+      "case": "late-completion-keeps-admission-order",
+      "passed": true
+    },
+    {
+      "store": "DatabaseStore/PostgreSQL",
+      "case": "expired-id-session-minute",
+      "passed": true
+    },
+    {
+      "store": "DatabaseStore/PostgreSQL",
+      "case": "expired-id-hour-after-501-rows",
+      "passed": true
+    },
+    {
+      "store": "DatabaseStore/PostgreSQL",
+      "case": "late-completion-keeps-admission-order",
+      "passed": true
+    }
+  ],
+  "cleanedUp": true,
+  "stage": "DatabaseStore/PostgreSQL:minute-second",
+  "lastResultError": "rate_limited: Try again in 59 seconds."
+}

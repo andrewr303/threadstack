@@ -1,0 +1,115 @@
+{
+  "completedAt": "2026-11-15T10:07:25.426212+00:00",
+  "beforeHashes": {
+    "server/src/__tests__/file-resources-git-scan-load.test.ts": "142de69f93e9e565d022add48d1178c275e1ebc758822725a8b5617d89c53649"
+  },
+  "finalHashes": {
+    "server/src/__tests__/file-resources-git-scan-load.test.ts": "c335137751459da0d4c127d146e6a49596ef7b7d1f30439b8a785fe442df2052"
+  },
+  "productionChanged": false,
+  "allOriginalExpectationLinesRetained": true,
+  "timeoutsUnchanged": true,
+  "green": {
+    "testsPassed": 4,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "heldConnections": 500,
+    "responses200": 500,
+    "underlyingScans": 2,
+    "singleFlightJoins": 498,
+    "peakActive": 2,
+    "healthP99Ms": 1.99
+  },
+  "typecheckExitCode": 0,
+  "diffCheckExitCode": 0,
+  "runs": [
+    {
+      "name": "git-scan-load-whole-file",
+      "exitCode": 1,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--project",
+        "@paperclipai/server",
+        "server/src/__tests__/file-resources-git-scan-load.test.ts",
+        "--maxWorkers",
+        "1",
+        "--no-file-parallelism"
+      ],
+      "startedAt": "2026-11-15T10:01:40.069980+00:00",
+      "finishedAt": "2026-11-15T10:02:10.595404+00:00",
+      "logSha256": "b273f1ebadd91a1341f659d9f32ba435bce636aa7a1f4fd3b25818bd9eba35f8"
+    },
+    {
+      "name": "git-scan-owned-socket-capacity",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "/tmp/tk-continue/git-scan-load-recheck/socket-probe.cjs"
+      ],
+      "startedAt": "2026-11-15T10:03:35.265506+00:00",
+      "finishedAt": "2026-11-15T10:03:40.331033+00:00",
+      "logSha256": "fb17a1e83c98ffa35643b81aa50060069f1e2094b12257e0a84c537bbf3c8419"
+    },
+    {
+      "name": "git-scan-owned-socket-batch-control",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "/tmp/tk-continue/git-scan-load-recheck/socket-probe-batched.cjs"
+      ],
+      "startedAt": "2026-11-15T10:05:56.537445+00:00",
+      "finishedAt": "2026-11-15T10:06:01.583363+00:00",
+      "logSha256": "a957dece951587114478fe689c2cbcc5d6c98eea05c2e864808c27105108b585"
+    },
+    {
+      "name": "git-scan-owned-agent-limits",
+      "exitCode": 0,
+      "command": [
+        "node",
+        "-e",
+        "const h=require(\"node:http\");console.log(JSON.stringify({node:process.version,maxSockets:String(h.globalAgent.maxSockets),maxTotalSockets:String(h.globalAgent.maxTotalSockets)}))"
+      ],
+      "startedAt": "2026-11-15T10:06:38.282201+00:00",
+      "finishedAt": "2026-11-15T10:06:38.313651+00:00",
+      "logSha256": "e333d73d7d3d035195853d176ff8eccc366be1e9d12b35dd9fdbc7103d8a5bfe"
+    },
+    {
+      "name": "git-scan-load-batched-whole-green",
+      "exitCode": 0,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--project",
+        "@paperclipai/server",
+        "server/src/__tests__/file-resources-git-scan-load.test.ts",
+        "--maxWorkers",
+        "1",
+        "--no-file-parallelism"
+      ],
+      "startedAt": "2026-11-15T10:05:57.594460+00:00",
+      "finishedAt": "2026-11-15T10:06:04.108090+00:00",
+      "logSha256": "882204cc8ea35971d1748b418024d098ab0e834a0bdbc9a01d0f010e56861c40"
+    },
+    {
+      "name": "git-scan-load-test-types",
+      "exitCode": 0,
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--project",
+        "/tmp/tk-continue/git-scan-load-recheck/tsconfig.json",
+        "--pretty",
+        "false"
+      ],
+      "startedAt": "2026-11-15T10:06:11.714862+00:00",
+      "finishedAt": "2026-11-15T10:06:17.756493+00:00",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

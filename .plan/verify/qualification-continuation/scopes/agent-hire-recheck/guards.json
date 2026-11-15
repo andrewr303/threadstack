@@ -1,0 +1,21 @@
+{
+  "testOnlyChanges": true,
+  "productionFilesUnchanged": [
+    "server/src/services/ai-connection-runtime.ts",
+    "server/src/services/ai-connections.ts",
+    "server/src/routes/agents.ts"
+  ],
+  "sameCredentialDenySandbox": "/tmp/tk-continue/runtime/tests.sb",
+  "sandboxSha256": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945",
+  "runtime": "Node24 cleanenv + explicit ps compatibility + isolated child session",
+  "noGlobalHomeOverride": true,
+  "cwdScope": "Only this Vitest worker enters its owned temporary workspace; original cwd restored in finally before directory removal.",
+  "fixtureConfigSeeds": [
+    "workspace/.claude/settings.json = {}",
+    "workspace/.codex/config.toml empty"
+  ],
+  "providerSafety": "Existing adapter environment/execute stubs and fetch stubs retained; account tokens/keys are explicit synthetic fixture strings. No real provider/login.",
+  "typeProgram": "/Users/andrew/dev/threadkeeper/paperclip/server/node_modules/.cache/paperclip-typecheck/tsconfig.test-tree-1.json",
+  "typeProgramSha256": "f8a476764eeded283aab9affc5e458ce8f3d35b98c251ecff27d3a5bb9c438a8",
+  "typeProgramContainsChangedTest": true
+}

@@ -1,0 +1,63 @@
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/server
+
+ ❯ src/__tests__/cli-invocation-safety.test.ts (45 tests | 1 failed) 1839ms
+   ❯ paperclipai CLI invocation safety (45)
+     × allows only exact-allowlist pnpm paperclipai commands on every guidance surface 1426ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/cli-invocation-safety.test.ts > paperclipai CLI invocation safety > allows only exact-allowlist pnpm paperclipai commands on every guidance surface
+AssertionError: Each pnpm paperclipai line must match an exact allowlist entry, else use npx paperclipai (or the direct-exec form for local source):
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:15: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:20: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:25: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:30: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:35: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\n\\nSettings\\nGeneral\\nCapture\\n15 of 41\\nAccounts\\nPaperclip\\nOff\\nAI models\\nO"
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:40: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:45: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:50: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\","
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:55: pnpm paperclipai <command>"
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:60: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.` |"
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:65: pnpm paperclipai service start"
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:70: pnpm paperclipai service start\" in the Paperclip folder, or install the Mac helper to start it automatically.</p></>}"
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-selected.json:11: pnpm paperclipai commands on every guidance surface",
+.plan/verify/final/artifacts/threadkeeper-native-cli-current-selected.json:55: pnpm paperclipai commands on every guidance surface|installs the exact retained pack through the real uploader on an empty host instead of the current image archive|keeps a matching current pack on its existing path without registry or cache reads|preserves historical code hardlinks only to earlier confined regular files|reuses a verified derived cache without registry reads and reconstructs it after an empty-host reset|shares warm-cache verification while a stopped caller leaves another waiter active|rejects a changed cached archive before any remote command or transfer|loads long supporting paths from the returned inventory \\(repository wrapper: false\\)|loads long supporting paths from the returned inventory \\(repository wrapper: true\\)|keeps the producing coordinator claim until the managed failed-turn close joins: normal|keeps the producing coordinator claim until the managed failed-turn close joins: delayed|keeps the producing coordinator claim until the managed failed-turn close joins: instruction_error|keeps the producing coordinator claim until the managed failed-turn close joins: fresh_successor|keeps the producing coordinator claim until the managed failed-turn close joins: wrong_boot|keeps the producing coordinator claim until the managed failed-turn close joins: superseded_owner|keeps the producing coordinator claim until the managed failed-turn close joins: detach_during_close|keeps the producing coordinator claim until the managed failed-turn close joins: detach_during_instruction_error|keeps the producing coordinator claim until the managed failed-turn close joins: detach_during_instruction_error_and_renewal_loss)$": expected [ …(14) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:15: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:20: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:25: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:30: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:35: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\\n\\\\nSettings\\\\nGeneral\\\\nCapture\\\\n15 of 41\\\\nAccounts\\\\nPaperclip\\\\nOff\\\\nAI models\\\\nO\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:40: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:45: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:50: pnpm paperclipai service start\\\\\\\" in the Paperclip folder, or install the Mac helper to start it automatically.\\\",\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:55: pnpm paperclipai <command>\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:60: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.` |\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:65: pnpm paperclipai service start\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-classification.json:70: pnpm paperclipai service start\\\" in the Paperclip folder, or install the Mac helper to start it automatically.</p></>}\"",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-selected.json:11: pnpm paperclipai commands on every guidance surface\",",
++   ".plan/verify/final/artifacts/threadkeeper-native-cli-current-selected.json:55: pnpm paperclipai commands on every guidance surface|installs the exact retained pack through the real uploader on an empty host instead of the current image archive|keeps a matching current pack on its existing path without registry or cache reads|preserves historical code hardlinks only to earlier confined regular files|reuses a verified derived cache without registry reads and reconstructs it after an empty-host reset|shares warm-cache verification while a stopped caller leaves another waiter active|rejects a changed cached archive before any remote command or transfer|loads long supporting paths from the returned inventory \\\\(repository wrapper: false\\\\)|loads long supporting paths from the returned inventory \\\\(repository wrapper: true\\\\)|keeps the producing coordinator claim until the managed failed-turn close joins: normal|keeps the producing coordinator claim until the managed failed-turn close joins: delayed|keeps the producing coordinator claim until the managed failed-turn close joins: instruction_error|keeps the producing coordinator claim until the managed failed-turn close joins: fresh_successor|keeps the producing coordinator claim until the managed failed-turn close joins: wrong_boot|keeps the producing coordinator claim until the managed failed-turn close joins: superseded_owner|keeps the producing coordinator claim until the managed failed-turn close joins: detach_during_close|keeps the producing coordinator claim until the managed failed-turn close joins: detach_during_instruction_error|keeps the producing coordinator claim until the managed failed-turn close joins: detach_during_instruction_error_and_renewal_loss)$\"",
++ ]
+
+ ❯ src/__tests__/cli-invocation-safety.test.ts:569:7
+    567|       `Each pnpm paperclipai line must match an exact allowlist entry,…
+    568|         `npx paperclipai (or the direct-exec form for local source):\n…
+    569|     ).toEqual([]);
+       |       ^
+    570|   });
+    571|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 44 passed (45)
+   Start at  02:40:31
+   Duration  1.97s (tests 96%, setup 2%, transform 1%)
+

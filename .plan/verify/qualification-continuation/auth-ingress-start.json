@@ -1,0 +1,9 @@
+{
+  "startedAt": "2026-11-15T09:31:39.692565+00:00",
+  "middlewareSha256": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+  "scope": "Server source restart only; UI/extension builds unchanged; original sealed43/44 preserved.",
+  "serverPid": 71394,
+  "processStartedAt": "2026-11-15T09:31:48.274Z",
+  "healthObservedAt": "2026-11-15T09:33:39.818723+00:00",
+  "healthStatus": "ok"
+}

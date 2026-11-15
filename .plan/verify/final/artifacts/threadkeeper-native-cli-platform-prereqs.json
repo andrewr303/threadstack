@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-11-14T09:07:40.335185+00:00",
+  "gtar": null,
+  "tar": "/usr/bin/tar",
+  "tarVersion": "bsdtar 3.5.3 - libarchive 3.7.4 zlib/1.2.12 liblzma/5.4.3 bz2lib/1.0.8 ",
+  "gnuTarAvailable": false,
+  "zstdPresent": true,
+  "sha256sumPresent": true,
+  "tmpPathMax": "1024"
+}

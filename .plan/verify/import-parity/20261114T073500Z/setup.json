@@ -1,0 +1,20 @@
+{
+  "kind": "reproduced-current-import-portability",
+  "recordedAt": "2026-11-14T07:35:00.558938+00:00",
+  "source": "/Users/andrew/dev/threadkeeper",
+  "copyParent": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-import-parity-v1cy8rl3",
+  "cwd": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-import-parity-v1cy8rl3/extension",
+  "evidenceDir": "/Users/andrew/dev/threadkeeper/paperclip/.plan/verify/import-parity/20261114T073500Z",
+  "sourceFilesVerifiedBeforeCopy": 443,
+  "copyFilesVerifiedBeforeChecks": 443,
+  "nodeVersion": "v24.22.1",
+  "reactVersion": "18.3.1",
+  "dependencies": "Symlink to installed fork extension/node_modules; package-lock hash matches approved snapshot; no install performed.",
+  "expectedBuildGitIdentity": "nogit: isolated temporary copy has no Git repository",
+  "before": {
+    "sourceHead": "9078b2b261d2e12b8bc3230090f217b40e7c9b81",
+    "sourceBranch": "main",
+    "liveManifestSha256": "7490fdc8f0ec3993c73ac591f7a884c26c16cf5c57de5834d62e917a32b7745a",
+    "liveManifestMtimeNs": 1794618008409849077
+  }
+}

@@ -1,0 +1,16 @@
+{"first":{"data":{"delivered":true,"at":"2026-11-14T06:47:52.751Z","untrusted":true},"content":"Message delivered."},"second":{"data":{"delivered":true,"at":"2026-11-14T06:47:53.751Z","untrusted":true},"content":"Message delivered."}}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: A fresh send must enforce the per-session minute after reusing an expired client ID
+    at <anonymous> (/private/tmp/threadkeeper-quality-rate-reuse-probe.mts:20:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '',
+  expected: /rate_limited/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.22.1

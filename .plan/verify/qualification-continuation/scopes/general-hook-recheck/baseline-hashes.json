@@ -1,0 +1,4 @@
+{
+  "server/src/services/native-runtime/native-safe-replacement.test.ts": "e121a47c697207fc5f0d0004f71984792ecc4fccc95640a592dd0d39bf3ba3f8",
+  "server/src/__tests__/git-workspace-expiration.test.ts": "c31bc151e9985fbef3dd1cafb850e4b66caf25351298071d75ef2e7be6dda3f9"
+}

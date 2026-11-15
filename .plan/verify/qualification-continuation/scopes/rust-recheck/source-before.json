@@ -1,0 +1,9 @@
+{
+  "server/src/__tests__/dot-runner.test.ts": "c3d69f316ee14509ee0379c1bb724b96b6ecbdc7536928f685bc95c350fd609e",
+  "server/src/services/native-runtime/plugin-runner-probe.test.ts": "8aff74560d5a01f7b18f18e4c7f49f0f0f1f95d8f08287e810d9423883440752",
+  "server/src/services/native-runtime/native-codex-runner.integration.test.ts": "f03b454367bf27d4d697a57fbad10e2df2c8d95d086c78a430e79b03af3c435a",
+  "server/src/services/native-runtime/native-usage-delivery.integration.test.ts": "c7f402f5fd316d760529e67e17b3c7fad1d6144f333f4b07e82ee95062962835",
+  "packages/paperclip-runner/runner/Cargo.lock": "838ba47fc53c69c0bdeac65440152ad4e469b6b0b3d3e184287f30c25375f136",
+  "packages/paperclip-runner/runner/Cargo.toml": "ffc6aa6ad2277b9bd194c2d7b12da0e2478a5c5de3343057c9a592ce07a17dbf",
+  "packages/paperclip-runner/rust-toolchain.toml": "e4c6d27e48d71df0ae66d84f3bc2d5df8cbf5c3cbb3225475a7852d94361a0c5"
+}

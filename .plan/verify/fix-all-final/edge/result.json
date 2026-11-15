@@ -1,0 +1,1549 @@
+{
+  "schemaVersion": 1,
+  "title": "Threadkeeper browser verification round-44: 157.0.4341.46",
+  "requirement": "Verify the remaining fused-window repairs and the requested compact chat/sidebar layout against an isolated real browser.",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "The fused window opens directly on Threads, keeps navigation and layering usable, accepts the first click after the palette closes, and recovers when Paperclip restarts."
+    },
+    {
+      "id": "R2",
+      "text": "Move Summary / Live / Split next to the thread title, fit the thread controls into one row, and give the live chat more space."
+    },
+    {
+      "id": "R3",
+      "text": "Merge thread search, filters, sort, grouping and selection into the existing Sessions sidebar."
+    },
+    {
+      "id": "R4",
+      "text": "Format Ask as a readable multiline question field with its action below in the sidebar."
+    }
+  ],
+  "createdAt": "2026-11-15T05:54:57.337Z",
+  "runtime": {
+    "expected": "browseros-neo",
+    "observed": "other-browser-tool",
+    "name": "Existing Playwright extension runner: /Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "selection": "user",
+    "reason": "The project-owned plan explicitly directs isolated Chrome/Edge extension profiles, and the continued acceptance task preserves both browser surfaces. This runner is not the shared Neo or in-app browser.",
+    "tools": [
+      "Playwright Page.screenshot",
+      "Playwright BrowserContext recordVideo",
+      "node extension/scripts/run-paperclip-fused-e2e.mjs"
+    ]
+  },
+  "context": {
+    "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads",
+    "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+    "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+    "buildVerified": true,
+    "role": "Isolated extension and local-trusted THR test company. Synthetic seeded threads; one locally fulfilled synthetic chat route."
+  },
+  "plan": [
+    {
+      "id": "setup",
+      "title": "Connect through Settings, seed synthetic threads, enter the fused window",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Connect through Settings, seed synthetic threads, enter the fused window",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "fused-direct-entry",
+      "title": "Manager opened at ?view=threads with the server running reaches fused Threads",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Manager opened at ?view=threads with the server running reaches fused Threads",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-palette",
+      "title": "Meta+K from a thread row opens Paperclip palette over the visible view",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Meta+K from a thread row opens Paperclip palette over the visible view",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-mobile-entry",
+      "title": "Cold narrow Threads entry fills the mobile slot and keeps one usable Sessions drawer",
+      "category": "Narrow navigation",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Cold narrow Threads entry fills the mobile slot and keeps one usable Sessions drawer",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "fused-entries",
+      "title": "Paperclip sidebar shows Browse, Threads, Session board",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Paperclip sidebar shows Browse, Threads, Session board",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-in-place",
+      "title": "Threads view inside the content rectangle; one switch; no reload",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Threads view inside the content rectangle; one switch; no reload",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-placement",
+      "title": "View edges follow the slot through resize and sidebar changes",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "View edges follow the slot through resize and sidebar changes",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-layering",
+      "title": "Paperclip's content rectangle goes transparent after the shell sends placed; opaque again on leaving",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Paperclip's content rectangle goes transparent after the shell sends placed; opaque again on leaving",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-input",
+      "title": "Real pointer input: row click, wheel scroll, Paperclip sidebar click",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Real pointer input: row click, wheel scroll, Paperclip sidebar click",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "single-session-sidebar",
+      "title": "One Sessions sidebar owns search, filters, grouping and selection",
+      "category": "Sessions sidebar",
+      "requirements": [
+        "R3"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "One Sessions sidebar owns search, filters, grouping and selection",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "compact-chat-header",
+      "title": "Title and view tabs share a row; controls use one row; chat receives the remaining space",
+      "category": "Chat layout",
+      "requirements": [
+        "R2"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Title and view tabs share a row; controls use one row; chat receives the remaining space",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "sidebar-ask-layout",
+      "title": "Ask has a full-width multiline question field and an accessible action below it",
+      "category": "Sessions sidebar",
+      "requirements": [
+        "R4"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Ask has a full-width multiline question field and an accessible action below it",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "fused-notice",
+      "title": "A real Paperclip toast shows over the view; dismiss works; view stays clickable",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "A real Paperclip toast shows over the view; dismiss works; view stays clickable",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-jank",
+      "title": "Long-task probe: 5 s idle and 20 rapid dialog open/close cycles with Threads fused",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Long-task probe: 5 s idle and 20 rapid dialog open/close cycles with Threads fused",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    },
+    {
+      "id": "fused-fallback",
+      "title": "An ordinary tab at /THR/threads offers Open this in Threadkeeper",
+      "category": "Fused window",
+      "requirements": [
+        "R1"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "An ordinary tab at /THR/threads offers Open this in Threadkeeper",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "fused-offline",
+      "title": "Server stop keeps Threads with the shell rail; restart resumes fused mode",
+      "category": "Recovery and standalone layout",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "verifier": "program",
+      "method": "Use the real extension in a disposable browser profile and the owned loopback Paperclip fixture. Exercise the named outcome through actual browser input; retain screenshots and measured execution data. Synthetic chat content is explicitly labelled.",
+      "expected": "Server stop keeps Threads with the shell rail; restart resumes fused mode",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript",
+        "video"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "setup",
+      "name": "Connect through Settings, seed synthetic threads, enter the fused window",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Connected to http://127.0.0.1:3217 through Settings; 40 synthetic threads seeded.",
+      "evidence": [
+        {
+          "path": "setup.png",
+          "type": "screenshot",
+          "description": "setup",
+          "capturedAt": "2026-11-15T05:54:10.939Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "setup.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:11.041Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-direct-entry",
+      "name": "Manager opened at ?view=threads with the server running reaches fused Threads",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Opened surface=page&view=threads without visiting the Paperclip view; fused Threads in 535 ms (shell within 1 px of slot).",
+      "evidence": [
+        {
+          "path": "fused-direct-entry.png",
+          "type": "screenshot",
+          "description": "fused direct entry",
+          "capturedAt": "2026-11-15T05:54:11.682Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-direct-entry.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:11.715Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:11.041Z to 2026-11-15T05:54:11.715Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-palette",
+      "name": "Meta+K from a thread row opens Paperclip palette over the visible view",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Meta+K from a focused row opened the palette (frame raised, on top, view visible under it by luminance correlation); typing reached it; Escape closed it; a row click right afterwards worked with and without a settle.",
+      "evidence": [
+        {
+          "path": "fused-palette-open.png",
+          "type": "screenshot",
+          "description": "fused palette open",
+          "capturedAt": "2026-11-15T05:54:12.439Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-palette-outside-dismiss.png",
+          "type": "screenshot",
+          "description": "fused palette outside dismiss",
+          "capturedAt": "2026-11-15T05:54:17.904Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-palette.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:17.956Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:11.716Z to 2026-11-15T05:54:17.956Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-mobile-entry",
+      "name": "Cold narrow Threads entry fills the mobile slot and keeps one usable Sessions drawer",
+      "category": "Narrow navigation",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Fresh Threads entries at700px and480px fill a nonzero mobile content slot. The single Sessions drawer searches and opens the matching chat; the main pane remains the selected conversation.",
+      "evidence": [
+        {
+          "path": "fused-mobile-entry-700-drawer.png",
+          "type": "screenshot",
+          "description": "fused mobile entry 700 drawer",
+          "capturedAt": "2026-11-15T05:54:18.435Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 700,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-mobile-entry-700-chat.png",
+          "type": "screenshot",
+          "description": "fused mobile entry 700 chat",
+          "capturedAt": "2026-11-15T05:54:18.765Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 700,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-mobile-entry-480-drawer.png",
+          "type": "screenshot",
+          "description": "fused mobile entry 480 drawer",
+          "capturedAt": "2026-11-15T05:54:19.280Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 480,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-mobile-entry-480-chat.png",
+          "type": "screenshot",
+          "description": "fused mobile entry 480 chat",
+          "capturedAt": "2026-11-15T05:54:19.697Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 480,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-mobile-entry.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:19.869Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-entries",
+      "name": "Paperclip sidebar shows Browse, Threads, Session board",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Sidebar lists Browse (/THR/browse), Threads (/THR/threads), Session board (/THR/session-board); a real click on each reached its path and the matching shell view.",
+      "evidence": [
+        {
+          "path": "fused-entries-browse.png",
+          "type": "screenshot",
+          "description": "fused entries browse",
+          "capturedAt": "2026-11-15T05:54:20.041Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=browse&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fbrowse",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-entries-dashboard.png",
+          "type": "screenshot",
+          "description": "fused entries dashboard",
+          "capturedAt": "2026-11-15T05:54:20.230Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=dashboard&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fsession-board",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-entries-threads.png",
+          "type": "screenshot",
+          "description": "fused entries threads",
+          "capturedAt": "2026-11-15T05:54:20.419Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-entries.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:20.479Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:19.869Z to 2026-11-15T05:54:20.479Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-in-place",
+      "name": "Threads view inside the content rectangle; one switch; no reload",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Threads view lies inside the slot with Paperclip sidebar on top at its entries; one switch group (Paperclip nav) and none in the shell; same view node and same frame timeOrigin after Tasks and back.",
+      "evidence": [
+        {
+          "path": "fused-in-place-threads.png",
+          "type": "screenshot",
+          "description": "fused in place threads",
+          "capturedAt": "2026-11-15T05:54:20.488Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-in-place-paperclip-page.png",
+          "type": "screenshot",
+          "description": "fused in place paperclip page",
+          "capturedAt": "2026-11-15T05:54:20.559Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=paperclip&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fissues%3Fview%3Dall",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-in-place.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:20.806Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:20.479Z to 2026-11-15T05:54:20.806Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-placement",
+      "name": "View edges follow the slot through resize and sidebar changes",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "8 placements measured (viewport resizes, sidebar drag, collapse/expand); max edge delta 0 px.",
+      "evidence": [
+        {
+          "path": "fused-placement-1000x700.png",
+          "type": "screenshot",
+          "description": "fused placement 1000x700",
+          "capturedAt": "2026-11-15T05:54:22.623Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1000,
+              "height": 700
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-placement-collapsed.png",
+          "type": "screenshot",
+          "description": "fused placement collapsed",
+          "capturedAt": "2026-11-15T05:54:27.504Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-placement.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:28.480Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:20.806Z to 2026-11-15T05:54:28.480Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-layering",
+      "name": "Paperclip's content rectangle goes transparent after the shell sends placed; opaque again on leaving",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Attribute: threads on Threads, removed on Tasks, threads again on return, browse on Browse (first set after 1 ms).",
+      "evidence": [
+        {
+          "path": "fused-layering-threads.png",
+          "type": "screenshot",
+          "description": "fused layering threads",
+          "capturedAt": "2026-11-15T05:54:28.489Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-layering-tasks.png",
+          "type": "screenshot",
+          "description": "fused layering tasks",
+          "capturedAt": "2026-11-15T05:54:28.685Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=paperclip&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fissues%3Fview%3Dall",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-layering.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:29.141Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:28.481Z to 2026-11-15T05:54:29.141Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-input",
+      "name": "Real pointer input: row click, wheel scroll, Paperclip sidebar click",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Row click selected \"Fused seed thread 4\" (index 3); wheel scrolled the list 0 -> 700; sidebar click reached Paperclip (/THR/issues).",
+      "evidence": [
+        {
+          "path": "fused-input-on-tasks.png",
+          "type": "screenshot",
+          "description": "fused input on tasks",
+          "capturedAt": "2026-11-15T05:54:29.327Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=paperclip&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fissues%3Fview%3Dall",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-input.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:29.541Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:29.141Z to 2026-11-15T05:54:29.541Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "single-session-sidebar",
+      "name": "One Sessions sidebar owns search, filters, grouping and selection",
+      "category": "Sessions sidebar",
+      "surface": "web",
+      "status": "pass",
+      "observation": "The existing Sessions rail contains the only thread index. Search selected the matching chat, filter/sort/group controls opened there, grouping changed, and Select all remained usable.",
+      "evidence": [
+        {
+          "path": "single-session-sidebar-search.png",
+          "type": "screenshot",
+          "description": "single session sidebar search",
+          "capturedAt": "2026-11-15T05:54:29.594Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "single-session-sidebar-filters.png",
+          "type": "screenshot",
+          "description": "single session sidebar filters",
+          "capturedAt": "2026-11-15T05:54:29.837Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "single-session-sidebar-bulk.png",
+          "type": "screenshot",
+          "description": "single session sidebar bulk",
+          "capturedAt": "2026-11-15T05:54:30.097Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "single-session-sidebar.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:30.190Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "compact-chat-header",
+      "name": "Title and view tabs share a row; controls use one row; chat receives the remaining space",
+      "category": "Chat layout",
+      "surface": "web",
+      "status": "pass",
+      "observation": "At 1600, 1280 and 700px widths, the title shares one row with view tabs and the controls remain on one row. The live synthetic conversation has at least 580px of vertical space in each 900px viewport.",
+      "evidence": [
+        {
+          "path": "compact-chat-header-1600.png",
+          "type": "screenshot",
+          "description": "compact chat header 1600",
+          "capturedAt": "2026-11-15T05:54:30.452Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1600,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "compact-chat-header-1280.png",
+          "type": "screenshot",
+          "description": "compact chat header 1280",
+          "capturedAt": "2026-11-15T05:54:30.669Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "compact-chat-header-700.png",
+          "type": "screenshot",
+          "description": "compact chat header 700",
+          "capturedAt": "2026-11-15T05:54:30.902Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 700,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "compact-chat-header-task-links.png",
+          "type": "screenshot",
+          "description": "compact chat header task links",
+          "capturedAt": "2026-11-15T05:54:31.423Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "compact-chat-header.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:31.558Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sidebar-ask-layout",
+      "name": "Ask has a full-width multiline question field and an accessible action below it",
+      "category": "Sessions sidebar",
+      "surface": "web",
+      "status": "pass",
+      "observation": "The Ask question field spans the Sessions sidebar at desktop and narrow widths, keeps four readable lines without a scrollbar for the two-line draft, and places its enabled action below the field.",
+      "evidence": [
+        {
+          "path": "sidebar-ask-layout-1280.png",
+          "type": "screenshot",
+          "description": "sidebar ask layout 1280",
+          "capturedAt": "2026-11-15T05:54:31.642Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "sidebar-ask-layout-700.png",
+          "type": "screenshot",
+          "description": "sidebar ask layout 700",
+          "capturedAt": "2026-11-15T05:54:32.314Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 700,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "sidebar-ask-layout.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:32.416Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-notice",
+      "name": "A real Paperclip toast shows over the view; dismiss works; view stays clickable",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Toast \"Created THR-23Open THR-23\" appeared (overlap with shell: yes), was on top, view row click selected index 6, dismiss button click removed it.",
+      "evidence": [
+        {
+          "path": "fused-notice-toast.png",
+          "type": "screenshot",
+          "description": "fused notice toast",
+          "capturedAt": "2026-11-15T05:54:33.446Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-notice.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:36.515Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:32.417Z to 2026-11-15T05:54:36.515Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-jank",
+      "name": "Long-task probe: 5 s idle and 20 rapid dialog open/close cycles with Threads fused",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Idle 5 s: frame 0 long tasks (0 ms), shell 0 (0 ms). 20 cycles in 984 ms: frame 0 (0 ms, max 0), shell 0 (0 ms, max 0).",
+      "evidence": [
+        {
+          "path": "fused-jank.png",
+          "type": "screenshot",
+          "description": "fused jank",
+          "capturedAt": "2026-11-15T05:54:43.111Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-jank.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:43.168Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:36.515Z to 2026-11-15T05:54:43.168Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-fallback",
+      "name": "An ordinary tab at /THR/threads offers Open this in Threadkeeper",
+      "category": "Fused window",
+      "surface": "web",
+      "status": "pass",
+      "observation": "The ordinary tab at /THR/threads shows the heading \"Open this in Threadkeeper\" and no slot.",
+      "evidence": [
+        {
+          "path": "fused-fallback.png",
+          "type": "screenshot",
+          "description": "fused fallback",
+          "capturedAt": "2026-11-15T05:54:43.550Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217/THR/threads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-fallback.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:43.741Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fused-offline",
+      "name": "Server stop keeps Threads with the shell rail; restart resumes fused mode",
+      "category": "Recovery and standalone layout",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Stopped the owned server (pid 87061); Threads stayed mounted with the shell rail and switch (Browse/Threads/Dashboard/Paperclip); after restart fused mode resumed on /THR/threads (same view node: true).",
+      "evidence": [
+        {
+          "path": "fused-offline-offline.png",
+          "type": "screenshot",
+          "description": "fused offline offline",
+          "capturedAt": "2026-11-15T05:54:45.016Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-offline-standalone-1280.png",
+          "type": "screenshot",
+          "description": "fused offline standalone 1280",
+          "capturedAt": "2026-11-15T05:54:45.102Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-offline-standalone-ask-1280.png",
+          "type": "screenshot",
+          "description": "fused offline standalone ask 1280",
+          "capturedAt": "2026-11-15T05:54:45.216Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-offline-standalone-700.png",
+          "type": "screenshot",
+          "description": "fused offline standalone 700",
+          "capturedAt": "2026-11-15T05:54:45.469Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 700,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-offline-standalone-ask-700.png",
+          "type": "screenshot",
+          "description": "fused offline standalone ask 700",
+          "capturedAt": "2026-11-15T05:54:45.948Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 700,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-offline-resumed.png",
+          "type": "screenshot",
+          "description": "fused offline resumed",
+          "capturedAt": "2026-11-15T05:54:54.611Z",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright Page.screenshot",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "role": "Disposable local-trusted THR company; synthetic isolated library"
+          }
+        },
+        {
+          "path": "fused-offline.json",
+          "type": "transcript",
+          "description": "Original case execution with real assertions, measured values and observed result.",
+          "capturedAt": "2026-11-15T05:54:54.680Z",
+          "capturedBy": "program",
+          "tool": "node extension/scripts/run-paperclip-fused-e2e.mjs",
+          "inspected": true,
+          "source": {
+            "command": "node scripts/run-paperclip-fused-e2e.mjs",
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)"
+          }
+        },
+        {
+          "path": "assets/page@286c4a3c36e6c784cc1efa81b05c9e10.webm",
+          "type": "video",
+          "description": "Original browser recording. Relevant case wall-time interval: 2026-11-15T05:54:43.741Z to 2026-11-15T05:54:54.680Z. Inspection sampling limits are recorded in report.md.",
+          "capturedAt": "2026-11-15T05:54:09.774777+00:00",
+          "capturedBy": "other-browser-tool",
+          "tool": "Playwright BrowserContext recordVideo",
+          "inspected": true,
+          "source": {
+            "url": "http://127.0.0.1:3217",
+            "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+            "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+            "role": "Disposable test fixture"
+          }
+        }
+      ]
+    }
+  ],
+  "coverageGaps": [],
+  "previousRound": "round-43",
+  "scopeLimitations": [
+    "No real provider account, real model key, native permission prompt, Mac helper/launchd installation, live-library deployment or MV3 suspension is qualified by this isolated run.",
+    "Synthetic provider-shaped route proves layout and interaction only, not provider authentication or sending."
+  ],
+  "inspectionNotes": [
+    "Inspected every original screenshot state through three labelled contact sheets, and opened the full-size standalone1280 and settledTasklinks originals. The compact layout, single index, readable Ask draft, opaque settled dialog and Unicode labels are visible.",
+    "Inspected the original video by decoding samples every2seconds across the entire recording, covering navigation, palette, mobile layout, modal, outage and return. Sparse sampling cannot exclude a one-frame flash; no such absence is claimed. Exact native input/timing comes from the original JSON receipts.",
+    "Every zero-delay attempt recorded row1selected/focused and an actually focused/opaque/raised palette BEFORE Escape. No state wait follows Escape before the native click. The outside-dismiss control retained row1 for350ms.",
+    "The runtime is an isolated Playwright Edge profile selected by the project plan, not the shared Neo browser. One locally fulfilled synthetic provider document qualifies layout, not provider accounts/authentication/sending.",
+    "Native permission consent, real providers/model keys, helper/launchd, live-library deployment and MV3 suspension remain outside this run."
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "startedAt": "2026-11-14T08:00:39.058Z",
+  "status": "passed",
+  "steps": [
+    {
+      "step": "normal-task-checkout",
+      "passed": true
+    },
+    {
+      "step": "actual-tool-catalog",
+      "passed": true,
+      "browserSessionTools": [
+        "browser-sessions:session_get",
+        "browser-sessions:session_link",
+        "browser-sessions:session_read",
+        "browser-sessions:session_send",
+        "browser-sessions:session_start",
+        "browser-sessions:session_unlink",
+        "browser-sessions:sessions_context",
+        "browser-sessions:sessions_list",
+        "browser-sessions:sessions_related",
+        "browser-sessions:sessions_search"
+      ]
+    },
+    {
+      "step": "actual-list",
+      "passed": true,
+      "count": 1,
+      "invocationId": "c35f5408-f37a-4709-b6eb-06cd8cc21b84"
+    },
+    {
+      "step": "actual-local-search",
+      "passed": true,
+      "count": 1,
+      "invocationId": "6f3ce5e4-f2cf-4ffe-bc11-ce7fb51fe54b"
+    },
+    {
+      "step": "actual-session-get",
+      "passed": true,
+      "invocationId": "e1ae75d3-5981-482f-8cf9-eba45ab469d9",
+      "citation": {
+        "threadKey": "claude_code:acct_claude_primary:default:threadkeeper_acceptance_agent-read-final:main",
+        "sourceUrl": "https://claude.ai/code/session_threadkeeper_acceptance",
+        "title": "Acceptance webhook retry session (agent-read-final)"
+      }
+    },
+    {
+      "step": "actual-bounded-session-read",
+      "passed": true,
+      "invocationId": "30bbcca0-3c0a-4c4b-834f-c85194dc282e",
+      "citation": {
+        "threadKey": "claude_code:acct_claude_primary:default:threadkeeper_acceptance_agent-read-final:main",
+        "sourceUrl": "https://claude.ai/code/session_threadkeeper_acceptance",
+        "messageIndex": 0
+      },
+      "excerpt": "Make acceptance webhook retries safe for Stripe delivery.",
+      "untrusted": true
+    }
+  ],
+  "agentId": "7a1332b5-1561-404c-b78a-ae132788bc3d",
+  "companyId": "5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+  "runId": "feff9b3f-c4d3-4909-a647-7a4af8009328",
+  "credentialSource": "normal process-adapter PAPERCLIP_API_KEY environment; values never captured",
+  "issueId": "feea093f-aa2b-47a7-b72d-d2454d9844b5",
+  "gatewayRevoked": true,
+  "finishedAt": "2026-11-14T08:00:42.400Z"
+}

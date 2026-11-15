@@ -1,0 +1,123 @@
+{
+  "id": "fused-notice",
+  "name": "A real Paperclip toast shows over the view; dismiss works; view stays clickable",
+  "acs": [
+    "AC-5"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:52:05.814Z",
+  "completedAt": "2026-11-15T05:52:09.786Z",
+  "observation": "Toast \"Created THR-22Open THR-22\" appeared (overlap with shell: yes), was on top, view row click selected index 6, dismiss button click removed it.",
+  "detail": {
+    "dialogRaised": "true",
+    "toast": {
+      "rect": {
+        "x": 16,
+        "y": 820,
+        "width": 376,
+        "height": 68,
+        "top": 820,
+        "right": 392,
+        "bottom": 888,
+        "left": 16
+      },
+      "dismiss": {
+        "x": 357,
+        "y": 833,
+        "width": 22,
+        "height": 22,
+        "top": 833,
+        "right": 379,
+        "bottom": 855,
+        "left": 357
+      },
+      "bg": "oklab(0.262 -0.0505697 0.00661094 / 0.6)",
+      "text": "Created THR-22Open THR-22",
+      "overlapWithShell": {
+        "x": 230,
+        "y": 820,
+        "width": 162,
+        "height": 68
+      },
+      "overlapPixels": [
+        [
+          12,
+          39,
+          32
+        ],
+        [
+          12,
+          39,
+          32
+        ],
+        [
+          10,
+          37,
+          29
+        ],
+        [
+          10,
+          37,
+          29
+        ],
+        [
+          9,
+          35,
+          28
+        ],
+        [
+          9,
+          35,
+          28
+        ]
+      ],
+      "unobstructedReferencePixels": [
+        [
+          16,
+          43,
+          36
+        ],
+        [
+          19,
+          46,
+          39
+        ]
+      ],
+      "matchingReference": "6/6",
+      "hitsInOverlap": [
+        {
+          "tag": "IFRAME",
+          "title": "Paperclip",
+          "cls": "tk-paperclip-frame",
+          "inThreadsView": false,
+          "inShell": true,
+          "inFrame": true
+        },
+        {
+          "tag": "IFRAME",
+          "title": "Paperclip",
+          "cls": "tk-paperclip-frame",
+          "inThreadsView": false,
+          "inShell": true,
+          "inFrame": true
+        }
+      ],
+      "raisedWhileToast": null
+    },
+    "clickThrough": {
+      "selectedIndex": 6
+    },
+    "dismissHit": {
+      "tag": "IFRAME",
+      "title": "Paperclip",
+      "cls": "tk-paperclip-frame",
+      "inThreadsView": false,
+      "inShell": true,
+      "inFrame": true
+    },
+    "dismissed": true
+  },
+  "evidence": [
+    "fused-notice-toast.png"
+  ]
+}

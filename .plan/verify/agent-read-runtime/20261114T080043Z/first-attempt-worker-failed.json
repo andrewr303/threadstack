@@ -1,0 +1,34 @@
+{
+  "startedAt": "2026-11-14T07:53:52.102Z",
+  "status": "failed",
+  "steps": [
+    {
+      "step": "normal-task-checkout",
+      "passed": true
+    },
+    {
+      "step": "actual-tool-catalog",
+      "passed": true,
+      "browserSessionTools": [
+        "browser-sessions:session_get",
+        "browser-sessions:session_link",
+        "browser-sessions:session_read",
+        "browser-sessions:session_send",
+        "browser-sessions:session_start",
+        "browser-sessions:session_unlink",
+        "browser-sessions:sessions_context",
+        "browser-sessions:sessions_list",
+        "browser-sessions:sessions_related",
+        "browser-sessions:sessions_search"
+      ]
+    }
+  ],
+  "agentId": "c3fb2641-16e7-4887-873f-59582e48b6a4",
+  "companyId": "5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+  "runId": "67737394-1977-45b3-b685-56fbafbd0b76",
+  "credentialSource": "normal process-adapter PAPERCLIP_API_KEY environment; values never captured",
+  "issueId": "23856076-647d-4ea0-88b1-7c54d00b1b72",
+  "error": "sessions_list lost its untrusted-data boundary\n+ actual - expected\n\n+ undefined\n- true\n",
+  "gatewayRevoked": true,
+  "finishedAt": "2026-11-14T07:53:52.291Z"
+}

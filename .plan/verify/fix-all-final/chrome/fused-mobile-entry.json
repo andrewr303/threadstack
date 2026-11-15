@@ -1,0 +1,95 @@
+{
+  "id": "fused-mobile-entry",
+  "name": "Cold narrow Threads entry fills the mobile slot and keeps one usable Sessions drawer",
+  "acs": [
+    "entry",
+    "UI-sidebar",
+    "UI-header"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:51:51.784Z",
+  "completedAt": "2026-11-15T05:51:53.570Z",
+  "observation": "Fresh Threads entries at700px and480px fill a nonzero mobile content slot. The single Sessions drawer searches and opens the matching chat; the main pane remains the selected conversation.",
+  "detail": {
+    "layouts": [
+      {
+        "width": 700,
+        "shell": {
+          "x": 0,
+          "y": 60,
+          "width": 700,
+          "height": 840,
+          "top": 60,
+          "right": 700,
+          "bottom": 900,
+          "left": 0
+        },
+        "slot": {
+          "x": 0,
+          "y": 60,
+          "width": 700,
+          "height": 840,
+          "top": 60,
+          "right": 700,
+          "bottom": 900,
+          "left": 0
+        },
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "width": 700,
+          "height": 900,
+          "top": 0,
+          "right": 700,
+          "bottom": 900,
+          "left": 0
+        },
+        "selectedTitle": "Fused seed thread 29",
+        "sidebarIndexes": 1,
+        "duplicateMainIndexes": 0
+      },
+      {
+        "width": 480,
+        "shell": {
+          "x": 0,
+          "y": 60,
+          "width": 480,
+          "height": 840,
+          "top": 60,
+          "right": 480,
+          "bottom": 900,
+          "left": 0
+        },
+        "slot": {
+          "x": 0,
+          "y": 60,
+          "width": 480,
+          "height": 840,
+          "top": 60,
+          "right": 480,
+          "bottom": 900,
+          "left": 0
+        },
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "width": 480,
+          "height": 900,
+          "top": 0,
+          "right": 480,
+          "bottom": 900,
+          "left": 0
+        },
+        "selectedTitle": "Fused seed thread 29",
+        "sidebarIndexes": 1,
+        "duplicateMainIndexes": 0
+      }
+    ]
+  },
+  "evidence": [
+    "fused-mobile-entry-700-drawer.png",
+    "fused-mobile-entry-700-chat.png",
+    "fused-mobile-entry-480-drawer.png",
+    "fused-mobile-entry-480-chat.png"
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "command": [
+    "npx",
+    "--yes",
+    "pnpm@9.15.4",
+    "build"
+  ],
+  "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+  "startedAt": "2026-11-14T08:53:15.379373+00:00",
+  "environmentKeys": [
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "CARGO_BUILD_JOBS",
+    "PATH",
+    "TK_OUT_DIR",
+    "TK_STABLE_ID"
+  ],
+  "unsetKeys": [
+    "CARGO_TARGET_DIR",
+    "TK_LIVE_DIR"
+  ],
+  "rustRoot": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-rust-h8ylrbst",
+  "log": "/tmp/threadkeeper-production-build.log",
+  "liveManifestBefore": {
+    "mtimeNs": 1794618008409849077,
+    "sha256": "7490fdc8f0ec3993c73ac591f7a884c26c16cf5c57de5834d62e917a32b7745a"
+  },
+  "sourceInventory": "/tmp/threadkeeper-production-build-before.json",
+  "pid": 55004,
+  "exitCode": 0,
+  "finishedAt": "2026-11-14T08:57:10.793419+00:00",
+  "logSha256": "2b1b9d3ca230fbfb5f62009dde81038ec05b0a9fe120132d868dbe936cbfe268",
+  "liveManifestAfter": {
+    "mtimeNs": 1794618008409849077,
+    "sha256": "7490fdc8f0ec3993c73ac591f7a884c26c16cf5c57de5834d62e917a32b7745a"
+  },
+  "sourceDelta": {
+    "changed": [],
+    "removed": [],
+    "added": []
+  },
+  "sourceFilesCompared": 16919,
+  "liveManifestUnchanged": true,
+  "artifacts": [
+    {
+      "path": "ui/dist/index.html",
+      "bytes": 8622,
+      "mtimeNs": 1794646604443302240,
+      "sha256": "84f0b1bd754a8deabd3486e53bde855d726cbba09c4d4c36e4e0a04e4fdc1361"
+    },
+    {
+      "path": "server/dist/index.js",
+      "bytes": 135161,
+      "mtimeNs": 1794646627036573313,
+      "sha256": "bc27edffec9c0e95f7780a53e9daea54f772793655af14bf3814ac6fef87bc7a"
+    },
+    {
+      "path": "server/dist/app.js",
+      "bytes": 68844,
+      "mtimeNs": 1794646626605770774,
+      "sha256": "760f3cd8e31a6ad820d52727fe542e237ceb4dae068f858a72b5a2c05117f816"
+    },
+    {
+      "path": "server/dist/build-info.json",
+      "bytes": 59,
+      "mtimeNs": 1794646630574748566,
+      "sha256": "41aafc44ea88947a54fae0d8f0a7d74afca088eb03b7e3a752e67f7e9e45ceb4"
+    },
+    {
+      "path": "cli/dist/index.js",
+      "bytes": 2748471,
+      "mtimeNs": 1794646630711246481,
+      "sha256": "85392414520887c59a88f1c98ade14282af60261e38737020128e8ee82183fd3"
+    },
+    {
+      "path": "packages/plugins/plugin-browser-sessions/dist/manifest.js",
+      "bytes": 6750,
+      "mtimeNs": 1794646600813899911,
+      "sha256": "9a611f092c9cbb47bbb5248c4373f6334a92af0e9f917ccc28c137f604c94391"
+    },
+    {
+      "path": "packages/plugins/plugin-browser-sessions/dist/worker.js",
+      "bytes": 9413,
+      "mtimeNs": 1794646600812529483,
+      "sha256": "8ed427e6ce3068147353a6e7d35536d7c376743df976644bbb8cae7e7ae2b4f5"
+    },
+    {
+      "path": "packages/plugins/plugin-browser-sessions/dist/ui/index.js",
+      "bytes": 21057,
+      "mtimeNs": 1794646600883226752,
+      "sha256": "5968b46818d505da1c78c621e781ded3ae7b27063352db466294354bfca0a1b4"
+    },
+    {
+      "path": "packages/paperclip-runner/dist/bin/paperclip-runnerd",
+      "bytes": 31101312,
+      "mtimeNs": 1794646596813317064,
+      "sha256": "7634881e8c1da373a24d97fe52f371c3999ebc2535c5ac29c45694eb6b10a133"
+    }
+  ],
+  "runnerCodesignVerification": {
+    "command": [
+      "codesign",
+      "--verify",
+      "--strict",
+      "packages/paperclip-runner/dist/bin/paperclip-runnerd"
+    ],
+    "exitCode": 0
+  },
+  "runnerFileType": "packages/paperclip-runner/dist/bin/paperclip-runnerd: Mach-O 64-bit executable arm64",
+  "completedBuildLines": [
+    "packages/paperclip-eval-kernel build: Done",
+    "packages/kv-demo-mcp-server build: Done",
+    "packages/tailscale-https-broker build: Done",
+    "packages/google-sheets-mcp-server build: Done",
+    "packages/shared build: Done",
+    "packages/teams-catalog build: Done",
+    "packages/mcp-server build: Done",
+    "packages/adapter-utils build: Done",
+    "packages/plugins/sdk build: Done",
+    "packages/db build: Done",
+    "packages/skills-catalog build: Done",
+    "packages/paperclip-runner build: Done",
+    "packages/adapters/cursor-local build: Done",
+    "packages/adapters/cursor-cloud build: Done",
+    "packages/adapters/codex-local build: Done",
+    "packages/adapters/claude-local build: Done",
+    "packages/adapters/grok-local build: Done",
+    "packages/adapters/gemini-local build: Done",
+    "packages/adapters/kimi-local build: Done",
+    "packages/adapters/hermes build: Done",
+    "packages/plugins/create-paperclip-plugin build: Done",
+    "packages/adapters/openclaw-gateway build: Done",
+    "packages/adapters/opencode-local build: Done",
+    "packages/adapters/pi-local build: Done",
+    ".../plugin-authoring-smoke-example build: Done",
+    ".../examples/plugin-hello-world-example build: Done",
+    ".../examples/plugin-file-browser-example build: Done",
+    ".../examples/plugin-kitchen-sink-example build: Done",
+    ".../paperclip-plugin-fake-sandbox build: Done",
+    "packages/plugins/plugin-llm-wiki build: Done",
+    "packages/plugins/plugin-browser-sessions build: Done",
+    "packages/plugins/plugin-workspace-diff build: Done",
+    "packages/adapters/hermes-gateway build: Done",
+    "ui build: Done",
+    "server build: Done",
+    "cli build: Done"
+  ],
+  "serverBuildInfo": {
+    "commit": "79589c00e99453352b0aafe1c8b5582af42284ba"
+  }
+}

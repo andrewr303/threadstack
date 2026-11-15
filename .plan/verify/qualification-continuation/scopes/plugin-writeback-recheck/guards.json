@@ -1,0 +1,14 @@
+{
+  "testOnlyChanged": "server/src/__tests__/plugin-task-credential-writeback.test.ts",
+  "productionHashesUnchanged": true,
+  "noProcessCwdChange": true,
+  "noGlobalHomeOverride": true,
+  "explicitRuntimeConfigCwd": "Owned temporary workspace under existing fixture home",
+  "projectConfigSeed": "Owned workspace/.codex/config.toml empty, mode0600",
+  "policyNegative": "Synthetic model_provider override rejected with ai_connection_incompatible, empty config restored in finally",
+  "providerScope": "Existing subscription refresh stub and fake PluginWorkerManager credential/status/stop/complete API retained. No process/model/provider/login invocation. All credentials are synthetic fixture strings.",
+  "sandboxSha256": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945",
+  "typeConfig": "/Users/andrew/dev/threadkeeper/paperclip/server/node_modules/.cache/paperclip-typecheck/tsconfig.test-tree-0.json",
+  "typeConfigSha256": "12f3b22b3b7f9aa0f05351c300e9858cd57eae1660378ce5cd31bf677ad55143",
+  "typeConfigContainsChangedFile": true
+}

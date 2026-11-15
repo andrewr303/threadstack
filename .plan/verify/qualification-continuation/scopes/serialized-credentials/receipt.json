@@ -1,0 +1,44 @@
+{
+  "head": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "sourceHashes": {
+    "server/src/__tests__/ai-connection-router.test.ts": "d186966830cf8c9096049a1badcb627a0da0c72f5872a629fd05b45f2cf886a4",
+    "server/src/__tests__/heartbeat-process-recovery.test.ts": "5a0927b060fd8f8f87281e0220a6602b029b74b7669c78f3e9dc8d573c0e589b"
+  },
+  "baselineHashes": {
+    "server/src/__tests__/ai-connection-router.test.ts": "3d2a8489eb15c6eeb8fa93c148e8cbe368ff02413ca58eafc43bd97160445bc1",
+    "server/src/__tests__/heartbeat-process-recovery.test.ts": "05362d6cbaf272accc726d7cd42552b07b85fee65529772e95b4d8a7ea5f925b"
+  },
+  "red": {
+    "files": 2,
+    "failed": 4,
+    "passed": 6,
+    "offScopeByFilter": 479,
+    "log": "serialized-credentials-red-with-prerequisite.log"
+  },
+  "green": {
+    "files": 2,
+    "passed": 38,
+    "scope": "complete32-case router suite plus6affectedheartbeatconfiguration variants",
+    "offScopeHeartbeatByFilter": 453,
+    "exitCode": 0,
+    "log": "serialized-credentials-accepted-green.log"
+  },
+  "types": {
+    "exitCode": 0,
+    "log": "serialized-credentials-types-accepted.log",
+    "config": "tsconfig.json"
+  },
+  "guard": {
+    "profile": "/tmp/tk-continue/runtime/tests.sb",
+    "sha256": "f7044e6fb7f2f04c70266b0e7ac2ed5fbd68ad4a10cbe9b4bc1c19dddb3c7945",
+    "wrapper": "/tmp/tk-continue/runtime/run-qualification.py",
+    "wrapperSha256": "8a6309858e165d934ff20205d624e023ad9739415e6498ac5fd4e4449e372c65",
+    "canary": {
+      "blocked": true,
+      "code": "EPERM"
+    },
+    "actualOperatorCredentialsRemainDenied": true
+  },
+  "noGlobalHomeOrProductionPolicyChange": true,
+  "noBuildProviderOrGitMutation": true
+}

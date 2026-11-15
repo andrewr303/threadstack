@@ -1,0 +1,76 @@
+{
+  "head": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "files": {
+    "server/src/__tests__/setup-supertest.ts": "13361bf71771f0ade4b41f1c025b8604607b614d151d2019cfaa71eb0a15b417",
+    "server/src/__tests__/setup-codex-home-isolation.test.ts": "2040333823fc917be71266259262651c9a226922d044e0ed18a9fc5b3d188ebb",
+    "server/src/services/native-runtime/setup-readiness.test.ts": "80a2ff45d15d0820d13c051f1e3208f875e3d3a29870ef0962224b963375c319"
+  },
+  "baseline": {
+    "server/src/services/native-runtime/setup-readiness.test.ts": "243ca4cbab5ef78a3cc87c03dff3801fab78c063986afedbfebd19a34328521e",
+    "server/src/__tests__/setup-supertest.ts": "99d7193927468e98b41255ea9a5e37b1a681f02b259c304f3af1a52304eed2bb"
+  },
+  "sharedSetupRed": {
+    "failed": 2,
+    "exitCode": 1,
+    "log": "shared-setup-red.log"
+  },
+  "sharedSetupGreen": {
+    "passed": 2,
+    "exitCode": 0,
+    "log": "shared-setup-green.log"
+  },
+  "controlledLinkedFixtureRed": {
+    "failed": 21,
+    "passed": 79,
+    "exitCode": 1,
+    "log": "controlled-linked-red.log",
+    "scope": "isolated synthetic linked operator home injection; original production unchanged"
+  },
+  "acceptedGreen": {
+    "passed": 102,
+    "files": 2,
+    "exitCode": 0,
+    "log": "readiness-accepted-green.log"
+  },
+  "acceptedTypecheck": {
+    "exitCode": 0,
+    "log": "typecheck-accepted.log",
+    "config": "tsconfig.json"
+  },
+  "safety": {
+    "auditedReadinessCases": 100,
+    "credentialOperations": 805,
+    "operationCounts": {
+      "readFile": 98,
+      "readLocalAiCredentialFile": 25,
+      "copyBackCodexAuth": 7,
+      "writeFile": 114,
+      "symlink": 94,
+      "lstat": 91,
+      "realpath": 67,
+      "stat": 73,
+      "open": 110,
+      "readlink": 19,
+      "rename": 54,
+      "rm": 53
+    },
+    "expectedGuardSelfTestDenials": 3,
+    "unexpectedDenials": [],
+    "auditContainsOnlyBasenames": true,
+    "executionBoundaries": "nativeProbe, SSH execute/runner, remote artifact/launcher, PRP registration and ingress are mocked; real policy merge uses only guarded synthetic fixture paths"
+  },
+  "historicalComparison": {
+    "historicalFailedTests": 21,
+    "controlledFixtureFailedTests": 21,
+    "exactSameNames": true,
+    "missing": [],
+    "new": []
+  },
+  "runtime": {
+    "node": "v26.13.0",
+    "pnpm": "9.15.4",
+    "vitest": "5.0.3"
+  },
+  "noProductionCredentialChanges": true,
+  "noProviderLoginGenerationBuildOrGitMutation": true
+}

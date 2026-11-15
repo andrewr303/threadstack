@@ -1,0 +1,52 @@
+{
+  "target": "edge-ext",
+  "startedAt": "2026-11-14T18:26:01.177Z",
+  "browserVersion": "157.0.4341.46",
+  "wheelPlaywright": {
+    "scrollTop": 0,
+    "hostWheelEvents": 1,
+    "frameWheelEvents": 0
+  },
+  "wheelRepeated": {
+    "scrollTop": 0,
+    "hostWheelEvents": 5,
+    "frameWheelEvents": 0
+  },
+  "gestureMouse": {
+    "scrollTop": 0,
+    "hostWheelEvents": 21,
+    "frameWheelEvents": 0
+  },
+  "gestureTouch": {
+    "scrollTop": 0
+  },
+  "wheelUnclippedControl": {
+    "scrollTop": 0,
+    "hostWheelEvents": 0,
+    "frameWheelEvents": 1
+  },
+  "keyboardPageDown": {
+    "scrollTop": 704
+  },
+  "clickAfterClipRestoreMs": {
+    "0": "0/6",
+    "4": "6/6",
+    "8": "6/6",
+    "16": "6/6",
+    "24": "6/6",
+    "33": "6/6",
+    "50": "6/6",
+    "75": "6/6",
+    "100": "6/6",
+    "150": "6/6"
+  },
+  "frameTakesClickAfterLiftMs": {
+    "0": "6/6",
+    "8": "6/6",
+    "16": "6/6",
+    "33": "6/6",
+    "50": "6/6",
+    "100": "6/6"
+  },
+  "finishedAt": "2026-11-14T18:26:45.237Z"
+}

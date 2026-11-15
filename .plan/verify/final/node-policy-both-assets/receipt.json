@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-11-14T10:02:31.985174+00:00",
+  "fixtureRoot": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-node-policy-both-assets-8p2l9s7y",
+  "checkerSha256": "ae129fd200fbfe72890f04124973bfe0287a961a4725801049a116864e22aa9b",
+  "cases": [
+    {
+      "case": "both-canonical-vendors-allowed",
+      "expectedExit": 0,
+      "exitCode": 0
+    },
+    {
+      "case": "other-same-name-directory-still-rejected",
+      "expectedExit": 1,
+      "exitCode": 1
+    },
+    {
+      "case": "owned-correct-allowed",
+      "expectedExit": 0,
+      "exitCode": 0
+    },
+    {
+      "case": "owned-wrong-types-rejected",
+      "expectedExit": 1,
+      "exitCode": 1
+    }
+  ],
+  "generatedPaths": [
+    "packages/paperclip-runner/provider-assets",
+    "server/provider-assets"
+  ],
+  "gitignoreLines": [
+    95,
+    96
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "server/src/__tests__/local-agent-process-boundary.test.ts": "2494cf34133db9171a21e859dfb41d9f9d987768165103ee09829d860d58de9b",
+  "server/src/services/native-runtime/native-session-resume.test.ts": "0e095ba8720dce699d4a1a4ddb5b0331ea352cf920c3ba9b3a4f95cdd12e51b3",
+  "server/src/services/native-runtime/native-runner-restart-recovery.integration.test.ts": "ff6d7883f6926a0b662eb05d86228ebddbf27443e0896fae76ccf241996bf721",
+  "server/src/middleware/local-agent-process-boundary.ts": "b3f2692b3507105b06496a8721a0a97bf81b07d70483d90a3d4a4c048c639f1d",
+  "server/src/services/hot-restart.ts": "ce34639157481d3cfba6652e068cf37568d95567066ad182382a1b2ccf2653be",
+  "server/src/services/native-runtime/native-session-executor.ts": "f515bcfa3644c9ce3ae762176c100d6da0ef262e4207c76886b6d3a40fbf844c"
+}

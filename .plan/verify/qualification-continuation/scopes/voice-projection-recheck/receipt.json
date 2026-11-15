@@ -1,0 +1,67 @@
+{
+  "completedAt": "2026-11-15T09:43:55.018971+00:00",
+  "sourceHashes": {
+    "server/src/__tests__/voice-session-store.integration.test.ts": "78e21a9e516f1d2b50c4070202c65326de456532561de1d8fc7716e8a062c1ff",
+    "server/src/__tests__/native-run-projection-work.test.ts": "75190a51d531d3dcf5c2469c77444f8f796a6372581f0317de008397f0768584"
+  },
+  "sourceUnchanged": true,
+  "runtime": "Node24.22.2 selected by unchanged guarded wrapper PATH; Vitest5.0.3",
+  "wholeFileResult": {
+    "filesPassed": 2,
+    "testsPassed": 188,
+    "testsFailed": 0,
+    "testsSkipped": 0
+  },
+  "targetedResult": {
+    "testsPassed": 3,
+    "filteredOut": 185,
+    "filteredOutNotQualification": true
+  },
+  "receipts": [
+    {
+      "name": "voice-projection-failed-cases",
+      "exitCode": 0,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--project",
+        "@paperclipai/server",
+        "server/src/__tests__/voice-session-store.integration.test.ts",
+        "server/src/__tests__/native-run-projection-work.test.ts",
+        "--maxWorkers",
+        "1",
+        "--no-file-parallelism",
+        "-t",
+        "retains both spoken sides once on the public call task and preserves quarantine|reconciles a provider hangup even without a browser end request|promotes the comment exactly once after the recovered run is projected terminal"
+      ],
+      "startedAt": "2026-11-15T09:39:48.798490+00:00",
+      "finishedAt": "2026-11-15T09:41:30.199103+00:00",
+      "logBytes": 4402,
+      "logSha256": "1349266bd6feedf09c1ffdb2707a9e523b33a56f4109d27b7b7ca0a93144b4d0"
+    },
+    {
+      "name": "voice-projection-whole-files",
+      "exitCode": 0,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--project",
+        "@paperclipai/server",
+        "server/src/__tests__/voice-session-store.integration.test.ts",
+        "server/src/__tests__/native-run-projection-work.test.ts",
+        "--maxWorkers",
+        "1",
+        "--no-file-parallelism"
+      ],
+      "startedAt": "2026-11-15T09:42:18.246475+00:00",
+      "finishedAt": "2026-11-15T09:43:12.441156+00:00",
+      "logBytes": 523507,
+      "logSha256": "2c4b102a617d5302e77fa9a6370b9338ea1bcf83aa43a14abe33f0c9ab80e562"
+    }
+  ],
+  "scope": "Existing three failures did not reproduce targeted or with both complete files run serially; original interrupted broad-run failures retained. No exact failure-cause claim."
+}

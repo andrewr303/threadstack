@@ -1,0 +1,9 @@
+{
+  "completedAt": "2026-11-15T09:33:07.803926+00:00",
+  "packagesRestored": 287,
+  "allArchivesMatchedCargoLock": true,
+  "quarantine": "/tmp/tk-continue/runtime/rust-incomplete-preserved",
+  "cargoHome": "/private/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-rust-h8ylrbst/cargo",
+  "globalCacheChanged": false,
+  "dependencyVersionsChanged": false
+}

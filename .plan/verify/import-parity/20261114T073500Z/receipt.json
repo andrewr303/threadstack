@@ -1,0 +1,86 @@
+{
+  "kind": "reproduced-current-import-portability",
+  "recordedAt": "2026-11-14T07:35:00.558938+00:00",
+  "source": "/Users/andrew/dev/threadkeeper",
+  "copyParent": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-import-parity-v1cy8rl3",
+  "cwd": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-import-parity-v1cy8rl3/extension",
+  "evidenceDir": "/Users/andrew/dev/threadkeeper/paperclip/.plan/verify/import-parity/20261114T073500Z",
+  "sourceFilesVerifiedBeforeCopy": 443,
+  "copyFilesVerifiedBeforeChecks": 443,
+  "nodeVersion": "v24.22.1",
+  "reactVersion": "18.3.1",
+  "dependencies": "Symlink to installed fork extension/node_modules; package-lock hash matches approved snapshot; no install performed.",
+  "expectedBuildGitIdentity": "nogit: isolated temporary copy has no Git repository",
+  "before": {
+    "sourceHead": "9078b2b261d2e12b8bc3230090f217b40e7c9b81",
+    "sourceBranch": "main",
+    "liveManifestSha256": "7490fdc8f0ec3993c73ac591f7a884c26c16cf5c57de5834d62e917a32b7745a",
+    "liveManifestMtimeNs": 1794618008409849077
+  },
+  "completedAt": "2026-11-14T07:36:03.636322+00:00",
+  "commands": [
+    {
+      "name": "typecheck",
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit"
+      ],
+      "env": {},
+      "exitCode": 0,
+      "log": "typecheck.log"
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run"
+      ],
+      "env": {},
+      "exitCode": 0,
+      "testFilesPassed": 83,
+      "testsPassed": 1713,
+      "log": "tests.log"
+    },
+    {
+      "name": "build",
+      "argv": [
+        "node",
+        "scripts/build-extension.mjs"
+      ],
+      "env": {
+        "TK_OUT_DIR": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-import-parity-v1cy8rl3/parity-build",
+        "TK_STABLE_ID": "0"
+      },
+      "exitCode": 0,
+      "log": "build.log"
+    }
+  ],
+  "after": {
+    "sourceHead": "9078b2b261d2e12b8bc3230090f217b40e7c9b81",
+    "sourceBranch": "main",
+    "liveManifestSha256": "7490fdc8f0ec3993c73ac591f7a884c26c16cf5c57de5834d62e917a32b7745a",
+    "liveManifestMtimeNs": 1794618008409849077
+  },
+  "originalSourceFilesVerifiedAfterChecks": 443,
+  "copyFilesVerifiedAfterChecks": 443,
+  "sourceAndLivePreserved": true,
+  "manifestHasKey": false,
+  "manifestVersionName": "0.5.0 (build 20261114.073516-nogit)",
+  "manifestSha256": "c6cd52e212504537bbd273792e4a5690bfedc53a80c11bc43d2415d48237b04c",
+  "evidenceHashes": {
+    "setup.json": "31a308ea0579ea5bea738373d1e80fa87ed5cc9ba7bcf567bc2343c8ad11b7f1",
+    "typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests.log": "a404f53001005806bcc6d5043b5c4aa3c1e93f675e3ad147be2758ce20778206",
+    "build.log": "a6d9b0f120abcfddcbfde7ad9065ec88235da5eef3d262db56852377df581c93",
+    "manifest.json": "c6cd52e212504537bbd273792e4a5690bfedc53a80c11bc43d2415d48237b04c",
+    "build-info.json": "8eb43e86f95990da1b9b9c9f8174736bae94750a8d32aa4eea71dbd1d9d22171"
+  },
+  "limitations": [
+    "This reproduces approved-snapshot nested import portability on the current runtime; it is not a historical pre-implementation command.",
+    "The isolated test copy has no Git repository and correctly builds with nogit identity.",
+    "Dependencies are reused via a symlink to installed fork extension dependencies; package-lock parity and React 18.3.1 verified, no fresh install.",
+    "No browser/provider/service/deployment/pipeline/load-gate acceptance or completion status is established."
+  ]
+}

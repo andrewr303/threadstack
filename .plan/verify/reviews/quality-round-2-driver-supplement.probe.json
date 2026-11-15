@@ -1,0 +1,36 @@
+{
+  "extractedLines": 9,
+  "currentSha256": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039",
+  "reconstructedReviewedSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+  "syntheticOnly": true,
+  "results": [
+    {
+      "scenario": "unset",
+      "passed": true,
+      "cleanupReached": true,
+      "writes": 0,
+      "waitTimeoutMs": null
+    },
+    {
+      "scenario": "unpaired",
+      "passed": true,
+      "cleanupReached": true,
+      "writes": 0,
+      "waitTimeoutMs": null
+    },
+    {
+      "scenario": "done",
+      "passed": true,
+      "cleanupReached": true,
+      "writes": 1,
+      "waitTimeoutMs": 300000
+    },
+    {
+      "scenario": "timeout",
+      "passed": true,
+      "cleanupReached": true,
+      "writes": 1,
+      "waitTimeoutMs": 300000
+    }
+  ]
+}

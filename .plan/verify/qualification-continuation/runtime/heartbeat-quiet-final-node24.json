@@ -1,0 +1,48 @@
+{
+  "command": [
+    "/Users/andrew/.nvm/versions/node/v24.22.2/bin/node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "server/src/services/heartbeat/queue.test.ts",
+    "server/src/services/heartbeat/run-completion.test.ts",
+    "--project",
+    "@paperclipai/server",
+    "--maxWorkers=1"
+  ],
+  "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+  "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+  "inheritedEnvironmentKeyNames": [
+    "COLORTERM",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "__CF_USER_TEXT_ENCODING"
+  ],
+  "injectedEnvironmentKeyNames": [
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "PAPERCLIP_TEST_HOST_HOME",
+    "RUSTUP_HOME"
+  ],
+  "ambientProviderEnvironmentRemoved": true,
+  "startedAt": "2026-11-15T10:14:40.277793+00:00",
+  "status": "completed",
+  "absolutePsCompatibility": false,
+  "wrapperPid": 23688,
+  "wrapperPgid": 23688,
+  "childPid": 23821,
+  "childPgid": 23821,
+  "isolatedChildSession": true,
+  "receivedSignals": [],
+  "exitCode": 0,
+  "finishedAt": "2026-11-15T10:16:58.389938+00:00"
+}

@@ -1,0 +1,8 @@
+{
+  "observedAt": "2026-11-15T10:17:37.399986+00:00",
+  "originalHead": "9078b2b261d2e12b8bc3230090f217b40e7c9b81",
+  "originalTrackedDiffExitCode": 0,
+  "liveManifestCurrentSha256": "7490fdc8f0ec3993c73ac591f7a884c26c16cf5c57de5834d62e917a32b7745a",
+  "liveManifestCurrentMtimeNs": 1794618008409849077,
+  "scope": "Read-only current observation. Historical443-file snapshot parity is not claimed. No live extension deployment or helper/service registration performed."
+}

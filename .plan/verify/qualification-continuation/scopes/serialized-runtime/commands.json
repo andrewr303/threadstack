@@ -1,0 +1,128 @@
+[
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "@paperclipai/server",
+      "server/src/__tests__/issue-queued-comments-routes.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:25:48.814964+00:00",
+    "status": "completed",
+    "exitCode": 0,
+    "finishedAt": "2026-11-15T08:28:12.014644+00:00"
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "@paperclipai/server",
+      "server/src/__tests__/issue-confirm-run-stopped-routes.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:26:21.901776+00:00",
+    "status": "completed",
+    "exitCode": 0,
+    "finishedAt": "2026-11-15T08:26:42.133708+00:00"
+  },
+  {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "@paperclipai/server",
+      "server/src/__tests__/maintenance-server-routes.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/Users/andrew/dev/threadkeeper/paperclip",
+    "sandboxProfile": "/tmp/tk-continue/runtime/tests.sb",
+    "inheritedEnvironmentKeyNames": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "injectedEnvironmentKeyNames": [
+      "CARGO_HOME",
+      "CARGO_TARGET_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "PAPERCLIP_TEST_HOST_HOME",
+      "RUSTUP_HOME"
+    ],
+    "ambientProviderEnvironmentRemoved": true,
+    "startedAt": "2026-11-15T08:26:43.592323+00:00",
+    "status": "completed",
+    "exitCode": 0,
+    "finishedAt": "2026-11-15T08:31:06.621547+00:00"
+  }
+]

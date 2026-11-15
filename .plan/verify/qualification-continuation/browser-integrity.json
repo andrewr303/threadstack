@@ -1,0 +1,128 @@
+{
+  "capturedAt": "2026-11-15T09:48:39.653860+00:00",
+  "scope": "Cryptographic/result metadata verification only. Original media inspection belongs to the browser verifier. No acceptance file was rewritten.",
+  "rounds": [
+    {
+      "path": "/Users/andrew/dev/threadkeeper/paperclip/.acceptances/paperclip-merge/round-43",
+      "label": "reused Chrome UI",
+      "sealVerdict": "pass",
+      "sealedAt": "2026-11-15T05:55:31.577674+00:00",
+      "caseCounts": {
+        "pass": 16
+      },
+      "sealedFilesChecked": 55,
+      "missing": [],
+      "mismatches": [],
+      "runtime": {
+        "expected": "browseros-neo",
+        "observed": "other-browser-tool",
+        "name": "Existing Playwright extension runner: /Users/andrew/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "selection": "user",
+        "reason": "The project-owned plan explicitly directs isolated Chrome/Edge extension profiles, and the continued acceptance task preserves both browser surfaces. This runner is not the shared Neo or in-app browser.",
+        "tools": [
+          "Playwright Page.screenshot",
+          "Playwright BrowserContext recordVideo",
+          "node extension/scripts/run-paperclip-fused-e2e.mjs"
+        ]
+      },
+      "context": {
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads",
+        "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+        "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+        "buildVerified": true,
+        "role": "Isolated extension and local-trusted THR test company. Synthetic seeded threads; one locally fulfilled synthetic chat route."
+      }
+    },
+    {
+      "path": "/Users/andrew/dev/threadkeeper/paperclip/.acceptances/paperclip-merge/round-44",
+      "label": "reused Edge UI",
+      "sealVerdict": "pass",
+      "sealedAt": "2026-11-15T05:56:19.421838+00:00",
+      "caseCounts": {
+        "pass": 16
+      },
+      "sealedFilesChecked": 55,
+      "missing": [],
+      "mismatches": [],
+      "runtime": {
+        "expected": "browseros-neo",
+        "observed": "other-browser-tool",
+        "name": "Existing Playwright extension runner: /Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "selection": "user",
+        "reason": "The project-owned plan explicitly directs isolated Chrome/Edge extension profiles, and the continued acceptance task preserves both browser surfaces. This runner is not the shared Neo or in-app browser.",
+        "tools": [
+          "Playwright Page.screenshot",
+          "Playwright BrowserContext recordVideo",
+          "node extension/scripts/run-paperclip-fused-e2e.mjs"
+        ]
+      },
+      "context": {
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads",
+        "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+        "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70)",
+        "buildVerified": true,
+        "role": "Isolated extension and local-trusted THR test company. Synthetic seeded threads; one locally fulfilled synthetic chat route."
+      }
+    },
+    {
+      "path": "/Users/andrew/dev/threadkeeper/paperclip/.acceptances/paperclip-auth-fallback/chrome-1",
+      "label": "fresh Chrome ingress",
+      "sealVerdict": "pass",
+      "sealedAt": "2026-11-15T09:41:27.393668+00:00",
+      "caseCounts": {
+        "pass": 3
+      },
+      "sealedFilesChecked": 9,
+      "missing": [],
+      "mismatches": [],
+      "runtime": {
+        "expected": "browseros-neo",
+        "observed": "other-browser-tool",
+        "name": "Existing project Playwright isolated extension runner; /Users/andrew/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "selection": "user",
+        "reason": "The continuation explicitly selects the existing isolated Chrome/Edge project runner. Shared Neo/Synara browser unavailable; no additional setup or role changes.",
+        "tools": [
+          "Playwright Page.screenshot",
+          "node scripts/run-paperclip-ingress-e2e.mjs"
+        ]
+      },
+      "context": {
+        "url": "http://127.0.0.1:3217",
+        "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+        "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70); source server middleware SHA256 19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+        "buildVerified": true,
+        "role": "Normal browser client against owned local-trusted THR fixture; no provider account/credential injection."
+      }
+    },
+    {
+      "path": "/Users/andrew/dev/threadkeeper/paperclip/.acceptances/paperclip-auth-fallback/edge-1",
+      "label": "fresh Edge ingress",
+      "sealVerdict": "pass",
+      "sealedAt": "2026-11-15T09:41:27.694269+00:00",
+      "caseCounts": {
+        "pass": 3
+      },
+      "sealedFilesChecked": 9,
+      "missing": [],
+      "mismatches": [],
+      "runtime": {
+        "expected": "browseros-neo",
+        "observed": "other-browser-tool",
+        "name": "Existing project Playwright isolated extension runner; /Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "selection": "user",
+        "reason": "The continuation explicitly selects the existing isolated Chrome/Edge project runner. Shared Neo/Synara browser unavailable; no additional setup or role changes.",
+        "tools": [
+          "Playwright Page.screenshot",
+          "node scripts/run-paperclip-ingress-e2e.mjs"
+        ]
+      },
+      "context": {
+        "url": "http://127.0.0.1:3217",
+        "revision": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+        "buildIdentity": "0.5.0 (build 20261115.054541-a44541df70); source server middleware SHA256 19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+        "buildVerified": true,
+        "role": "Normal browser client against owned local-trusted THR fixture; no provider account/credential injection."
+      }
+    }
+  ]
+}

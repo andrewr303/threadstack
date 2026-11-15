@@ -1,0 +1,37 @@
+{
+  "errors": [],
+  "gaps": [],
+  "counts": {
+    "pass": 16,
+    "fail": 0,
+    "blocked": 0,
+    "uncertain": 0,
+    "not_run": 0
+  },
+  "verdict": "pass",
+  "planned": 16,
+  "requirements": 4,
+  "mapped_requirements": 4,
+  "evidence_complete": 16,
+  "effective_statuses": {
+    "setup": "pass",
+    "fused-direct-entry": "pass",
+    "fused-palette": "pass",
+    "fused-mobile-entry": "pass",
+    "fused-entries": "pass",
+    "fused-in-place": "pass",
+    "fused-placement": "pass",
+    "fused-layering": "pass",
+    "fused-input": "pass",
+    "single-session-sidebar": "pass",
+    "compact-chat-header": "pass",
+    "sidebar-ask-layout": "pass",
+    "fused-notice": "pass",
+    "fused-jank": "pass",
+    "fused-fallback": "pass",
+    "fused-offline": "pass"
+  },
+  "missing_files": [],
+  "contract_valid": true,
+  "note": "Checks declarations and file integrity, not browser execution or evidence semantics."
+}

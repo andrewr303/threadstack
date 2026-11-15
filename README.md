@@ -1,355 +1,603 @@
-# Threadkeeper — automatic organizer for all your AI threads
+<p align="center">
+  <img src="doc/assets/banner.jpg" alt="Paperclip is the app people use to manage AI agents for work." width="720" />
+</p>
 
-Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok (on grok.com and inside X), Gemini, Google AI Studio, Perplexity, DeepSeek, Kimi, Le Chat and Microsoft Copilot**, plus agents, coding agents, app builders and other chat sites you turn on (ChatGPT dots, Meta's Muse, Meta AI, Grok Bot, Poe, HuggingChat, Manus, GitHub Copilot, Cursor, Devin, Jules, Lovable, Bolt, v0, Replit and more — see [Supported AI products](#supported-ai-products)) and any self-hosted chat you add, syncs the issues and agent runs of a [Paperclip](#7-syncs-paperclip-agent-work) server, works out what each one is about, and files it automatically, so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
+<p align="center">
+  <a href="#quickstart"><strong>Quickstart</strong></a> &middot;
+  <a href="https://docs.paperclip.ing"><strong>Docs</strong></a> &middot;
+  <a href="https://github.com/paperclipai/paperclip"><strong>GitHub</strong></a> &middot;
+  <a href="https://discord.gg/paperclipai"><strong>Discord</strong></a> &middot;
+  <a href="https://x.com/papercliping"><strong>Twitter</strong></a> &middot;
+  <a href="https://paperclip.ing"><strong>Website</strong></a>
+</p>
 
-Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key or AWS account (Amazon Bedrock or Claude Platform on AWS).
+<p align="center">
+  <a href="https://github.com/paperclipai/paperclip/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" /></a>
+  <a href="https://github.com/paperclipai/paperclip/stargazers"><img src="https://img.shields.io/github/stars/paperclipai/paperclip?style=flat" alt="Stars" /></a>
+  <a href="https://discord.gg/paperclipai"><img src="https://img.shields.io/badge/discord-join-7289da" alt="Discord" /></a>
+  <a href="https://superagent.sh"><picture><source media="(prefers-color-scheme: dark)" srcset="https://www.superagent.sh/api/badge/paperclipai/paperclip/shield.svg?theme=dark&accent=teal&variant=scanned" /><img src="https://www.superagent.sh/api/badge/paperclipai/paperclip/shield.svg?theme=light&accent=teal&variant=scanned" alt="Security posture verified by Superagent" /></picture></a>
+</p>
 
-The full-page workspace combines **Browse** (embedded provider tabs), **Threads** (summaries, related threads, and grouping by repository, account, project, type, provider, date or status) and **Dashboard** (pinned sessions in up to four panes). It opens on Claude Code, with Claude's own sidebar and chat/code switch showing; Settings → Workspace changes the start page. Sessions save through automatic capture. The rail groups sessions by type (coding sessions, chats, bots) or by provider, account, last active or repository; its **Organize** menu, also on the Dashboard, filters by type, provider and account, and sorts by recent activity, creation date, title or number of messages. Each thread can show its summary, live page, or both.
+<p align="center">
+  <a href="https://www.star-history.com/paperclipai/paperclip"><img src="https://api.star-history.com/badge?repo=paperclipai/paperclip" alt="Star History Rank" /></a>
+</p>
 
-Use **Add account** to add another account of a provider. Two accounts of one provider work at the same time inside the workspace: the one your browser is signed in to, and one more in frames with their own cookies, which Threadkeeper saves encrypted and puts back each time the page loads. Move between accounts from the tabs, the sessions in the rail, or the account menu. Opening a third account of the same provider reloads the workspace; nobody is signed out. **Sign in here** signs an added account in inside the workspace. If the sign-in goes through Google, Apple, a passkey or a pop-up, **Sign in with a browser tab** sets your browser's own sign-in aside, lets you sign in, then puts it back. **Use as browser account** still changes which account the rest of the browser uses. Sessions you open under an added account are saved under that account; **Catch up** still imports only the browser's account. This has been tested against stand-in sites, not yet against each real provider signed in. Session Control backups can be imported through Import / Export.
+<br/>
+
+This hard fork includes Threadkeeper's browser-session library and extension in `extension/`.
+See [Threadkeeper setup and safe verification](doc/threadkeeper.md).
+
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/773bdfb2-6d1e-4e30-8c5f-3487d5b70c8f" width="600" controls></video>
+</div>
+
+<p align="center">
+  <a href="https://paperclip.ing/waitlist/"><strong>Sign up for the Paperclip Cloud waitlist →</strong></a>
+</p>
+
+<br/>
+
+# Paperclip is the app people use to manage AI agents for work.
+
+Open-source orchestration for teams of AI agents.
+
+**If OpenClaw is an _employee_, Paperclip is the _company_.**
+
+Paperclip is a Node.js server and React UI that orchestrates a team of AI agents to run a business. Bring your own agents, assign goals, and track work and costs from one dashboard. Choose models and harnesses per agent while keeping your team's tasks, skills, permissions, and history in one place.
+
+It looks like a task manager. Under the hood: org charts, budgets, governance, goal alignment, and agent coordination.
+
+**Manage business goals, not pull requests.**
+
+|        | Step            | Example                                                            |
+| ------ | --------------- | ------------------------------------------------------------------ |
+| **01** | Define the goal | _"Build the #1 AI note-taking app to $1M MRR."_                    |
+| **02** | Hire the team   | CEO, CTO, engineers, designers, marketers — any bot, any provider. |
+| **03** | Approve and run | Review strategy. Set budgets. Hit go. Monitor from the dashboard.  |
+
+<br/>
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" rowspan="2"><strong>Works<br/>with</strong></td>
+    <td align="center" valign="top"><img src="doc/assets/logos/openclaw.svg" width="32" height="32" alt="OpenClaw" /><br/><sub>OpenClaw</sub></td>
+    <td align="center" valign="top"><img src="doc/assets/logos/claude.svg" width="32" height="32" alt="Claude Code" /><br/><sub>Claude Code</sub></td>
+    <td align="center" valign="top"><img src="ui/public/brands/codex-color.svg" width="32" height="32" alt="Codex" /><br/><sub>Codex</sub></td>
+    <td align="center" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="ui/public/brands/adapters/cursor-dark.svg" /><img src="ui/public/brands/adapters/cursor.svg" width="32" height="32" alt="Cursor and Cursor Cloud" /></picture><br/><sub>Cursor<br/>+ Cloud</sub></td>
+    <td align="center" valign="top"><img src="ui/public/brands/adapters/gemini-color.svg" width="32" height="32" alt="Gemini CLI" /><br/><sub>Gemini CLI</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="ui/public/brands/opencode-logo-dark-square.svg" /><img src="ui/public/brands/opencode-logo-light-square.svg" width="32" height="32" alt="OpenCode" /></picture><br/><sub>OpenCode</sub></td>
+    <td align="center" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="ui/public/brands/adapters/pi-dark.svg" /><img src="ui/public/brands/adapters/pi.svg" width="32" height="32" alt="Pi" /></picture><br/><sub>Pi</sub></td>
+    <td align="center" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="ui/public/brands/adapters/hermesagent-dark.svg" /><img src="ui/public/brands/adapters/hermesagent.svg" width="32" height="32" alt="Hermes and Hermes Gateway" /></picture><br/><sub>Hermes<br/>+ Gateway</sub></td>
+    <td align="center" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="ui/public/brands/adapters/grok-dark.svg" /><img src="ui/public/brands/adapters/grok.svg" width="32" height="32" alt="Grok Build" /></picture><br/><sub>Grok Build</sub></td>
+    <td align="center" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="ui/public/brands/adapters/kimi-color.svg" /><img src="ui/public/brands/adapters/kimi-color-light.svg" width="32" height="32" alt="Kimi Code" /></picture><br/><sub>Kimi Code</sub></td>
+  </tr>
+</table>
+
+<em>If it can receive a heartbeat, it's hired.</em>
+
+</div>
+
+Custom processes, HTTP endpoints, and external adapter packages extend the roster. See the [adapter overview](https://docs.paperclip.ing/reference/adapters/overview/) for setup and capabilities.
+
+<br/>
+
+## Paperclip is right for you if
+
+- ✅ You want to build **autonomous AI organizations**
+- ✅ You **coordinate many different agents** (OpenClaw, Codex, Claude, Cursor) toward a common goal
+- ✅ You have **20 simultaneous Claude Code terminals** open and lose track of what everyone is doing
+- ✅ You want agents running **autonomously 24/7**, but still want to audit work and chime in when needed
+- ✅ You want to **monitor costs** and enforce budgets
+- ✅ You want a process for managing agents that **feels like using a task manager**
+- ✅ You want to manage your autonomous businesses **from your phone**
+
+<br/>
+
+## The four pillars
+
+Four things have to work for an organization of AI agents to actually produce: the tasks, the org, the training, and the infrastructure. Paperclip is built around exactly those four pillars.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/paperclipai/paperclip/1ec33ffd8b597f7e36aac3e2fbb4665b8c42dc3c/doc/assets/four-pillars-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/paperclipai/paperclip/1ec33ffd8b597f7e36aac3e2fbb4665b8c42dc3c/doc/assets/four-pillars-light.png">
+  <img src="https://raw.githubusercontent.com/paperclipai/paperclip/1ec33ffd8b597f7e36aac3e2fbb4665b8c42dc3c/doc/assets/four-pillars-light.png" alt="The four pillars of Paperclip">
+</picture>
+
+| Pillar | Built for | What it covers |
+| --- | --- | --- |
+| **Agentic Task Manager** — Declare intent. Agents work. You verify the output. | Everyone, daily | Tasks, approvals & review gates · proactive agent coworkers · auditable routines & workflows · verify from diffs, screenshots & tests |
+| **Org Chart for Agents** — Roles, permissions & boundaries for humans and agents. | Managers | Mixed human + agent org chart · responsibilities, delegation, specialization · governance: who can do what · scoped secrets & company boundaries · connection permissions & responsible-user identities |
+| **Agent Employee Training** — Design, train & evaluate your AI employees. | Enablers | Skill Studio & shared org-wide skills · evals & saved test runs · active learning loops & quality metrics · performance reviews for agents · saved test inputs · skill version history & restore · reusable team templates |
+| **Agentic OS** — The infrastructure that makes the work run. | IT & platform | Cross-provider runtime: any model, any agent · sandboxing, integrations & MCP servers · SSO, GRC, RBAC & cost controls · data privacy, internal trace collection, compounding data value · personal & shared app connections · run history & opt-in tracing |
+
+<br/>
+
+## Features
+
+<table>
+<tr>
+<td align="center" width="33%">
+<h3>🔌 Bring Your Own Agent</h3>
+Any agent, any runtime, one org chart. If it can receive a heartbeat, it's hired.
+</td>
+<td align="center" width="33%">
+<h3>🎯 Goal Alignment</h3>
+Link tasks and projects to your organization goals. Agents receive the goal context behind their work.
+</td>
+<td align="center" width="33%">
+<h3>💓 Heartbeats</h3>
+Agents wake for assigned work, follow-up messages, or configured schedules. Delegation flows up and down the org chart.
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>💰 Cost Control</h3>
+Company, agent, and project <a href="https://docs.paperclip.ing/guides/day-to-day/costs/">budgets</a>. Track reported spend, get threshold alerts, and pause work at configured limits.
+</td>
+<td align="center">
+<h3>🏢 Multi-Organization</h3>
+One deployment, many organizations. Separate tasks, agents, permissions, and activity histories for each.
+</td>
+<td align="center">
+<h3>🎫 Task Threads</h3>
+Keep conversations, plans, blockers, files, and run history attached to the work. Assign tasks to agents or people.
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>🛡️ Governance</h3>
+Configure <a href="https://docs.paperclip.ing/guides/day-to-day/approvals/">review and approval stages</a>, approve hires, and pause, reassign, or stop work when needed.
+</td>
+<td align="center">
+<h3>📊 Org Chart</h3>
+Hierarchies, roles, reporting lines. Your agents have a boss, a title, and a job description.
+</td>
+<td align="center">
+<h3>📱 Mobile Ready</h3>
+Monitor and manage your autonomous businesses from anywhere.
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>🔗 Apps & Connections</h3>
+<a href="https://docs.paperclip.ing/connectors/">Connect services</a> such as GitHub, Notion, and Railway, or your own MCP server. Set gateway actions to Allowed, Ask first, or Off.
+</td>
+<td align="center">
+<h3>👥 Shared Agents, Personal Accounts</h3>
+Choose <a href="https://docs.paperclip.ing/connectors/access-model/">who can use a connection and which agents can access it</a>. Managed GitHub operations can use the account of the person directing the work.
+</td>
+<td align="center">
+<h3>🧠 Skills & Skill Studio</h3>
+Install or write <a href="https://docs.paperclip.ing/guides/org/skills/">shared skills</a>, test them with saved inputs, inspect results, and restore earlier versions.
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>📅 Scheduled Routines</h3>
+Run <a href="https://docs.paperclip.ing/guides/projects-workflow/routines/">recurring work</a> on a schedule or trigger it through an API or webhook. Each run has a task, an owner, and a history.
+</td>
+<td align="center">
+<h3>📎 Artifacts & Feedback</h3>
+Find the <a href="https://docs.paperclip.ing/guides/day-to-day/artifacts/">files and documents agents produce</a>. Preview supported formats and leave comments on specific passages in documents.
+</td>
+<td align="center">
+<h3>📦 Ready-Made Teams</h3>
+Preview and install <a href="https://docs.paperclip.ing/guides/org/team-catalog/">teams</a> with roles, skills, projects, and routines. Choose their runtimes and make the setup your own.
+</td>
+</tr>
+</table>
+
+Experimental **Agent Chat** and **chat/email connectors** add conversations with agents in Paperclip and through configured services such as Slack, Discord, Telegram, and AgentMail. Enable the relevant instance settings to try them.
+
+<br/>
+
+## Problems Paperclip solves
+
+| Without Paperclip                                                                                                                     | With Paperclip                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| ❌ You have 20 Claude Code tabs open and can't track which one does what. On reboot you lose everything.                              | ✅ Tasks are ticket-based, conversations are threaded, sessions persist across reboots.                                                |
+| ❌ You manually gather context from several places to remind your bot what you're actually doing.                                     | ✅ Context flows from the task up through the project and company goals — your agent always knows what to do and why.                  |
+| ❌ Folders of agent configs are disorganized and you're re-inventing task management, communication, and coordination between agents. | ✅ Paperclip gives you org charts, ticketing, delegation, and governance out of the box — so you run a company, not a pile of scripts. |
+| ❌ Runaway loops waste hundreds of dollars of tokens and max your quota before you even know what happened.                           | ✅ Spend tracking, budget alerts, and automatic pauses help you control the cost of ongoing work.                                       |
+| ❌ You have recurring jobs (customer support, social, reports) and have to remember to manually kick them off.                        | ✅ Routines create assigned tasks on a schedule, with outputs and run history you can inspect.                                         |
+| ❌ You have an idea, you have to find your repo, fire up Claude Code, keep a tab open, and babysit it.                                | ✅ Add a task in Paperclip. Your coding agent works on it until it's done. Management reviews their work.                              |
+
+<br/>
+
+## Why Paperclip is special
+
+Paperclip handles the hard orchestration details correctly.
+
+|                                   |                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Atomic task checkout.**         | A single assignee and execution locks prevent competing runs from claiming the same task.                    |
+| **Persistent work context.**      | Tasks, comments, and documents stay in Paperclip. Supporting adapters resume saved sessions across runs.       |
+| **Runtime skill injection.**      | Agents can learn Paperclip workflows and project context at runtime, without retraining.                      |
+| **Governance with rollback.**     | Approval gates are enforced, config changes are revisioned, and bad changes can be rolled back safely.        |
+| **Accountable connections.**      | Human access, agent eligibility, and gateway action permissions are separate controls. Approve a call once or save a revocable rule. |
+| **Goal-aware execution.**         | Linked tasks and projects carry goal ancestry so agents see the "why," not just a title.                      |
+| **Portable company templates.**   | Export/import orgs, agents, and skills with secret scrubbing and collision handling.                          |
+| **Organization boundaries.**      | Company-scoped access checks keep each organization's work, agents, and activity separate within one deployment. |
+
+<br/>
+
+## What's Under the Hood
+
+Paperclip is a full control plane, not a wrapper. Before you build any of this yourself, know that it already exists:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                       PAPERCLIP SERVER                       │
+│                                                              │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  │
+│  │Identity & │  │  Work &   │  │ Heartbeat │  │Governance │  │
+│  │  Access   │  │   Tasks   │  │ Execution │  │& Approvals│  │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────┘  │
+│                                                              │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  │
+│  │ Org Chart │  │Workspaces │  │  Plugins  │  │  Budget   │  │
+│  │ & Agents  │  │ & Runtime │  │           │  │ & Costs   │  │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────┘  │
+│                                                              │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  │
+│  │ Routines  │  │ Secrets & │  │ Activity  │  │  Company  │  │
+│  │& Schedules│  │  Storage  │  │ & Events  │  │Portability│  │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────┘  │
+└──────────────────────────────────────────────────────────────┘
+         ▲              ▲              ▲              ▲
+   ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐
+   │  Claude   │  │   Codex   │  │   CLI     │  │ HTTP/web  │
+   │   Code    │  │           │  │  agents   │  │   bots    │
+   └───────────┘  └───────────┘  └───────────┘  └───────────┘
+```
+
+### The Systems
+
+<table>
+<tr>
+<td width="50%">
+
+**Identity & Access** — Two deployment modes (trusted local or authenticated), human roles and permissions, agent API keys, short-lived run JWTs, company memberships, and invite flows. Responsible-user attribution follows work through delegation and supported managed connections.
+
+</td>
+<td width="50%">
+
+**Org Chart & Agents** — Agents have roles, titles, reporting lines, permissions, and budgets. Adapter examples match the diagram: Claude Code, Codex, CLI agents such as Cursor/Gemini/bash, HTTP/webhook bots such as OpenClaw, and external adapter plugins. If it can receive a heartbeat, it's hired.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Work & Task System** — Issues carry company/project/goal/parent links, atomic checkout with execution locks, first-class blocker dependencies, comments, documents, attachments, work products, labels, and inbox state. Search across work, review document revisions, and leave anchored feedback.
+
+</td>
+<td>
+
+**Heartbeat Execution** — DB-backed wakeup queue with coalescing, budget checks, workspace resolution, secret injection, skill loading, and adapter invocation. Runs produce logs, usage records, and adapter-specific session state. Bounded recovery handles supported failures and surfaces cases that need human action.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Workspaces & Runtime** — Project repositories and workspaces, optional isolated execution workspaces (git worktrees, operator branches), and runtime services (dev servers, preview URLs). Sandbox providers extend execution beyond the local host; availability depends on the configured environment and adapter.
+
+</td>
+<td>
+
+**Governance & Approvals** — Board approval workflows, execution policies with review/approval stages, decision tracking, budget hard-stops, and agent pause/resume/terminate. Configured task reviews govern completion; connection action approvals govern calls through the tool gateway.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Budget & Cost Control** — Token and cost tracking by company, agent, project, goal, issue, provider, and model. Scoped budget policies with warning thresholds and hard stops. Enforcement uses recorded spend; usage reporting and in-flight work can delay a stop.
+
+</td>
+<td>
+
+**Routines & Schedules** — Recurring tasks with cron, webhook, and API triggers. Concurrency and catch-up policies. Each routine execution creates a tracked issue and wakes the assigned agent — no manual kick-offs needed.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**[Plugins](https://docs.paperclip.ing/administration/plugins/)** — Instance-wide plugin system with out-of-process workers, capability-gated host services, job scheduling, tool exposure, and UI contributions. Extend Paperclip without forking it.
+
+</td>
+<td>
+
+**Secrets & Storage** — Company secrets and per-person secret values, encrypted credential storage, local or S3-compatible file storage, attachments, and work products. Secret references supply credentials to authorized runs without copying values into ordinary agent configuration.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Activity & Events** — Mutating actions, heartbeat state changes, cost events, approvals, comments, and work products are recorded as durable activity so operators can audit what happened and why.
+
+</td>
+<td>
+
+**[Company Portability](https://docs.paperclip.ing/guides/power/export-import/)** — Preview, export, and import organization packages with agents, skills, and optional projects, routines, tasks, and attachments. Referenced secret values are omitted; review packages before sharing because plain environment values and local paths can remain. Packages share an operating setup; full-instance recovery uses backups.
+
+</td>
+</tr>
+</table>
+
+<br/>
+
+## What Paperclip is not
+
+|                              |                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Not just a chatbot.**      | Conversations stay attached to tasks, plans, decisions, and outputs. Experimental Agent Chat can hand work off to assigned tasks.    |
+| **Not an agent framework.**  | We don't tell you how to build agents. We tell you how to run a company made of them.                                |
+| **Not just a workflow builder.** | Routines operate within an organization, with roles, goals, budgets, and governance.                  |
+| **Not a prompt manager.**    | Agents bring their own prompts, models, and runtimes. Paperclip manages the organization they work in.               |
+| **Not limited to one agent.** | Start with one agent and grow into a team with shared skills, delegation, and review.                                              |
+| **Not only for code review.** | Coding and PR review fit alongside research, operations, content, and other work.                                                  |
+
+<br/>
+
+## Quickstart
+
+Open source. Self-hosted. No Paperclip account required. Follow the [guided quickstart](https://docs.paperclip.ing/guides/getting-started/five-minute-path/) to set up your first agent.
+
+### Just ask your agent to install Paperclip
+
+Share the [installation guide](https://docs.paperclip.ing/reference/cli/installation/) with your agent.
+
+### Or install it yourself
+
+With **Node.js 24.11 or newer** installed:
+
+```bash
+npx paperclipai@latest onboard --yes
+```
+
+The CLI runs from npm's cache; your instance configuration and data persist locally.
+
+See the [installation guide](https://docs.paperclip.ing/reference/cli/installation/) for managed installs, pinned versions, canary and git-ref installs, updates, rollback, service management, and uninstalling.
+
+For an isolated manual test instance that is already initialized with a CEO
+agent, use `test-drive`. It stays in the foreground, never installs a service
+or creates a first task, and opens the browser only after setup succeeds:
+
+```bash
+ANTHROPIC_API_KEY=... npx paperclipai test-drive
+OPENAI_API_KEY=... npx paperclipai test-drive --harness codex
+OPENROUTER_API_KEY=... npx paperclipai test-drive \
+  --harness opencode \
+  --model openrouter/anthropic/claude-sonnet-4.5
+```
+
+Each run without `--data-dir` gets a unique, retained temporary directory; its
+absolute path is printed at startup. Pass `--data-dir` to reuse one, or
+`--no-browser` to leave the initialized instance unopened. When invoked from a
+linked Git worktree, `test-drive` also enables task execution in that worktree.
+See the [test-drive guide](https://docs.paperclip.ing/reference/cli/test-drive/) for credential and
+reuse behavior.
+
+> **Troubleshooting: private npm registry `.npmrc`**
+>
+> If this fails with an `E404` for `paperclipai` (or similar) and you use a private npm registry (for example GitHub Packages) via a global `~/.npmrc`, `npx` may be resolving `paperclipai` against that private registry instead of the public npm registry.
+>
+> Diagnostic:
+>
+> ```bash
+> npm config get registry
+> ```
+>
+> Workaround (cross-platform; force the public npm registry for this command):
+>
+> ```bash
+> npx --registry https://registry.npmjs.org paperclipai@latest onboard --yes
+> ```
+
+That quickstart path now defaults to trusted local loopback mode for the fastest first run. To start in authenticated/private mode instead, choose a bind preset explicitly:
+
+```bash
+npx paperclipai@latest onboard --yes --bind lan
+# or:
+npx paperclipai@latest onboard --yes --bind tailnet
+```
+
+If you already have Paperclip configured, rerunning `onboard` keeps the existing config in place. Use `npx paperclipai configure` to edit settings.
+
+Or manually:
+
+```bash
+git clone https://github.com/paperclipai/paperclip.git
+cd paperclip
+pnpm install
+pnpm dev
+```
+
+This starts the UI and API at `http://localhost:3100`. An embedded PostgreSQL database is created automatically — no setup required.
+
+> **Requirements:** Node.js 24.11+, pnpm 9.15+
+
+Local Claude and Codex subscription sign-in also needs Python 3 and the
+corresponding provider CLI on the Paperclip host. The Docker image includes them.
+
+Source development also builds the native Paperclip Runner when enabled (the self-hosted default). Install a Rust toolchain, or set `PAPERCLIP_RUNNER_BINARY` to a compatible prebuilt runner.
+
+<br/>
+
+## FAQ
+
+**Q: Is this project maintained or just slop?**
+
+**A:** Paperclip is maintained by the [Paperclip team](https://paperclip.ing). We've merged [over 2,700 pull requests](https://github.com/paperclipai/paperclip/pulls?q=is%3Apr+is%3Amerged).
+
+<br/>
+
+**Q: What does a typical setup look like?**
+
+**A:** Locally, a single Node.js process manages an embedded Postgres and local file storage. For production, point it at your own Postgres and deploy however you like. Configure projects, agents, and goals — the agents take care of the rest.
+
+For remote access, use authenticated mode with a private-network bind such as Tailscale, or deploy the persistent server with Docker. See [deployment modes](https://docs.paperclip.ing/reference/deploy/deployment-modes/) and the [Docker guide](https://docs.paperclip.ing/reference/deploy/docker/).
+
+<br/>
+
+**Q: Can I run multiple companies?**
+
+**A:** Yes. A single deployment can host multiple organizations with company-scoped data and access checks.
+
+<br/>
+
+**Q: How is Paperclip different from agents like OpenClaw or Claude Code?**
+
+**A:** Paperclip _uses_ those agents. It orchestrates them into a company — with org charts, budgets, goals, governance, and accountability.
+
+<br/>
+
+**Q: Why should I use Paperclip instead of just pointing my OpenClaw to Asana or Trello?**
+
+**A:** Agent orchestration has subtleties in how you coordinate who has work checked out, how to maintain sessions, monitoring costs, establishing governance - Paperclip does this for you.
+
+(Bring-your-own-ticket-system is on the Roadmap)
+
+<br/>
+
+**Q: Do agents run continuously?**
+
+**A:** Agents wake for assigned work and follow-up messages. Optional timer heartbeats let them check for work periodically; routines create recurring tasks on their own schedules. You can also connect externally running agents such as OpenClaw. A mention alone does not assign work or wake another agent.
+
+<br/>
+
+## Development
+
+```bash
+pnpm dev              # Full dev (API + UI, watch mode)
+pnpm dev:once         # Full dev without file watching
+pnpm dev:server       # Server only
+pnpm dev:mobile       # Serve prebuilt UI on :3101 for phones/tablets (proxies /api → :3100)
+pnpm dev:both         # Run `pnpm dev` and `pnpm dev:mobile` together
+pnpm build            # Build all
+pnpm typecheck        # Type checking
+pnpm test             # Cheap default test run (Vitest only)
+pnpm test:watch       # Vitest watch mode
+pnpm test:e2e         # Playwright browser suite
+pnpm db:generate      # Generate DB migration
+pnpm db:migrate       # Apply migrations
+```
+
+`pnpm test` does not run Playwright. Browser suites stay separate and are typically run only when working on those flows or in CI.
+
+See [doc/DEVELOPING.md](doc/DEVELOPING.md) for the full development guide.
+
+<br/>
+
+## Roadmap
+
+- ✅ Plugin system (e.g. add a knowledge base, custom tracing, queues, etc)
+- ✅ Get OpenClaw / claw-style agent employees
+- ✅ companies.sh - import and export entire organizations
+- ✅ Easy AGENTS.md configurations
+- ✅ Skills Manager, Skill Studio & Skills Store
+- ✅ Scheduled Routines
+- ✅ Better Budgeting
+- ✅ Agent Reviews and Approvals
+- ✅ Multiple Human Users
+- ✅ Cloud / Sandbox agents (e2b, Cloudflare, Daytona, Modal, Novita, boxd, self-hosted Kubernetes)
+- ✅ Artifacts & Work Products
+- ✅ Deep Planning (planning mode, revisioned plans, plan approvals)
+- ✅ Enforced Outcomes (watchdogs, recovery actions, review gates)
+- ✅ MCP Tool Gateway & Apps (governed tool access)
+- ✅ Secrets Manager with per-agent access
+- ✅ Activity log & action attribution
+- ✅ Self-healing runs & automatic recovery
+- ✅ Agent evals & feedback
+- ✅ Connected Apps
+- ✅ Personal & Shared AI Accounts
+- ✅ Shared Agents Use Personal GitHub Identities
+- ✅ Skill Version History & Restore
+- ✅ Document Comments & Revision History
+- ✅ Company-Wide Search
+- ✅ Multi-Model & Multi-Harness Teams
+- 🟡 Memory / Knowledge
+- ⚪ MAXIMIZER MODE
+- ⚪ Work Queues
+- ⚪ Self-Organization
+- ⚪ Automatic Organizational Learning
+- 🟡 Agent Chat
+- 🟡 Cloud deployments
+- ⚪ Desktop App
+- ⚪ Bring-your-own-ticket-system (Asana / Linear / Jira as on-ramps)
+
+This is the short roadmap preview. See the full roadmap in [ROADMAP.md](ROADMAP.md).
+
+<br/>
+
+## Community & Plugins
+
+Find Plugins and more at [awesome-paperclip](https://github.com/gsxdsm/awesome-paperclip)
+
+## Observability
+
+Paperclip ships with opt-in OpenTelemetry auto-instrumentation for the server (traces only). It activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set and supports `grpc`, `http/protobuf`, and `http/json` via the standard `OTEL_EXPORTER_OTLP_PROTOCOL` env var. `@opentelemetry/api` is a normal server dependency; the SDK, auto-instrumentation, and exporter packages are optional peer dependencies — install them only if you want tracing. See [doc/observability.md](doc/observability.md) for install commands and the full env-var reference.
+
+Paperclip also ships with opt-in Sentry error monitoring for the server and the browser. Set `SENTRY_DSN_FRONTEND` to activate it for the browser and `SENTRY_DSN_BACKEND` to activate it for the server — each variable is optional, and the legacy `SENTRY_DSN` variable still works as a fallback for either component. The supported server SDK version is `@sentry/node@10.71.0`; it is an optional peer dependency for the server, so install it only if you want error monitoring. The browser SDK, `@sentry/browser`, is pinned to the same exact version. See [doc/observability.md](doc/observability.md#sentry-error-monitoring) for the install command, the privacy settings, and the full default capture set.
+
+## Telemetry
+
+Paperclip collects anonymous usage telemetry to help us understand how the product is used and improve it. No personal information, issue content, prompts, file paths, or secrets are ever collected. Private repository references are hashed with a per-install salt before being sent.
+
+Contributors changing emitted telemetry events should follow the [Telemetry Data Contract](packages/shared/src/telemetry/README.md).
+For proposed first-party events that are not in the generated contract yet, follow [Telemetry Workflow](doc/TELEMETRY_WORKFLOW.md).
+
+Telemetry is **enabled by default** and can be disabled with any of the following:
+
+| Method               | How                                                     |
+| -------------------- | ------------------------------------------------------- |
+| Environment variable | `PAPERCLIP_TELEMETRY_DISABLED=1`                        |
+| Standard convention  | `DO_NOT_TRACK=1`                                        |
+| CI environments      | Automatically disabled when `CI=true`                   |
+| Config file          | Set `telemetry.enabled: false` in your Paperclip config |
+
+## Contributing
+
+We welcome contributions. See the [contributing guide](CONTRIBUTING.md) for details.
+
+**[We're hiring](https://paperclip.ing/about/#careers)**
+
+<br/>
+
+## Community
+
+- [Discord](https://discord.gg/paperclipai) — Join the community
+- [Twitter / X](https://x.com/papercliping) — Follow updates and announcements
+- [GitHub Issues](https://github.com/paperclipai/paperclip/issues) — bugs and feature requests
+- [GitHub Discussions](https://github.com/paperclipai/paperclip/discussions) — ideas and RFC
+
+<br/>
+
+## License
+
+MIT &copy; 2026 [Paperclip Labs, Inc](https://paperclip.ing)
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=paperclipai%2Fpaperclip&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=paperclipai/paperclip&type=date&theme=dark&legend=top-left&sealed_token=hFjuwFq41bQD5cevvXVv5cTru2swWRZujwJYKlHhtBh6n0H5-VvJZW2SAlcQKB8u4KxhyEB9JqFg1yccJ8WLv9wPBcoWpWcak4gx0MYTWu_pOs2jKOaDluH7KsLeTKt6DHGkHiN3LsqV9s--MTDQcC6Xl7zV51W0-YezQXo-pVPgoFDFAGf2CY5fiP5Q" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=paperclipai/paperclip&type=date&legend=top-left&sealed_token=hFjuwFq41bQD5cevvXVv5cTru2swWRZujwJYKlHhtBh6n0H5-VvJZW2SAlcQKB8u4KxhyEB9JqFg1yccJ8WLv9wPBcoWpWcak4gx0MYTWu_pOs2jKOaDluH7KsLeTKt6DHGkHiN3LsqV9s--MTDQcC6Xl7zV51W0-YezQXo-pVPgoFDFAGf2CY5fiP5Q" />
+    <img src="https://api.star-history.com/chart?repos=paperclipai/paperclip&type=date&legend=top-left&sealed_token=hFjuwFq41bQD5cevvXVv5cTru2swWRZujwJYKlHhtBh6n0H5-VvJZW2SAlcQKB8u4KxhyEB9JqFg1yccJ8WLv9wPBcoWpWcak4gx0MYTWu_pOs2jKOaDluH7KsLeTKt6DHGkHiN3LsqV9s--MTDQcC6Xl7zV51W0-YezQXo-pVPgoFDFAGf2CY5fiP5Q" alt="Star History Chart" />
+  </picture>
+</a>
+
+<br/>
 
 ---
 
-## What it does
-
-### 1. Captures automatically
-- Open a conversation on any supported site and it lands in the library — no clicks. Capture is read-only, zero-footprint (no injected buttons, badges or layout changes) and never captures the composer or an in-progress streaming reply.
-- **Provider-native organization is kept:** ChatGPT Projects, Claude Projects, the GitHub repository of a Claude Code / Codex web session, and the model a ChatGPT reply used.
-- **Grok on X** (`x.com/i/grok`): X loads each Grok conversation as data, and Threadkeeper reads that response as the page receives it instead of scraping the page. A small script in X's page observes those requests without changing them. This needs host access to x.com and twitter.com; nothing outside Grok conversations is captured.
-- **Any AI product, opt-in:** besides the sites above (on from install), **Settings → Capture** lists agents, coding agents, app builders, companions and other chat sites by category. Turning one on asks the browser for access to that site only; nothing is read there before you do. **Any AI site** adds a site Threadkeeper does not list — your own Open WebUI, LibreChat, LobeChat or AnythingLLM (recognised by their pages), or anything else, where messages are found by their roles on the page. Removing a site removes its access too. Plain http is accepted only for this computer and private networks.
-- **Grok Bot through X Chat** (`x.com/i/chat`): X Chat also carries your private messages, so it is never read on its own. Open the chat with your Grok Bot and choose **Settings → Capture → Capture this tab** (Grok Bot must be turned on).
-- On pages without a reliable "still writing" signal (generic readers, added sites, some agents), a capture is sent only after two reads in a row see the same text.
-- Messages keep the site's own ids where it exposes them, so long conversations that the site renders in pieces are not stored twice, and replies still streaming or showing "thinking" are skipped.
-- **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`, or pick `~/.codex` to include `archived_sessions` too). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
-  - Codex rollouts older than a week (`.jsonl.zst`) are decompressed on your device.
-  - Subagent transcripts and other side files are never imported as threads of their own. A Codex fork is filed as a branch of the thread it came from, without the history it replayed, and a reverted Codex thread keeps its newest rollout.
-  - A Claude Code session is titled by your rename if you made one, else by its agent name, its generated title, its summary, or its first prompt, in that order.
-- **Complete capture on ChatGPT and Claude:** both apps load each conversation as one JSON document. Threadkeeper reads that response as the page receives it (it never alters it and sends no request of its own), so a conversation is stored whole, with the site's message ids, timestamps, model and active branch, even when the page only renders part of it. Page reading stays as the live fallback and merges with it by message id, so nothing is dropped or stored twice.
-- **Import online history, no export needed:** **Import / Export → Import from online accounts → All history** reads old and recent ChatGPT and Claude conversations through your signed-in session in this browser, without the recent import's 300-chat cap. It pages through the active account/workspace, includes archived ChatGPT conversations, skips complete unchanged copies, and reads each remaining chat with a pause. Cancel at any time and run again to continue; imported copies are kept. Keep the browser and source tabs open. Deleted/unavailable chats cannot be recovered, and changed site formats or repeated pages stop the run with an error. The last 7, 14 or 30 days remain available for recent catch-up and its optional brief. In recent mode, Gemini, Grok, Perplexity, DeepSeek, Kimi, Le Chat, Copilot and AI Studio use their sidebar links (newest 30). Imported conversations follow your existing summarization, filing and privacy settings.
-- **Paperclip agent companies:** connect your [Paperclip](https://github.com/paperclipai/paperclip) server in **Settings → Paperclip** and every issue becomes a thread: the task, its comment thread, and the transcripts of the agent runs that worked on it, in time order. Details below.
-- **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
-
-### 2. Understands every thread (beyond the title)
-Each thread gets a **gist** (one line: what it is about and how it ended), a summary, the user's goal and outcome, the **kind of work** (building, debugging, writing, research, planning, design, data, business, learning, personal…), topic tags, named entities and artifacts (files, links), plus **where you left off**, **decisions** (yours vs. the assistant's suggestions), **next steps** and **open questions** — each linked to the exact message it came from.
-
-- **On-device analysis** runs instantly on every capture, with no network and no key.
-- **Claude analysis** (optional): Claude (default **Claude Opus 5.5**, selectable Sonnet 5.5 / Haiku 5.5 / Fable 5.1) re-reads each new or changed thread once the chat has gone quiet and writes an in-depth summary about the work itself (not about the chat): a descriptive title, a short gist, a 2–4 paragraph overview, key points, decisions with their reasons, what was produced, where you left off and the single next step, next steps, open questions and the project. Every key point, decision, next step and question must quote its source message verbatim; anything Claude cannot ground is dropped. Analysis runs at Medium effort or higher and reads up to about 160,000 characters of each thread (the opening and the newest turns of longer ones). **Copy summary** in a thread's detail copies all of it as Markdown, and **Copy handoff** adds the transcript. Summaries written by earlier versions are never re-analyzed automatically: open one and press **Improve summary**, or use **Settings → AI models → Older summaries** (shows the count and a cost estimate first). Claude can run through any of three providers, chosen in **Settings → AI models**:
-
-  | Provider | Credentials | Notes |
-  |---|---|---|
-  | Anthropic API | API key from console.anthropic.com | Server-side refusal fallback on Opus 5.5, Sonnet 5.5 and Fable 5.1 |
-  | Amazon Bedrock | Bedrock API key, or IAM access keys (optional session token) | Claude in Amazon Bedrock at `bedrock-mantle.{region}.api.aws`, model IDs such as `anthropic.claude-opus-5-5`. Enable model access in the Bedrock console first |
-  | Claude Platform on AWS | Workspace ID (`wrkspc_…`) plus a short-term API key, or IAM access keys | Anthropic-operated, billed through AWS Marketplace |
-
-  AWS credentials live under **Settings → Amazon Web Services** and are shared by Bedrock Claude, embeddings and reranking. Prefer short-term Bedrock API keys (12 hours at most) or temporary IAM credentials; AWS recommends long-term keys only for exploration. IAM keys are signed in the browser with SigV4.
-
-### 3. Organizes automatically
-New threads are filed into projects the moment they are captured, using the strongest signal available:
-
-1. **Your choice** — a project you set or locked is never changed.
-2. **The provider's own project** — ChatGPT/Claude Project or the coding session's repository (creating the project if needed).
-3. **Claude's judgement** — matched to an existing project, or a new project for a clear new workstream.
-4. **Keyword routing** — each project's keywords (seeded for your starter areas, editable).
-5. **Similar threads** — nearest neighbours among confidently filed threads in vector space.
-
-Status is set automatically too (*active*, *needs review* when the assistant is waiting on you, *done* when you wrapped up, *paused* after 30 days of silence) unless you set it yourself. **Auto-organize** reviews the whole library — with Claude when a key is set, otherwise by clustering similar unfiled threads into proposed projects — and shows every change for approval; every apply is undoable.
-
-**Many threads at once:** tick rows (shift-click for a range, or select all in view) to move them to a project, set their status, add a tag, pin or unpin them, make them local-only, export them as a Markdown handoff or a Portable bundle, or delete them. Every bulk edit can be undone. The list sorts by recent activity, oldest first, title or message count.
-
-### 4. Finds and answers
-- **Search** fuses keyword, phrase, fuzzy and semantic (vector) matches across titles, gists, summaries, topics, decisions and full message text. With a reranker on, pressing Enter re-reads the top candidates and puts the most relevant first.
-- **Ask** your library a question ("What did I decide about the Stripe webhook retries?") and Claude answers from your own threads with clickable `[T1]` citations.
-- **Related threads** for every conversation, by semantic similarity.
-
-### 5. Lives next to your chats
-- **Side panel** (default for the toolbar button): the library beside any page, with the conversation open in the current tab pinned at the top.
-- **Overlay** on AI pages (`Alt+Shift+K`) and a **full-page library** (`Alt+Shift+M`). Side panel shortcut: `Alt+Shift+L`.
-
-### 6. Works with Still (Sidebar Dock)
-Threadkeeper can feed **Still**, a separate sidebar extension, so your AI threads show up there as chats (summary and transcript) inside its collections, and Still's assistant can search them. The two extensions stay independent: Still keeps its own copy of every chat, so it keeps working when Threadkeeper is off.
-- **Connect from Still.** In Still: Settings → Integrations → AI chat threads → Find Threadkeeper → Connect. Threadkeeper opens a small window naming the extension that asks; type the 6-digit code Still shows and press **Allow** (or **Deny**, which blocks that extension until you unblock it). Threadkeeper shows its own ID under Settings → Sidebar Dock if Still needs it pasted.
-- **Still chooses what to sync** (every thread, chosen projects, or only threads it asks for) and where the chats go. Nothing syncs until you press Start syncing in Still.
-- **What Still gets:** title, provider category (from the table under [Supported AI products](#supported-ai-products)), the agent label of Paperclip threads (`Engineer · Claude Code`), gist and full analysis (overview, key points, decisions, next steps, open questions, what was produced), project, provider and, if transcript sharing is on in both apps, the transcript. Secrets in tool and system messages (API keys, tokens, private keys, `KEY=` lines) are replaced with `[redacted]`. Changes are pushed when a thread has been quiet for a minute (or your AI debounce), one batch at a time.
-- **Never shared:** local-only threads, threads in local-only projects, providers excluded from cloud processing, and synthetic threads. A thread that becomes private after it was shared is removed from Still right away; Threadkeeper also asks Still, after pairing, configuring and daily, which private threads it still holds and removes them.
-- **Searches from Still** use Threadkeeper's own hybrid search and Ask-style passage retrieval. They reach your embedding and rerank providers only if you allow it ("Let Still's searches use my embedding and rerank providers", off by default) and only for explicit searches.
-- **Send to Still from Threadkeeper.** Once connected, **Send to Still…** appears on a thread's detail row, in the bulk bar (select threads → Send to Still…), above search results ("Send these results to Still…", up to 200) and under an Ask answer (the threads it cites). Pick Still's default placement, one of Still's collections, or a new collection by name. Sending works whatever Still syncs on its own and brings back a chat you deleted in Still; local-only threads are skipped and named in the result. The thread detail shows **In Still · <collection>** when Still holds the thread.
-- **Settings → Sidebar Dock** shows the connection (Still's name and ID, since when, last push, counts), a read-only readout of what Still asked to sync, the options *Let Still search my threads*, *Share full transcripts* and *Let Still's searches use my embedding and rerank providers*, **Resync**, **Disconnect** (Still keeps the chats it has), blocked extensions with **Unblock**, and this Threadkeeper's ID with **Copy ID** for pasting into Still. A waiting request shows **Review request…**, which opens the consent window; Allow and Deny exist only there. In the overlay (Threadkeeper framed inside an AI site) these controls are read-only.
-- Edits made in the library (renames, status, project moves, local-only, deletes, organize, undo, analysis, imports) reach Still on their own; changes that can make a thread private are taken back from Still at once.
-- See `docs/sidebar-dock-integration.md` for the protocol.
-
-### 7. Syncs Paperclip agent work
-
-[Paperclip](https://github.com/paperclipai/paperclip) runs companies of AI agents (Claude Code, Codex, Gemini, OpenCode, Grok Build, and its own Grok Bot, OpenAI Dot and Muse runners) on a server you host. **Settings → Paperclip** connects to it:
-
-- **Server:** type the address (default `http://localhost:3100`) and press **Connect**. The browser asks for access to that host from the click. A local server that moved to the next free port is found on 3100-3110 automatically.
-- **Sign-in:** a `local_trusted` server (the `npx paperclipai onboard` default) needs none. On an authenticated server, **Sign in with Paperclip** runs the same approval flow as the Paperclip CLI: Paperclip opens in a tab, you approve, and Threadkeeper keeps the board key (valid 30 days) in this browser profile like its other keys. You can paste a `pcp_board_…` key instead.
-- **Companies:** every company you can see, or the ones you choose.
-- **Sync:** every 5 minutes while the browser runs, plus **Sync now**. Each sync reads only issues changed since the last one (`updatedSince`, with a cursor per company) and the newest runs, so a run that finished without touching its issue still shows up. A finished run is read once; later syncs reuse its stored transcript. Rate limits (429) are waited out or retried later, and repeated failures back off up to an hour. On a local server Threadkeeper also listens to Paperclip's live events to sync sooner.
-- **Threads:** one per issue, titled `PAP-12 Fix the CTA`. The issue description is the opening message, comments follow (agents' comments as replies), and each run is a block that opens with a one-line header (agent, outcome, duration, tokens, cost) followed by its transcript, with tool calls condensed the way Claude Code and Codex sessions are. Threads go through the normal on-device analysis and Claude analysis, are filed under the Paperclip project (else the goal, else the company), and take their status from the issue (in review → needs review, done → done, blocked → paused). A status you set yourself is kept.
-- **Agents and sessions:** each thread records who did the work, for example `Engineer · Claude Code` or `CEO · Grok Bot`. A Claude Code or Codex run is linked to its session: the thread shows **Linked session**, and the session shows **Run by Paperclip**. Import `~/.claude/projects` as usual; Paperclip gives Codex agents their own home, so import `~/.paperclip/instances/default/companies/<company id>/codex-home` to link Codex runs.
-- Paperclip threads (category *Agent*) go to Still like any other thread once Still syncs them, with their agent label; Still can filter for them by category.
-- Threadkeeper only reads. Apart from the sign-in request and revoking its own key when you sign out, it sends Paperclip nothing but GET requests. Threads you delete in Threadkeeper stay deleted.
-
----
-
-## Privacy
-
-- Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
-- API keys and AWS credentials (Anthropic, Voyage, OpenAI, Bedrock, Claude Platform on AWS) are stored the same way and only sent to their own API.
-- Paperclip is reached only after you connect it in **Settings → Paperclip**: access to `localhost` / `127.0.0.1` (or your server's host) is an optional permission asked for from that click. The board key, when one is needed, is stored like the other keys and sent only to your Paperclip server.
-- Hosts for MongoDB Atlas and Cohere are optional permissions too: Settings asks for the one host you chose when you press Test.
-- **Catch up** uses your own signed-in session in this browser to read your own conversations from the site you pick, and nothing else. It keeps no credentials, only reads, and nothing it reads leaves the browser except through the analysis, embedding and reranking settings you already control. The ChatGPT and Claude endpoints it uses are the sites' own and are not documented or supported by OpenAI or Anthropic. They can change or be restricted, and the sites' terms may limit automated access, so it runs only when you start it, at a human pace, and stops at the first sign of a block.
-- The extension holds no AWS host permission at install. **Settings → Amazon Web Services → Allow access** asks the browser for exactly the endpoints of the configured region (for example `bedrock-mantle.us-east-1.api.aws`).
-- **Settings → Privacy & limits** lists every host that captured text can reach with the current settings.
-- Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and threads already filed in a local-only project (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker. The check happens when a thread is analyzed, so a brand-new conversation that nothing has filed yet *is* sent before Claude can recognize it as personal — mark such conversations local-only, or switch off automatic Claude analysis.
-- Because the library frame must load from the extension's fixed ID (required for Edge, see Troubleshooting), a website can detect that Threadkeeper is installed by probing that URL. It cannot read anything: unauthenticated frames are rejected and the database is extension-only.
-- A daily limit (default 150 analyses) caps Claude usage; Settings shows a cost estimate for your library and model.
-
-## Embeddings
-
-On-device vectors (feature-hashed, 384 dims) are always maintained and need no key. For true semantic search and better auto-filing choose a hosted model in **Settings → Search & embeddings**:
-
-| Provider | Models | Notes |
-|---|---|---|
-| Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | Atlas model API key (default endpoint: ai.mongodb.com); select Legacy Voyage for voyageai.com keys |
-| MongoDB Atlas (Voyage) | The same four Voyage models, 256 to 2048 dimensions | A model API key created in Atlas, with the geography it was issued for (`ai.mongodb.com`, `us.ai.mongodb.com` or `eu.ai.mongodb.com`). It does not work on voyageai.com, and a voyageai.com key does not work here |
-| Cohere | `embed-v5.0-fast`, `embed-v5.0-pro`, `embed-v4.0`, `embed-multilingual-v3.0`, `embed-english-v3.0` | API key from dashboard.cohere.com, called directly on `api.cohere.com`. v5.0 and v4.0 take 256 to 2048 or 1536 dimensions (default here 1024); v5.0 Pro and Fast share one vector space, so you can index with Pro and query with Fast |
-| Amazon Bedrock | Amazon Titan Text Embeddings V2, Cohere Embed v4 (256, 512 or 1024 dimensions), Cohere Embed English v3 and Multilingual v3 (fixed 1024) | Uses the AWS credentials in Settings |
-| OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | API key from platform.openai.com |
-| Ollama (local) | any embedding model, e.g. `nomic-embed-text` | start Ollama with `OLLAMA_ORIGINS=chrome-extension://*` |
-
-Vectors are only compared within one model space, so switching provider never mixes incompatible vectors. Atlas and direct Voyage are separate spaces even for the same model name. Cohere's newest models (Embed v5.0, Rerank v5.0) are only on Cohere's own API; Amazon Bedrock offers Cohere Embed v4 and v3 and Rerank 3.5.
-
-The Voyage endpoint setting applies to both embeddings and reranking. Existing saved Voyage keys without an endpoint keep using `api.voyageai.com`; choose MongoDB explicitly when replacing one with an Atlas model API key. For a US/EU key, choose the separate **MongoDB Atlas (Voyage)** provider and the matching geography. Keys are never retried against another host. MongoDB documents this key/endpoint requirement in its [API overview](https://www.mongodb.com/docs/voyageai/api-reference/overview/).
-
-Typing searches locally. Press **Enter** to add the configured hosted query embedding and reranker to the currently filtered candidates. Remote search uses compatible, current vectors; rebuilding vectors in Settings fills the selected provider's space. A failed or timed-out model request keeps local results available. Local-only threads and projects stay out of remote reranking and remote vector retrieval. These model calls are optional; generation settings remain independent.
-
-### Reranking
-
-A reranker re-scores the best first-stage candidates of a search (when you press Enter) or of an Ask question, then blends its score with the first-stage rank so a strong exact match is not buried. It sends only each thread's title, gist and best-matching excerpt, never local-only threads, and caches scores per query.
-
-| Reranker | Models | Notes |
-|---|---|---|
-| Voyage AI | `rerank-3-lite` (default), `rerank-3` | Atlas model API key; endpoint setting shared with embeddings, with explicit Legacy Voyage support |
-| MongoDB Atlas (Voyage) | `rerank-3-lite`, `rerank-3`, `rerank-2.5-lite`, `rerank-2.5` | Atlas model API key and geography, as above |
-| Cohere | `rerank-v5.0-fast`, `rerank-v5.0-pro`, `rerank-v4.0-fast`, `rerank-v4.0-pro`, `rerank-v3.5` | Cohere API key, called directly on `api.cohere.com` |
-| Amazon Bedrock | Cohere Rerank 3.5, Amazon Rerank 1.0 | With IAM keys it uses the Bedrock Rerank API. Bedrock API keys are not accepted there, so with an API key Cohere Rerank 3.5 is called directly (experimental). Cohere Rerank 3.5 runs in us-east-1, us-west-2, ca-central-1, eu-central-1 and ap-northeast-1 |
-
----
-
-## Getting started
-
-Prerequisites: Node.js ≥ 20, npm ≥ 10, Chrome or Microsoft Edge.
-
-```bash
-npm install
-```
-
-```bash
-npm run build
-```
-
-The unpacked extension is written to `.output/chrome-mv3`.
-
-1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. On macOS the `.output` folder is hidden: press **Cmd+Shift+.** in the folder picker to show it. A browser keeps the library under the extension's ID, and removing a Threadkeeper card deletes that copy's library, so before you remove or replace a copy, make a backup with the [Mac helper](docs/mac-helper.md) (Settings, Accounts, Library backups). New installs have a fixed ID, so the library follows Threadkeeper to any folder; a copy loaded before that keeps its older, folder-based ID until you move it (see "The extension ID" in that guide).
-2. Check that the version on the extensions page matches the `Built Threadkeeper … (build …)` line that `npm run build` printed. After every later `npm run build`, click **Reload** (or let the extension reload itself within a few minutes).
-3. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
-4. Optional: **Settings → AI models** → choose the Anthropic API, Amazon Bedrock or Claude Platform on AWS, add the key → **Test connection**. Then press **Auto-organize** to analyze and file your whole library.
-5. Optional: **Import / Export** → import your ChatGPT/Claude export and your Claude Code / Codex session folders.
-
-### Commands
-
-```bash
-# Typecheck, build and run the unit tests
-npm run check
-```
-
-```bash
-# Packaged-extension acceptance suite (QUIET-01 .. PERF-10) in headless Chromium
-npm run test:acceptance
-```
-
-```bash
-# End-to-end organizer check: Edge static-URL overlay, multi-provider capture, auto-filing,
-# Claude analysis / Ask against a mocked Anthropic API, side panel layout
-npm run test:e2e
-```
-
-```bash
-# Real Microsoft Edge: overlay, full page, side panel, and stale-manifest recovery
-# (set EDGE_EXECUTABLE_PATH if Edge is not in a standard location)
-npm run test:edge
-```
-
-```bash
-# ChatGPT capture and Catch up against a mock ChatGPT / Claude: complete capture from the site's
-# own data, history sync, the brief, Check capture, and the narrow layout
-npm run test:catchup
-```
-
-```bash
-# 10,000-thread warm-open and local search benchmark
-npm run bench
-```
-
-Set `CHROME_EXECUTABLE_PATH` to use a specific Chromium build for the browser suites (for example `/opt/pw-browsers/chromium` when the repo's Playwright version does not match the installed browsers).
-
----
-
-## Supported AI products
-
-Every provider in `src/core/providers.ts`, with the category Threadkeeper filters by and passes to Still (`chat`, `coding_agent`, `agent`, `builder`, `search`, `companion`). **Host access**: *install* = access held since install, capture on by default (Grok Bot excepted); *on request* = asked for when you turn the product on in Settings → Capture; *your sites* = sites you add under Any AI site; Paperclip is read from its API on a server you connect (never from a page), and Imported holds files that belong to no known provider. **Selectors**: how sure we are the page reader matches the live site. Every adapter added with the opt-in products is tested only against synthetic fixtures modelled on public exporters and the sites' own code; none was checked against a signed-in page.
-
-| Product | Category | Pages | Host access | Selectors |
-|---|---|---|---|---|
-| ChatGPT (`chatgpt`) | Chat | chatgpt.com, chat.openai.com | install | high |
-| Claude (`claude`) | Chat | claude.ai | install | high |
-| Claude Code (`claude_code`) | Coding agent | claude.ai | install | high |
-| Codex (`codex`) | Coding agent | chatgpt.com | install | high |
-| Grok (`grok`) | Chat | grok.com | install | medium |
-| Grok on X (`grok_x`) | Chat | x.com, twitter.com | install | high |
-| Gemini (`gemini`) | Chat | gemini.google.com | install | medium |
-| Google AI Studio (`ai_studio`) | Chat | aistudio.google.com | install | medium |
-| Perplexity (`perplexity`) | Search | www.perplexity.ai, perplexity.ai | install | medium |
-| DeepSeek (`deepseek`) | Chat | chat.deepseek.com | install | medium |
-| Le Chat (`mistral`) | Chat | chat.mistral.ai | install | low |
-| Copilot (`copilot`) | Chat | copilot.microsoft.com, copilot.com, www.copilot.com | install | medium |
-| Kimi (`kimi`) | Chat | www.kimi.com, kimi.com, kimi.ai, www.kimi.ai | install (+ on request for www.kimi.ai) | medium |
-| Imported (`imported`) | Chat | import files only | none | – |
-| Paperclip (`paperclip`) | Agent | your Paperclip server (API, Settings → Paperclip) | on request (your server) | – |
-| ChatGPT dots (`chatgpt_dots`) | Agent | chatgpt.com | install | medium |
-| Claude Duet (`claude_duet`) | Agent | claude.ai | install | low |
-| Grok Bot (`grok_bot`) | Agent | x.com, twitter.com | install, only via Capture this tab | low |
-| Muse (`muse`) | Agent | muse.ai, www.muse.ai | on request | low |
-| Meta AI (`meta_ai`) | Chat | www.meta.ai, meta.ai | on request | medium |
-| Poe (`poe`) | Chat | poe.com | on request | low |
-| HuggingChat (`huggingchat`) | Chat | huggingface.co/chat | on request | high |
-| Qwen Chat (`qwen`) | Chat | chat.qwen.ai | on request | high |
-| Doubao (`doubao`) | Chat | www.doubao.com | on request | high |
-| Z.ai (`zai`) | Chat | chat.z.ai, zchat.z.ai | on request | high |
-| Manus (`manus`) | Agent | manus.im, www.manus.im | on request | medium |
-| Genspark (`genspark`) | Agent | www.genspark.ai, genspark.ai | on request | high |
-| MiniMax Agent (`minimax_agent`) | Agent | agent.minimax.io, agent.minimaxi.com | on request | low |
-| Character.AI (`character_ai`) | Companion | character.ai | on request | medium |
-| Duck.ai (`duck_ai`) | Chat | duck.ai | on request | high |
-| Lumo (`lumo`) | Chat | lumo.proton.me | on request | medium |
-| Arena (`arena`) | Chat | arena.ai, lmarena.ai | on request | low |
-| T3 Chat (`t3_chat`) | Chat | t3.chat | on request | low |
-| Gemini Notebook (`gemini_notebook`) | Chat | notebook.google.com, notebooklm.google.com | on request | medium |
-| GitHub Copilot (`github_copilot`) | Coding agent | github.com | on request | low |
-| Cursor agents (`cursor_agents`) | Coding agent | cursor.com, www.cursor.com | on request | low |
-| Devin (`devin`) | Coding agent | app.devin.ai | on request | low |
-| Jules (`jules`) | Coding agent | jules.google.com | on request | low |
-| Lovable (`lovable`) | App builder | lovable.dev | on request | medium |
-| Bolt (`bolt`) | App builder | bolt.new | on request | low |
-| v0 (`v0`) | App builder | v0.app, v0.dev | on request | low |
-| Replit Agent (`replit`) | App builder | replit.com | on request | low |
-| LobeChat (`lobechat`) | Chat | app.lobehub.com | on request | low |
-| Other AI sites (`custom_web`) | Chat | sites you add | your sites | low |
-| Open WebUI (`open_webui`) | Chat | sites you add | your sites | medium |
-| LibreChat (`librechat`) | Chat | sites you add | your sites | medium |
-| AnythingLLM (`anythingllm`) | Chat | sites you add | your sites | low |
-
-
-Reading is DOM-first everywhere except ChatGPT, Claude and Grok on X (which also read the conversation data the page loads). Catch up, network readers and history import for the newer products are not built yet; their threads arrive as you open them.
-
-## Repository structure
-
-```text
-src/
-  core/
-    providers.ts         Provider registry (category, hosts, host access, URL ids, labels) — the manifest is derived from it
-    dom-capture.ts       Per-provider DOM adapters, self-hosted app detection, generic fallback, structure-aware text extraction
-    custom-sites.ts      Sites added under Any AI site + runtime content-script registration for opt-in providers
-    capture-gate.ts      The service worker's accept/reject decision for every capture (sender page, provider, explicit token)
-    cli-sessions.ts      Claude Code and Codex CLI JSONL parsers
-    importers.ts         Format detection, zip/JSON/JSONL import, folder sync
-    site-api.ts          Parsers for the conversation JSON ChatGPT and Claude load (active branch, hidden turns, citations)
-    merge.ts             Identity-anchored merge of a DOM window into a stored thread
-    history-sync.ts      Catch up: sites, events, state, validation
-    site-history.ts      Page-side reader for ChatGPT and Claude through the signed-in session
-    sidebar-history.ts   Tab-by-tab reader for sites without a readable history
-    sync-orchestrator.ts Service-worker run: tabs, progress, cancel, idle timeout
-    sync-env.ts          The orchestrator's view of chrome.tabs and the database
-    catch-up.ts          Catch-up brief: on-device, or written by Claude from titles and summaries only
-    model-apis.ts        MongoDB Atlas and Cohere endpoints, model catalogs and dimension rules
-    adapters.ts          ChatGPT/Claude export parsers, Portable bundle, Markdown handoff
-    insights.ts          On-device analyzer (gist, kind, topics, decisions, next steps, status)
-    grok-x.ts            Parser for the Grok-on-X conversation data the page loads
-    ai/claude.ts         Claude analysis, library planning and Ask via the official Anthropic SDK
-    ai/backends.ts       One SDK client for the Anthropic API, Amazon Bedrock and Claude Platform on AWS
-    aws.ts               AWS endpoints, Bedrock API keys and SigV4 signing (aws4fetch), host access
-    embeddings.ts        Local hashed vectors + Voyage / Bedrock / OpenAI / Ollama
-    rerank.ts            Voyage and Bedrock reranking, score fusion, local-only filter
-    diagnostics.ts       Running-manifest vs build check, one-time self-reload, report
-    auto-organize.ts     Project filing precedence, k-NN, clustering
-    pipeline.ts          Capture → analyze → embed → file; debounced, leased Claude job queue
-    library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
-    db.ts, schema.ts     Dexie schema (v3), identity, tombstones, settings normalization
-    dock/                Still (Sidebar Dock) link: protocol + validators, pairing state, payloads,
-                         outbox/ledger/reconcile/drain, read queries, external handler
-    search.ts            Hybrid lexical + vector retrieval
-    paperclip/           Paperclip sync: client.ts (read-only API client, discovery, 429 handling),
-                         auth.ts (CLI approval flow, board keys), mapper.ts (issue/comments/runs → thread,
-                         run-log and native-event transcripts), sync.ts (incremental sync, cursors, backoff),
-                         live.ts (optional live-event hint)
-  entrypoints/
-    background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
-    content.ts           Zero-footprint capture observer, overlay host with load watchdog
-    grok-x-main.ts       Page-world observer for Grok on X responses (reads, never changes)
-    site-data-main.ts    Page-world observer for ChatGPT and Claude conversation responses (reads, never changes)
-    manager/             React UI shared by side panel, overlay and full page
-    connect/             Consent window for a Still pair request (connect.html, top-level popup only)
-shared/cloud.ts          Wire schemas for the optional Cloudflare Worker
-worker/                  Optional Cloudflare Worker (DeepSeek + MongoDB Voyage)
-scripts/                 Build, acceptance, e2e, Edge smoke, bulk screenshots and benchmark runners
-tests/unit/              Vitest suites
-evidence/                Acceptance ledger, benchmark report and screenshots
-```
-
----
-
-## Optional Cloudflare Worker (`worker/`)
-
-Not needed when Claude analysis is configured. To use your own Worker for enrichment and embeddings instead:
-
-1. Configure `QUOTA_KV` in `worker/wrangler.toml` and set secrets:
-   ```bash
-   cd worker
-   npx wrangler secret put AUTH_TOKEN_HASHES_JSON
-   npx wrangler secret put MONGODB_ATLAS_MODEL_API_KEY
-   ```
-   - `AUTH_TOKEN_HASHES_JSON`: JSON map of lowercase SHA-256 hex digests of client Bearer tokens to user IDs.
-   - `MONGODB_ATLAS_MODEL_API_KEY`: MongoDB Atlas Model API key for Voyage embeddings and rerankers.
-2. Deploy with `npx wrangler deploy`.
-3. In **Settings → Cloudflare Worker enrichment (advanced)**, enable it, enter the Worker URL and Bearer token, and set a non-zero daily budget.
-
----
-
-## Acceptance gates
-
-All gates pass in packaged-extension headless Chromium (see [`evidence/acceptance/acceptance-report.md`](evidence/acceptance/acceptance-report.md) and the [ledger](evidence/acceptance/acceptance-ledger.json)); the organizer e2e writes screenshots to [`evidence/organizer/`](evidence/organizer).
-
-| Gate | Requirement | Result |
-| :--- | :--- | :--- |
-| `QUIET-01` | Zero-presence closed state | 0 injected nodes, byte-identical host screenshots, no stray network; the manager loads from the static-ID URL Edge uses |
-| `OPEN-02` | Deliberate invocation & restoration | Layered `Escape`, scroll, focus and unsent draft restored |
-| `PARITY-03` | Overlay / full-page parity | Reconciled counts, 5 evidence locations, list / kanban / project cards, no horizontal overflow at 1440, 1280, 700 px |
-| `CAPTURE-04` | Passive capture & monotonic coverage | Partial DOM capture never downgrades full exports |
-| `IMPORT-05` | Lossless import / export | 652-thread ChatGPT fixture, Claude export, Portable JSON + Markdown round-trip |
-| `ISOLATE-06` | Account / workspace / branch isolation | 5-part identity key, `account_mismatch` guard |
-| `AI-07` | Grounded enrichment & NL organize | Quote-grounded claims, exclusion clauses, one-click undo |
-| `SEARCH-08` | Hybrid search | Match reasons, RRF lexical + vector fusion, compatibility checks |
-| `LIFE-09` | Lifecycle hygiene | Handshake framing guard, tombstones, cascade delete, no localhost origins |
-| `PERF-10` | 10k threads | Chromium IndexedDB warm-open p95 221 ms (≤ 500 ms); local search p95 5.6 ms (≤ 150 ms) |
-
----
-
-## Troubleshooting
-
-- **"`<extension id>` is blocked · This page has been blocked by Microsoft Edge · ERR_BLOCKED_BY_CLIENT":** Edge is still running an old manifest. Builds before 0.2.0 made the library pages reachable only through a dynamic URL (`use_dynamic_url`), and Edge blocks the static URL it hands out, including the full-page library. Edge reads `manifest.json` only when an unpacked extension is loaded or reloaded, so running `npm run build` without pressing **Reload** keeps the broken manifest live. Fix: open `edge://extensions`, click **Reload** under Threadkeeper, and check that the version shown matches the `Built Threadkeeper … (build …)` line printed by `npm run build`. From 0.3.0 the extension detects this itself. After a rebuild, the service worker (which keeps running its previous script) reads the new `build-info.json` from disk the next time it wakes, at most a few minutes later, and reloads the extension once; any library page opened before that shows a **Reload extension** banner. **Settings → Diagnostics** compares the running manifest with the files on disk and copies a report. `npm run test:edge` reproduces the block in real Edge and checks every surface.
-- **Capture looks incomplete or missing on a site:** open the conversation, then **Settings → Diagnostics → Check capture in my AI tab**. It says whether the page was read, whether the site's own data arrived, and what the last capture did, as counts only (copy it into a bug report). For ChatGPT and Claude, reloading the tab makes the page send the complete conversation again.
-- **Catch up says to sign in, or that a site blocked it:** open the site in a normal tab, sign in or complete any check it shows, and run Catch up again. What was already imported is kept, and unchanged conversations are not read twice.
-- **Settings → Diagnostics** shows the running and on-disk versions, recent capture and overlay events, and copies a report without keys or thread content.
-- **A site changed its markup and capture stopped:** the generic role heuristics usually keep working; otherwise use the provider's data export via **Import / Export**.
-- **Claude analysis paused:** the status chip in the header shows the last error (invalid key, rate limit, daily limit). Fix it in Settings; queued threads resume automatically.
+<p align="center">
+  <sub>Open source under MIT. Built for people who want to get work done, not babysit agents.</sub>
+</p>

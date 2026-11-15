@@ -1,0 +1,5 @@
+{
+  "server/src/__tests__/workspace-runtime.test.ts": "2004602519f183918bb05bed50397e7341ded70010dea032f0504cc50a3d2de4",
+  "server/src/services/workspace-runtime.ts": "5d68cd9455d78474416ff363740baf1a25e87dcf0966941551c747dcd9db97e1",
+  "server/src/services/local-service-supervisor.ts": "4d6155f773beff51c5f4468d7ceaf3da80f614ffd8afbee4fa7269e48183aebf"
+}

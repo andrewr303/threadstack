@@ -1,0 +1,24 @@
+{
+  "requestedAt": "2026-11-15T05:58:21.250339+00:00",
+  "scope": "Only owned disposable3217 server, embedded55487 PostgreSQL and owned recoverywatcher. No shared/default browser/service stopped.",
+  "serverPid": 91325,
+  "launcherPid": 91324,
+  "watcherSession": 80988,
+  "commandVerified": true,
+  "stoppedAt": "2026-11-15T05:58:22.054997+00:00",
+  "ports": {
+    "3217": {
+      "listeners": []
+    },
+    "55487": {
+      "listeners": []
+    }
+  },
+  "serverStopped": true,
+  "postgresStopped": true,
+  "profilesClosedByRunner": true,
+  "watcherStopped": true,
+  "ownedBrowserProcessCount": 0,
+  "verifiedAt": "2026-11-15T05:59:24.253299+00:00",
+  "ownedBrowserProcesses": []
+}

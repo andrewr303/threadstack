@@ -1,0 +1,513 @@
+{
+  "id": "fused-offline",
+  "name": "Server stop keeps Threads with the shell rail; restart resumes fused mode",
+  "acs": [
+    "AC-8"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:43.741Z",
+  "completedAt": "2026-11-15T05:54:54.680Z",
+  "observation": "Stopped the owned server (pid 87061); Threads stayed mounted with the shell rail and switch (Browse/Threads/Dashboard/Paperclip); after restart fused mode resumed on /THR/threads (same view node: true).",
+  "detail": {
+    "ownership": {
+      "listenerPid": 87061,
+      "recordedPid": 87061,
+      "commandOk": true,
+      "metadataCurrent": true
+    },
+    "offline": {
+      "fused": null,
+      "radiogroup": true,
+      "status": "stopped",
+      "threadsVisible": true,
+      "rows": 41,
+      "sameNode": true,
+      "railVisible": true,
+      "railRect": {
+        "x": 8,
+        "y": 8,
+        "width": 264,
+        "height": 884,
+        "top": 8,
+        "right": 272,
+        "bottom": 892,
+        "left": 8
+      },
+      "switchVisible": true,
+      "switchLabels": [
+        "Browse",
+        "Threads",
+        "Dashboard",
+        "Paperclip"
+      ],
+      "shellStyle": ""
+    },
+    "standaloneLayouts": [
+      {
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "title": {
+          "x": 297,
+          "y": 82,
+          "width": 661.796875,
+          "height": 24,
+          "top": 82,
+          "right": 958.796875,
+          "bottom": 106,
+          "left": 297
+        },
+        "modes": {
+          "x": 970.796875,
+          "y": 77,
+          "width": 284.203125,
+          "height": 34,
+          "top": 77,
+          "right": 1255,
+          "bottom": 111,
+          "left": 970.796875
+        },
+        "header": {
+          "x": 297,
+          "y": 77,
+          "width": 958,
+          "height": 110.390625,
+          "top": 77,
+          "right": 1255,
+          "bottom": 187.390625,
+          "left": 297
+        },
+        "live": {
+          "x": 297,
+          "y": 199.390625,
+          "width": 958,
+          "height": 679.609375,
+          "top": 199.390625,
+          "right": 1255,
+          "bottom": 879,
+          "left": 297
+        },
+        "controls": {
+          "x": 297,
+          "y": 140.390625,
+          "width": 958,
+          "height": 38,
+          "top": 140.390625,
+          "right": 1255,
+          "bottom": 178.390625,
+          "left": 297
+        },
+        "actionRects": [
+          {
+            "x": 300,
+            "y": 143.390625,
+            "width": 140,
+            "height": 32,
+            "top": 143.390625,
+            "right": 440,
+            "bottom": 175.390625,
+            "left": 300
+          },
+          {
+            "x": 446,
+            "y": 143.390625,
+            "width": 54,
+            "height": 32,
+            "top": 143.390625,
+            "right": 500,
+            "bottom": 175.390625,
+            "left": 446
+          },
+          {
+            "x": 506,
+            "y": 143.390625,
+            "width": 128,
+            "height": 32,
+            "top": 143.390625,
+            "right": 634,
+            "bottom": 175.390625,
+            "left": 506
+          },
+          {
+            "x": 640,
+            "y": 143.390625,
+            "width": 86.109375,
+            "height": 32,
+            "top": 143.390625,
+            "right": 726.109375,
+            "bottom": 175.390625,
+            "left": 640
+          },
+          {
+            "x": 732.109375,
+            "y": 143.390625,
+            "width": 88.203125,
+            "height": 32,
+            "top": 143.390625,
+            "right": 820.3125,
+            "bottom": 175.390625,
+            "left": 732.109375
+          },
+          {
+            "x": 826.3125,
+            "y": 143.390625,
+            "width": 57.359375,
+            "height": 32,
+            "top": 143.390625,
+            "right": 883.671875,
+            "bottom": 175.390625,
+            "left": 826.3125
+          },
+          {
+            "x": 889.671875,
+            "y": 143.390625,
+            "width": 83.546875,
+            "height": 32,
+            "top": 143.390625,
+            "right": 973.21875,
+            "bottom": 175.390625,
+            "left": 889.671875
+          },
+          {
+            "x": 979.21875,
+            "y": 143.390625,
+            "width": 98.171875,
+            "height": 32,
+            "top": 143.390625,
+            "right": 1077.390625,
+            "bottom": 175.390625,
+            "left": 979.21875
+          },
+          {
+            "x": 1083.390625,
+            "y": 143.390625,
+            "width": 78.078125,
+            "height": 32,
+            "top": 143.390625,
+            "right": 1161.46875,
+            "bottom": 175.390625,
+            "left": 1083.390625
+          }
+        ],
+        "sidebarIndexes": 1,
+        "duplicateMainIndexes": 0,
+        "liveFrame": {
+          "slot": {
+            "x": 297,
+            "y": 199.390625,
+            "width": 958,
+            "height": 679.609375,
+            "top": 199.390625,
+            "right": 1255,
+            "bottom": 879,
+            "left": 297
+          },
+          "frame": {
+            "x": 297,
+            "y": 199,
+            "width": 958,
+            "height": 680,
+            "top": 199,
+            "right": 1255,
+            "bottom": 879,
+            "left": 297
+          }
+        },
+        "ask": {
+          "width": 1280,
+          "form": {
+            "x": 17,
+            "y": 180,
+            "width": 246,
+            "height": 161.9375,
+            "top": 180,
+            "right": 263,
+            "bottom": 341.9375,
+            "left": 17
+          },
+          "input": {
+            "x": 17,
+            "y": 180,
+            "width": 246,
+            "height": 98,
+            "top": 180,
+            "right": 263,
+            "bottom": 278,
+            "left": 17
+          },
+          "action": {
+            "x": 17,
+            "y": 309.9375,
+            "width": 246,
+            "height": 32,
+            "top": 309.9375,
+            "right": 263,
+            "bottom": 341.9375,
+            "left": 17
+          }
+        }
+      },
+      {
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "title": {
+          "x": 97,
+          "y": 116,
+          "width": 464,
+          "height": 24,
+          "top": 116,
+          "right": 561,
+          "bottom": 140,
+          "left": 97
+        },
+        "modes": {
+          "x": 573,
+          "y": 111,
+          "width": 102,
+          "height": 34,
+          "top": 111,
+          "right": 675,
+          "bottom": 145,
+          "left": 573
+        },
+        "header": {
+          "x": 97,
+          "y": 111,
+          "width": 578,
+          "height": 110.390625,
+          "top": 111,
+          "right": 675,
+          "bottom": 221.390625,
+          "left": 97
+        },
+        "live": {
+          "x": 97,
+          "y": 233.390625,
+          "width": 578,
+          "height": 645.609375,
+          "top": 233.390625,
+          "right": 675,
+          "bottom": 879,
+          "left": 97
+        },
+        "controls": {
+          "x": 97,
+          "y": 174.390625,
+          "width": 578,
+          "height": 38,
+          "top": 174.390625,
+          "right": 675,
+          "bottom": 212.390625,
+          "left": 97
+        },
+        "actionRects": [
+          {
+            "x": 100,
+            "y": 177.390625,
+            "width": 138.71875,
+            "height": 32,
+            "top": 177.390625,
+            "right": 238.71875,
+            "bottom": 209.390625,
+            "left": 100
+          },
+          {
+            "x": 244.71875,
+            "y": 177.390625,
+            "width": 54,
+            "height": 32,
+            "top": 177.390625,
+            "right": 298.71875,
+            "bottom": 209.390625,
+            "left": 244.71875
+          },
+          {
+            "x": 304.71875,
+            "y": 177.390625,
+            "width": 128,
+            "height": 32,
+            "top": 177.390625,
+            "right": 432.71875,
+            "bottom": 209.390625,
+            "left": 304.71875
+          },
+          {
+            "x": 438.71875,
+            "y": 177.390625,
+            "width": 32,
+            "height": 32,
+            "top": 177.390625,
+            "right": 470.71875,
+            "bottom": 209.390625,
+            "left": 438.71875
+          },
+          {
+            "x": 476.71875,
+            "y": 177.390625,
+            "width": 32,
+            "height": 32,
+            "top": 177.390625,
+            "right": 508.71875,
+            "bottom": 209.390625,
+            "left": 476.71875
+          },
+          {
+            "x": 514.71875,
+            "y": 177.390625,
+            "width": 32,
+            "height": 32,
+            "top": 177.390625,
+            "right": 546.71875,
+            "bottom": 209.390625,
+            "left": 514.71875
+          },
+          {
+            "x": 552.71875,
+            "y": 177.390625,
+            "width": 32,
+            "height": 32,
+            "top": 177.390625,
+            "right": 584.71875,
+            "bottom": 209.390625,
+            "left": 552.71875
+          },
+          {
+            "x": 590.71875,
+            "y": 177.390625,
+            "width": 32,
+            "height": 32,
+            "top": 177.390625,
+            "right": 622.71875,
+            "bottom": 209.390625,
+            "left": 590.71875
+          },
+          {
+            "x": 628.71875,
+            "y": 177.390625,
+            "width": 32,
+            "height": 32,
+            "top": 177.390625,
+            "right": 660.71875,
+            "bottom": 209.390625,
+            "left": 628.71875
+          }
+        ],
+        "sidebarIndexes": 1,
+        "duplicateMainIndexes": 0,
+        "liveFrame": {
+          "slot": {
+            "x": 97,
+            "y": 233.390625,
+            "width": 578,
+            "height": 645.609375,
+            "top": 233.390625,
+            "right": 675,
+            "bottom": 879,
+            "left": 97
+          },
+          "frame": {
+            "x": 97,
+            "y": 233,
+            "width": 578,
+            "height": 646,
+            "top": 233,
+            "right": 675,
+            "bottom": 879,
+            "left": 97
+          }
+        },
+        "ask": {
+          "width": 700,
+          "form": {
+            "x": 17,
+            "y": 180,
+            "width": 246,
+            "height": 161.9375,
+            "top": 180,
+            "right": 263,
+            "bottom": 341.9375,
+            "left": 17
+          },
+          "input": {
+            "x": 17,
+            "y": 180,
+            "width": 246,
+            "height": 98,
+            "top": 180,
+            "right": 263,
+            "bottom": 278,
+            "left": 17
+          },
+          "action": {
+            "x": 17,
+            "y": 309.9375,
+            "width": 246,
+            "height": 32,
+            "top": 309.9375,
+            "right": 263,
+            "bottom": 341.9375,
+            "left": 17
+          }
+        }
+      }
+    ],
+    "firstFusedObservation": {
+      "path": "/THR/threads",
+      "slotPresentInFrame": true,
+      "shell": {
+        "x": 230,
+        "y": 60,
+        "width": 1050,
+        "height": 840,
+        "top": 60,
+        "right": 1280,
+        "bottom": 900,
+        "left": 230
+      }
+    },
+    "resumed": {
+      "path": "/THR/threads",
+      "workbench": {
+        "surface": "page",
+        "view": "threads",
+        "fused": "true"
+      },
+      "shell": {
+        "x": 230,
+        "y": 60,
+        "width": 1050,
+        "height": 840,
+        "top": 60,
+        "right": 1280,
+        "bottom": 900,
+        "left": 230
+      },
+      "slot": {
+        "x": 230,
+        "y": 60,
+        "width": 1050,
+        "height": 840,
+        "top": 60,
+        "right": 1280,
+        "bottom": 900,
+        "left": 230
+      },
+      "withinOnePx": true,
+      "sameNodeAfterResume": true,
+      "ownership": {
+        "newListenerPid": 91325
+      }
+    }
+  },
+  "evidence": [
+    "fused-offline-offline.png",
+    "fused-offline-standalone-1280.png",
+    "fused-offline-standalone-ask-1280.png",
+    "fused-offline-standalone-700.png",
+    "fused-offline-standalone-ask-700.png",
+    "fused-offline-resumed.png"
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "capturedAt": "2026-11-15T10:03:19.138632+00:00",
+  "sourceHead": "48275586efb8641ab8e763d378e6d5e676dc6681",
+  "changedFiles": {
+    "server/src/services/native-runtime/native-ingress-bootstrap-retry.integration.test.ts": "aa11a0b853b8bc418eecfd8d7e03b33067e9ec9ffe35e5fec865c219998c25eb",
+    "server/src/__tests__/workspace-instance-cleanup.test.ts": "836d86a56137810faeb6cf4f386a5d3656c97f3ece1b0417f2221e29930e5763"
+  },
+  "productionFilesChanged": false,
+  "nodeRuntime": "24.22.2",
+  "red": {
+    "failed": 2,
+    "passed": 12,
+    "exitCode": 1
+  },
+  "green": {
+    "filesPassed": 2,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "targetedTypes": {
+    "files": [
+      "server/src/services/native-runtime/native-ingress-bootstrap-retry.integration.test.ts",
+      "server/src/__tests__/workspace-instance-cleanup.test.ts"
+    ],
+    "exitCode": 0
+  },
+  "receivedSignals": [],
+  "receipts": [
+    {
+      "path": "/tmp/tk-continue/bootstrap-cleanup-recheck/bootstrap-cleanup-red.json",
+      "sha256": "2603921e6adbe3b11144e95ad9ad386f43fea200073494e110bd0c515f031b4d",
+      "bytes": 1214
+    },
+    {
+      "path": "/tmp/tk-continue/bootstrap-cleanup-recheck/bootstrap-cleanup-red.log",
+      "sha256": "6b5ae711f1529b55f162300763790a817142ddf60fca656ee251bd2135fa72c1",
+      "bytes": 4603
+    },
+    {
+      "path": "/tmp/tk-continue/bootstrap-cleanup-recheck/bootstrap-cleanup-green.json",
+      "sha256": "3bcf5b3bbcf22e5cf0ba5152227b9d52c6389a032e53054e34624df4f04936b9",
+      "bytes": 1214
+    },
+    {
+      "path": "/tmp/tk-continue/bootstrap-cleanup-recheck/bootstrap-cleanup-green.log",
+      "sha256": "a985d428a40fdd8c4c02cfe2c3b04380077209aef8a12b113872cce485677fe9",
+      "bytes": 1269
+    },
+    {
+      "path": "/tmp/tk-continue/bootstrap-cleanup-recheck/bootstrap-cleanup-types.json",
+      "sha256": "1cc23710561a4b8f1f5eb3bbd9477f55f03a2850a7e0b25ef9aebbf00029d027",
+      "bytes": 1101
+    },
+    {
+      "path": "/tmp/tk-continue/bootstrap-cleanup-recheck/bootstrap-cleanup-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ]
+}

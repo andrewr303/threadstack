@@ -1,0 +1,8 @@
+{
+  "server/src/__tests__/maintenance-server-routes.test.ts": "7fa0b76d38acb2786cd8bf78cdea5dcc5a471d6692838cf9bfbc4f936db78b80",
+  "server/src/__tests__/issue-confirm-run-stopped-routes.test.ts": "278b896ad2c53e8eba4bb343e7fcb6a3e0a7b0f8ff86f2e33fedc6583dcb8f32",
+  "server/src/__tests__/issue-queued-comments-routes.test.ts": "2e991396b799b685d5664b18a830b89ef9c6989592d35c22f1f9f77251e37a5a",
+  "server/src/__tests__/helpers/maintenance/runtime-build.ts": "270d7525842a4f61ef33a008fbf840ed15f807b2fc8a39bf83bdc17417103223",
+  "server/src/services/native-local-process-stop.ts": "8ef8e1c32b7d16cba260afb1d45167e8f6491de30acdc55b39f0370ac2eb4b87",
+  "server/src/middleware/local-agent-process-boundary.ts": "b3f2692b3507105b06496a8721a0a97bf81b07d70483d90a3d4a4c048c639f1d"
+}

@@ -1,0 +1,10 @@
+{
+  "server/src/services/native-runtime/native-session-executor.ts": {
+    "sha256": "f515bcfa3644c9ce3ae762176c100d6da0ef262e4207c76886b6d3a40fbf844c",
+    "matchesHead": true
+  },
+  "server/src/services/workspace-instance-cleanup.ts": {
+    "sha256": "b10922baedf62dfad40139eb7acd7fe011796dc830e0269c8a309ed33ce161e9",
+    "matchesHead": true
+  }
+}

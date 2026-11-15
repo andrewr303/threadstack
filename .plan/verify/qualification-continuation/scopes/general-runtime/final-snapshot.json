@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-11-15T09:33:05.042885+00:00",
+  "productionFile": "server/src/middleware/local-agent-process-boundary.ts",
+  "productionSha256": "19a1e50c9f6e892455aeb8e75372c54ae678494c4181b4871c64651e1c2e9b01",
+  "directTestFile": "server/src/__tests__/local-agent-process-boundary.test.ts",
+  "directTestSha256": "266a52c98c3972af17846e5aa094889061a2be4bc2b05cba6e4f0029c726e6dd",
+  "damagedEpochTestSha256": "a41e97469f095f089ffd3f05797d0f61bbb3bf990c1e7421abae2d497fb97c27",
+  "lastChange": "Only final helper indentation after passing suite/typecheck; formatting-integrity.json proves identical emitted JS with installed esbuild. No further code changes.",
+  "receipts": {
+    "directSuite": "general-boundary-fallback-final.json",
+    "directSuiteLog": "general-boundary-fallback-final.log",
+    "serverLayers": "general-boundary-server-types.json",
+    "serverLayersLog": "general-boundary-server-types.log",
+    "damagedEpoch": "general-damaged-epoch-fixed.json",
+    "recycledPid": "general-native-ps-compatible.json",
+    "ordinaryHttp": "owned-http-ordinary.json",
+    "protectedHttp": "general-owned-http-protected.json"
+  }
+}

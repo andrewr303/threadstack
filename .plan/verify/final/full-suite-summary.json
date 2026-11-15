@@ -1,0 +1,63 @@
+{
+  "status": "interrupted_unqualified",
+  "exitCode": 130,
+  "originalCommand": [
+    "npx",
+    "--yes",
+    "pnpm@9.15.4",
+    "test:run"
+  ],
+  "workingDirectory": "/Users/andrew/dev/threadkeeper/paperclip",
+  "originalLog": "/tmp/threadkeeper-fork-tests.log",
+  "originalLogSha256": "ab6244b6d77721be2c272d74cddfb8a627027e395a36ee49accfc03c4d957e7d",
+  "observedFailedFileSummaries": [
+    {
+      "file": "src/__tests__/workspace-runtime.test.ts",
+      "testsInFile": 180,
+      "reportedFailed": 4
+    },
+    {
+      "file": "src/services/remote-workspace-migration.test.ts",
+      "testsInFile": 207,
+      "reportedFailed": 4
+    },
+    {
+      "file": "src/services/remote-workspace-snapshot-archive.test.ts",
+      "testsInFile": 122,
+      "reportedFailed": 2
+    },
+    {
+      "file": "src/__tests__/cli-invocation-safety.test.ts",
+      "testsInFile": 40,
+      "reportedFailed": 1
+    },
+    {
+      "file": "src/services/native-runtime/setup-readiness.test.ts",
+      "testsInFile": 98,
+      "reportedFailed": 21
+    },
+    {
+      "file": "src/services/native-runtime/retained-provider-pack-source.test.ts",
+      "testsInFile": 34,
+      "reportedFailed": 6
+    },
+    {
+      "file": "src/__tests__/bundled-plugins.test.ts",
+      "testsInFile": 52,
+      "reportedFailed": 2
+    },
+    {
+      "file": "src/services/native-runtime/native-skill-library-tools.integration.test.ts",
+      "testsInFile": 20,
+      "reportedFailed": 2
+    },
+    {
+      "file": "src/services/native-runtime/native-warm-checkpoint-ownership.integration.test.ts",
+      "testsInFile": 9,
+      "reportedFailed": 9
+    }
+  ],
+  "observedFailedTests": 51,
+  "reason": "Run started before final source/toolchain and recorded failures; stopped as stale rather than representing it as current-source qualification. Focused current repairs are separate evidence.",
+  "stopReceipt": ".plan/verify/full-suite-stop.json"
+}

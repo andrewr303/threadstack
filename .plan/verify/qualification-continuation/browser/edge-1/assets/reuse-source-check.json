@@ -1,0 +1,10 @@
+{
+  "unchangedProductionFiles": 2022,
+  "changed": [],
+  "originalRounds": [
+    "paperclip-merge/round-43",
+    "paperclip-merge/round-44"
+  ],
+  "scope": "Unchanged UI/extension geometry and interaction evidence remains valid with its original capture provenance; no claim of repainting32 journeys.",
+  "priorSourceHashFileSha256": "83e1b055de1448508132646015b813630532ad6de08f83113cdca1ab8df2f3d4"
+}
