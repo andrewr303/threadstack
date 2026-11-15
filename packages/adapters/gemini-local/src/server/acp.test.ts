@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdapterExecutionContext, AdapterInvocationMeta } from "@paperclipai/adapter-utils";
 import { runChildProcess } from "@paperclipai/adapter-utils/server-utils";
 
@@ -93,7 +93,15 @@ function setNodeVersion(version: string): void {
   });
 }
 
+beforeEach(async () => {
+  // Skill preparation is real even when the ACP runtime is fake. Keep its default
+  // ~/.gemini/skills target inside this test's owned home, never the operator's.
+  const home = await makeTempRoot("paperclip-gemini-acp-home-");
+  vi.stubEnv("HOME", home);
+});
+
 afterEach(async () => {
+  vi.unstubAllEnvs();
   setNodeVersion(originalNodeVersion);
   if (originalPath === undefined) delete process.env.PATH;
   else process.env.PATH = originalPath;

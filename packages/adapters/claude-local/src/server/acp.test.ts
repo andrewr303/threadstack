@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createPromptContextFixture } from "@paperclipai/adapter-utils/test-fixtures/prompt-context";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdapterExecutionContext, AdapterInvocationMeta } from "@paperclipai/adapter-utils";
 import { runChildProcess } from "@paperclipai/adapter-utils/server-utils";
 
@@ -99,7 +99,21 @@ function setNodeVersion(version: string): void {
   });
 }
 
+beforeEach(async () => {
+  // Remote staging reads shared settings and writes managed state before the fake
+  // ACP runtime starts. Both sides must be fixtures, including when a test does
+  // not explicitly exercise Claude config seeding.
+  const root = await makeTempRoot("paperclip-claude-acp-home-");
+  const configDir = path.join(root, ".claude");
+  await fs.mkdir(configDir, { recursive: true });
+  vi.stubEnv("HOME", root);
+  vi.stubEnv("CLAUDE_CONFIG_DIR", configDir);
+  vi.stubEnv("PAPERCLIP_HOME", path.join(root, ".paperclip"));
+  vi.stubEnv("PAPERCLIP_INSTANCE_ID", "test");
+});
+
 afterEach(async () => {
+  vi.unstubAllEnvs();
   setNodeVersion(originalNodeVersion);
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key];

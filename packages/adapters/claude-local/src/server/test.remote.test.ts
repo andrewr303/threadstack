@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdapterExecutionTarget, AdapterSandboxInstallCommandCheck } from "@paperclipai/adapter-utils/execution-target";
 
 const {
@@ -93,9 +96,22 @@ const loginRequiredStdout = [
   '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Please run `claude login` to authenticate.","session_id":"abc"}',
 ].join("\n");
 
-afterEach(() => {
+let hostFixtureRoot: string;
+beforeEach(async () => {
+  hostFixtureRoot = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-remote-home-"));
+  const configDir = path.join(hostFixtureRoot, ".claude");
+  await mkdir(configDir, { recursive: true });
+  vi.stubEnv("HOME", hostFixtureRoot);
+  vi.stubEnv("CLAUDE_CONFIG_DIR", configDir);
+  vi.stubEnv("PAPERCLIP_HOME", path.join(hostFixtureRoot, ".paperclip"));
+  vi.stubEnv("PAPERCLIP_INSTANCE_ID", "test");
+});
+
+afterEach(async () => {
   vi.clearAllMocks();
   resetClaudeCliCapabilitiesCacheForTests();
+  vi.unstubAllEnvs();
+  await rm(hostFixtureRoot, { recursive: true, force: true });
 });
 
 describe("claude sandbox auth-missing check", () => {

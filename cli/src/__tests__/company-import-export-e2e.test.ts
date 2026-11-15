@@ -300,6 +300,8 @@ describeEmbeddedPostgres("paperclipai company import/export e2e", () => {
   let paperclipHome = "";
   let cliShellHome = "";
   let paperclipInstanceId = "";
+  let blockedProviderCommand = "";
+  let providerInvocationMarker = "";
   let serverProcess: ServerProcess | null = null;
   let requestedPortReservation: Awaited<ReturnType<typeof reserveRequestedPort>> | null = null;
   let tempDb: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>> | null = null;
@@ -311,6 +313,10 @@ describeEmbeddedPostgres("paperclipai company import/export e2e", () => {
     paperclipHome = path.join(tempRoot, "paperclip-home");
     cliShellHome = path.join(tempRoot, "shell-home");
     paperclipInstanceId = "company-cli-e2e";
+    blockedProviderCommand = path.join(tempRoot, "provider-disabled.cjs");
+    providerInvocationMarker = path.join(tempRoot, "unexpected-provider-invocation");
+    // Portability exercises stored adapter configuration, never an operator's provider CLI.
+    writeFileSync(blockedProviderCommand, `#!/usr/bin/env node\nrequire("node:fs").writeFileSync(${JSON.stringify(providerInvocationMarker)}, "unexpected provider invocation\\n");\nprocess.exit(78);\n`, { mode: 0o700 });
     mkdirSync(paperclipHome, { recursive: true });
     mkdirSync(cliShellHome, { recursive: true });
 
@@ -359,9 +365,11 @@ describeEmbeddedPostgres("paperclipai company import/export e2e", () => {
     await stopServerProcess(serverProcess);
     await requestedPortReservation?.release();
     await tempDb?.cleanup();
+    const providerWasInvoked = existsSync(providerInvocationMarker);
     if (tempRoot) {
       removeTestHome(tempRoot);
     }
+    expect(providerWasInvoked).toBe(false);
   });
 
   it("exports a company package and imports it into new and existing companies", async () => {
@@ -413,7 +421,9 @@ describeEmbeddedPostgres("paperclipai company import/export e2e", () => {
           name: "Export Engineer",
           role: "engineer",
           adapterType: "claude_local",
-          adapterConfig: {},
+          runner: "legacy",
+          adapterConfig: { command: blockedProviderCommand },
+          runtimeConfig: { heartbeat: { enabled: false, wakeOnDemand: false } },
           instructionsBundle: {
             files: {
               "AGENTS.md": "You verify company portability.",

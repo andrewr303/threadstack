@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AdapterExecutionTarget } from "@paperclipai/adapter-utils/execution-target";
@@ -80,9 +80,24 @@ const sandboxTarget: AdapterExecutionTarget = {
 const initLine =
   '{"type":"system","subtype":"init","cwd":"/home/daytona/paperclip-workspace","session_id":"abc","tools":["Bash","Read"]}';
 
-afterEach(() => {
+let hostFixtureRoot: string;
+beforeEach(async () => {
+  // Exercise actual config preparation with empty, owned settings. Ambient
+  // operator settings must not prevent the mocked probe from being reached.
+  hostFixtureRoot = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-probe-home-"));
+  const configDir = path.join(hostFixtureRoot, ".claude");
+  await mkdir(configDir, { recursive: true });
+  vi.stubEnv("HOME", hostFixtureRoot);
+  vi.stubEnv("CLAUDE_CONFIG_DIR", configDir);
+  vi.stubEnv("PAPERCLIP_HOME", path.join(hostFixtureRoot, ".paperclip"));
+  vi.stubEnv("PAPERCLIP_INSTANCE_ID", "test");
+});
+
+afterEach(async () => {
   vi.clearAllMocks();
   probeResult.throwError = null;
+  vi.unstubAllEnvs();
+  await rm(hostFixtureRoot, { recursive: true, force: true });
 });
 
 describe("claude sandbox hello probe diagnostics", () => {

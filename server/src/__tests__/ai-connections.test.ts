@@ -56,6 +56,7 @@ vi.mock("../services/local-ai-browser-login.js", () => ({
 let database: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>>;
 let db: ReturnType<typeof createDb>;
 let home: string;
+const originalProjectCwd = process.cwd();
 const companyId = randomUUID();
 const otherCompanyId = randomUUID();
 const agentId = randomUUID();
@@ -74,10 +75,20 @@ beforeAll(async () => {
   await db.insert(companies).values([{ id: companyId, name: "AI connection tests", issuePrefix: "AIT" }, { id: otherCompanyId, name: "Other", issuePrefix: "AIO" }]);
   await db.insert(agents).values({ id: agentId, companyId, name: "Nova", adapterType: "claude_local" });
   await db.insert(companyMemberships).values(["alice", "bob"].map(principalId => ({ companyId, principalId, principalType: "user", status: "active", membershipRole: "member" })));
+  // Unspecified project auth belongs to this fixture, never the developer checkout's ancestors.
+  process.chdir(home);
 }, 90000);
-afterAll(async () => { await database?.cleanup(); vi.unstubAllEnvs(); if (home) await rm(home, { recursive: true, force: true }); });
+afterAll(async () => {
+  try { await database?.cleanup(); }
+  finally { process.chdir(originalProjectCwd); vi.unstubAllEnvs(); if (home) await rm(home, { recursive: true, force: true }); }
+});
 
 describe("managed AI connections", () => {
+  it("checks default project authentication inside the owned fixture", async () => {
+    expect(process.cwd()).toBe(home);
+    await expect(assertManagedAiProjectAuth({}, "anthropic")).resolves.toBeUndefined();
+    await expect(assertManagedAiProjectAuth({}, "openai")).resolves.toBeUndefined();
+  });
   it.each([
     { provider: "openrouter", envKey: "OPENROUTER_API_KEY", routed: false },
     { provider: "openrouter", envKey: "OPENROUTER_API_KEY", routed: true },

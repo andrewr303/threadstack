@@ -2,10 +2,12 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { doctor } from "../commands/doctor.js";
 import { writeConfig } from "../config/store.js";
 import type { PaperclipConfig } from "../config/schema.js";
+import * as installStore from "../install-store.js";
+import * as serviceManager from "../services/service-manager.js";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -20,8 +22,7 @@ async function availablePort(): Promise<number> {
   return address.port;
 }
 
-function createTempConfig(serverPort: number): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-doctor-"));
+function createTempConfig(root: string, serverPort: number): string {
   const configPath = path.join(root, ".paperclip", "config.json");
   const runtimeRoot = path.join(root, "runtime");
 
@@ -87,19 +88,36 @@ function createTempConfig(serverPort: number): string {
 }
 
 describe("doctor", () => {
+  let testRoot: string;
   beforeEach(() => {
+    testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-doctor-"));
     process.env = { ...ORIGINAL_ENV };
     delete process.env.PAPERCLIP_AGENT_JWT_SECRET;
     delete process.env.PAPERCLIP_SECRETS_MASTER_KEY;
     delete process.env.PAPERCLIP_SECRETS_MASTER_KEY_FILE;
+    process.env.PAPERCLIP_UPDATE_CHECK = "0";
+    const fixturePaths = installStore.resolveInstallStorePaths({
+      paperclipHome: path.join(testRoot, "paperclip-home"),
+      homeDir: path.join(testRoot, "shell-home"),
+    });
+    // The repair test owns its install metadata and never probes the operator's service.
+    vi.spyOn(installStore, "resolveInstallStorePaths").mockReturnValue(fixturePaths);
+    vi.spyOn(serviceManager, "detectServiceManager").mockResolvedValue({
+      supported: false,
+      reason: "No background service in the doctor test fixture.",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => { throw new Error("The doctor repair test must not access the network"); }));
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     process.env = { ...ORIGINAL_ENV };
+    fs.rmSync(testRoot, { recursive: true, force: true });
   });
 
   it("re-runs repairable checks so repaired failures do not remain blocking", async () => {
-    const configPath = createTempConfig(await availablePort());
+    const configPath = createTempConfig(testRoot, await availablePort());
 
     const summary = await doctor({
       config: configPath,
@@ -110,5 +128,6 @@ describe("doctor", () => {
     expect(summary.failed).toBe(0);
     expect(summary.warned).toBe(0);
     expect(process.env.PAPERCLIP_AGENT_JWT_SECRET).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

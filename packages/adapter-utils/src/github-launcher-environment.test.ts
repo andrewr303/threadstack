@@ -410,15 +410,19 @@ describe("managed GitHub launcher environment", () => {
     expect(env.PAPERCLIP_GITHUB_LAUNCHER_DIR).toBeUndefined();
   });
 
-  it("preserves local host credential helpers and validates worktree metadata", async () => {
+  it.each([false, true])("preserves local host credential helpers and validates worktree metadata (explicit global config: %s)", async (explicitGlobalConfig) => {
     const root = await mkdtemp(path.join(os.tmpdir(), "paperclip-host-git-")); roots.push(root);
     vi.stubEnv("HOME", root);
     vi.stubEnv("GH_TOKEN", "legacy-token");
-    await writeFile(path.join(root, ".gitconfig"), '[credential]\n  helper = store\n');
+    // Cover both host lookup modes explicitly instead of inheriting the shell's
+    // global-config override (qualification intentionally supplies /dev/null).
+    const globalConfig = explicitGlobalConfig ? path.join(root, "host.gitconfig") : undefined;
+    vi.stubEnv("GIT_CONFIG_GLOBAL", globalConfig);
+    await writeFile(globalConfig ?? path.join(root, ".gitconfig"), '[credential]\n  helper = store\n');
     await exec("git", ["init", path.join(root, "repo")]);
     const env = await prepareGitHubExecutionEnvironment({ target: null, cwd: path.join(root, "repo"), env: {}, hostCredentials: true, networkAccess: true });
     expect(env.GH_TOKEN).toBe("legacy-token");
-    expect(env.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(env.GIT_CONFIG_GLOBAL).toBe(globalConfig);
     expect(env.PAPERCLIP_GIT_METADATA_ROOTS).toContain("/repo/.git");
     const config = await exec("git", ["config", "credential.helper"], { cwd: root, env: { ...process.env, ...env } });
     expect(config.stdout.trim()).toBe("store");

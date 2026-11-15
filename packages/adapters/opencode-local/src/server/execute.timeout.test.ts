@@ -35,6 +35,7 @@ describe("OpenCode timeout reporting", () => {
   beforeEach(async () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-opencode-timeout-"));
     vi.stubEnv("XDG_CONFIG_HOME", dir);
+    vi.stubEnv("HOME", path.join(dir, "home"));
     mocks.process.mockReset().mockResolvedValue(failed);
     mocks.restore.mockReset().mockResolvedValue(undefined);
     mocks.stop.mockReset().mockResolvedValue(undefined);

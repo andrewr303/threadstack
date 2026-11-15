@@ -40,6 +40,9 @@ describe("OpenCode local skill injection", () => {
   beforeEach(async () => {
     configHome = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-opencode-test-config-"));
     vi.stubEnv("XDG_CONFIG_HOME", configHome);
+    // OpenCode also prepares Claude-compatible skills; XDG_CONFIG_HOME alone
+    // does not isolate that ~/.claude/skills path.
+    vi.stubEnv("HOME", path.join(configHome, "home"));
   });
 
   afterEach(async () => {

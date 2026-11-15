@@ -37,12 +37,19 @@ describe("Advanced agent configuration", () => {
     vi.clearAllMocks();
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} unobserve() {} });
+    // jsdom has no Range geometry. Keep real ranges and the real CodeMirror editor; an empty
+    // DOMRectList reflects this layoutless fixture without inventing rendered coordinates.
+    const createRange = document.createRange.bind(document);
+    const emptyRects: DOMRectList = { length: 0, item: () => null, [Symbol.iterator]: () => new Array<DOMRect>().values() };
+    vi.spyOn(document, "createRange").mockImplementation(() => Object.assign(createRange(), {
+      getClientRects: () => emptyRects,
+    }));
     api.load.mockResolvedValue(snapshot());
     container = document.createElement("div"); document.body.appendChild(container);
     root = createRoot(container);
     client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   });
-  afterEach(async () => { await act(() => root.unmount()); client.clear(); container.remove(); vi.unstubAllGlobals(); });
+  afterEach(async () => { await act(() => root.unmount()); client.clear(); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
   async function settle(assertion: () => void) {
     for (let i = 0; i < 30; i++) {
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
@@ -59,6 +66,15 @@ describe("Advanced agent configuration", () => {
     await act(() => { const view = editor(); view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: transform(view.state.doc.toString()) } }); });
   }
   function button(label: string) { return [...container.querySelectorAll("button")].find(button => button.textContent === label)!; }
+
+  it("supports CodeMirror measurement reads in the layoutless editor fixture", async () => {
+    await render(); await settle(() => expect(editor()).toBeTruthy());
+    const rects = document.createRange().getClientRects();
+    expect(rects.length).toBe(0);
+    expect(rects.item(0)).toBeNull();
+    expect([...rects]).toEqual([]);
+    expect(editor().coordsAtPos(1)).toBeNull();
+  });
 
   it("retains an invalid or rejected draft and reloads the saved configuration explicitly", async () => {
     api.save.mockRejectedValue(new Error("Agent configuration changed while you were editing."));

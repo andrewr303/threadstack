@@ -61,7 +61,9 @@ describe.skipIf(!support.supported)("confirming that an unidentified local run s
     await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: "board-user",
       status: "active", membershipRole: "admin" });
     await db.insert(agents).values({ id: agentId, companyId, name: "Codex", role: "engineer", adapterType: "codex_local",
-      adapterConfig: {}, runtimeConfig: {}, permissions: {} });
+      // Retry may execute after the confirmed stop. Never resolve an operator's Codex CLI:
+      // this test only requires the successor to reach a terminal state, not a provider reply.
+      adapterConfig: { command: process.execPath }, runtimeConfig: {}, permissions: {} });
     await db.insert(issues).values({ id: issueId, companyId, title: "Chaos A1 brief", status: "blocked", priority: "medium",
       assigneeAgentId: agentId, issueNumber: 1, identifier: `CHA-${issueId.slice(0, 8)}` });
     const finishedAt = new Date(Date.now() - 60_000);

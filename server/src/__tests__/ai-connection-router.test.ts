@@ -1,7 +1,7 @@
 import { enableRunFailureReporting } from "./helpers/run-failure-reporting.js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createIsolatedTestHome } from "./helpers/isolated-test-home.js";
 import path from "node:path";
 import { and, eq } from "drizzle-orm";
@@ -391,10 +391,10 @@ describe("durable, authorized connection routing", () => {
   }, 30_000);
   it("repairs the failed pool account without replacing the pool or adopting the configured provider", async () => {
     const pool = await makePool({ members: [members[1]!] });
-    const [agent] = await db.insert(agents).values({ companyId, name: "Pool repair", adapterType: "paperclip_runner", adapterConfig: { provider: "codex", model: "gpt-5.6-sol" }, runtimeConfig: { aiConnection: { mode: "router", connectionId: pool.id } } }).returning();
+    const [agent] = await db.insert(agents).values({ companyId, name: "Pool repair", adapterType: "paperclip_runner", adapterConfig: { provider: "codex", model: "gpt-5.6-sol", cwd: home }, runtimeConfig: { aiConnection: { mode: "router", connectionId: pool.id } } }).returning();
     const [issue] = await db.insert(issues).values({ companyId, title: "Pool repair", status: "in_progress", assigneeAgentId: agent!.id, responsibleUserId: "alice", createdByUserId: "alice" }).returning();
     const selection = await resolve(pool.id, issue!.id, { agentId: agent!.id });
-    const runtime = await prepareManagedAiRuntime(db, { companyId, agentId: agent!.id, responsibleUserId: "alice", adapterType: "paperclip_runner", config: selection.runtimeConfig, binding: selection.binding });
+    const runtime = await prepareManagedAiRuntime(db, { companyId, agentId: agent!.id, responsibleUserId: "alice", adapterType: "paperclip_runner", config: { ...selection.runtimeConfig, cwd: home }, binding: selection.binding });
     const [run] = await db.insert(heartbeatRuns).values({ companyId, agentId: agent!.id, status: "failed", errorCode: "acpx_auth_required", responsibleUserId: "alice", startedAt: new Date(), contextSnapshot: { issueId: issue!.id, aiRouterTaskKey: issue!.id, aiRouterSelection: selection, aiConnection: { ...runtime!.attribution, identity: runtime!.identity } } }).returning();
     try {
       const intents = connectionIntentService(db);
@@ -430,7 +430,7 @@ describe("durable, authorized connection routing", () => {
     const pool = await makePool({ members: [members[0]!] });
     const selected = await resolve(pool.id, "managed-mode-adoption", { requireExisting: true, existingGrantId: members[0]!.binding.grantId });
     const directBinding = { mode: "responsible_user" as const, provider: "openai" as const, method: "api_key" as const };
-    const prepare = { companyId, agentId, responsibleUserId: "alice", adapterType: "paperclip_runner", config: selected.runtimeConfig };
+    const prepare = { companyId, agentId, responsibleUserId: "alice", adapterType: "paperclip_runner", config: { ...selected.runtimeConfig, cwd: home } };
     const before = await prepareManagedAiRuntime(db, { ...prepare, binding: directBinding });
     const after = await prepareManagedAiRuntime(db, { ...prepare, binding: selected.binding });
     try {
@@ -495,7 +495,7 @@ describe("durable, authorized connection routing", () => {
   }, 30_000);
 
   it("keeps session identity and fingerprints stable on authenticated refresh, but changes them on manual replacement", async () => {
-    const input = { companyId, agentId, responsibleUserId: "alice", adapterType: "paperclip_runner", binding: members[0]!.binding, config: { provider: "codex", model: "gpt-5.6-sol" } };
+    const input = { companyId, agentId, responsibleUserId: "alice", adapterType: "paperclip_runner", binding: members[0]!.binding, config: { provider: "codex", model: "gpt-5.6-sol", cwd: home } };
     const first = await prepareManagedAiRuntime(db, input);
     const [grant] = await db.select().from(connectionGrants).where(eq(connectionGrants.id, members[0]!.binding.grantId)); const ref = grant!.credentialSecretRefs.find(ref => ref.configPath === "ai.credential")!;
     try {
@@ -506,6 +506,19 @@ describe("durable, authorized connection routing", () => {
       const replaced = await prepareManagedAiRuntime(db, input); try { expect(replaced.sessionIdentity).not.toBe(first.sessionIdentity); } finally { await replaced.cleanup(); }
       const [secret] = await db.select().from(companySecrets).where(and(eq(companySecrets.companyId, companyId), eq(companySecrets.id, ref.secretId))); expect(secret!.aiSessionEpoch).toBeGreaterThan(0);
     } finally { await first.cleanup(); }
+  });
+  it.each(["anthropic", "openai"] as const)("keeps the real %s project-auth policy active inside owned fixtures", async provider => {
+    const project = path.join(home, `conflicting-project-${provider}`);
+    const file = path.join(project, provider === "anthropic" ? ".claude/settings.json" : ".codex/config.toml");
+    await mkdir(path.dirname(file), { recursive: true });
+    try {
+      await writeFile(file, provider === "anthropic" ? '{"apiKeyHelper":"fixture-only-command"}' : 'model_provider = "fixture-only-provider"\n', { mode: 0o600 });
+      const member = members[provider === "anthropic" ? 1 : 0]!;
+      await expect(prepareManagedAiRuntime(db, {
+        companyId, agentId, responsibleUserId: "alice", adapterType: "paperclip_runner",
+        binding: member.binding, config: { ...poolMemberRuntimeConfig(member, "paperclip_runner").config, cwd: project },
+      })).rejects.toMatchObject({ status: 422, details: { code: "ai_connection_incompatible" } });
+    } finally { await rm(project, { recursive: true, force: true }); }
   });
 });
 
