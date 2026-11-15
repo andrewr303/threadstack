@@ -1,0 +1,39 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: No projects were found. Make sure your configuration is correct. The filter matched no projects: server. The projects definition: [
+    "packages/shared",
+    "packages/skills-catalog",
+    "packages/db",
+    "packages/adapter-utils",
+    "packages/adapters/claude-local",
+    "packages/adapters/codex-local",
+    "packages/adapters/cursor-cloud",
+    "packages/adapters/cursor-local",
+    "packages/adapters/gemini-local",
+    "packages/adapters/grok-local",
+    "packages/adapters/hermes",
+    "packages/adapters/kimi-local",
+    "packages/adapters/openclaw-gateway",
+    "packages/adapters/opencode-local",
+    "packages/adapters/pi-local",
+    "packages/plugins/sdk",
+    "packages/plugins/plugin-browser-sessions",
+    "packages/plugins/create-paperclip-plugin",
+    "packages/plugins/sandbox-providers/daytona",
+    "server",
+    "ui",
+    "cli"
+].
+    at resolveProjectEntries (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/index.DpLw24bj.js:12557:59)
+    at async resolveConfig$1 (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/index.DpLw24bj.js:14899:32)
+    at async createVitest (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/cli-api.C4x4GGip.js:26:17)
+    at async prepareVitest (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/cli-api.C4x4GGip.js:421:14)
+    at async startVitest (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/cli-api.C4x4GGip.js:340:14)
+    at async start (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/cac.DfDGTQ9W.js:2370:15)
+    at async CAC.run (file:///Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/cac.DfDGTQ9W.js:2346:2)
+
+
+

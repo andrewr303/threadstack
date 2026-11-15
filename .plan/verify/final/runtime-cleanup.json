@@ -1,0 +1,103 @@
+{
+  "completedAt": "2026-11-14T08:33:07.981512+00:00",
+  "scope": "Only disposable main3217 and authenticated3218 fixtures; no default/user services or upstream test processes signaled.",
+  "targets": [
+    {
+      "serverPid": 33470,
+      "httpPort": 3217,
+      "postgresPid": 33802,
+      "postgresPort": 55487,
+      "ownershipVerifiedBeforeSignal": true,
+      "postgresParentMatchedServer": true,
+      "signal": "SIGTERM",
+      "signalAt": "2026-11-14T08:32:13.214804+00:00",
+      "launcherExitCode": 0,
+      "ports": [
+        {
+          "port": 3217,
+          "closed": true
+        },
+        {
+          "port": 55487,
+          "closed": true
+        },
+        {
+          "port": 13217,
+          "closed": true
+        }
+      ],
+      "ownedDescendantPids": [
+        33802,
+        33803,
+        33804,
+        33805,
+        33806,
+        33807,
+        33809,
+        33810,
+        33811,
+        34064,
+        71105
+      ],
+      "ownedPidsRemaining": [],
+      "orderedShutdownObserved": true,
+      "embeddedPostgresStopObserved": true,
+      "runtimeRootPreserved": true,
+      "databaseDirectoryPreserved": true,
+      "configPreserved": true,
+      "logPreserved": true
+    },
+    {
+      "serverPid": 61385,
+      "httpPort": 3218,
+      "postgresPid": 61613,
+      "postgresPort": 55488,
+      "ownershipVerifiedBeforeSignal": true,
+      "postgresParentMatchedServer": true,
+      "signal": "SIGTERM",
+      "signalAt": "2026-11-14T08:32:13.215311+00:00",
+      "launcherExitCode": 0,
+      "ports": [
+        {
+          "port": 3218,
+          "closed": true
+        },
+        {
+          "port": 55488,
+          "closed": true
+        },
+        {
+          "port": 13218,
+          "closed": true
+        }
+      ],
+      "ownedDescendantPids": [
+        61613,
+        61614,
+        61615,
+        61616,
+        61617,
+        61618,
+        61620,
+        61621,
+        61622,
+        61690,
+        71142
+      ],
+      "ownedPidsRemaining": [],
+      "orderedShutdownObserved": true,
+      "embeddedPostgresStopObserved": true,
+      "runtimeRootPreserved": true,
+      "databaseDirectoryPreserved": true,
+      "configPreserved": true,
+      "logPreserved": true
+    }
+  ],
+  "ownedHelpersRemaining": [],
+  "recovery79777": "already expired; no stale PID signaled",
+  "runtimeFilesDeletedByCleanup": false,
+  "credentialsChangedByCleanup": false,
+  "allOwnedRuntimePortsClosed": true,
+  "allTrackedOwnedPidsGone": true,
+  "allOwnedHelpersGone": true
+}

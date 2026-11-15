@@ -1,0 +1,188 @@
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> paperclip@ typecheck /Users/andrew/dev/threadkeeper/paperclip
+> pnpm run preflight:workspace-links && pnpm -r typecheck
+
+
+> paperclip@ preflight:workspace-links /Users/andrew/dev/threadkeeper/paperclip
+> node cli/node_modules/tsx/dist/cli.mjs scripts/ensure-workspace-package-links.ts
+
+Scope: 36 of 37 workspace projects
+packages/google-sheets-mcp-server typecheck$ tsc --noEmit
+packages/kv-demo-mcp-server typecheck$ tsc --noEmit
+packages/shared typecheck$ tsc --noEmit
+packages/paperclip-eval-kernel typecheck$ tsc -p tsconfig.json --noEmit
+packages/paperclip-eval-kernel typecheck: Done
+packages/tailscale-https-broker typecheck$ tsc --noEmit
+packages/kv-demo-mcp-server typecheck: Done
+packages/teams-catalog typecheck$ tsc -p tsconfig.json --noEmit
+packages/tailscale-https-broker typecheck: Done
+packages/teams-catalog typecheck: Done
+packages/google-sheets-mcp-server typecheck: Done
+packages/shared typecheck: Done
+packages/db typecheck$ pnpm run check:migrations && tsc --noEmit
+packages/paperclip-runner typecheck$ pnpm run typecheck:typescript && pnpm run typecheck:rust
+packages/mcp-server typecheck$ tsc --noEmit
+packages/adapter-utils typecheck$ tsc --noEmit
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-runner@0.0.0 typecheck:typescript /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner typecheck: > pnpm run check:acpx-profiles && pnpm run ensure:eval-build-deps && node --check scripts/protocol-contract.mjs && node --check scripts/generate-protocol-manifest.mjs && node --check scripts/generate-protocol-schema-module.mjs && node --check scripts/generate-acpx-sidecar-contract.mjs && node --check scripts/generate-replay-goldens.mjs && node --check scripts/generate-semantic-action-catalog.mjs && pnpm run check:protocol-types && node ./node_modules/typescript/bin/tsc --version && node ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit && node ./node_modules/typescript/bin/tsc -p tsconfig.surfaces.json --noEmit
+packages/db typecheck: > @paperclipai/db@0.3.1 check:migrations /Users/andrew/dev/threadkeeper/paperclip/packages/db
+packages/db typecheck: > tsx src/check-migration-numbering.ts && tsx src/check-migration-safety.ts && tsx scripts/migration-compatibility.ts --check
+packages/mcp-server typecheck: Done
+packages/plugins/sdk typecheck$ pnpm --filter @paperclipai/shared build && tsc --noEmit
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-runner@0.0.0 check:acpx-profiles /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner typecheck: > node scripts/generate-acpx-profiles.mjs --check
+packages/paperclip-runner typecheck: TypeScript/Rust ACPX profiles match the release manifest.
+packages/db typecheck: Migration safety check passed: 20 historical finding(s) covered by baseline (1 stale baseline id(s) ignored).
+packages/plugins/sdk typecheck: > @paperclipai/shared@0.3.1 build /Users/andrew/dev/threadkeeper/paperclip/packages/shared
+packages/plugins/sdk typecheck: > tsc && mkdir -p dist/cliplab && cp src/cliplab/LICENSE src/cliplab/PROVENANCE.md dist/cliplab/
+packages/adapter-utils typecheck: Done
+packages/skills-catalog typecheck$ tsc -p tsconfig.json --noEmit
+packages/db typecheck: migration compatibility: 0 new migration(s) since edb6945ff3f2, none unclassified.
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-runner@0.0.0 ensure:eval-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner typecheck: > pnpm --filter @paperclipai/paperclip-eval-kernel build
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-eval-kernel@0.1.0 build /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-eval-kernel
+packages/paperclip-runner typecheck: > tsc -p tsconfig.json
+packages/skills-catalog typecheck: Done
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-runner@0.0.0 check:protocol-types /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner typecheck: > node scripts/generate-protocol-schema-module.mjs --check && node scripts/generate-acpx-sidecar-contract.mjs --check && node scripts/generate-runtime-context-contract.mjs --check && node scripts/generate-provider-failure-contract.mjs --check
+packages/plugins/sdk typecheck: Done
+packages/paperclip-runner typecheck: Generated PRP schema modules match the JSON Schema sources.
+packages/paperclip-runner typecheck: Generated TypeScript/Rust ACPX sidecar contracts match the schema.
+packages/paperclip-runner typecheck: Generated runtime context contract matches the schema.
+packages/paperclip-runner typecheck: Version 7.0.2
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-runner@0.0.0 typecheck:rust /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner typecheck: > pnpm run check:acpx-profiles && cargo fmt --manifest-path runner/Cargo.toml --all -- --check && cargo check --manifest-path runner/Cargo.toml --locked --workspace
+packages/db typecheck: Done
+packages/paperclip-runner typecheck: > @paperclipai/paperclip-runner@0.0.0 check:acpx-profiles /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+packages/paperclip-runner typecheck: > node scripts/generate-acpx-profiles.mjs --check
+packages/paperclip-runner typecheck: TypeScript/Rust ACPX profiles match the release manifest.
+packages/paperclip-runner typecheck: warning: unused import: `CursorMode`
+packages/paperclip-runner typecheck:   --> crates/runner-core/src/acpx_provider_checkpoint.rs:13:81
+packages/paperclip-runner typecheck:    |
+packages/paperclip-runner typecheck: 13 |     AcpxPermissionMode, AcpxProviderSessionConfig, AcpxProviderSessionIdentity, CursorMode,
+packages/paperclip-runner typecheck:    |                                                                                 ^^^^^^^^^^
+packages/paperclip-runner typecheck:    |
+packages/paperclip-runner typecheck:    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+packages/paperclip-runner typecheck: warning: variable does not need to be mutable
+packages/paperclip-runner typecheck:     --> crates/runner-core/src/durable/state.rs:2022:5
+packages/paperclip-runner typecheck:      |
+packages/paperclip-runner typecheck: 2022 |     mut sanitized: Value,
+packages/paperclip-runner typecheck:      |     ----^^^^^^^^^
+packages/paperclip-runner typecheck:      |     |
+packages/paperclip-runner typecheck:      |     help: remove this `mut`
+packages/paperclip-runner typecheck:      |
+packages/paperclip-runner typecheck:      = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+packages/paperclip-runner typecheck: warning: fields `config` and `system_instructions` are never read
+packages/paperclip-runner typecheck:     --> crates/runner-core/src/claude_managed_provider.rs:1248:5
+packages/paperclip-runner typecheck:      |
+packages/paperclip-runner typecheck: 1232 | pub struct ClaudeManagedProvider {
+packages/paperclip-runner typecheck:      |            --------------------- fields in this struct
+packages/paperclip-runner typecheck: ...
+packages/paperclip-runner typecheck: 1248 |     config: ClaudeManagedProviderConfig,
+packages/paperclip-runner typecheck:      |     ^^^^^^
+packages/paperclip-runner typecheck: 1249 |     system_instructions: String,
+packages/paperclip-runner typecheck:      |     ^^^^^^^^^^^^^^^^^^^
+packages/paperclip-runner typecheck:      |
+packages/paperclip-runner typecheck:      = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+packages/paperclip-runner typecheck: warning: function `receive_plain` is never used
+packages/paperclip-runner typecheck:     --> crates/runner-core/src/durable/transport.rs:1596:4
+packages/paperclip-runner typecheck:      |
+packages/paperclip-runner typecheck: 1596 | fn receive_plain(
+packages/paperclip-runner typecheck:      |    ^^^^^^^^^^^^^
+packages/paperclip-runner typecheck: warning: function `validate_tool_result_contract` is never used
+packages/paperclip-runner typecheck:     --> crates/runner-core/src/provider_bridge.rs:1079:4
+packages/paperclip-runner typecheck:      |
+packages/paperclip-runner typecheck: 1079 | fn validate_tool_result_contract(
+packages/paperclip-runner typecheck:      |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/paperclip-runner typecheck: warning: `paperclip-runner-core` (lib) generated 5 warnings (run `cargo fix --lib -p paperclip-runner-core` to apply 2 suggestions)
+packages/paperclip-runner typecheck:     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.42s
+packages/paperclip-runner typecheck: Done
+packages/adapters/cursor-local typecheck$ tsc --noEmit
+packages/adapters/claude-local typecheck$ tsc --noEmit
+packages/adapters/codex-local typecheck$ tsc --noEmit
+packages/adapters/cursor-cloud typecheck$ tsc --noEmit
+packages/adapters/cursor-local typecheck: Done
+packages/adapters/gemini-local typecheck$ tsc --noEmit
+packages/adapters/cursor-cloud typecheck: Done
+packages/adapters/grok-local typecheck$ tsc --noEmit
+packages/adapters/claude-local typecheck: Done
+packages/adapters/hermes typecheck$ tsc --noEmit
+packages/adapters/codex-local typecheck: Done
+packages/adapters/kimi-local typecheck$ tsc --noEmit
+packages/adapters/gemini-local typecheck: Done
+packages/adapters/openclaw-gateway typecheck$ tsc --noEmit
+packages/adapters/grok-local typecheck: Done
+packages/adapters/opencode-local typecheck$ tsc --noEmit
+packages/adapters/hermes typecheck: Done
+packages/adapters/pi-local typecheck$ tsc --noEmit
+packages/adapters/kimi-local typecheck: Done
+packages/plugins/create-paperclip-plugin typecheck$ tsc --noEmit
+packages/plugins/create-paperclip-plugin typecheck: Done
+.../plugin-authoring-smoke-example typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit
+packages/adapters/openclaw-gateway typecheck: Done
+.../examples/plugin-file-browser-example typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit
+.../plugin-authoring-smoke-example typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../plugin-authoring-smoke-example typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+packages/adapters/opencode-local typecheck: Done
+.../examples/plugin-hello-world-example typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit
+packages/adapters/pi-local typecheck: Done
+.../examples/plugin-kitchen-sink-example typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit
+.../examples/plugin-file-browser-example typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../examples/plugin-file-browser-example typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../examples/plugin-hello-world-example typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../examples/plugin-hello-world-example typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../examples/plugin-kitchen-sink-example typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../examples/plugin-kitchen-sink-example typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../plugin-authoring-smoke-example typecheck: Done
+.../paperclip-plugin-fake-sandbox typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit
+.../examples/plugin-file-browser-example typecheck: Done
+packages/plugins/plugin-browser-sessions typecheck$ tsc --noEmit && tsc --noEmit -p tsconfig.test.json
+.../paperclip-plugin-fake-sandbox typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+.../paperclip-plugin-fake-sandbox typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../examples/plugin-hello-world-example typecheck: Done
+packages/plugins/plugin-llm-wiki typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit
+.../examples/plugin-kitchen-sink-example typecheck: Done
+packages/plugins/plugin-workspace-diff typecheck$ pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit && tsc --noEmit -p tsconfig.test.json
+packages/plugins/plugin-llm-wiki typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+packages/plugins/plugin-llm-wiki typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+packages/plugins/plugin-workspace-diff typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+packages/plugins/plugin-workspace-diff typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+.../paperclip-plugin-fake-sandbox typecheck: Done
+packages/plugins/plugin-browser-sessions typecheck: Done
+packages/plugins/plugin-llm-wiki typecheck: Done
+packages/plugins/plugin-workspace-diff typecheck: Done
+ui typecheck$ node ../scripts/storybook-catalog.mjs && node ../scripts/run-tsc.mjs -b
+server typecheck$ pnpm --filter @paperclipai/paperclip-runner run build:typescript && pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && node scripts/typecheck-layers.mjs
+packages/adapters/hermes-gateway typecheck$ tsc --noEmit
+server typecheck: > @paperclipai/paperclip-runner@0.0.0 build:typescript /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+server typecheck: > pnpm run check:acpx-profiles && pnpm run ensure:eval-build-deps && pnpm run check:protocol-types && node ./node_modules/typescript/bin/tsc --version && node ./node_modules/typescript/bin/tsc -p tsconfig.json && node ./node_modules/typescript/bin/tsc -p tsconfig.surfaces.json && node scripts/build-verified-provider-entrypoints.mjs && node scripts/install-copilot-assets.mjs
+packages/adapters/hermes-gateway typecheck: Done
+server typecheck: > @paperclipai/paperclip-runner@0.0.0 check:acpx-profiles /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+server typecheck: > node scripts/generate-acpx-profiles.mjs --check
+server typecheck: TypeScript/Rust ACPX profiles match the release manifest.
+server typecheck: > @paperclipai/paperclip-runner@0.0.0 ensure:eval-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+server typecheck: > pnpm --filter @paperclipai/paperclip-eval-kernel build
+server typecheck: > @paperclipai/paperclip-eval-kernel@0.1.0 build /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-eval-kernel
+server typecheck: > tsc -p tsconfig.json
+server typecheck: > @paperclipai/paperclip-runner@0.0.0 check:protocol-types /Users/andrew/dev/threadkeeper/paperclip/packages/paperclip-runner
+server typecheck: > node scripts/generate-protocol-schema-module.mjs --check && node scripts/generate-acpx-sidecar-contract.mjs --check && node scripts/generate-runtime-context-contract.mjs --check && node scripts/generate-provider-failure-contract.mjs --check
+server typecheck: Generated PRP schema modules match the JSON Schema sources.
+ui typecheck: Storybook map: 354 files, 3250 stories. Structure only; no runtime proof.
+server typecheck: Generated TypeScript/Rust ACPX sidecar contracts match the schema.
+server typecheck: Generated runtime context contract matches the schema.
+server typecheck: Version 7.0.2
+server typecheck: Copilot runtime assets: verified-existing (darwin-arm64)
+server typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+server typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+server typecheck: typecheck:layers: below (1125 files)
+ui typecheck: Done
+server typecheck: typecheck:layers: cycle (731 files)
+server typecheck: typecheck:layers: above (279 files)
+server typecheck: typecheck:layers: tests (781 files)
+server typecheck: typecheck:layers: test-tree-0 (467 files)
+server typecheck: typecheck:layers: test-tree-1 (463 files)
+server typecheck: typecheck:layers: test-tree-2 (457 files)
+server typecheck: Done
+cli typecheck$ tsc --noEmit
+cli typecheck: Done

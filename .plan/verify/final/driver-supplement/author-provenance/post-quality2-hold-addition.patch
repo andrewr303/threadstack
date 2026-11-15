@@ -1,0 +1,18 @@
+--- a/extension/scripts/run-paperclip-e2e.mjs (RECONSTRUCTED reviewed hash)
++++ b/extension/scripts/run-paperclip-e2e.mjs (current frozen source)
+@@ -493,6 +493,15 @@
+       return { observation: 'A disposable user signed in through the real UI, approved Threadkeeper board access, then signed out and signed back in inside the real Paperclip iframe. Its same-auth HTTP event stream delivered the matching created-task event and updated the actual UI without reload; the real app service worker was active. No authentication cookies or tokens were injected.', evidence: authEvidence };
+     });
+   }
++  if (process.env.TK_PAPERCLIP_READ_HOLD) {
++    const control = path.resolve(process.env.TK_PAPERCLIP_READ_HOLD);
++    const paired = cases.find(item => item.id === 'pc-session-ui')?.status === 'pass';
++    if (!paired) throw new Error('Read-tool hold requires a successful explicit UI pairing case.');
++    fs.writeFileSync(control, JSON.stringify({ phase: 'ready', at: new Date().toISOString(), origin, companyId: fixture.companyId, extensionId }));
++    record('read-tool-hold', { phase: 'ready', path: control, companyId: fixture.companyId });
++    await until(() => Promise.resolve(JSON.parse(fs.readFileSync(control, 'utf8')).phase), phase => phase === 'done', 300_000);
++    record('read-tool-hold', { phase: 'done' });
++  }
+ 
+ } catch (error) { record('runner-error', { error: error.stack || String(error) }); process.exitCode = 1; }
+ finally {

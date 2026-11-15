@@ -1,0 +1,6 @@
+{
+  "inputSha256": "f9d5d17709d67507ade1fa33b9eadb0bcb6f6cdc3eeb8e22ca55256c55bd9f54",
+  "outputSha256": "2e78848e16d0b2fb93ea0a01b92285cb083b12329884da758fd61e122d014737",
+  "patchSha256": "7014e80a06ae8ec66d59268c4037262ab7d1f86e494a783bcc9c6d6c0f39ad02",
+  "basis": "Reviewed for the browser-sessions workspace importer addition. The existing offline dependency correction and patch bytes are unchanged; the committed lock already contains the reviewed correction."
+}

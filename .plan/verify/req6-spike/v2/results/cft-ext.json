@@ -1,0 +1,429 @@
+{
+  "target": "cft-ext",
+  "mode": "ext",
+  "executablePath": "/Users/andrew/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+  "startedAt": "2026-11-14T18:28:09.840Z",
+  "checks": {
+    "c1": {
+      "name": "A cross-origin frame whose page background is transparent shows the element beneath it",
+      "pass": true,
+      "note": "Rows with expectTransparent=false document the color-scheme mismatch rule; they are informational and do not gate the check.",
+      "mismatchRowsBehaveAsExpected": true,
+      "rows": [
+        {
+          "id": "default",
+          "docScheme": "none",
+          "iframeScheme": "none",
+          "hostScheme": "none",
+          "expectTransparent": true,
+          "sample": [
+            0,
+            200,
+            120
+          ],
+          "transparent": true,
+          "frameSidebarPainted": true
+        },
+        {
+          "id": "doc-dark-unmatched",
+          "docScheme": "dark",
+          "iframeScheme": "none",
+          "hostScheme": "none",
+          "expectTransparent": false,
+          "sample": [
+            18,
+            18,
+            18
+          ],
+          "transparent": false,
+          "frameSidebarPainted": true
+        },
+        {
+          "id": "doc-dark-iframe-dark",
+          "docScheme": "dark",
+          "iframeScheme": "dark",
+          "hostScheme": "none",
+          "expectTransparent": true,
+          "sample": [
+            0,
+            200,
+            120
+          ],
+          "transparent": true,
+          "frameSidebarPainted": true
+        },
+        {
+          "id": "doc-dark-host-dark",
+          "docScheme": "dark",
+          "iframeScheme": "none",
+          "hostScheme": "dark",
+          "expectTransparent": true,
+          "sample": [
+            0,
+            200,
+            120
+          ],
+          "transparent": true,
+          "frameSidebarPainted": true
+        },
+        {
+          "id": "doc-light-host-dark-unmatched",
+          "docScheme": "light",
+          "iframeScheme": "none",
+          "hostScheme": "dark",
+          "expectTransparent": false,
+          "sample": [
+            255,
+            255,
+            255
+          ],
+          "transparent": false,
+          "frameSidebarPainted": true
+        },
+        {
+          "id": "doc-light-host-dark-iframe-light",
+          "docScheme": "light",
+          "iframeScheme": "light",
+          "hostScheme": "dark",
+          "expectTransparent": true,
+          "sample": [
+            0,
+            200,
+            120
+          ],
+          "transparent": true,
+          "frameSidebarPainted": true
+        }
+      ]
+    },
+    "c2": {
+      "name": "With clip-path removing a rectangle from the frame, a click inside reaches the element beneath and a click outside reaches the frame",
+      "pass": false,
+      "steps": {
+        "insideReachesBeneath": true,
+        "hoverReachesBeneath": true,
+        "frameElementInsideHoleNotClicked": true,
+        "viewReceivedClickAtFrameElementPoint": true,
+        "outsideReachesFrame": true,
+        "outsideNotSeenByView": true,
+        "wheelScrollsBeneath": false,
+        "nestedProviderFrameReceivesInput": true,
+        "justInsideEdgeReachesView": true,
+        "justOutsideEdgeStaysInFrame": true,
+        "controlUnclippedFrameTakesClick": true
+      }
+    },
+    "c4": {
+      "name": "Lifting and restoring the clip causes no visible flash for longer than one frame at 60 Hz",
+      "pass": true,
+      "rule": "A violation is a presented frame in which neither the view beneath nor the overlay is visible. Every presented frame is captured through the DevTools screencast, which is stricter than reviewing a 60 Hz recording.",
+      "detectorProvenByNegativeControl": true,
+      "transparent": {
+        "query": {},
+        "cycles": 8,
+        "framesCaptured": 28,
+        "framesWithDialog": 8,
+        "framesWithoutDialog": 20,
+        "violations": 0,
+        "violationSamples": [],
+        "overlayMessageLatencyMs": {
+          "median": 0.89990234375,
+          "max": 1.89990234375,
+          "count": 18
+        }
+      },
+      "transparentDelayed": {
+        "query": {
+          "restoreDelay": "150"
+        },
+        "cycles": 8,
+        "framesCaptured": 31,
+        "framesWithDialog": 8,
+        "framesWithoutDialog": 23,
+        "violations": 0,
+        "violationSamples": [],
+        "overlayMessageLatencyMs": {
+          "median": 1.800048828125,
+          "max": 15.199951171875,
+          "count": 18
+        }
+      },
+      "opaqueImmediate": {
+        "query": {
+          "opaque": "1"
+        },
+        "cycles": 8,
+        "framesCaptured": 29,
+        "framesWithDialog": 8,
+        "framesWithoutDialog": 21,
+        "violations": 7,
+        "violationSamples": [
+          {
+            "timestamp": 1794680908.234928,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680908.484933,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680908.734454,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680908.86825,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680908.993832,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          }
+        ],
+        "overlayMessageLatencyMs": {
+          "median": 1,
+          "max": 21.699951171875,
+          "count": 18
+        }
+      },
+      "opaqueDelayedControl": {
+        "query": {
+          "opaque": "1",
+          "restoreDelay": "150"
+        },
+        "cycles": 8,
+        "framesCaptured": 28,
+        "framesWithDialog": 8,
+        "framesWithoutDialog": 20,
+        "violations": 8,
+        "violationSamples": [
+          {
+            "timestamp": 1794680911.792444,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680912.204315,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680912.613984,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680913.027534,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "timestamp": 1794680913.430845,
+            "viewPixel": [
+              255,
+              255,
+              255
+            ],
+            "dialogPixel": [
+              255,
+              255,
+              255
+            ]
+          }
+        ],
+        "overlayMessageLatencyMs": {
+          "median": 0.899658203125,
+          "max": 2.999755859375,
+          "count": 18
+        }
+      }
+    },
+    "c5": {
+      "name": "Keyboard focus moves from the view beneath to a dialog in the frame when it opens and back when it closes",
+      "pass": true,
+      "note": "hostDriven (the shell calls iframe.focus() before sending the command) is the design under test. frameDriven (the frame focuses itself) is recorded for information only.",
+      "hostDriven": {
+        "focus": "host",
+        "pass": true,
+        "steps": {
+          "viewEditorTypedThroughHole": true,
+          "shellSawShortcut": true,
+          "hostActiveIsFrame": true,
+          "frameHasFocus": true,
+          "frameActiveIsDialogInput": true,
+          "dialogReceivedTyping": true,
+          "viewEditorUntouchedWhileDialogOpen": true,
+          "focusReturnedToViewEditor": true,
+          "viewEditorTypedAfterClose": true,
+          "clickOpenedDialogReceivedTyping": true,
+          "focusReturnedAfterClickClose": true,
+          "noticeVisibleOverView": true,
+          "viewStillVisibleBeneathNotice": true,
+          "noticeActionClickable": true,
+          "viewClickableAfterNotice": true,
+          "providerPageKeepsShortcut": true
+        }
+      },
+      "frameDriven": {
+        "focus": "frame",
+        "pass": false,
+        "steps": {
+          "viewEditorTypedThroughHole": true,
+          "shellSawShortcut": true,
+          "hostActiveIsFrame": true,
+          "frameHasFocus": true,
+          "frameActiveIsDialogInput": true,
+          "dialogReceivedTyping": true,
+          "viewEditorUntouchedWhileDialogOpen": true,
+          "focusReturnedToViewEditor": true,
+          "viewEditorTypedAfterClose": true,
+          "clickOpenedDialogReceivedTyping": true,
+          "focusReturnedAfterClickClose": true,
+          "noticeVisibleOverView": true,
+          "viewStillVisibleBeneathNotice": true,
+          "noticeActionClickable": true,
+          "viewClickableAfterNotice": false,
+          "providerPageKeepsShortcut": true
+        }
+      }
+    },
+    "extra": {
+      "name": "Placement accuracy after resize and rejection of bad rectangles (informational for AC-9 and AC-11)",
+      "pass": true,
+      "initial": {
+        "reported": {
+          "x": 240,
+          "y": 56,
+          "width": 1040,
+          "height": 744
+        },
+        "placed": {
+          "x": 240,
+          "y": 56,
+          "width": 1040,
+          "height": 744
+        },
+        "maxEdgeDelta": 0
+      },
+      "afterSidebarResize": {
+        "reported": {
+          "x": 120,
+          "y": 56,
+          "width": 1160,
+          "height": 744
+        },
+        "placed": {
+          "x": 120,
+          "y": 56,
+          "width": 1160,
+          "height": 744
+        },
+        "maxEdgeDelta": 0
+      },
+      "afterWindowResize": {
+        "reported": {
+          "x": 120,
+          "y": 56,
+          "width": 980,
+          "height": 644
+        },
+        "placed": {
+          "x": 120,
+          "y": 56,
+          "width": 980,
+          "height": 644
+        },
+        "maxEdgeDelta": 0
+      },
+      "badRectanglesIgnored": 3
+    }
+  },
+  "errors": [],
+  "browserVersion": "153.0.8010.12",
+  "hostOrigin": "chrome-extension://gpbadklhlmmiijgffmoebnnbkcgnbaeo",
+  "frameOrigin": "http://127.0.0.1:51249",
+  "nestedOrigin": "http://localhost:51250",
+  "oopif": [
+    "http://localhost:51250",
+    "http://127.0.0.1:51249"
+  ],
+  "frameIsOutOfProcess": true,
+  "finishedAt": "2026-11-14T18:28:41.965Z",
+  "pass": false
+}

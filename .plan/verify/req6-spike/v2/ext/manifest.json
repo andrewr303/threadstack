@@ -1,0 +1,7 @@
+{
+  "manifest_version": 3,
+  "name": "REQ-6 spike host (throwaway, not product code)",
+  "version": "0.0.1",
+  "description": "Throwaway extension page that frames a cross-site loopback document, mirroring the real shell-to-Paperclip embedding context.",
+  "background": { "service_worker": "sw.js" }
+}

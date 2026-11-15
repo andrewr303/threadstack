@@ -1,0 +1,63 @@
+{
+  "recordedAt": "2026-11-14T08:52:18.914046+00:00",
+  "reviewer": "/root/quality_review",
+  "syntheticBlackBoxFixtureOnly": true,
+  "sourceCheckerSha256": "fd78472832b38a3ca57ea601ab9d947f50aba5cba612178f61147cc7be9f43f3",
+  "reconstructedOldSha256": "8f4337c5da04cb2096d0ca9f741ff7e3262b9641faba000eecf5fa5e6eb72ae8",
+  "addedLines": 3,
+  "noOriginalSourceEdits": true,
+  "ownedTemporaryCopyCleanedUp": true,
+  "cases": [
+    {
+      "case": "canonical-generated-vendor-without-engine",
+      "expectedExit": 0,
+      "exitCode": 0,
+      "passed": true,
+      "stdout": "Node version policy check passed (Node >=24.11.0, @types/node 24.x).\n",
+      "stderr": ""
+    },
+    {
+      "case": "same-name-owned-invalid-engine-rejected",
+      "expectedExit": 1,
+      "exitCode": 1,
+      "passed": true,
+      "stdout": "",
+      "stderr": "Node version policy check failed:\n- packages/owned-source/provider-assets/package.json: engines.node must be >=24.11.0, found >=22.0.0\n"
+    },
+    {
+      "case": "owned-correct-engine-and-types-allowed",
+      "expectedExit": 0,
+      "exitCode": 0,
+      "passed": true,
+      "stdout": "Node version policy check passed (Node >=24.11.0, @types/node 24.x).\n",
+      "stderr": ""
+    },
+    {
+      "case": "owned-invalid-node-types-rejected",
+      "expectedExit": 1,
+      "exitCode": 1,
+      "passed": true,
+      "stdout": "",
+      "stderr": "Node version policy check failed:\n- packages/owned-source/provider-assets/package.json: devDependencies.@types/node must be ^24.0.0, found ^22.0.0\n"
+    }
+  ],
+  "actualRootCheck": {
+    "command": [
+      "node",
+      "scripts/check-node-version-policy.mjs"
+    ],
+    "exitCode": 0,
+    "stdout": "Node version policy check passed (Node >=24.11.0, @types/node 24.x).\n",
+    "stderr": ""
+  },
+  "syntaxCheck": {
+    "command": [
+      "node",
+      "--check",
+      "scripts/check-node-version-policy.mjs"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+}

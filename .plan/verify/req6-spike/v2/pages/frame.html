@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>REQ-6 spike frame (Paperclip stand-in)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; font: 16px system-ui; }
+  nav { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; background: rgb(30, 40, 60); color: white; }
+  header { position: fixed; left: 240px; right: 0; top: 0; height: 56px; background: rgb(60, 70, 90); color: white; }
+  /* The plugin page's content rectangle. Transparent unless ?opaque=1 (negative control). */
+  #content { position: fixed; left: 240px; right: 0; top: 56px; bottom: 0; background: transparent; }
+  body.opaque #content { background: rgb(255, 255, 255); }
+  body.narrow nav { width: 120px; }
+  body.narrow header, body.narrow #content { left: 120px; }
+  nav button { display: block; margin: 10px; }
+  #in-content { position: absolute; left: 40px; top: 300px; }
+  dialog { padding: 24px; border: 2px solid rgb(200, 30, 30); background: rgb(255, 230, 0); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+  #toast { position: fixed; right: 16px; bottom: 16px; width: 260px; padding: 12px; background: rgb(120, 0, 160); color: white; display: none; }
+</style>
+</head>
+<body>
+<nav>
+  <button id="frame-btn">Frame sidebar button</button>
+  <button id="open-dialog">Open dialog</button>
+  <button id="show-toast">Show notice</button>
+  <button id="toggle-narrow">Resize sidebar</button>
+</nav>
+<header>Header of the framed app</header>
+<div id="content"><button id="in-content">Frame button inside the content rectangle</button></div>
+<dialog id="dialog"><h2>Command palette stand-in</h2><input id="dialog-input" aria-label="Palette input"><button id="dialog-close">Close</button></dialog>
+<div id="toast" role="status">Notice <button id="toast-action">Undo</button></div>
+<script src="frame.js"></script>
+</body>
+</html>

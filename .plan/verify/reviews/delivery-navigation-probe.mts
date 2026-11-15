@@ -1,0 +1,11 @@
+import { JSDOM } from '/Users/andrew/dev/threadkeeper/paperclip/extension/node_modules/jsdom/lib/api.js';
+import { deliverProviderMessage } from '/Users/andrew/dev/threadkeeper/paperclip/extension/src/core/embed/session-delivery.ts';
+const dom = new JSDOM('<div contenteditable="true" data-testid="chat-input"></div><button aria-label="Send message" disabled>Send</button>', { url: 'https://claude.ai/chat/one' });
+for (const name of ['HTMLElement', 'HTMLTextAreaElement', 'HTMLInputElement', 'HTMLButtonElement', 'InputEvent', 'MutationObserver']) (globalThis as any)[name] = (dom.window as any)[name];
+const doc = dom.window.document;
+const button = doc.querySelector('button')!;
+button.addEventListener('click', () => { const row = doc.createElement('div'); row.setAttribute('data-testid', 'user-message'); row.textContent = 'Review probe'; doc.body.append(row); });
+setTimeout(() => { dom.window.history.pushState({}, '', '/chat/two'); button.disabled = false; }, 25);
+const outcome = await deliverProviderMessage(doc, doc.location.href, { requestId: 'probe', provider: 'claude', text: 'Review probe', expectedUrl: 'https://claude.ai/chat/one', deadlineAt: Date.now() + 1000 }, { visible: () => true, confirmationMs: 100 });
+console.log(JSON.stringify({ outcome, expectedUrl: 'https://claude.ai/chat/one', deliveredAtUrl: doc.location.href }));
+if (doc.location.href !== 'https://claude.ai/chat/one') throw new Error('Delivery was reported successful after navigation to a different session');

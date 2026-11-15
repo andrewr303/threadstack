@@ -1,0 +1,53 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+ ❯ src/lib/threadkeeper-boot-channel.test.ts (4 tests | 4 failed) 3ms
+   ❯ origin-checked host messages during application boot (4)
+     × retains an early valid hello until the router bridge mounts 2ms
+     × replays the authenticated hello across a React effect remount without stale navigation 0ms
+     × buffers only the latest valid navigation after a verified early hello 0ms
+     × drops later messages after disposing its owned listener 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/threadkeeper-boot-channel.test.ts > origin-checked host messages during application boot > retains an early valid hello until the router bridge mounts
+TypeError: createThreadkeeperBootChannel is not a function
+ ❯ setup src/lib/threadkeeper-boot-channel.test.ts:7:19
+
+ ❯ src/lib/threadkeeper-boot-channel.test.ts:13:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/lib/threadkeeper-boot-channel.test.ts > origin-checked host messages during application boot > replays the authenticated hello across a React effect remount without stale navigation
+TypeError: createThreadkeeperBootChannel is not a function
+ ❯ setup src/lib/threadkeeper-boot-channel.test.ts:7:19
+
+ ❯ src/lib/threadkeeper-boot-channel.test.ts:19:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/lib/threadkeeper-boot-channel.test.ts > origin-checked host messages during application boot > buffers only the latest valid navigation after a verified early hello
+TypeError: createThreadkeeperBootChannel is not a function
+ ❯ setup src/lib/threadkeeper-boot-channel.test.ts:7:19
+
+ ❯ src/lib/threadkeeper-boot-channel.test.ts:25:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/lib/threadkeeper-boot-channel.test.ts > origin-checked host messages during application boot > drops later messages after disposing its owned listener
+TypeError: createThreadkeeperBootChannel is not a function
+ ❯ setup src/lib/threadkeeper-boot-channel.test.ts:7:19
+
+ ❯ src/lib/threadkeeper-boot-channel.test.ts:31:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  00:19:01
+   Duration  297ms (environment 91%, transform 5%, tests 1%, import 1%, setup 1%, worker 1%)
+

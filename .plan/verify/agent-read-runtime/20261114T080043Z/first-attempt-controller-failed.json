@@ -1,0 +1,23 @@
+{
+  "startedAt": "2026-11-14T07:53:51.333Z",
+  "status": "failed",
+  "companyId": "5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+  "source": "documented process adapter + normal heartbeat + run-scoped HTTP gateway",
+  "directory": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-acceptance-nd_ao6zw/agent-read-probe-ca45608b",
+  "cleanup": [
+    "owned-task-deleted",
+    "owned-agent-terminated",
+    "terminated-agent-audit-history-retained-by-policy"
+  ],
+  "agentId": "c3fb2641-16e7-4887-873f-59582e48b6a4",
+  "issueId": "23856076-647d-4ea0-88b1-7c54d00b1b72",
+  "runId": "67737394-1977-45b3-b685-56fbafbd0b76",
+  "runStatus": "failed",
+  "runErrorCode": "adapter_failed",
+  "runError": "Process exited with code 1",
+  "workerReceipt": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-acceptance-nd_ao6zw/agent-read-probe-ca45608b/worker-result.json",
+  "workerStatus": "failed",
+  "error": "Actual process run did not succeed\n+ actual - expected\n\n+ 'failed'\n- 'succeeded'\n",
+  "finishedAt": "2026-11-14T07:53:52.717Z",
+  "cleanupComplete": true
+}

@@ -1,0 +1,204 @@
+{
+  "requestedAt": "2026-11-14T08:14:34.346964+00:00",
+  "rootPid": 52994,
+  "controllerPid": 53398,
+  "processGroup": 52994,
+  "rootCommand": "npm exec pnpm@9.15.4 test:run",
+  "controllerCommand": "node scripts/run-vitest-stable.mjs",
+  "reason": "Stale failing full-suite run started before final source and toolchain; not a passing current-source qualification. Preserve all observed failures and raw log.",
+  "groupMembers": [
+    {
+      "pid": 17452,
+      "ppid": 53398,
+      "pgid": 52994,
+      "comm": "node"
+    },
+    {
+      "pid": 17453,
+      "ppid": 17452,
+      "pgid": 52994,
+      "comm": "node"
+    },
+    {
+      "pid": 24503,
+      "ppid": 17453,
+      "pgid": 52994,
+      "comm": "/usr/local/bin/node"
+    },
+    {
+      "pid": 24524,
+      "ppid": 24503,
+      "pgid": 52994,
+      "comm": "/Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.1.0-beta.16/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres"
+    },
+    {
+      "pid": 52994,
+      "ppid": 8770,
+      "pgid": 52994,
+      "comm": "npm exec pnpm@9.15.4 test:run"
+    },
+    {
+      "pid": 53186,
+      "ppid": 52994,
+      "pgid": 52994,
+      "comm": "node"
+    },
+    {
+      "pid": 53269,
+      "ppid": 53186,
+      "pgid": 52994,
+      "comm": "sh"
+    },
+    {
+      "pid": 53398,
+      "ppid": 53269,
+      "pgid": 52994,
+      "comm": "node"
+    }
+  ],
+  "ownedDescendants": [
+    {
+      "pid": 17452,
+      "ppid": 53398,
+      "pgid": 52994,
+      "comm": "node"
+    },
+    {
+      "pid": 17453,
+      "ppid": 17452,
+      "pgid": 52994,
+      "comm": "node"
+    },
+    {
+      "pid": 24503,
+      "ppid": 17453,
+      "pgid": 52994,
+      "comm": "/usr/local/bin/node"
+    },
+    {
+      "pid": 24524,
+      "ppid": 24503,
+      "pgid": 52994,
+      "comm": "/Users/andrew/dev/threadkeeper/paperclip/node_modules/.pnpm/@embedded-postgres+darwin-arm64@18.1.0-beta.16/node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres"
+    },
+    {
+      "pid": 24525,
+      "ppid": 24524,
+      "pgid": 24525,
+      "comm": "postgres: io worker 0"
+    },
+    {
+      "pid": 24526,
+      "ppid": 24524,
+      "pgid": 24526,
+      "comm": "postgres: io worker 1"
+    },
+    {
+      "pid": 24527,
+      "ppid": 24524,
+      "pgid": 24527,
+      "comm": "postgres: io worker 2"
+    },
+    {
+      "pid": 24528,
+      "ppid": 24524,
+      "pgid": 24528,
+      "comm": "postgres: checkpointer"
+    },
+    {
+      "pid": 24529,
+      "ppid": 24524,
+      "pgid": 24529,
+      "comm": "postgres: background writer"
+    },
+    {
+      "pid": 24531,
+      "ppid": 24524,
+      "pgid": 24531,
+      "comm": "postgres: walwriter"
+    },
+    {
+      "pid": 24532,
+      "ppid": 24524,
+      "pgid": 24532,
+      "comm": "postgres: autovacuum launcher"
+    },
+    {
+      "pid": 24533,
+      "ppid": 24524,
+      "pgid": 24533,
+      "comm": "postgres: logical replication launcher"
+    },
+    {
+      "pid": 24536,
+      "ppid": 24524,
+      "pgid": 24536,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49219) idle"
+    },
+    {
+      "pid": 24666,
+      "ppid": 24524,
+      "pgid": 24666,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49220) idle"
+    },
+    {
+      "pid": 24668,
+      "ppid": 24524,
+      "pgid": 24668,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49223) idle"
+    },
+    {
+      "pid": 24669,
+      "ppid": 24524,
+      "pgid": 24669,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49224) idle"
+    },
+    {
+      "pid": 25063,
+      "ppid": 24524,
+      "pgid": 25063,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49225) idle"
+    },
+    {
+      "pid": 25064,
+      "ppid": 24524,
+      "pgid": 25064,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49226) idle"
+    },
+    {
+      "pid": 25066,
+      "ppid": 24524,
+      "pgid": 25066,
+      "comm": "postgres: paperclip paperclip 127.0.0.1(49228) idle"
+    },
+    {
+      "pid": 52994,
+      "ppid": 8770,
+      "pgid": 52994,
+      "comm": "npm exec pnpm@9.15.4 test:run"
+    },
+    {
+      "pid": 53186,
+      "ppid": 52994,
+      "pgid": 52994,
+      "comm": "node"
+    },
+    {
+      "pid": 53269,
+      "ppid": 53186,
+      "pgid": 52994,
+      "comm": "sh"
+    },
+    {
+      "pid": 53398,
+      "ppid": 53269,
+      "pgid": 52994,
+      "comm": "node"
+    }
+  ],
+  "sigintSent": true,
+  "groupMembersStillPresentAfter5s": [
+    24503
+  ],
+  "checkedAt": "2026-11-14T08:14:39.357783+00:00"
+}

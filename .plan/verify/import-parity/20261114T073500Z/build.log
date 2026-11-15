@@ -1,0 +1,9 @@
+fatal: not a git repository (or any of the parent directories): .git
+Built Threadkeeper 0.5.0 (build 20261114.073516-nogit) to /var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-import-parity-v1cy8rl3/parity-build
+Extension ID: glhbehcpnaagpdjfgjbhafhibbieklkg
+
+Next: reload the extension so the browser picks up the new manifest.
+  Edge:   edge://extensions   → Threadkeeper → Reload
+  Chrome: chrome://extensions → Threadkeeper → Reload
+The extensions page should then show version 0.5.0 (build 20261114.073516-nogit).
+If you forget, the extension reloads itself within a few minutes, and an open library page offers a one-click Reload.

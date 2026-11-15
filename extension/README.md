@@ -1,0 +1,355 @@
+# Threadkeeper — automatic organizer for all your AI threads
+
+Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conversations with **ChatGPT, Claude, Claude Code, Codex, Grok (on grok.com and inside X), Gemini, Google AI Studio, Perplexity, DeepSeek, Kimi, Le Chat and Microsoft Copilot**, plus agents, coding agents, app builders and other chat sites you turn on (ChatGPT dots, Meta's Muse, Meta AI, Grok Bot, Poe, HuggingChat, Manus, GitHub Copilot, Cursor, Devin, Jules, Lovable, Bolt, v0, Replit and more — see [Supported AI products](#supported-ai-products)) and any self-hosted chat you add, syncs the issues and agent runs of a [Paperclip](#7-syncs-paperclip-agent-work) server, works out what each one is about, and files it automatically, so you can find any thread by what it *was*, not just by its title, and pick it up where you left off.
+
+Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key or AWS account (Amazon Bedrock or Claude Platform on AWS).
+
+The full-page workspace combines **Browse** (embedded provider tabs), **Threads** (summaries, related threads, and grouping by repository, account, project, type, provider, date or status) and **Dashboard** (pinned sessions in up to four panes). It opens on Claude Code, with Claude's own sidebar and chat/code switch showing; Settings → Workspace changes the start page. Sessions save through automatic capture. The rail groups sessions by type (coding sessions, chats, bots) or by provider, account, last active or repository; its **Organize** menu, also on the Dashboard, filters by type, provider and account, and sorts by recent activity, creation date, title or number of messages. Each thread can show its summary, live page, or both.
+
+Use **Add account** to add another account of a provider. Two accounts of one provider work at the same time inside the workspace: the one your browser is signed in to, and one more in frames with their own cookies, which Threadkeeper saves encrypted and puts back each time the page loads. Move between accounts from the tabs, the sessions in the rail, or the account menu. Opening a third account of the same provider reloads the workspace; nobody is signed out. **Sign in here** signs an added account in inside the workspace. If the sign-in goes through Google, Apple, a passkey or a pop-up, **Sign in with a browser tab** sets your browser's own sign-in aside, lets you sign in, then puts it back. **Use as browser account** still changes which account the rest of the browser uses. Sessions you open under an added account are saved under that account; **Catch up** still imports only the browser's account. This has been tested against stand-in sites, not yet against each real provider signed in. Session Control backups can be imported through Import / Export.
+
+---
+
+## What it does
+
+### 1. Captures automatically
+- Open a conversation on any supported site and it lands in the library — no clicks. Capture is read-only, zero-footprint (no injected buttons, badges or layout changes) and never captures the composer or an in-progress streaming reply.
+- **Provider-native organization is kept:** ChatGPT Projects, Claude Projects, the GitHub repository of a Claude Code / Codex web session, and the model a ChatGPT reply used.
+- **Grok on X** (`x.com/i/grok`): X loads each Grok conversation as data, and Threadkeeper reads that response as the page receives it instead of scraping the page. A small script in X's page observes those requests without changing them. This needs host access to x.com and twitter.com; nothing outside Grok conversations is captured.
+- **Any AI product, opt-in:** besides the sites above (on from install), **Settings → Capture** lists agents, coding agents, app builders, companions and other chat sites by category. Turning one on asks the browser for access to that site only; nothing is read there before you do. **Any AI site** adds a site Threadkeeper does not list — your own Open WebUI, LibreChat, LobeChat or AnythingLLM (recognised by their pages), or anything else, where messages are found by their roles on the page. Removing a site removes its access too. Plain http is accepted only for this computer and private networks.
+- **Grok Bot through X Chat** (`x.com/i/chat`): X Chat also carries your private messages, so it is never read on its own. Open the chat with your Grok Bot and choose **Settings → Capture → Capture this tab** (Grok Bot must be turned on).
+- On pages without a reliable "still writing" signal (generic readers, added sites, some agents), a capture is sent only after two reads in a row see the same text.
+- Messages keep the site's own ids where it exposes them, so long conversations that the site renders in pieces are not stored twice, and replies still streaming or showing "thinking" are skipped.
+- **Coding agents on your computer:** import Claude Code sessions (`~/.claude/projects`) and Codex CLI sessions (`~/.codex/sessions`, or pick `~/.codex` to include `archived_sessions` too). Pick the folder once; new sessions sync every time the library opens. Each session keeps its working directory, git branch, model and a ready-to-copy `claude --resume …` / `codex resume …` command.
+  - Codex rollouts older than a week (`.jsonl.zst`) are decompressed on your device.
+  - Subagent transcripts and other side files are never imported as threads of their own. A Codex fork is filed as a branch of the thread it came from, without the history it replayed, and a reverted Codex thread keeps its newest rollout.
+  - A Claude Code session is titled by your rename if you made one, else by its agent name, its generated title, its summary, or its first prompt, in that order.
+- **Complete capture on ChatGPT and Claude:** both apps load each conversation as one JSON document. Threadkeeper reads that response as the page receives it (it never alters it and sends no request of its own), so a conversation is stored whole, with the site's message ids, timestamps, model and active branch, even when the page only renders part of it. Page reading stays as the live fallback and merges with it by message id, so nothing is dropped or stored twice.
+- **Import online history, no export needed:** **Import / Export → Import from online accounts → All history** reads old and recent ChatGPT and Claude conversations through your signed-in session in this browser, without the recent import's 300-chat cap. It pages through the active account/workspace, includes archived ChatGPT conversations, skips complete unchanged copies, and reads each remaining chat with a pause. Cancel at any time and run again to continue; imported copies are kept. Keep the browser and source tabs open. Deleted/unavailable chats cannot be recovered, and changed site formats or repeated pages stop the run with an error. The last 7, 14 or 30 days remain available for recent catch-up and its optional brief. In recent mode, Gemini, Grok, Perplexity, DeepSeek, Kimi, Le Chat, Copilot and AI Studio use their sidebar links (newest 30). Imported conversations follow your existing summarization, filing and privacy settings.
+- **Paperclip agent companies:** connect your [Paperclip](https://github.com/paperclipai/paperclip) server in **Settings → Paperclip** and every issue becomes a thread: the task, its comment thread, and the transcripts of the agent runs that worked on it, in time order. Details below.
+- **Exports:** drop in a ChatGPT or Claude data export (`.zip` or `conversations.json`), a Threadkeeper Portable bundle, or `.jsonl` session files — the format is detected automatically.
+
+### 2. Understands every thread (beyond the title)
+Each thread gets a **gist** (one line: what it is about and how it ended), a summary, the user's goal and outcome, the **kind of work** (building, debugging, writing, research, planning, design, data, business, learning, personal…), topic tags, named entities and artifacts (files, links), plus **where you left off**, **decisions** (yours vs. the assistant's suggestions), **next steps** and **open questions** — each linked to the exact message it came from.
+
+- **On-device analysis** runs instantly on every capture, with no network and no key.
+- **Claude analysis** (optional): Claude (default **Claude Opus 5.5**, selectable Sonnet 5.5 / Haiku 5.5 / Fable 5.1) re-reads each new or changed thread once the chat has gone quiet and writes an in-depth summary about the work itself (not about the chat): a descriptive title, a short gist, a 2–4 paragraph overview, key points, decisions with their reasons, what was produced, where you left off and the single next step, next steps, open questions and the project. Every key point, decision, next step and question must quote its source message verbatim; anything Claude cannot ground is dropped. Analysis runs at Medium effort or higher and reads up to about 160,000 characters of each thread (the opening and the newest turns of longer ones). **Copy summary** in a thread's detail copies all of it as Markdown, and **Copy handoff** adds the transcript. Summaries written by earlier versions are never re-analyzed automatically: open one and press **Improve summary**, or use **Settings → AI models → Older summaries** (shows the count and a cost estimate first). Claude can run through any of three providers, chosen in **Settings → AI models**:
+
+  | Provider | Credentials | Notes |
+  |---|---|---|
+  | Anthropic API | API key from console.anthropic.com | Server-side refusal fallback on Opus 5.5, Sonnet 5.5 and Fable 5.1 |
+  | Amazon Bedrock | Bedrock API key, or IAM access keys (optional session token) | Claude in Amazon Bedrock at `bedrock-mantle.{region}.api.aws`, model IDs such as `anthropic.claude-opus-5-5`. Enable model access in the Bedrock console first |
+  | Claude Platform on AWS | Workspace ID (`wrkspc_…`) plus a short-term API key, or IAM access keys | Anthropic-operated, billed through AWS Marketplace |
+
+  AWS credentials live under **Settings → Amazon Web Services** and are shared by Bedrock Claude, embeddings and reranking. Prefer short-term Bedrock API keys (12 hours at most) or temporary IAM credentials; AWS recommends long-term keys only for exploration. IAM keys are signed in the browser with SigV4.
+
+### 3. Organizes automatically
+New threads are filed into projects the moment they are captured, using the strongest signal available:
+
+1. **Your choice** — a project you set or locked is never changed.
+2. **The provider's own project** — ChatGPT/Claude Project or the coding session's repository (creating the project if needed).
+3. **Claude's judgement** — matched to an existing project, or a new project for a clear new workstream.
+4. **Keyword routing** — each project's keywords (seeded for your starter areas, editable).
+5. **Similar threads** — nearest neighbours among confidently filed threads in vector space.
+
+Status is set automatically too (*active*, *needs review* when the assistant is waiting on you, *done* when you wrapped up, *paused* after 30 days of silence) unless you set it yourself. **Auto-organize** reviews the whole library — with Claude when a key is set, otherwise by clustering similar unfiled threads into proposed projects — and shows every change for approval; every apply is undoable.
+
+**Many threads at once:** tick rows (shift-click for a range, or select all in view) to move them to a project, set their status, add a tag, pin or unpin them, make them local-only, export them as a Markdown handoff or a Portable bundle, or delete them. Every bulk edit can be undone. The list sorts by recent activity, oldest first, title or message count.
+
+### 4. Finds and answers
+- **Search** fuses keyword, phrase, fuzzy and semantic (vector) matches across titles, gists, summaries, topics, decisions and full message text. With a reranker on, pressing Enter re-reads the top candidates and puts the most relevant first.
+- **Ask** your library a question ("What did I decide about the Stripe webhook retries?") and Claude answers from your own threads with clickable `[T1]` citations.
+- **Related threads** for every conversation, by semantic similarity.
+
+### 5. Lives next to your chats
+- **Side panel** (default for the toolbar button): the library beside any page, with the conversation open in the current tab pinned at the top.
+- **Overlay** on AI pages (`Alt+Shift+K`) and a **full-page library** (`Alt+Shift+M`). Side panel shortcut: `Alt+Shift+L`.
+
+### 6. Works with Still (Sidebar Dock)
+Threadkeeper can feed **Still**, a separate sidebar extension, so your AI threads show up there as chats (summary and transcript) inside its collections, and Still's assistant can search them. The two extensions stay independent: Still keeps its own copy of every chat, so it keeps working when Threadkeeper is off.
+- **Connect from Still.** In Still: Settings → Integrations → AI chat threads → Find Threadkeeper → Connect. Threadkeeper opens a small window naming the extension that asks; type the 6-digit code Still shows and press **Allow** (or **Deny**, which blocks that extension until you unblock it). Threadkeeper shows its own ID under Settings → Sidebar Dock if Still needs it pasted.
+- **Still chooses what to sync** (every thread, chosen projects, or only threads it asks for) and where the chats go. Nothing syncs until you press Start syncing in Still.
+- **What Still gets:** title, provider category (from the table under [Supported AI products](#supported-ai-products)), the agent label of Paperclip threads (`Engineer · Claude Code`), gist and full analysis (overview, key points, decisions, next steps, open questions, what was produced), project, provider and, if transcript sharing is on in both apps, the transcript. Secrets in tool and system messages (API keys, tokens, private keys, `KEY=` lines) are replaced with `[redacted]`. Changes are pushed when a thread has been quiet for a minute (or your AI debounce), one batch at a time.
+- **Never shared:** local-only threads, threads in local-only projects, providers excluded from cloud processing, and synthetic threads. A thread that becomes private after it was shared is removed from Still right away; Threadkeeper also asks Still, after pairing, configuring and daily, which private threads it still holds and removes them.
+- **Searches from Still** use Threadkeeper's own hybrid search and Ask-style passage retrieval. They reach your embedding and rerank providers only if you allow it ("Let Still's searches use my embedding and rerank providers", off by default) and only for explicit searches.
+- **Send to Still from Threadkeeper.** Once connected, **Send to Still…** appears on a thread's detail row, in the bulk bar (select threads → Send to Still…), above search results ("Send these results to Still…", up to 200) and under an Ask answer (the threads it cites). Pick Still's default placement, one of Still's collections, or a new collection by name. Sending works whatever Still syncs on its own and brings back a chat you deleted in Still; local-only threads are skipped and named in the result. The thread detail shows **In Still · <collection>** when Still holds the thread.
+- **Settings → Sidebar Dock** shows the connection (Still's name and ID, since when, last push, counts), a read-only readout of what Still asked to sync, the options *Let Still search my threads*, *Share full transcripts* and *Let Still's searches use my embedding and rerank providers*, **Resync**, **Disconnect** (Still keeps the chats it has), blocked extensions with **Unblock**, and this Threadkeeper's ID with **Copy ID** for pasting into Still. A waiting request shows **Review request…**, which opens the consent window; Allow and Deny exist only there. In the overlay (Threadkeeper framed inside an AI site) these controls are read-only.
+- Edits made in the library (renames, status, project moves, local-only, deletes, organize, undo, analysis, imports) reach Still on their own; changes that can make a thread private are taken back from Still at once.
+- See `docs/sidebar-dock-integration.md` for the protocol.
+
+### 7. Syncs Paperclip agent work
+
+[Paperclip](https://github.com/paperclipai/paperclip) runs companies of AI agents (Claude Code, Codex, Gemini, OpenCode, Grok Build, and its own Grok Bot, OpenAI Dot and Muse runners) on a server you host. **Settings → Paperclip** connects to it:
+
+- **Server:** type the address (default `http://localhost:3100`) and press **Connect**. The browser asks for access to that host from the click. A local server that moved to the next free port is found on 3100-3110 automatically.
+- **Sign-in:** a `local_trusted` server (the `npx paperclipai onboard` default) needs none. On an authenticated server, **Sign in with Paperclip** runs the same approval flow as the Paperclip CLI: Paperclip opens in a tab, you approve, and Threadkeeper keeps the board key (valid 30 days) in this browser profile like its other keys. You can paste a `pcp_board_…` key instead.
+- **Companies:** every company you can see, or the ones you choose.
+- **Sync:** every 5 minutes while the browser runs, plus **Sync now**. Each sync reads only issues changed since the last one (`updatedSince`, with a cursor per company) and the newest runs, so a run that finished without touching its issue still shows up. A finished run is read once; later syncs reuse its stored transcript. Rate limits (429) are waited out or retried later, and repeated failures back off up to an hour. On a local server Threadkeeper also listens to Paperclip's live events to sync sooner.
+- **Threads:** one per issue, titled `PAP-12 Fix the CTA`. The issue description is the opening message, comments follow (agents' comments as replies), and each run is a block that opens with a one-line header (agent, outcome, duration, tokens, cost) followed by its transcript, with tool calls condensed the way Claude Code and Codex sessions are. Threads go through the normal on-device analysis and Claude analysis, are filed under the Paperclip project (else the goal, else the company), and take their status from the issue (in review → needs review, done → done, blocked → paused). A status you set yourself is kept.
+- **Agents and sessions:** each thread records who did the work, for example `Engineer · Claude Code` or `CEO · Grok Bot`. A Claude Code or Codex run is linked to its session: the thread shows **Linked session**, and the session shows **Run by Paperclip**. Import `~/.claude/projects` as usual; Paperclip gives Codex agents their own home, so import `~/.paperclip/instances/default/companies/<company id>/codex-home` to link Codex runs.
+- Paperclip threads (category *Agent*) go to Still like any other thread once Still syncs them, with their agent label; Still can filter for them by category.
+- Threadkeeper only reads. Apart from the sign-in request and revoking its own key when you sign out, it sends Paperclip nothing but GET requests. Threads you delete in Threadkeeper stay deleted.
+
+---
+
+## Privacy
+
+- Transcripts live in extension IndexedDB in your browser profile. Websites and content scripts cannot read it.
+- API keys and AWS credentials (Anthropic, Voyage, OpenAI, Bedrock, Claude Platform on AWS) are stored the same way and only sent to their own API.
+- Paperclip is reached only after you connect it in **Settings → Paperclip**: access to `localhost` / `127.0.0.1` (or your server's host) is an optional permission asked for from that click. The board key, when one is needed, is stored like the other keys and sent only to your Paperclip server.
+- Hosts for MongoDB Atlas and Cohere are optional permissions too: Settings asks for the one host you chose when you press Test.
+- **Catch up** uses your own signed-in session in this browser to read your own conversations from the site you pick, and nothing else. It keeps no credentials, only reads, and nothing it reads leaves the browser except through the analysis, embedding and reranking settings you already control. The ChatGPT and Claude endpoints it uses are the sites' own and are not documented or supported by OpenAI or Anthropic. They can change or be restricted, and the sites' terms may limit automated access, so it runs only when you start it, at a human pace, and stops at the first sign of a block.
+- The extension holds no AWS host permission at install. **Settings → Amazon Web Services → Allow access** asks the browser for exactly the endpoints of the configured region (for example `bedrock-mantle.us-east-1.api.aws`).
+- **Settings → Privacy & limits** lists every host that captured text can reach with the current settings.
+- Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and threads already filed in a local-only project (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker. The check happens when a thread is analyzed, so a brand-new conversation that nothing has filed yet *is* sent before Claude can recognize it as personal — mark such conversations local-only, or switch off automatic Claude analysis.
+- Because the library frame must load from the extension's fixed ID (required for Edge, see Troubleshooting), a website can detect that Threadkeeper is installed by probing that URL. It cannot read anything: unauthenticated frames are rejected and the database is extension-only.
+- A daily limit (default 150 analyses) caps Claude usage; Settings shows a cost estimate for your library and model.
+
+## Embeddings
+
+On-device vectors (feature-hashed, 384 dims) are always maintained and need no key. For true semantic search and better auto-filing choose a hosted model in **Settings → Search & embeddings**:
+
+| Provider | Models | Notes |
+|---|---|---|
+| Voyage AI (recommended by Anthropic) | `voyage-4-lite`, `voyage-4`, `voyage-4-large`, `voyage-code-4` | Atlas model API key (default endpoint: ai.mongodb.com); select Legacy Voyage for voyageai.com keys |
+| MongoDB Atlas (Voyage) | The same four Voyage models, 256 to 2048 dimensions | A model API key created in Atlas, with the geography it was issued for (`ai.mongodb.com`, `us.ai.mongodb.com` or `eu.ai.mongodb.com`). It does not work on voyageai.com, and a voyageai.com key does not work here |
+| Cohere | `embed-v5.0-fast`, `embed-v5.0-pro`, `embed-v4.0`, `embed-multilingual-v3.0`, `embed-english-v3.0` | API key from dashboard.cohere.com, called directly on `api.cohere.com`. v5.0 and v4.0 take 256 to 2048 or 1536 dimensions (default here 1024); v5.0 Pro and Fast share one vector space, so you can index with Pro and query with Fast |
+| Amazon Bedrock | Amazon Titan Text Embeddings V2, Cohere Embed v4 (256, 512 or 1024 dimensions), Cohere Embed English v3 and Multilingual v3 (fixed 1024) | Uses the AWS credentials in Settings |
+| OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | API key from platform.openai.com |
+| Ollama (local) | any embedding model, e.g. `nomic-embed-text` | start Ollama with `OLLAMA_ORIGINS=chrome-extension://*` |
+
+Vectors are only compared within one model space, so switching provider never mixes incompatible vectors. Atlas and direct Voyage are separate spaces even for the same model name. Cohere's newest models (Embed v5.0, Rerank v5.0) are only on Cohere's own API; Amazon Bedrock offers Cohere Embed v4 and v3 and Rerank 3.5.
+
+The Voyage endpoint setting applies to both embeddings and reranking. Existing saved Voyage keys without an endpoint keep using `api.voyageai.com`; choose MongoDB explicitly when replacing one with an Atlas model API key. For a US/EU key, choose the separate **MongoDB Atlas (Voyage)** provider and the matching geography. Keys are never retried against another host. MongoDB documents this key/endpoint requirement in its [API overview](https://www.mongodb.com/docs/voyageai/api-reference/overview/).
+
+Typing searches locally. Press **Enter** to add the configured hosted query embedding and reranker to the currently filtered candidates. Remote search uses compatible, current vectors; rebuilding vectors in Settings fills the selected provider's space. A failed or timed-out model request keeps local results available. Local-only threads and projects stay out of remote reranking and remote vector retrieval. These model calls are optional; generation settings remain independent.
+
+### Reranking
+
+A reranker re-scores the best first-stage candidates of a search (when you press Enter) or of an Ask question, then blends its score with the first-stage rank so a strong exact match is not buried. It sends only each thread's title, gist and best-matching excerpt, never local-only threads, and caches scores per query.
+
+| Reranker | Models | Notes |
+|---|---|---|
+| Voyage AI | `rerank-3-lite` (default), `rerank-3` | Atlas model API key; endpoint setting shared with embeddings, with explicit Legacy Voyage support |
+| MongoDB Atlas (Voyage) | `rerank-3-lite`, `rerank-3`, `rerank-2.5-lite`, `rerank-2.5` | Atlas model API key and geography, as above |
+| Cohere | `rerank-v5.0-fast`, `rerank-v5.0-pro`, `rerank-v4.0-fast`, `rerank-v4.0-pro`, `rerank-v3.5` | Cohere API key, called directly on `api.cohere.com` |
+| Amazon Bedrock | Cohere Rerank 3.5, Amazon Rerank 1.0 | With IAM keys it uses the Bedrock Rerank API. Bedrock API keys are not accepted there, so with an API key Cohere Rerank 3.5 is called directly (experimental). Cohere Rerank 3.5 runs in us-east-1, us-west-2, ca-central-1, eu-central-1 and ap-northeast-1 |
+
+---
+
+## Getting started
+
+Prerequisites: Node.js ≥ 20, npm ≥ 10, Chrome or Microsoft Edge.
+
+```bash
+npm install
+```
+
+```bash
+npm run build
+```
+
+The unpacked extension is written to `.output/chrome-mv3`.
+
+1. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and choose `.output/chrome-mv3`. On macOS the `.output` folder is hidden: press **Cmd+Shift+.** in the folder picker to show it. A browser keeps the library under the extension's ID, and removing a Threadkeeper card deletes that copy's library, so before you remove or replace a copy, make a backup with the [Mac helper](docs/mac-helper.md) (Settings, Accounts, Library backups). New installs have a fixed ID, so the library follows Threadkeeper to any folder; a copy loaded before that keeps its older, folder-based ID until you move it (see "The extension ID" in that guide).
+2. Check that the version on the extensions page matches the `Built Threadkeeper … (build …)` line that `npm run build` printed. After every later `npm run build`, click **Reload** (or let the extension reload itself within a few minutes).
+3. Click the Threadkeeper toolbar icon to open the side panel, then open any conversation on a supported site — it appears in the library, already summarized and filed.
+4. Optional: **Settings → AI models** → choose the Anthropic API, Amazon Bedrock or Claude Platform on AWS, add the key → **Test connection**. Then press **Auto-organize** to analyze and file your whole library.
+5. Optional: **Import / Export** → import your ChatGPT/Claude export and your Claude Code / Codex session folders.
+
+### Commands
+
+```bash
+# Typecheck, build and run the unit tests
+npm run check
+```
+
+```bash
+# Packaged-extension acceptance suite (QUIET-01 .. PERF-10) in headless Chromium
+npm run test:acceptance
+```
+
+```bash
+# End-to-end organizer check: Edge static-URL overlay, multi-provider capture, auto-filing,
+# Claude analysis / Ask against a mocked Anthropic API, side panel layout
+npm run test:e2e
+```
+
+```bash
+# Real Microsoft Edge: overlay, full page, side panel, and stale-manifest recovery
+# (set EDGE_EXECUTABLE_PATH if Edge is not in a standard location)
+npm run test:edge
+```
+
+```bash
+# ChatGPT capture and Catch up against a mock ChatGPT / Claude: complete capture from the site's
+# own data, history sync, the brief, Check capture, and the narrow layout
+npm run test:catchup
+```
+
+```bash
+# 10,000-thread warm-open and local search benchmark
+npm run bench
+```
+
+Set `CHROME_EXECUTABLE_PATH` to use a specific Chromium build for the browser suites (for example `/opt/pw-browsers/chromium` when the repo's Playwright version does not match the installed browsers).
+
+---
+
+## Supported AI products
+
+Every provider in `src/core/providers.ts`, with the category Threadkeeper filters by and passes to Still (`chat`, `coding_agent`, `agent`, `builder`, `search`, `companion`). **Host access**: *install* = access held since install, capture on by default (Grok Bot excepted); *on request* = asked for when you turn the product on in Settings → Capture; *your sites* = sites you add under Any AI site; Paperclip is read from its API on a server you connect (never from a page), and Imported holds files that belong to no known provider. **Selectors**: how sure we are the page reader matches the live site. Every adapter added with the opt-in products is tested only against synthetic fixtures modelled on public exporters and the sites' own code; none was checked against a signed-in page.
+
+| Product | Category | Pages | Host access | Selectors |
+|---|---|---|---|---|
+| ChatGPT (`chatgpt`) | Chat | chatgpt.com, chat.openai.com | install | high |
+| Claude (`claude`) | Chat | claude.ai | install | high |
+| Claude Code (`claude_code`) | Coding agent | claude.ai | install | high |
+| Codex (`codex`) | Coding agent | chatgpt.com | install | high |
+| Grok (`grok`) | Chat | grok.com | install | medium |
+| Grok on X (`grok_x`) | Chat | x.com, twitter.com | install | high |
+| Gemini (`gemini`) | Chat | gemini.google.com | install | medium |
+| Google AI Studio (`ai_studio`) | Chat | aistudio.google.com | install | medium |
+| Perplexity (`perplexity`) | Search | www.perplexity.ai, perplexity.ai | install | medium |
+| DeepSeek (`deepseek`) | Chat | chat.deepseek.com | install | medium |
+| Le Chat (`mistral`) | Chat | chat.mistral.ai | install | low |
+| Copilot (`copilot`) | Chat | copilot.microsoft.com, copilot.com, www.copilot.com | install | medium |
+| Kimi (`kimi`) | Chat | www.kimi.com, kimi.com, kimi.ai, www.kimi.ai | install (+ on request for www.kimi.ai) | medium |
+| Imported (`imported`) | Chat | import files only | none | – |
+| Paperclip (`paperclip`) | Agent | your Paperclip server (API, Settings → Paperclip) | on request (your server) | – |
+| ChatGPT dots (`chatgpt_dots`) | Agent | chatgpt.com | install | medium |
+| Claude Duet (`claude_duet`) | Agent | claude.ai | install | low |
+| Grok Bot (`grok_bot`) | Agent | x.com, twitter.com | install, only via Capture this tab | low |
+| Muse (`muse`) | Agent | muse.ai, www.muse.ai | on request | low |
+| Meta AI (`meta_ai`) | Chat | www.meta.ai, meta.ai | on request | medium |
+| Poe (`poe`) | Chat | poe.com | on request | low |
+| HuggingChat (`huggingchat`) | Chat | huggingface.co/chat | on request | high |
+| Qwen Chat (`qwen`) | Chat | chat.qwen.ai | on request | high |
+| Doubao (`doubao`) | Chat | www.doubao.com | on request | high |
+| Z.ai (`zai`) | Chat | chat.z.ai, zchat.z.ai | on request | high |
+| Manus (`manus`) | Agent | manus.im, www.manus.im | on request | medium |
+| Genspark (`genspark`) | Agent | www.genspark.ai, genspark.ai | on request | high |
+| MiniMax Agent (`minimax_agent`) | Agent | agent.minimax.io, agent.minimaxi.com | on request | low |
+| Character.AI (`character_ai`) | Companion | character.ai | on request | medium |
+| Duck.ai (`duck_ai`) | Chat | duck.ai | on request | high |
+| Lumo (`lumo`) | Chat | lumo.proton.me | on request | medium |
+| Arena (`arena`) | Chat | arena.ai, lmarena.ai | on request | low |
+| T3 Chat (`t3_chat`) | Chat | t3.chat | on request | low |
+| Gemini Notebook (`gemini_notebook`) | Chat | notebook.google.com, notebooklm.google.com | on request | medium |
+| GitHub Copilot (`github_copilot`) | Coding agent | github.com | on request | low |
+| Cursor agents (`cursor_agents`) | Coding agent | cursor.com, www.cursor.com | on request | low |
+| Devin (`devin`) | Coding agent | app.devin.ai | on request | low |
+| Jules (`jules`) | Coding agent | jules.google.com | on request | low |
+| Lovable (`lovable`) | App builder | lovable.dev | on request | medium |
+| Bolt (`bolt`) | App builder | bolt.new | on request | low |
+| v0 (`v0`) | App builder | v0.app, v0.dev | on request | low |
+| Replit Agent (`replit`) | App builder | replit.com | on request | low |
+| LobeChat (`lobechat`) | Chat | app.lobehub.com | on request | low |
+| Other AI sites (`custom_web`) | Chat | sites you add | your sites | low |
+| Open WebUI (`open_webui`) | Chat | sites you add | your sites | medium |
+| LibreChat (`librechat`) | Chat | sites you add | your sites | medium |
+| AnythingLLM (`anythingllm`) | Chat | sites you add | your sites | low |
+
+
+Reading is DOM-first everywhere except ChatGPT, Claude and Grok on X (which also read the conversation data the page loads). Catch up, network readers and history import for the newer products are not built yet; their threads arrive as you open them.
+
+## Repository structure
+
+```text
+src/
+  core/
+    providers.ts         Provider registry (category, hosts, host access, URL ids, labels) — the manifest is derived from it
+    dom-capture.ts       Per-provider DOM adapters, self-hosted app detection, generic fallback, structure-aware text extraction
+    custom-sites.ts      Sites added under Any AI site + runtime content-script registration for opt-in providers
+    capture-gate.ts      The service worker's accept/reject decision for every capture (sender page, provider, explicit token)
+    cli-sessions.ts      Claude Code and Codex CLI JSONL parsers
+    importers.ts         Format detection, zip/JSON/JSONL import, folder sync
+    site-api.ts          Parsers for the conversation JSON ChatGPT and Claude load (active branch, hidden turns, citations)
+    merge.ts             Identity-anchored merge of a DOM window into a stored thread
+    history-sync.ts      Catch up: sites, events, state, validation
+    site-history.ts      Page-side reader for ChatGPT and Claude through the signed-in session
+    sidebar-history.ts   Tab-by-tab reader for sites without a readable history
+    sync-orchestrator.ts Service-worker run: tabs, progress, cancel, idle timeout
+    sync-env.ts          The orchestrator's view of chrome.tabs and the database
+    catch-up.ts          Catch-up brief: on-device, or written by Claude from titles and summaries only
+    model-apis.ts        MongoDB Atlas and Cohere endpoints, model catalogs and dimension rules
+    adapters.ts          ChatGPT/Claude export parsers, Portable bundle, Markdown handoff
+    insights.ts          On-device analyzer (gist, kind, topics, decisions, next steps, status)
+    grok-x.ts            Parser for the Grok-on-X conversation data the page loads
+    ai/claude.ts         Claude analysis, library planning and Ask via the official Anthropic SDK
+    ai/backends.ts       One SDK client for the Anthropic API, Amazon Bedrock and Claude Platform on AWS
+    aws.ts               AWS endpoints, Bedrock API keys and SigV4 signing (aws4fetch), host access
+    embeddings.ts        Local hashed vectors + Voyage / Bedrock / OpenAI / Ollama
+    rerank.ts            Voyage and Bedrock reranking, score fusion, local-only filter
+    diagnostics.ts       Running-manifest vs build check, one-time self-reload, report
+    auto-organize.ts     Project filing precedence, k-NN, clustering
+    pipeline.ts          Capture → analyze → embed → file; debounced, leased Claude job queue
+    library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
+    db.ts, schema.ts     Dexie schema (v3), identity, tombstones, settings normalization
+    dock/                Still (Sidebar Dock) link: protocol + validators, pairing state, payloads,
+                         outbox/ledger/reconcile/drain, read queries, external handler
+    search.ts            Hybrid lexical + vector retrieval
+    paperclip/           Paperclip sync: client.ts (read-only API client, discovery, 429 handling),
+                         auth.ts (CLI approval flow, board keys), mapper.ts (issue/comments/runs → thread,
+                         run-log and native-event transcripts), sync.ts (incremental sync, cursors, backoff),
+                         live.ts (optional live-event hint)
+  entrypoints/
+    background.ts        Service worker: capture, alarms, analysis queue, side panel / overlay routing
+    content.ts           Zero-footprint capture observer, overlay host with load watchdog
+    grok-x-main.ts       Page-world observer for Grok on X responses (reads, never changes)
+    site-data-main.ts    Page-world observer for ChatGPT and Claude conversation responses (reads, never changes)
+    manager/             React UI shared by side panel, overlay and full page
+    connect/             Consent window for a Still pair request (connect.html, top-level popup only)
+shared/cloud.ts          Wire schemas for the optional Cloudflare Worker
+worker/                  Optional Cloudflare Worker (DeepSeek + MongoDB Voyage)
+scripts/                 Build, acceptance, e2e, Edge smoke, bulk screenshots and benchmark runners
+tests/unit/              Vitest suites
+evidence/                Acceptance ledger, benchmark report and screenshots
+```
+
+---
+
+## Optional Cloudflare Worker (`worker/`)
+
+Not needed when Claude analysis is configured. To use your own Worker for enrichment and embeddings instead:
+
+1. Configure `QUOTA_KV` in `worker/wrangler.toml` and set secrets:
+   ```bash
+   cd worker
+   npx wrangler secret put AUTH_TOKEN_HASHES_JSON
+   npx wrangler secret put MONGODB_ATLAS_MODEL_API_KEY
+   ```
+   - `AUTH_TOKEN_HASHES_JSON`: JSON map of lowercase SHA-256 hex digests of client Bearer tokens to user IDs.
+   - `MONGODB_ATLAS_MODEL_API_KEY`: MongoDB Atlas Model API key for Voyage embeddings and rerankers.
+2. Deploy with `npx wrangler deploy`.
+3. In **Settings → Cloudflare Worker enrichment (advanced)**, enable it, enter the Worker URL and Bearer token, and set a non-zero daily budget.
+
+---
+
+## Acceptance gates
+
+All gates pass in packaged-extension headless Chromium (see [`evidence/acceptance/acceptance-report.md`](evidence/acceptance/acceptance-report.md) and the [ledger](evidence/acceptance/acceptance-ledger.json)); the organizer e2e writes screenshots to [`evidence/organizer/`](evidence/organizer).
+
+| Gate | Requirement | Result |
+| :--- | :--- | :--- |
+| `QUIET-01` | Zero-presence closed state | 0 injected nodes, byte-identical host screenshots, no stray network; the manager loads from the static-ID URL Edge uses |
+| `OPEN-02` | Deliberate invocation & restoration | Layered `Escape`, scroll, focus and unsent draft restored |
+| `PARITY-03` | Overlay / full-page parity | Reconciled counts, 5 evidence locations, list / kanban / project cards, no horizontal overflow at 1440, 1280, 700 px |
+| `CAPTURE-04` | Passive capture & monotonic coverage | Partial DOM capture never downgrades full exports |
+| `IMPORT-05` | Lossless import / export | 652-thread ChatGPT fixture, Claude export, Portable JSON + Markdown round-trip |
+| `ISOLATE-06` | Account / workspace / branch isolation | 5-part identity key, `account_mismatch` guard |
+| `AI-07` | Grounded enrichment & NL organize | Quote-grounded claims, exclusion clauses, one-click undo |
+| `SEARCH-08` | Hybrid search | Match reasons, RRF lexical + vector fusion, compatibility checks |
+| `LIFE-09` | Lifecycle hygiene | Handshake framing guard, tombstones, cascade delete, no localhost origins |
+| `PERF-10` | 10k threads | Chromium IndexedDB warm-open p95 221 ms (≤ 500 ms); local search p95 5.6 ms (≤ 150 ms) |
+
+---
+
+## Troubleshooting
+
+- **"`<extension id>` is blocked · This page has been blocked by Microsoft Edge · ERR_BLOCKED_BY_CLIENT":** Edge is still running an old manifest. Builds before 0.2.0 made the library pages reachable only through a dynamic URL (`use_dynamic_url`), and Edge blocks the static URL it hands out, including the full-page library. Edge reads `manifest.json` only when an unpacked extension is loaded or reloaded, so running `npm run build` without pressing **Reload** keeps the broken manifest live. Fix: open `edge://extensions`, click **Reload** under Threadkeeper, and check that the version shown matches the `Built Threadkeeper … (build …)` line printed by `npm run build`. From 0.3.0 the extension detects this itself. After a rebuild, the service worker (which keeps running its previous script) reads the new `build-info.json` from disk the next time it wakes, at most a few minutes later, and reloads the extension once; any library page opened before that shows a **Reload extension** banner. **Settings → Diagnostics** compares the running manifest with the files on disk and copies a report. `npm run test:edge` reproduces the block in real Edge and checks every surface.
+- **Capture looks incomplete or missing on a site:** open the conversation, then **Settings → Diagnostics → Check capture in my AI tab**. It says whether the page was read, whether the site's own data arrived, and what the last capture did, as counts only (copy it into a bug report). For ChatGPT and Claude, reloading the tab makes the page send the complete conversation again.
+- **Catch up says to sign in, or that a site blocked it:** open the site in a normal tab, sign in or complete any check it shows, and run Catch up again. What was already imported is kept, and unchanged conversations are not read twice.
+- **Settings → Diagnostics** shows the running and on-disk versions, recent capture and overlay events, and copies a report without keys or thread content.
+- **A site changed its markup and capture stopped:** the generic role heuristics usually keep working; otherwise use the provider's data export via **Import / Export**.
+- **Claude analysis paused:** the status chip in the header shows the last error (invalid key, rate limit, daily limit). Fix it in Settings; queued threads resume automatically.

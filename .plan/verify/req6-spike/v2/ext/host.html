@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>REQ-6 spike host</title>
+<style>
+  html, body { margin: 0; height: 100%; font: 16px system-ui; background: rgb(250, 250, 250); }
+  /* The Threadkeeper view stand-in. It sits BENEATH the frame and is positioned from the slot rectangle. */
+  #view { position: fixed; left: 0; top: 0; width: 0; height: 0; background: rgb(0, 200, 120); overflow: auto; box-sizing: border-box; }
+  #view-inner { height: 3000px; padding: 16px; }
+  #underlay { display: block; margin: 8px 0; width: 220px; height: 40px; }
+  #editor { display: block; margin: 8px 0; width: 220px; }
+  #nested { display: block; margin: 8px 0; width: 320px; height: 80px; border: 1px solid #333; background: white; }
+  /* The Paperclip stand-in: full-size, on top. */
+  #paperclip { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: transparent; }
+</style>
+</head>
+<body>
+<main id="view">
+  <div id="view-inner">
+    <button id="underlay">Underlying view button</button>
+    <input id="editor" aria-label="Underlying editor">
+    <iframe id="nested" title="Provider page stand-in"></iframe>
+  </div>
+</main>
+<iframe id="paperclip" title="Paperclip stand-in"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
+  allow="clipboard-read; clipboard-write; microphone; camera; display-capture; fullscreen; publickey-credentials-get; autoplay"></iframe>
+<script src="host.js"></script>
+</body>
+</html>

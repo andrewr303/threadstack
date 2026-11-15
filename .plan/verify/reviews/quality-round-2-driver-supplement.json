@@ -1,0 +1,154 @@
+{
+  "recordedAt": "2026-11-14T08:41:06.356982+00:00",
+  "reviewer": "/root/quality_review",
+  "verdict": "driver-only-quality-pass",
+  "orderedAfter": ".plan/verify/reviews/spec-round-3-driver-supplement.md",
+  "productQualityVerdictChanged": false,
+  "scope": "Nine optional harness lines only; unchanged 183 files compose with reviewed current driver",
+  "driverPath": "extension/scripts/run-paperclip-e2e.mjs",
+  "currentDriverSha256": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039",
+  "reconstructedReviewedSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+  "addedLines": 9,
+  "removedLines": 0,
+  "scopes": [
+    {
+      "path": ".plan/verify/reviews/spec-round-3.scope.json",
+      "sha256": "6e63da109c7e1c57b5d95b2c6b7211e348f2cacb17b31770702d5e0abf8060ab",
+      "unchangedOtherFiles": 183,
+      "changedOtherFiles": []
+    },
+    {
+      "path": ".plan/verify/reviews/quality-round-2.scope.json",
+      "sha256": "a4753b386a97df289de9fe06a0f364b4773f7313219df78e093d828c11070837",
+      "unchangedOtherFiles": 183,
+      "changedOtherFiles": []
+    }
+  ],
+  "protectedSealedFiles": [
+    {
+      "path": ".acceptances/paperclip-merge/round-13/assets/attempt-2026-11-14T072435871Z/execution.json",
+      "sha256": "b56f75574deb90b578e64e60744bb23c1c4c6c7befde5fa86f082e669be91fd6",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-13/result.json",
+      "sha256": "c45257eed2d5c160b99b1c9476c86d9c5f0b108936dc5473063441b3b980a791",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-13/report.md",
+      "sha256": "4acb4b5b972dcf228103898f27123c4c0ddb9115f6314222bb731e6e7cb99d62",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-13/seal.json",
+      "sha256": "f4ec379f5842bf95f6fcedc1f3d3251322c185e24349a76c835b7b5fc1cbf8e3",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-14/assets/attempt-2026-11-14T072959983Z/execution.json",
+      "sha256": "3db20cab624114d745fcb9803b899b1d9cfc3730e2d077aee97cb620b39dd0a6",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-14/result.json",
+      "sha256": "800a625942b4a9e36e10bdbf2528c34bea328ecc9910be05d05e6e17375af792",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-14/report.md",
+      "sha256": "33aa776163646826063b9a8f740259d916b3c788312b7780c730829da1b42fef",
+      "matchesAuthorProvenance": true
+    },
+    {
+      "path": ".acceptances/paperclip-merge/round-14/seal.json",
+      "sha256": "e5cd860c1249739ea6a6ad1a40fd075ec95a96052cc9a9f38656cf1d7bf92658",
+      "matchesAuthorProvenance": true
+    }
+  ],
+  "authorProvenanceSha256": "99e43ba8c7e81627acf0b72380a10f9bc6ad13d5c144bf7a4ba2d2e37dc48924",
+  "historicalRoundAssociations": [
+    {
+      "round": 13,
+      "executionShaMatchesAuthor": true,
+      "contemporaneousDriverShaClaimed": false,
+      "association": "retrospective author attestation; not capture-time hash"
+    },
+    {
+      "round": 14,
+      "executionShaMatchesAuthor": true,
+      "contemporaneousDriverShaClaimed": false,
+      "association": "retrospective author attestation; not capture-time hash"
+    },
+    {
+      "round": 15,
+      "executionShaMatchesAuthor": true,
+      "contemporaneousDriverShaClaimed": false,
+      "association": "retrospective author attestation; not capture-time hash"
+    },
+    {
+      "round": 16,
+      "executionShaMatchesAuthor": true,
+      "contemporaneousDriverShaClaimed": false,
+      "association": "retrospective author attestation; not capture-time hash"
+    }
+  ],
+  "nodeSyntaxCheck": {
+    "command": [
+      "node",
+      "--check",
+      "extension/scripts/run-paperclip-e2e.mjs"
+    ],
+    "exitCode": 0
+  },
+  "syntheticBranchChecks": {
+    "extractedLines": 9,
+    "currentSha256": "408bff8a995af3b3248fe0b637b092d3501f829d36ad8b9cfa1107554d0a7039",
+    "reconstructedReviewedSha256": "525689347e1863abbf62e019ecc33a71da720d7b1abaf9db10958e50c2010b5e",
+    "syntheticOnly": true,
+    "results": [
+      {
+        "scenario": "unset",
+        "passed": true,
+        "cleanupReached": true,
+        "writes": 0,
+        "waitTimeoutMs": null
+      },
+      {
+        "scenario": "unpaired",
+        "passed": true,
+        "cleanupReached": true,
+        "writes": 0,
+        "waitTimeoutMs": null
+      },
+      {
+        "scenario": "done",
+        "passed": true,
+        "cleanupReached": true,
+        "writes": 1,
+        "waitTimeoutMs": 300000
+      },
+      {
+        "scenario": "timeout",
+        "passed": true,
+        "cleanupReached": true,
+        "writes": 1,
+        "waitTimeoutMs": 300000
+      }
+    ]
+  },
+  "syntheticCleanupOnly": true,
+  "configuredWaitBudgetMs": 300000,
+  "hardWallClockDeadlineMeasured": false,
+  "historicalCaptureTimeDriverHashesAbsent": true,
+  "historicalAssociationsRemainRetrospective": true,
+  "protectedFilesEditedByReviewer": false,
+  "priorSourceScopesOrSealsEdited": false,
+  "probeEvidence": {
+    "path": ".plan/verify/reviews/quality-round-2-driver-supplement.probe.json",
+    "sha256": "3102a46b023aa631574dca1b04c1ab3e4527eb4fea9b56e88381730f393151d6",
+    "executedProbeSource": ".plan/verify/reviews/spec-round-3-driver-supplement.probe.mjs",
+    "executedProbeSourceSha256": "7963e235103470c5ac1fc4fad0c13f77ce50d1f32eb4905dd31f7b8c6d51fc18"
+  },
+  "acceptanceAndFullSuiteVerdictChanged": false
+}

@@ -1,0 +1,21 @@
+{
+  "startedAt": "2026-11-14T08:00:38.609Z",
+  "status": "passed",
+  "companyId": "5652b79c-bee1-424f-8603-5dcc5d4e8fa1",
+  "source": "documented process adapter + normal heartbeat + run-scoped HTTP gateway",
+  "directory": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-acceptance-nd_ao6zw/agent-read-probe-d35fa191",
+  "cleanup": [
+    "owned-task-deleted",
+    "owned-agent-terminated",
+    "terminated-agent-audit-history-retained-by-policy"
+  ],
+  "agentId": "7a1332b5-1561-404c-b78a-ae132788bc3d",
+  "issueId": "feea093f-aa2b-47a7-b72d-d2454d9844b5",
+  "runId": "feff9b3f-c4d3-4909-a647-7a4af8009328",
+  "runStatus": "succeeded",
+  "runErrorCode": null,
+  "runError": null,
+  "workerReceipt": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-acceptance-nd_ao6zw/agent-read-probe-d35fa191/worker-result.json",
+  "workerStatus": "passed",
+  "finishedAt": "2026-11-14T08:00:43.142Z"
+}

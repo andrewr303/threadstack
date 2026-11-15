@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-11-14T08:46:48.140905+00:00",
+  "fixtureRoot": "/var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-node-policy-ybvnrn14",
+  "noOriginalSourceEdits": true,
+  "checkerSha256": "fd78472832b38a3ca57ea601ab9d947f50aba5cba612178f61147cc7be9f43f3",
+  "cases": [
+    {
+      "case": "generated-vendor-allowed",
+      "expectedExit": 0,
+      "exitCode": 0,
+      "artifact": ".plan/verify/final/node-policy-fixture/generated-vendor-allowed.log"
+    },
+    {
+      "case": "other-source-with-same-directory-name-rejected",
+      "expectedExit": 1,
+      "exitCode": 1,
+      "artifact": ".plan/verify/final/node-policy-fixture/other-source-with-same-directory-name-rejected.log"
+    },
+    {
+      "case": "owned-source-correct-floor-allowed",
+      "expectedExit": 0,
+      "exitCode": 0,
+      "artifact": ".plan/verify/final/node-policy-fixture/owned-source-correct-floor-allowed.log"
+    },
+    {
+      "case": "owned-source-invalid-types-rejected",
+      "expectedExit": 1,
+      "exitCode": 1,
+      "artifact": ".plan/verify/final/node-policy-fixture/owned-source-invalid-types-rejected.log"
+    }
+  ]
+}
