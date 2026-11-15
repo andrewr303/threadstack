@@ -160,6 +160,12 @@ describePostgres("heartbeat execution configuration through adapter dispatch", (
     const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID(), projectId = randomUUID();
     const userId = `configuration-user-${companyId}`;
     const credential = `fixture-api-key-${companyId}`;
+    // Managed preparation checks .codex/config.toml from the execution cwd through its
+    // ancestors. Keep that real policy check inside an owned temporary project, rather
+    // than inheriting this checkout's path through the operator's home directory.
+    const cwd = path.join(home, "projects", companyId);
+    await mkdir(path.join(cwd, ".codex"), { recursive: true });
+    await writeFile(path.join(cwd, ".codex", "config.toml"), "# Synthetic heartbeat project configuration.\n");
     await db.insert(authUsers).values({ id: userId, name: "Configuration user", email: `${userId}@example.test`,
       createdAt: new Date(), updatedAt: new Date() });
     await db.insert(companies).values({ id: companyId, name: "Execution configuration fixture", issuePrefix: `C${companyId.slice(0, 6)}` });
@@ -169,7 +175,7 @@ describePostgres("heartbeat execution configuration through adapter dispatch", (
     }, credential) : null;
     await db.insert(projects).values({ id: projectId, companyId, name: "Config project", env: { SHARED_VALUE: "project", PROJECT_ONLY: "project-only" } });
     await db.insert(agents).values({ id: agentId, companyId, name: "Configuration reader", adapterType, status: "idle",
-      adapterConfig: { model: "agent-model", env: { SHARED_VALUE: "agent", AGENT_ONLY: "agent-only", ...(managed ? { OPENAI_API_KEY: "stale-agent-key" } : {}) } },
+      adapterConfig: { cwd, model: "agent-model", env: { SHARED_VALUE: "agent", AGENT_ONLY: "agent-only", ...(managed ? { OPENAI_API_KEY: "stale-agent-key" } : {}) } },
       runtimeConfig: account ? { aiConnection: { provider: "openai", method: "api_key", mode: "delegated", connectionId: account.connectionId, grantId: account.grantId } } : {},
     });
     await db.insert(issues).values({ id: issueId, companyId, projectId, title: "Configuration fixture", status: "todo", assigneeAgentId: agentId, responsibleUserId: userId, issueNumber: 1, assigneeAdapterOverrides: { adapterConfig: { model: "issue-model" } } });

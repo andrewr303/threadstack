@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq, sql } from "drizzle-orm";
@@ -23,8 +23,12 @@ const auth = (token: string, year = 2020) => JSON.stringify({ tokens: { account_
 
 suite("durable plugin task credential handoff", () => {
   let database: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>>, db: ReturnType<typeof createDb>, home: string;
+  let workspace: string;
   beforeAll(async () => {
     home = await realpath(await mkdtemp(join(tmpdir(), "plugin-task-secret-")));
+    workspace = join(home, "workspace");
+    await mkdir(join(workspace, ".codex"), { recursive: true });
+    await writeFile(join(workspace, ".codex", "config.toml"), "", { mode: 0o600 });
     vi.stubEnv("PAPERCLIP_HOME", home); vi.stubEnv("PAPERCLIP_INSTANCE_ID", "plugin-task-fixture");
     database = await startEmbeddedPostgresTestDatabase("plugin-task-credential-"); db = createDb(database.connectionString);
   }, 90_000);
@@ -46,7 +50,8 @@ suite("durable plugin task credential handoff", () => {
     const [selection] = await service.quotaAccounts(companyId, owner, true);
     const managed = await prepareManagedAiRuntime(db, { companyId, agentId, responsibleUserId: owner, adapterType: "paperclip_runner",
       binding: { mode: "responsible_user", provider: selectedProvider, method: "subscription" },
-      config: provider === "codex" ? { provider: "codex" } : { provider: "acpx", acpxAgent: "grok" } });
+      // Project-auth checks must inspect only this fixture's workspace and ancestors.
+      config: { cwd: workspace, ...(provider === "codex" ? { provider: "codex" } : { provider: "acpx", acpxAgent: "grok" }) } });
     expect(managed.credentialWriteback).toBeDefined();
     await db.insert(environments).values({ id: environmentId, name: `Fixture ${environmentId}`, driver: "plugin", status: "active", config: { pluginKey: pluginId, driverKey: "tasks", driverConfig: {} } });
     await db.insert(plugins).values({ id: pluginId, pluginKey: pluginId, packageName: "fixture-tasks", version: "1.0.0", status: "ready", manifestJson: {
@@ -83,6 +88,15 @@ suite("durable plugin task credential handoff", () => {
       failExport(value: boolean) { failExport = value; }, credential: () => service.credential(selection!),
       settle: (executionStopObserved = false) => settleDispatchedEnvironmentTask(db, workers, { companyId, id: leaseId }, { executionStopObserved }) };
   }
+  it("still rejects project authentication overrides before preparing a credential handoff", async () => {
+    const config = join(workspace, ".codex", "config.toml");
+    try {
+      await writeFile(config, 'model_provider = "fixture-project-auth"\n');
+      await expect(fixture()).rejects.toMatchObject({ details: { code: "ai_connection_incompatible" } });
+    } finally {
+      await writeFile(config, "");
+    }
+  });
   it("completes a moved task's saved credential handoff after confirming stop", async () => {
     const f = await fixture();
     await db.update(environmentLeases).set({ metadata:

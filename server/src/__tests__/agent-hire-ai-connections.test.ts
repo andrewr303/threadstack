@@ -2,7 +2,7 @@ import { enableRunFailureReporting } from "./helpers/run-failure-reporting.js";
 import * as codexAdapter from "@paperclipai/adapter-codex-local/server";
 import { WORKSPACE_RESTORE_LOCK_TIMEOUT_CODE } from "@paperclipai/adapter-utils/workspace-restore-merge";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import express from "express";
@@ -36,9 +36,19 @@ let database: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>>;
 const externalTestDatabaseUrl = process.env.PAPERCLIP_TEST_DATABASE_URL?.trim();
 let db: ReturnType<typeof createDb>;
 let home: string;
+let workspace: string;
+const originalCwd = process.cwd();
 
 beforeAll(async () => {
   home = await mkdtemp(path.join(os.tmpdir(), "paperclip-hire-ai-"));
+  workspace = path.join(home, "workspace");
+  await mkdir(path.join(workspace, ".claude"), { recursive: true });
+  await mkdir(path.join(workspace, ".codex"), { recursive: true });
+  await writeFile(path.join(workspace, ".claude", "settings.json"), "{}\n");
+  await writeFile(path.join(workspace, ".codex", "config.toml"), "");
+  // Managed project-auth checks traverse cwd ancestors. Keep the real checks within an
+  // owned temporary project instead of traversing the operator's repository/home.
+  process.chdir(workspace);
   vi.stubEnv("PAPERCLIP_HOME", home);
   vi.stubEnv("PAPERCLIP_INSTANCE_ID", "hire-ai");
   vi.stubEnv("PAPERCLIP_IN_WORKTREE", "false");
@@ -50,12 +60,16 @@ beforeAll(async () => {
 }, 90_000);
 
 afterAll(async () => {
-  await waitForPendingRunFailureReports();
-  if (externalTestDatabaseUrl) await closeRegisteredClients(externalTestDatabaseUrl);
-  await db?.$client.end();
-  await database?.cleanup();
-  vi.unstubAllEnvs();
-  if (home) await rm(home, { recursive: true, force: true });
+  try {
+    await waitForPendingRunFailureReports();
+    if (externalTestDatabaseUrl) await closeRegisteredClients(externalTestDatabaseUrl);
+    await db?.$client.end();
+    await database?.cleanup();
+  } finally {
+    process.chdir(originalCwd);
+    vi.unstubAllEnvs();
+    if (home) await rm(home, { recursive: true, force: true });
+  }
 });
 
 async function fixture(provider: "anthropic" | "openai", method: "api_key" | "subscription" = "api_key") {
@@ -110,6 +124,19 @@ async function poolFixture(f: Awaited<ReturnType<typeof fixture>>, extraMembers:
 }
 
 describe("agent-created hires use managed AI connections", () => {
+  it("still rejects conflicting authentication in the owned project fixture", async () => {
+    const f = await fixture("anthropic");
+    const settings = path.join(workspace, ".claude", "settings.json");
+    try {
+      await writeFile(settings, JSON.stringify({ env: { ANTHROPIC_API_KEY: "fixture-project-only-key" } }));
+      await expect(prepareManagedAiRuntime(db, {
+        companyId: f.companyId, agentId: f.agentId, responsibleUserId: f.userId,
+        adapterType: f.adapterType, binding: f.binding, config: {},
+      })).rejects.toMatchObject({ details: { code: "ai_connection_incompatible" } });
+    } finally {
+      await writeFile(settings, "{}\n");
+    }
+  });
   it.each(["agent-hires", "agents"])("%s inherits a manager's pool without copying legacy credentials", async (endpoint) => {
     const f = await fixture("openai");
     const p = await poolFixture(f);

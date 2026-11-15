@@ -168,7 +168,8 @@ describePostgres("heartbeat session preparation through adapter dispatch", () =>
         apiKey: "fixture-key", agentIds: [], allAgents: true,
       }, "fixture-key");
       await db.update(agents).set({ adapterType: "paperclip_runner",
-        adapterConfig: { provider: "codex", model: "model-a" },
+        // Managed project-auth checks run before the synthetic realization.
+        adapterConfig: { provider: "codex", model: "model-a", cwd },
         runtimeConfig: { aiConnection: { provider: "openai", method: "api_key", mode: "delegated",
           connectionId: account.connectionId, grantId: account.grantId } },
       }).where(eq(agents.id, f.agentId));

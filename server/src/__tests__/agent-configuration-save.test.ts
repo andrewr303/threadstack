@@ -45,7 +45,7 @@ describePostgres("agent configuration save latency", () => {
     await db.insert(companies).values({ id: companyId, name: "Configuration save", issuePrefix: `CS${++fixtureNumber}` });
     await db.insert(companyMemberships).values({ companyId, principalId: userId, principalType: "user", status: "active", membershipRole: "member" });
     [agent] = await db.insert(agents).values({ companyId, name: "Configuration agent", adapterType: "paperclip_runner",
-      adapterConfig: { provider: "codex", model: "gpt-5.6-sol" } }).returning();
+      adapterConfig: { cwd: home, provider: "codex", model: "gpt-5.6-sol" } }).returning();
     account = await aiConnectionService(db).save(companyId, userId, {
       provider: "openai", method: "api_key", ownership: "personal", name: "Saved account", apiKey: "fixture-save-key", agentIds: [agent.id], allAgents: false,
     }, "fixture-save-key");

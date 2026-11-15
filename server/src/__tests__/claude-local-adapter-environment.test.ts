@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,8 +11,19 @@ const ORIGINAL_BEDROCK_URL = process.env.ANTHROPIC_BEDROCK_BASE_URL;
 const ORIGINAL_CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR;
 const ORIGINAL_PAPERCLIP_HOME = process.env.PAPERCLIP_HOME;
 const ORIGINAL_PAPERCLIP_INSTANCE_ID = process.env.PAPERCLIP_INSTANCE_ID;
+let fixtureRoot: string;
 
-afterEach(() => {
+beforeEach(async () => {
+  fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-envtest-config-"));
+  const configDir = path.join(fixtureRoot, "claude-config");
+  await fs.mkdir(configDir);
+  // Remote probes seed the host's shared Claude config before materialization.
+  // Own that input without reading the operator's configuration or changing HOME.
+  process.env.CLAUDE_CONFIG_DIR = configDir;
+  process.env.PAPERCLIP_HOME = path.join(fixtureRoot, "paperclip-home");
+});
+
+afterEach(async () => {
   resetClaudeCliCapabilitiesCacheForTests();
   if (ORIGINAL_ANTHROPIC === undefined) {
     delete process.env.ANTHROPIC_API_KEY;
@@ -44,6 +55,7 @@ afterEach(() => {
   } else {
     process.env.PAPERCLIP_INSTANCE_ID = ORIGINAL_PAPERCLIP_INSTANCE_ID;
   }
+  if (fixtureRoot) await fs.rm(fixtureRoot, { recursive: true, force: true });
 });
 
 async function writeHelpWithoutEffortClaudeCommand(commandPath: string): Promise<void> {
@@ -457,6 +469,7 @@ console.log(JSON.stringify({ type: "result", result: "hello", usage: { input_tok
           command: commandPath,
           cwd: workspace,
           effort: "low",
+          env: { HOME: root },
         },
         executionTarget: {
           kind: "remote",

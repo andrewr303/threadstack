@@ -29,8 +29,8 @@ const cases: Array<{ name: string; execute: () => Promise<Execute>; event: unkno
 ];
 
 describe("CLI adapter accounting on timeout", () => {
-  // Keep OpenCode runtime config copies inside each fixture; host config may
-  // include plugins and large dependency trees unrelated to accounting.
+  // Keep OpenCode runtime config copies and its Claude-compatible skills home
+  // inside each fixture; neither uses operator state for accounting.
   const directories: string[] = [];
   afterEach(async () => { vi.clearAllMocks(); for (const dir of directories.splice(0)) await rm(dir, { recursive: true, force: true }); });
   it.each(cases.filter(f => ["codex", "cursor", "opencode"].includes(f.name)))("$name preserves malformed optional counters through the checkpoint wrapper", async fixture => {
@@ -51,7 +51,7 @@ describe("CLI adapter accounting on timeout", () => {
         runId: "invalid-counter-run", agent: { id: "agent", companyId: "company", name: "Worker", adapterType: `${fixture.name}_local`, adapterConfig: {} },
         runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
         config: { engine: "cli", command, cwd: dir, model: fixture.name === "opencode" ? "openai/test" : "gpt-6-astra", paperclipRuntimeSkills: [],
-          env: { XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "fixture", OPENCODE_ALLOW_ALL_MODELS: "1" } },
+          env: { HOME: dir, XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "fixture", OPENCODE_ALLOW_ALL_MODELS: "1" } },
         context: {}, onLog: async () => {}, onUsage,
       });
       const valid = cached === 0 || cached === undefined;
@@ -79,7 +79,7 @@ describe("CLI adapter accounting on timeout", () => {
       runId: "test-run", agent: { id: "test-agent", companyId: "test-company", name: "Accounting", adapterType: `${fixture.name}_local`, adapterConfig: {} },
       runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
       config: { engine: "cli", command, cwd: dir, model: ["opencode", "pi"].includes(fixture.name) ? "openai/test" : fixture.name === "cursor" ? "gpt-5" : "test", paperclipRuntimeSkills: [],
-        env: { XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "test-placeholder", ANTHROPIC_API_KEY: "test-placeholder", GEMINI_API_KEY: "test-placeholder", OPENCODE_ALLOW_ALL_MODELS: "1", CLAUDE_CONFIG_DIR: dir } },
+        env: { HOME: dir, XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "test-placeholder", ANTHROPIC_API_KEY: "test-placeholder", GEMINI_API_KEY: "test-placeholder", OPENCODE_ALLOW_ALL_MODELS: "1", CLAUDE_CONFIG_DIR: dir } },
       context: {}, onLog: async () => {}, onUsage,
     };
     const execute = await fixture.execute();
@@ -213,7 +213,7 @@ describe("CLI adapter accounting on timeout", () => {
       const result = await execute({
         runId: "tail-run", agent: { id: "test-agent", companyId: "test-company", name: "Accounting", adapterType: `${fixture.name}_local`, adapterConfig: {} },
         runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
-        config: { engine: "cli", command, cwd: dir, model: "anthropic/test", paperclipRuntimeSkills: [], env: { XDG_CONFIG_HOME: dir, ANTHROPIC_API_KEY: "fixture", OPENAI_BASE_URL: "https://unrelated-proxy.example/v1", OPENROUTER_API_KEY: "unrelated-key", OPENCODE_ALLOW_ALL_MODELS: "1" } },
+        config: { engine: "cli", command, cwd: dir, model: "anthropic/test", paperclipRuntimeSkills: [], env: { HOME: dir, XDG_CONFIG_HOME: dir, ANTHROPIC_API_KEY: "fixture", OPENAI_BASE_URL: "https://unrelated-proxy.example/v1", OPENROUTER_API_KEY: "unrelated-key", OPENCODE_ALLOW_ALL_MODELS: "1" } },
         context: {}, onLog: async () => {}, onUsage,
       });
       expect(result.usage).toMatchObject({ inputTokens: 40, outputTokens: 20, cachedInputTokens: 200 });
@@ -233,7 +233,7 @@ describe("CLI adapter accounting on timeout", () => {
       runId: "test-run", agent: { id: "test-agent", companyId: "test-company", name: "Accounting", adapterType: `${fixture.name}_local`, adapterConfig: {} },
       runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
       config: { engine: "cli", command, cwd: dir, model: ["opencode", "pi"].includes(fixture.name) ? "openai/test" : fixture.name === "cursor" ? "gpt-5" : "test", paperclipRuntimeSkills: [],
-        env: { XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "test-placeholder", ANTHROPIC_API_KEY: "test-placeholder", GEMINI_API_KEY: "test-placeholder", MOONSHOT_API_KEY: "test-placeholder", OPENCODE_ALLOW_ALL_MODELS: "1", CLAUDE_CONFIG_DIR: dir } },
+        env: { HOME: dir, XDG_CONFIG_HOME: dir, OPENAI_API_KEY: "test-placeholder", ANTHROPIC_API_KEY: "test-placeholder", GEMINI_API_KEY: "test-placeholder", MOONSHOT_API_KEY: "test-placeholder", OPENCODE_ALLOW_ALL_MODELS: "1", CLAUDE_CONFIG_DIR: dir } },
       context: {}, onLog: async () => {},
     });
     expect(result.timedOut).toBe(true);
