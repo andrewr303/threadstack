@@ -396,17 +396,18 @@ describe('fused window (real App)', () => {
     await settle();
   });
 
-  it('recovers only one existing Threads row selection immediately after a real overlay close', async () => {
+  it('recovers distinct existing Threads row presses after a close, with duplicate and expired packets refused', async () => {
     await mountFused();
     const rows = [...host.querySelectorAll<HTMLButtonElement>('.tk-row-btn')];
     const target = rows[3]!;
     const next = rows[4]!;
+    const later = rows[5]!;
     const point = vi.fn((): Element => target);
     const now = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
     const previous = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
     Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: point });
-    const activate = () => fromPaperclip({ type: 'slot-activate', view: 'threads', x: 250, y: 100 });
+    const activate = (sequence = 1) => fromPaperclip({ type: 'slot-activate', view: 'threads', x: 250, y: 100, sequence });
     try {
       await activate(); // No overlay closed: no selection capability.
       expect(target.getAttribute('aria-selected')).toBe('false');
@@ -428,14 +429,22 @@ describe('fused window (real App)', () => {
       point.mockReturnValue(next);
       await activate(); // A duplicate packet cannot select a second row.
       expect(next.getAttribute('aria-selected')).toBe('false');
+      await activate(2); // A second physical press is still valid while Chromium catches up.
+      expect(next.getAttribute('aria-selected')).toBe('true');
+      point.mockReturnValue(later);
+      await activate(1); // An old gesture cannot be replayed after a newer one.
+      expect(later.getAttribute('aria-selected')).toBe('false');
       await fromPaperclip({ type: 'overlay', open: true, regions: [] });
       await fromPaperclip({ type: 'overlay', open: false, regions: [] });
       clock.mockReturnValue(now + 251);
-      await activate();
-      expect(next.getAttribute('aria-selected')).toBe('false');
+      await activate(3);
+      expect(later.getAttribute('aria-selected')).toBe('false');
       await fromPaperclip({ type: 'overlay', open: false, regions: [] });
-      await activate(); // Repeated closed reports cannot renew an expired close window.
-      expect(next.getAttribute('aria-selected')).toBe('false');
+      await activate(3); // Repeated closed reports cannot renew an expired close window.
+      expect(later.getAttribute('aria-selected')).toBe('false');
+      clock.mockReturnValue(now - 1);
+      await activate(3); // A backward wall-clock adjustment cannot reopen the window either.
+      expect(later.getAttribute('aria-selected')).toBe('false');
     } finally {
       clock.mockRestore();
       if (previous) Object.defineProperty(document, 'elementFromPoint', previous);

@@ -1,0 +1,338 @@
+{
+  "id": "fused-palette",
+  "name": "Meta+K from a thread row opens Paperclip palette over the visible view",
+  "acs": [
+    "AC-4",
+    "AC-6"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:11.716Z",
+  "completedAt": "2026-11-15T05:54:17.956Z",
+  "observation": "Meta+K from a focused row opened the palette (frame raised, on top, view visible under it by luminance correlation); typing reached it; Escape closed it; a row click right afterwards worked with and without a settle.",
+  "detail": {
+    "withoutSettle": {
+      "label": "asserted: no settle",
+      "settle": false,
+      "opened": true,
+      "open": {
+        "raised": "true",
+        "topAtInput": {
+          "tag": "IFRAME",
+          "title": "Paperclip",
+          "cls": "tk-paperclip-frame",
+          "inThreadsView": false,
+          "inShell": true,
+          "inFrame": true
+        },
+        "threadsViewVisible": true,
+        "luminanceCorrelationOutsidePalette": {
+          "n": 1303,
+          "r": 1,
+          "baselineSpread": 13.63
+        },
+        "slotAttr": "threads"
+      },
+      "typed": "fusedpal",
+      "clickSentAfterEscapeMs": 2,
+      "selected": 4,
+      "selectionWaitMs": 124,
+      "closedAfterMs": 131,
+      "hitAfterClick": {
+        "tag": "SPAN",
+        "title": null,
+        "cls": "tk-session-index-text",
+        "inThreadsView": true,
+        "inShell": true,
+        "inFrame": false
+      },
+      "problems": []
+    },
+    "withSettle": {
+      "label": "control: 800 ms settle after Escape",
+      "settle": true,
+      "opened": true,
+      "open": {
+        "raised": "true",
+        "topAtInput": {
+          "tag": "IFRAME",
+          "title": "Paperclip",
+          "cls": "tk-paperclip-frame",
+          "inThreadsView": false,
+          "inShell": true,
+          "inFrame": true
+        },
+        "threadsViewVisible": true,
+        "luminanceCorrelationOutsidePalette": {
+          "n": 1303,
+          "r": 1,
+          "baselineSpread": 13.63
+        },
+        "slotAttr": "threads"
+      },
+      "typed": "fusedpal",
+      "clickSentAfterEscapeMs": 818,
+      "selected": 5,
+      "selectionWaitMs": 1,
+      "closedAfterMs": 823,
+      "hitAfterClick": {
+        "tag": "SPAN",
+        "title": null,
+        "cls": "tk-session-index-text",
+        "inThreadsView": true,
+        "inShell": true,
+        "inFrame": false
+      },
+      "problems": []
+    },
+    "immediateClickPreconditionContract": "Before Escape: row1 is selected and focused, then the actual focused palette is fully visible and the parent is raised with the iframe on top at its input. No wait follows Escape before the native click.",
+    "immediateClickPreconditions": [
+      {
+        "delay": 0,
+        "attempt": 0,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 0,
+        "attempt": 1,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 0,
+        "attempt": 2,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 0,
+        "attempt": 3,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 100,
+        "attempt": 0,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 100,
+        "attempt": 1,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 100,
+        "attempt": 2,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 100,
+        "attempt": 3,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 300,
+        "attempt": 0,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 300,
+        "attempt": 1,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 300,
+        "attempt": 2,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      },
+      {
+        "delay": 300,
+        "attempt": 3,
+        "resetSelected": 1,
+        "resetFocused": true,
+        "ready": {
+          "child": {
+            "focused": true,
+            "visible": true,
+            "opacity": 1
+          },
+          "parent": {
+            "raised": "true",
+            "iframeOwnsPoint": true
+          }
+        }
+      }
+    ],
+    "clickLandsAfterEscape": {
+      "0ms": "4/4",
+      "100ms": "4/4",
+      "300ms": "4/4"
+    },
+    "outsideDismiss": {
+      "target": {
+        "index": 0,
+        "x": 280,
+        "y": 274
+      },
+      "selectedBefore": 1,
+      "selectedSamples": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "observationWindowMs": 350
+    }
+  },
+  "evidence": [
+    "fused-palette-open.png",
+    "fused-palette-outside-dismiss.png"
+  ]
+}

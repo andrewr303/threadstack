@@ -20,6 +20,7 @@ let parent: Window;
 let post: ReturnType<typeof vi.fn>;
 let root: Root;
 let mount: HTMLDivElement;
+let documentListeners: ReturnType<typeof vi.spyOn>;
 const sent = () => post.mock.calls.map((call) => call[0] as Record<string, unknown>);
 
 async function flush() { await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); }); }
@@ -42,6 +43,7 @@ beforeEach(async () => {
   document.body.append(appRoot);
   mount = document.createElement("div");
   appRoot.append(mount);
+  documentListeners = vi.spyOn(document, "addEventListener");
   vi.resetModules();
   const { ThreadkeeperHostBridge } = await import("../components/ThreadkeeperHostBridge");
   root = createRoot(mount);
@@ -54,6 +56,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  documentListeners.mockRestore();
   Object.defineProperty(window, "parent", { configurable: true, get: () => window });
   document.body.innerHTML = "";
   document.head.innerHTML = "";
@@ -64,6 +67,31 @@ afterEach(async () => {
 });
 
 describe("ThreadkeeperHostBridge through the boot channel", () => {
+  it("captures pointerdown for selection recovery and refuses programmatic pointer events", async () => {
+    expect(documentListeners.mock.calls.filter((call: unknown[]) => call[0] === "pointerdown" && call[2] === true)).toHaveLength(1);
+    await fromShell({ type: "hello" });
+    const { registerThreadkeeperSlot } = await import("./threadkeeper-host-slot");
+    const slot = document.createElement("div");
+    document.getElementById("root")!.append(slot);
+    const release = registerThreadkeeperSlot("threads", slot);
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("data-state", "open");
+    document.body.append(dialog);
+    try {
+      await fromShell({ type: "placed", view: "threads" });
+      await fromShell({ type: "overlay-query" });
+      dialog.setAttribute("data-state", "closed");
+      await flush();
+      post.mockClear();
+      // A script-created event is never represented as a browser-trusted pointer press.
+      const event = new MouseEvent("pointerdown", { button: 0, buttons: 1, clientX: 300, clientY: 100, bubbles: true });
+      expect(event.isTrusted).toBe(false);
+      slot.dispatchEvent(event);
+      await flush();
+      expect(sent().some((packet) => packet.type === "slot-activate")).toBe(false);
+    } finally { release(); dialog.remove(); }
+  });
   it("delivers placed, the palette command and overlay queries from the verified shell", async () => {
     await fromShell({ type: "hello" });
     await flush();

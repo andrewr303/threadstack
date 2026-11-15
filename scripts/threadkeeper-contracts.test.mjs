@@ -146,6 +146,21 @@ const [extensionHost, fusion, uiHost, uiSlot, pluginManifest] = await Promise.al
 );
 const views = [['browse', 'browse'], ['threads', 'threads'], ['session-board', 'dashboard']];
 
+test('native session presses carry host-owned sequence IDs through the extension parser', () => {
+  const packets = [];
+  const parent = { postMessage: packet => packets.push(packet) };
+  const frame = {};
+  const extensionOrigin = `chrome-extension://${'a'.repeat(32)}`;
+  const pageOrigin = 'http://127.0.0.1:3100';
+  const host = uiHost.createThreadkeeperHost({ parent, extensionIds: ['a'.repeat(32)], currentPath: () => '/ACME/threads', currentTitle: () => 'Threads', navigate: () => {}, fusedAvailable: () => true });
+  host.handleMessage({ source: parent, origin: extensionOrigin, data: { source: 'threadkeeper-shell', v: 1, type: 'hello' } });
+  host.reportSlot({ view: 'threads', rect: { x: 240, y: 48, width: 1040, height: 752 }, scheme: 'dark' }, 'dark');
+  assert.equal(host.reportSlotActivation({ view: 'threads', x: 300, y: 100, sequence: 999 }), true);
+  assert.equal(host.reportSlotActivation({ view: 'threads', x: 301, y: 100 }), true);
+  const parsed = packets.filter(packet => packet.type === 'slot-activate').map(data => extensionHost.parsePaperclipHostMessage({ source: frame, origin: pageOrigin, data }, frame, pageOrigin, { width: 1280, height: 800 }));
+  assert.deepEqual(parsed, [{ type: 'slot-activate', view: 'threads', x: 300, y: 100, sequence: 1 }, { type: 'slot-activate', view: 'threads', x: 301, y: 100, sequence: 2 }]);
+});
+
 test('the plugin pages and UI host expose the same Threadkeeper routes', () => {
   const pages = pluginManifest.default.ui.slots.filter((slot) => slot.type === 'page').map((slot) => slot.routePath);
   assert.deepEqual(pages, views.map(([route]) => route));

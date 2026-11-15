@@ -346,10 +346,12 @@ export function App() {
   // its matching slot arrives; old home-page slots may still be queued during navigation.
   const fusedEntryRef = useRef<Exclude<WorkspaceView, 'paperclip'> | null>(null);
   const fusedOverlayClosedAt = useRef(Number.NEGATIVE_INFINITY);
+  const fusedLastActivationSequence = useRef(0);
   // Without the server the shell shows its own rail and view switch (FR-6); a new `ready` resumes.
   useEffect(() => {
     if (!paperclipRunning) {
       fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      fusedLastActivationSequence.current = 0;
       fuse({ type: 'offline' });
     }
   }, [paperclipRunning, fuse]);
@@ -1205,6 +1207,7 @@ export function App() {
       } else if (view === 'paperclip') window.history.replaceState(null, '', paperclipPageAddress(window.location.href, message.path));
     } else if (message.type === 'ready') {
       fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      fusedLastActivationSequence.current = 0;
       fuse({ type: 'ready', mode: message.mode, at: Date.now() });
     }
     else if (message.type === 'slot') {
@@ -1239,8 +1242,10 @@ export function App() {
       // Chromium may deliver the first post-Escape click to the old OOPIF hit-test surface.
       // Recover only an existing session-row selection, never a generic toolbar/DOM action.
       const state = fusionRef.current;
+      const closeAge = Date.now() - fusedOverlayClosedAt.current;
       if (!fused || view !== 'threads' || state.slotView !== 'threads' || state.overlayOpen
-        || Date.now() - fusedOverlayClosedAt.current > SLOT_ACTIVATION_WINDOW_MS) return;
+        || closeAge < 0 || closeAge > SLOT_ACTIVATION_WINDOW_MS
+        || message.sequence <= fusedLastActivationSequence.current) return;
       const frame = paperclipControl.current?.frame();
       const box = frame?.getBoundingClientRect();
       const slot = state.rect;
@@ -1251,7 +1256,7 @@ export function App() {
       if (!(row instanceof HTMLButtonElement) || !row.isConnected || !row.closest('.tk-list-sidebar')) return;
       const key = [...rowRefs.current].find(([, element]) => element === row)?.[0];
       if (!key || !conversationByKey.has(key)) return;
-      fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      fusedLastActivationSequence.current = message.sequence;
       handleSelectThread(key);
       row.focus();
     } else if (message.type === 'open-view') setView(message.view);

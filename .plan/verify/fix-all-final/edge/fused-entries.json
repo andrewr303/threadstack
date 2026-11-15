@@ -1,0 +1,139 @@
+{
+  "id": "fused-entries",
+  "name": "Paperclip sidebar shows Browse, Threads, Session board",
+  "acs": [
+    "AC-1"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:19.869Z",
+  "completedAt": "2026-11-15T05:54:20.479Z",
+  "observation": "Sidebar lists Browse (/THR/browse), Threads (/THR/threads), Session board (/THR/session-board); a real click on each reached its path and the matching shell view.",
+  "detail": {
+    "nav": [
+      {
+        "text": "Browse",
+        "href": "/THR/browse",
+        "rect": {
+          "x": 12,
+          "y": 224,
+          "width": 215,
+          "height": 36,
+          "top": 224,
+          "right": 227,
+          "bottom": 260,
+          "left": 12
+        }
+      },
+      {
+        "text": "Threads",
+        "href": "/THR/threads",
+        "rect": {
+          "x": 12,
+          "y": 264,
+          "width": 215,
+          "height": 36,
+          "top": 264,
+          "right": 227,
+          "bottom": 300,
+          "left": 12
+        }
+      },
+      {
+        "text": "Session board",
+        "href": "/THR/session-board",
+        "rect": {
+          "x": 12,
+          "y": 304,
+          "width": 215,
+          "height": 36,
+          "top": 304,
+          "right": 227,
+          "bottom": 340,
+          "left": 12
+        }
+      }
+    ],
+    "navigation": [
+      {
+        "clicked": "Browse",
+        "framePath": "/THR/browse",
+        "shellView": "browse",
+        "slot": {
+          "x": 240,
+          "y": 60,
+          "width": 1040,
+          "height": 840,
+          "top": 60,
+          "right": 1280,
+          "bottom": 900,
+          "left": 240
+        },
+        "shell": {
+          "x": 240,
+          "y": 60,
+          "width": 1040,
+          "height": 840,
+          "top": 60,
+          "right": 1280,
+          "bottom": 900,
+          "left": 240
+        }
+      },
+      {
+        "clicked": "Session board",
+        "framePath": "/THR/session-board",
+        "shellView": "dashboard",
+        "slot": {
+          "x": 240,
+          "y": 60,
+          "width": 1040,
+          "height": 840,
+          "top": 60,
+          "right": 1280,
+          "bottom": 900,
+          "left": 240
+        },
+        "shell": {
+          "x": 240,
+          "y": 60,
+          "width": 1040,
+          "height": 840,
+          "top": 60,
+          "right": 1280,
+          "bottom": 900,
+          "left": 240
+        }
+      },
+      {
+        "clicked": "Threads",
+        "framePath": "/THR/threads",
+        "shellView": "threads",
+        "slot": {
+          "x": 240,
+          "y": 60,
+          "width": 1040,
+          "height": 840,
+          "top": 60,
+          "right": 1280,
+          "bottom": 900,
+          "left": 240
+        },
+        "shell": {
+          "x": 240,
+          "y": 60,
+          "width": 1040,
+          "height": 840,
+          "top": 60,
+          "right": 1280,
+          "bottom": 900,
+          "left": 240
+        }
+      }
+    ]
+  },
+  "evidence": [
+    "fused-entries-browse.png",
+    "fused-entries-dashboard.png",
+    "fused-entries-threads.png"
+  ]
+}

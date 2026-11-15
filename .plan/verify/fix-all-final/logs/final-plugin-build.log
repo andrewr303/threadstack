@@ -1,0 +1,17 @@
+
+> @paperclipai/plugin-browser-sessions@0.1.0 prebuild /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/plugin-browser-sessions
+> pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+
+
+> @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/sdk
+> node ../../../scripts/ensure-plugin-build-deps.mjs
+
+
+> @paperclipai/plugin-browser-sessions@0.1.0 build /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/plugin-browser-sessions
+> tsc && node scripts/build-ui.mjs
+
+
+  dist/ui/index.js      22.4kb
+  dist/ui/index.js.map  37.1kb
+
+⚡ Done in 8ms

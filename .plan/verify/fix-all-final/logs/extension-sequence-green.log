@@ -1,0 +1,22 @@
+
+ RUN  v3.2.7 /Users/andrew/dev/threadkeeper/paperclip/extension
+
+ ✓ tests/unit/paperclip-host.test.ts (10 tests) 4ms
+ ✓ tests/unit/paperclip-fused.test.tsx (28 tests) 12668ms
+   ✓ fused window (real App) > lays the same mounted Threads view over the reported rectangle with no second view switch (AC-3, AC-7, AC-9)  308ms
+   ✓ fused window (real App) > acknowledges each placement so the page turns transparent only under a placed view (F-2)  386ms
+   ✓ fused window (real App) > re-sends placed when ready+slot or slot null+slot view arrive in one batch (quality F-1)  321ms
+   ✓ fused window (real App) > switches views without engaging when the page is not fused (F-2 fallback)  335ms
+   ✓ fused window (real App) > keeps a direct Threads entry while the real frame first reports its home page and stale empty slots  416ms
+   ✓ fused window (real App) > follows Paperclip pages without remounting views, and sends Paperclip to the page of a view the shell opens (AC-3)  408ms
+   ✓ fused window (real App) > recovers distinct existing Threads row presses after a close, with duplicate and expired packets refused  792ms
+   ✓ fused window (real App) > still moves through rows with plain j and k in fused mode  312ms
+   ✓ fused window (real App) > cuts a notice out of the view instead of raising Paperclip (AC-5)  304ms
+   ✓ fused window (real App) > asks Paperclip about an overlay open for 60 s and restores the view when it reports none (FR-3 negative)  1399ms
+   ✓ fused window (real App) > shows the shell rail with Threads still mounted when the server stops, and fuses again on ready (AC-8)  5300ms
+
+ Test Files  2 passed (2)
+      Tests  38 passed (38)
+   Start at  22:42:12
+   Duration  13.91s (transform 546ms, setup 0ms, collect 875ms, tests 12.67s, environment 409ms, prepare 101ms)
+

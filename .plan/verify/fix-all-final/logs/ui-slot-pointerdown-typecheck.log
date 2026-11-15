@@ -1,0 +1,2 @@
+src/lib/threadkeeper-host-bridge.test.ts(71,50): error TS7031: Binding element 'type' implicitly has an 'any' type.
+src/lib/threadkeeper-host-bridge.test.ts(71,58): error TS7031: Binding element 'options' implicitly has an 'any' type.

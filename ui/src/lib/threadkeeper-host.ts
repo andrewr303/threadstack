@@ -101,6 +101,8 @@ export function createThreadkeeperHost(options: HostOptions) {
   let announcedMode: "fused" | "switching" | null = null;
   let lastSlot: string | null = null;
   let reportedSlot: ThreadkeeperSlot | null = null;
+  // Owned by this host, never supplied by the input caller; retained across re-handshakes.
+  let activationSequence = 0;
   const currentMode = () => (options.fusedAvailable?.() ? "fused" : "switching");
   const post = (body: Record<string, unknown>): boolean => {
     if (!parentOrigin) return false;
@@ -185,7 +187,8 @@ export function createThreadkeeperHost(options: HostOptions) {
       const { x, y, width, height } = reportedSlot.rect;
       if (activation.x < Math.max(0, x) || activation.y < Math.max(0, y)
         || activation.x >= x + width || activation.y >= y + height) return false;
-      return post({ type: "slot-activate", view: "threads", x: activation.x, y: activation.y });
+      if (activationSequence >= Number.MAX_SAFE_INTEGER) return false;
+      return post({ type: "slot-activate", view: "threads", x: activation.x, y: activation.y, sequence: ++activationSequence });
     },
     /** `open` counts blocking overlays only; notices travel as rectangles the shell cuts out of its view. */
     reportOverlay(report: { open: boolean; regions: readonly ThreadkeeperRect[] }): boolean {

@@ -1,0 +1,68 @@
+{
+  "id": "fused-layering",
+  "name": "Paperclip's content rectangle goes transparent after the shell sends placed; opaque again on leaving",
+  "acs": [
+    "REQ-6-design"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:28.481Z",
+  "completedAt": "2026-11-15T05:54:29.141Z",
+  "observation": "Attribute: threads on Threads, removed on Tasks, threads again on return, browse on Browse (first set after 1 ms).",
+  "detail": {
+    "onThreads": {
+      "attr": "threads",
+      "waitedMs": 1,
+      "placedMessagesReceivedByFrame": [
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"placed\",\"view\":\"session-board\"}",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"placed\",\"view\":\"threads\"}",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"placed\",\"view\":null}",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"placed\",\"view\":\"threads\"}"
+      ],
+      "slotAttrMutations": [
+        [
+          3773,
+          "slot-attr",
+          "threads"
+        ],
+        [
+          4683,
+          "slot-attr",
+          "threads"
+        ],
+        [
+          4685,
+          "slot-attr",
+          "threads"
+        ],
+        [
+          6766,
+          "slot-attr",
+          "threads"
+        ],
+        [
+          7683,
+          "slot-attr",
+          "threads"
+        ],
+        [
+          8653,
+          "slot-attr",
+          "threads"
+        ]
+      ]
+    },
+    "onTasks": {
+      "attr": null
+    },
+    "backOnThreads": {
+      "attr": "threads"
+    },
+    "onBrowse": {
+      "attr": "browse"
+    }
+  },
+  "evidence": [
+    "fused-layering-threads.png",
+    "fused-layering-tasks.png"
+  ]
+}

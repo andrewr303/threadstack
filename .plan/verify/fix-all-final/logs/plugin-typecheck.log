@@ -1,0 +1,4 @@
+
+> @paperclipai/plugin-browser-sessions@0.1.0 typecheck /Users/andrew/dev/threadkeeper/paperclip/packages/plugins/plugin-browser-sessions
+> tsc --noEmit && tsc --noEmit -p tsconfig.test.json
+

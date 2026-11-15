@@ -1,0 +1,20 @@
+{
+  "id": "fused-fallback",
+  "name": "An ordinary tab at /THR/threads offers Open this in Threadkeeper",
+  "acs": [
+    "AC-2"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:52:16.286Z",
+  "completedAt": "2026-11-15T05:52:16.816Z",
+  "observation": "The ordinary tab at /THR/threads shows the heading \"Open this in Threadkeeper\" and no slot.",
+  "detail": {
+    "url": "http://127.0.0.1:3217/THR/threads",
+    "body": "Back\nOpen this in Threadkeeper\n\nBrowse, Threads and the session board run inside the Threadkeeper window.\n\nOpen Threadkeeper",
+    "hostAttr": false,
+    "slotPresent": false
+  },
+  "evidence": [
+    "fused-fallback.png"
+  ]
+}
