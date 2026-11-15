@@ -386,6 +386,171 @@
   color: var(--text-3);
 }
 
+/* ---------- Sessions: heading row, Organize button and menu, filter line ---------- */
+.tk-rail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tk-rail-group-head > span:not(.tk-rail-count):not(.tk-acct):not(.tk-mark) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-rail-group-head .tk-mark,
+.tk-rail-group-head .tk-acct {
+  flex: none;
+}
+
+.tk-rail-mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.tk-rail-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px 4px 8px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+.tk-rail-filters-text {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.tk-rail-clear {
+  flex: none;
+  min-height: var(--row-h);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tk-rail-clear:hover {
+  background: var(--ctl-hover);
+}
+
+.tk-rail-clear:active {
+  background: var(--ctl-press);
+}
+
+.tk-rail-clear:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--ring-inner);
+}
+
+/* The Organize button: an icon button with the number of active filters beside it. The number,
+   not the colour, says that something is filtered. */
+.tk-org-btn {
+  position: relative;
+}
+
+.tk-org-btn[data-active="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-tint);
+  color: var(--text);
+}
+
+.tk-org-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-cap);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* Drawn on the page, outside the glass rail and bars (see AccountMenu); opaque enough to sit over
+   any embedded page. */
+.tk-org-menu {
+  position: fixed;
+  z-index: 100;
+  width: min(288px, calc(100vw - 16px));
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tk-org-menu:focus-visible {
+  outline-offset: -2px;
+}
+
+.tk-org-head {
+  padding: 6px 10px 2px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.tk-org-sub {
+  padding: 6px 10px 0;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.tk-org-item {
+  min-height: var(--row-h);
+  padding-block: 4px;
+}
+
+.tk-org-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.tk-org-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-org-count {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+@media (forced-colors: active) {
+  .tk-org-badge {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .tk-org-btn[data-active="true"] {
+    border-color: Highlight;
+  }
+  .tk-org-item[aria-checked="true"] {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+}
+
 /* The Threads navigation (projects, queues) the app passes in sits in the rail as plain lists. */
 .tk-rail .tk-nav,
 .tk-rail .tk-nav[data-drawer-open] {

@@ -29,10 +29,14 @@ function sameProfile(a: string | undefined, b: string | undefined): boolean {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
 
-/** The isolated account of the Claude sign-in that already uses this Chrome profile, if any. */
+/**
+ * The account of the Claude sign-in that was brought over from this Session Control profile, if
+ * any. Such accounts used to open in their own Chrome window; they are ordinary accounts now and
+ * keep the profile id only so that importing the same list again does not add them twice.
+ */
 export function findAccountByProfile(realms: readonly RealmAccounts[], profileId: string | undefined): AccountRecord | null {
   const entry = realms.find((r) => r.realm.id === REALM);
-  return entry?.accounts.find((a) => a.mode === 'isolated' && sameProfile(a.profileId, profileId)) ?? null;
+  return entry?.accounts.find((a) => sameProfile(a.profileId, profileId)) ?? null;
 }
 
 export interface PlanPreview {
@@ -48,7 +52,7 @@ export function previewSessionControlImport(plan: SessionControlImportPlan, real
     accounts: plan.accounts.map((a) => ({
       label: a.label,
       email: a.email,
-      where: a.mode === 'isolated' ? 'In its own Chrome window' : 'In the workspace (this browser’s Claude sign-in)',
+      where: a.mode === 'isolated' ? 'Inside Threadkeeper (sign in to it once)' : 'This browser’s Claude sign-in',
       status: a.primary ? 'Uses the account already here' : findAccountByProfile(realms, a.profileId) ? 'Already added' : 'Will be added',
     })),
     projects: plan.projects,

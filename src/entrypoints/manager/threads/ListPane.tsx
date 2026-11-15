@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useLayoutEffect, useMemo } from 'react';
 import { RUN_FILTER_LABELS, type RunFilter } from './filters.js';
 import {
-  THREADS_GROUP_BY,
   THREAD_KINDS,
   THREAD_KIND_LABELS,
   type CollectionRecord,
@@ -23,8 +22,16 @@ import { RowCheck, BulkActions, THREAD_SORT_LABELS, type ThreadSortMode } from '
 import { AskPanel } from '../AskPanel.js';
 import { relativeTime } from '../shared.js';
 import { Icon } from '../shell/icons.js';
-import { Segmented } from '../shell/primitives.js';
 import { useOptionalWorkspaceContext } from '../workspace/context.js';
+import { sessionGroupOf } from '../workspace/state.js';
+import {
+  LENS_GROUP_BY_LABELS,
+  SESSION_KINDS,
+  SESSION_KIND_LABELS,
+  availableGroupBy,
+  lensGroupLabel,
+  type SessionKind,
+} from '../workspace/lens.js';
 import { ThreadRow } from './ThreadRow.js';
 import {
   buildRepositoryIndex,
@@ -34,13 +41,6 @@ import {
   useThreadGrouping,
   type ThreadGroup,
 } from './grouping.js';
-
-const GROUP_BY_LABELS: Record<ThreadsGroupBy, string> = {
-  none: 'None',
-  project: 'Project',
-  repository: 'Repository',
-  account: 'Account',
-};
 
 export const KANBAN_STATES: WorkflowState[] = ['active', 'needs_review', 'waiting', 'paused', 'done'];
 /** Threads shown per project card. */
@@ -59,6 +59,9 @@ export interface ListPaneProps {
   repositoryFilter?: string | null;
   accountFilter?: string | null;
   runFilter?: RunFilter;
+  /** Type of session (coding, chats, bots, other) to keep, or 'all'. */
+  typeFilter?: SessionKind | 'all';
+  onTypeFilterChange?: (type: SessionKind | 'all') => void;
   onRepositoryFilterChange?: (repository: string | null) => void;
   onAccountFilterChange?: (accountId: string | null) => void;
   onRunFilterChange?: (filter: RunFilter) => void;
@@ -131,6 +134,8 @@ export function ListPane({
   repositoryFilter = null,
   accountFilter = null,
   runFilter = 'all',
+  typeFilter = 'all',
+  onTypeFilterChange,
   onRepositoryFilterChange,
   onAccountFilterChange,
   onRunFilterChange,
@@ -189,7 +194,9 @@ export function ListPane({
   const ws = useOptionalWorkspaceContext();
   // The workspace toolbar and grouped list are for the full page. Without a workspace around the
   // list (a test of the list alone) the filter props being present is what asks for them.
-  const isPage = ws ? ws.surface === 'page' : Boolean(onRepositoryFilterChange || onAccountFilterChange || onRunFilterChange);
+  const isPage = ws
+    ? ws.surface === 'page'
+    : Boolean(onRepositoryFilterChange || onAccountFilterChange || onRunFilterChange || onTypeFilterChange);
   const isListView = settings?.viewMode !== 'kanban' && settings?.viewMode !== 'cards';
   // Full page: the occasional filters sit behind one button so the list starts higher. The
   // button says how many are narrowing the list even while the controls are collapsed.
@@ -199,7 +206,8 @@ export function ListPane({
     Number(stateFilter !== 'all') +
     Number(coverageFilter !== 'all') +
     Number((runFilter ?? 'all') !== 'all') +
-    Number(Boolean(accountFilter));
+    Number(Boolean(accountFilter)) +
+    Number(typeFilter !== 'all');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersShown = filtersOpen;
   const groupBy: ThreadsGroupBy = settings?.threadsGroupBy ?? 'none';
@@ -218,19 +226,100 @@ export function ListPane({
     (conv: ConversationRecord) => ws?.accountOfThread(conv).account?.id ?? null,
     [ws]
   );
+  const realms = ws?.workspace.realms ?? [];
+  const accountOrder = useMemo(() => realms.flatMap((r) => r.accounts.map((a) => a.id)), [realms]);
   const groups: ThreadGroup[] | null = useMemo(
     () =>
       isPage && isListView && groupBy !== 'none' && repositoryIndex
         ? groupThreadHits(listHits, groupBy, {
             repository: (c) => repositoryIndex.get(c.threadKey) ?? null,
             account: accountIdOf,
+            accountOrder,
           })
         : null,
-    [isPage, isListView, groupBy, listHits, repositoryIndex, accountIdOf]
+    [isPage, isListView, groupBy, listHits, repositoryIndex, accountIdOf, accountOrder]
   );
-  const realms = ws?.workspace.realms ?? [];
   const someRealmHasManyAccounts = realms.some((r) => r.accounts.length > 1);
-  const workspaceFilterActive = Boolean(repositoryFilter || accountFilter || runFilter !== 'all');
+  const workspaceFilterActive = Boolean(repositoryFilter || accountFilter || runFilter !== 'all' || typeFilter !== 'all');
+  // What "Group by" offers: no Account without a second account, no Type or Provider when every
+  // thread has the same one. Whatever is in force stays in the list.
+  const groupOptions = useMemo(() => {
+    if (!isPage) return [];
+    const kinds = new Set<string>();
+    const providers = new Set<string>();
+    for (const c of conversations) {
+      if (c.isSyntheticBenchmark) continue;
+      providers.add(c.provider);
+      kinds.add(sessionGroupOf(c.provider));
+    }
+    return availableGroupBy(
+      'threads',
+      { multiAccount: someRealmHasManyAccounts, kindCount: kinds.size, providerCount: providers.size },
+      groupBy
+    );
+  }, [isPage, conversations, someRealmHasManyAccounts, groupBy]);
+  const clearWorkspaceFilters = () => {
+    onTypeFilterChange?.('all');
+    onProviderFilterChange('all');
+    onRepositoryFilterChange?.(null);
+    onAccountFilterChange?.(null);
+    onRunFilterChange?.('all');
+  };
+  const accountLabel = (accountId: string): string => {
+    for (const r of realms) {
+      const account = r.accounts.find((a) => a.id === accountId);
+      if (account) return `${r.realm.label} · ${account.label}`;
+    }
+    return 'Removed account';
+  };
+
+  const activeChips: Array<{ id: string; name: string; value: string; mono?: boolean; removeLabel: string; remove: () => void }> = [];
+  if (typeFilter !== 'all') {
+    activeChips.push({
+      id: 'type',
+      name: 'Type',
+      value: SESSION_KIND_LABELS[typeFilter],
+      removeLabel: `Remove type filter ${SESSION_KIND_LABELS[typeFilter]}`,
+      remove: () => onTypeFilterChange?.('all'),
+    });
+  }
+  if (providerFilter !== 'all') {
+    activeChips.push({
+      id: 'provider',
+      name: 'Provider',
+      value: providerLabel(providerFilter),
+      removeLabel: `Remove provider filter ${providerLabel(providerFilter)}`,
+      remove: () => onProviderFilterChange('all'),
+    });
+  }
+  if (accountFilter) {
+    activeChips.push({
+      id: 'account',
+      name: 'Account',
+      value: accountLabel(accountFilter),
+      removeLabel: `Remove account filter ${accountLabel(accountFilter)}`,
+      remove: () => onAccountFilterChange?.(null),
+    });
+  }
+  if (repositoryFilter) {
+    activeChips.push({
+      id: 'repository',
+      name: 'Repository',
+      value: repositoryFilter,
+      mono: true,
+      removeLabel: `Remove repository filter ${repositoryFilter}`,
+      remove: () => onRepositoryFilterChange?.(null),
+    });
+  }
+  if (runFilter !== 'all') {
+    activeChips.push({
+      id: 'run',
+      name: 'Run state',
+      value: RUN_FILTER_LABELS[runFilter],
+      removeLabel: `Remove run state filter ${RUN_FILTER_LABELS[runFilter]}`,
+      remove: () => onRunFilterChange?.('all'),
+    });
+  }
 
   const renderRow = (hit: SearchHit) => {
     const c = hit.conversation;
@@ -252,7 +341,7 @@ export function ListPane({
     );
   };
 
-  /** "<Sign-in> · <Account>" for an account group; the repository or project name otherwise. */
+  /** "<Sign-in> · <Account>" for an account group; the repository, project, type, provider, date or status name otherwise. */
   const groupHeading = (group: ThreadGroup) => {
     if (groupBy === 'repository') {
       return group.key ? <span className="tk-thr-mono">{group.key}</span> : <span>No repository</span>;
@@ -272,7 +361,8 @@ export function ListPane({
         </>
       );
     }
-    return <span>{group.key}</span>;
+    if (groupBy === 'project') return <span>{group.key}</span>;
+    return <span>{lensGroupLabel(groupBy, group.key)}</span>;
   };
   const groupName = (group: ThreadGroup): string => {
     if (groupBy === 'repository') return group.key ?? 'No repository';
@@ -280,7 +370,7 @@ export function ListPane({
       const owner = ws?.accountOfThread(group.hits[0].conversation);
       return owner?.account ? `${owner.realm ? `${owner.realm.label} · ` : ''}${owner.account.label}` : 'No account';
     }
-    return group.key ?? 'Unassigned';
+    return groupBy === 'project' ? group.key ?? 'Unassigned' : lensGroupLabel(groupBy, group.key);
   };
 
   const renderGroups = (list: ThreadGroup[]) => (
@@ -417,6 +507,21 @@ export function ListPane({
                 </option>
               ))}
             </select>
+            {isPage && (
+              <select
+                className="tk-select"
+                aria-label="Filter by type"
+                value={typeFilter}
+                onChange={(e) => onTypeFilterChange?.(e.target.value as SessionKind | 'all')}
+              >
+                <option value="all">All types</option>
+                {SESSION_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {SESSION_KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
               className="tk-select"
               aria-label="Filter by kind of work"
@@ -467,12 +572,18 @@ export function ListPane({
                 <span className="tk-thr-label" aria-hidden="true">
                   Group by
                 </span>
-                <Segmented
-                  label="Group by"
+                <select
+                  className="tk-select"
+                  aria-label="Group by"
                   value={groupBy}
-                  options={THREADS_GROUP_BY.map((value) => ({ value, label: GROUP_BY_LABELS[value] }))}
-                  onChange={(value) => void onPatchSettings({ threadsGroupBy: value })}
-                />
+                  onChange={(e) => void onPatchSettings({ threadsGroupBy: e.target.value as ThreadsGroupBy })}
+                >
+                  {groupOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {LENS_GROUP_BY_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
             <select
@@ -508,21 +619,23 @@ export function ListPane({
                   ))}
               </select>
             )}
-            {repositoryFilter && (
-              <span className="tk-thr-filter-chip">
+          </div>
+        )}
+        {isPage && listMode === 'search' && activeChips.length > 0 && (
+          <div className="tk-thr-chips" role="group" aria-label="Active filters">
+            {activeChips.map((chip) => (
+              <span className="tk-thr-filter-chip" key={chip.id}>
                 <span>
-                  Repository: <span className="tk-thr-mono">{repositoryFilter}</span>
+                  {chip.name}: {chip.mono ? <span className="tk-thr-mono">{chip.value}</span> : chip.value}
                 </span>
-                <button
-                  type="button"
-                  className="tk-icon-btn"
-                  aria-label={`Remove repository filter ${repositoryFilter}`}
-                  onClick={() => onRepositoryFilterChange?.(null)}
-                >
+                <button type="button" className="tk-icon-btn" aria-label={chip.removeLabel} onClick={chip.remove}>
                   <Icon name="close" size={14} />
                 </button>
               </span>
-            )}
+            ))}
+            <button type="button" className="tk-btn tk-btn-quiet tk-thr-clear" onClick={clearWorkspaceFilters}>
+              Clear filters
+            </button>
           </div>
         )}
       </div>
@@ -714,12 +827,13 @@ export function ListPane({
                         type="button"
                         className="tk-btn"
                         onClick={() => {
+                          onTypeFilterChange?.('all');
                           onRepositoryFilterChange?.(null);
                           onAccountFilterChange?.(null);
                           onRunFilterChange?.('all');
                         }}
                       >
-                        Clear repository, account and run filters
+                        Clear type, repository, account and run filters
                       </button>
                     </p>
                   )}

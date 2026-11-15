@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ThreadkeeperDB } from '../../../core/db.js';
 import type { ConversationRecord, SettingsRecord } from '../../../core/schema.js';
+import { parsePaneName } from '../../../core/embed/frame.js';
 import { realmById } from '../../../core/workspace/realms.js';
 import {
   EMBED_FRAME_NAME_PREFIX,
@@ -23,7 +24,8 @@ import {
   type WorkspaceView,
 } from '../../../core/workspace/types.js';
 import { createAdoptionGate, isEmbedGestureMessage } from './adoption.js';
-import { sendFrameCommand, workspaceApi } from './client.js';
+import { loadSeed, reloadWorkspacePage, sendFrameCommand, startWorkspacePort, workspaceApi } from './client.js';
+import { LAUNCH_PROVIDERS } from './launch.js';
 import {
   accountForThread,
   embedTargetFor,
@@ -31,10 +33,15 @@ import {
   findAccount,
   normalizeWorkspaceState,
   planFrames,
+  slotOfTab,
   threadKeyForUrl,
   threadTabId,
+  wantedProfiles,
   workspaceReducer,
+  workspaceShape,
   type FramePlan,
+  type ProfileSlotMap,
+  type TabSlot,
   type WorkspaceAction,
 } from './state.js';
 
@@ -89,17 +96,47 @@ export interface WorkspaceController {
   state: WorkspaceState;
   plan: FramePlan;
   runtime: (tabId: string) => FrameRuntime;
-  /** Realm whose accounts are being switched right now. */
-  switchingRealm: string | null;
+  /** Realm whose accounts are being changed right now (a sign-in starting or ending, a switch). */
+  busyRealm: string | null;
+  /** What this page's profile slots hold, by realm. Empty again after every page load. */
+  slots: ProfileSlotMap;
+  /**
+   * False when the worker cannot see the cookies profile pages are given (an old manifest): a
+   * profile then works until the page reloads, but its sign-in is not saved.
+   */
+  profilesSaved: boolean;
+  /** Where a tab's page loads: an ordinary frame or the profile slot. */
+  slotOf: (tab: SessionTab) => TabSlot;
   dispatch: (action: WorkspaceAction) => void;
   /** Open an address as a session tab under the realm's signed-in account (or `accountId`). */
   openUrl: (url: string, options?: { accountId?: string; activate?: boolean; title?: string }) => OpenOutcome;
+  /**
+   * Land on the start page: the most recently used tab of that product when one is open, else a
+   * new tab on it.
+   */
+  openStartPage: (url: string) => OpenOutcome;
   /** Open a library thread as a session tab under the account it was captured with. */
   openThread: (conv: ConversationRecord, options?: { activate?: boolean }) => OpenOutcome;
   closeTab: (id: string) => void;
   activateTab: (id: string) => void;
-  /** Sign the tab's realm in as the tab's account, so the tab can load. */
-  switchAccount: (accountId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
+  /**
+   * Go to an account: its most recently used tab of the realm, or a new tab on the realm's
+   * start page when it has none. Nothing is signed out anywhere.
+   */
+  goToAccount: (accountId: string) => OpenOutcome;
+  /**
+   * Load a profile account into this page's slot of its realm now. For an account without a
+   * saved sign-in this is "sign in here": its pages open on the site's own sign-in page.
+   */
+  showProfile: (accountId: string) => Promise<void>;
+  /** Reload the page so that `tabId`'s account takes its realm's slot from the account holding it. */
+  switchProfile: (tabId: string) => Promise<void>;
+  /** Make an account the browser's own sign-in for its realm. Changes every tab of the realm. */
+  useAsBrowserAccount: (accountId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
+  /** Sign a profile account in through an ordinary browser tab (for sign-ins a frame cannot finish). */
+  beginBrowserSignIn: (accountId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
+  finishBrowserSignIn: () => Promise<AccountsChangeResult | WorkspaceFailure>;
+  cancelBrowserSignIn: () => Promise<AccountsChangeResult | WorkspaceFailure>;
   addAccount: (input: {
     realm: string;
     mode: AccountMode;
@@ -110,8 +147,6 @@ export interface WorkspaceController {
   updateAccount: (accountId: string, patch: { label?: string; color?: AccountColor }) => Promise<AccountsChangeResult | WorkspaceFailure>;
   removeAccount: (accountId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
   refreshAccounts: () => Promise<void>;
-  /** Open an address in an isolated account's own Chrome window (needs the Mac helper). */
-  openIsolated: (accountId: string, url: string) => Promise<{ ok: true } | WorkspaceFailure>;
   back: (id: string) => void;
   forward: (id: string) => void;
   reload: (id: string) => void;
@@ -131,13 +166,13 @@ function newTabId(): string {
   return `tab_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** The session tab an embedded frame belongs to, from the name its iframe was given. */
+/**
+ * The session tab an embedded frame belongs to: the frame's whole name as the workspace gave it,
+ * or the tab id the content script already read out of it.
+ */
 export function tabIdFromPane(pane: unknown): string | null {
-  return typeof pane === 'string' && pane.startsWith(EMBED_FRAME_NAME_PREFIX)
-    ? pane.slice(EMBED_FRAME_NAME_PREFIX.length)
-    : typeof pane === 'string' && pane
-      ? pane
-      : null;
+  if (typeof pane !== 'string' || !pane) return null;
+  return pane.startsWith(EMBED_FRAME_NAME_PREFIX) ? (parsePaneName(pane)?.id ?? null) : pane;
 }
 
 export function useWorkspace(input: WorkspaceInput): WorkspaceController {
@@ -148,7 +183,9 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   const [embedding, setEmbedding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tabId, setTabId] = useState<number | null>(null);
-  const [switchingRealm, setSwitchingRealm] = useState<string | null>(null);
+  const [busyRealm, setBusyRealm] = useState<string | null>(null);
+  const [slots, setSlots] = useState<ProfileSlotMap>({});
+  const [profilesSaved, setProfilesSaved] = useState(true);
   const [runtimes, setRuntimes] = useState<Record<string, FrameRuntime>>({});
   // Tabs whose page has been mounted this session; they may stay loaded in the background.
   const [warmed, setWarmed] = useState<ReadonlySet<string>>(new Set());
@@ -168,6 +205,12 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   const adoptionGate = useMemo(() => createAdoptionGate(), []);
   const runtimesRef = useRef(runtimes);
   runtimesRef.current = runtimes;
+  const slotsRef = useRef(slots);
+  slotsRef.current = slots;
+  /** Realms with a slot claim in flight, so one click or one render never starts two. */
+  const claiming = useRef(new Set<string>());
+  /** The session tab whose page was clicked last: a tab it opens belongs to the same account. */
+  const lastGestureTab = useRef<string | null>(null);
   const threadKeys = useMemo(() => new Set(conversations.map((c) => c.threadKey)), [conversations]);
   const threadKeysRef = useRef(threadKeys);
   threadKeysRef.current = threadKeys;
@@ -189,6 +232,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
       if (hello.ok) {
         setRealms(hello.realms);
         setEmbedding(hello.embedding);
+        setProfilesSaved(hello.profiles !== false);
         setTabId(hello.tabId);
         setError(hello.embedding ? null : 'Threadkeeper could not prepare this tab for embedded pages. Reload the extension, then this page.');
       } else {
@@ -202,23 +246,66 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   }, [db, enabled]);
 
   // ---- persist (the page is the only writer of this row) ------------------------------------
+  /** Write the latest state now. Never throws; resolves once the write is done (or failed). */
+  const persistNow = useCallback(async () => {
+    if (!enabled || !hydrated.current) return;
+    try {
+      await db.kv.put({ key: KV_KEYS.workspaceState, value: stateRef.current, updatedAt: new Date().toISOString() });
+    } catch {
+      // The next change writes again.
+    }
+  }, [db, enabled]);
+
+  // What the person arranged (tabs, their accounts, the dashboard) is written at once, so a reload
+  // right after never loses it; a page reporting its title or address is written a moment later.
+  const savedShape = useRef('');
   useEffect(() => {
     if (!enabled || !hydrated.current) return;
-    const timer = setTimeout(() => {
-      void db.kv.put({ key: KV_KEYS.workspaceState, value: state, updatedAt: new Date().toISOString() }).catch(() => {});
-    }, 400);
+    const shape = workspaceShape(state);
+    if (shape !== savedShape.current) {
+      savedShape.current = shape;
+      void persistNow();
+      return;
+    }
+    const timer = setTimeout(() => void persistNow(), 300);
     return () => clearTimeout(timer);
-  }, [db, enabled, state]);
+  }, [enabled, state, persistNow]);
+
+  // Leaving the page (closing it, reloading it, going elsewhere) writes what is pending.
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+    const onHide = () => void persistNow();
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  }, [enabled, persistNow]);
+
+  /** Reload the page once the latest state is written (a reload is how a profile slot is freed). */
+  const reloadSaved = useCallback(() => {
+    void persistNow().finally(reloadWorkspacePage);
+  }, [persistNow]);
 
   const applyChange = useCallback((result: AccountsChangeResult | WorkspaceFailure) => {
     if (result.ok && alive.current) setRealms(result.realms);
     return result;
   }, []);
 
-  const refreshAccounts = useCallback(async () => {
+  /** The accounts as the worker has them now; null when it did not answer. */
+  const loadAccounts = useCallback(async (): Promise<RealmAccounts[] | null> => {
     const res = await workspaceApi.listAccounts();
-    if (res.ok && alive.current) setRealms(res.realms);
+    if (!res.ok) return null;
+    if (alive.current) setRealms(res.realms);
+    return res.realms;
   }, []);
+
+  const refreshAccounts = useCallback(async () => {
+    await loadAccounts();
+  }, [loadAccounts]);
+
+  // ---- the worker stays awake while this page shows ------------------------------------------
+  useEffect(() => {
+    if (!enabled) return;
+    return startWorkspacePort();
+  }, [enabled]);
 
   // ---- what the frames and the service worker tell this page --------------------------------
   useEffect(() => {
@@ -227,8 +314,29 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
       const msg = message as { type?: string } & Record<string, unknown>;
       if (!msg || typeof msg.type !== 'string') return;
 
+      if (msg.type === 'PROFILE_RETIRED') {
+        // From the worker only (never a frame): this account's saved sign-in was replaced, so a
+        // slot of this page that shows it holds old cookies. Its tabs rest until a reload.
+        if (sender.tab || typeof msg.accountId !== 'string') return;
+        const retired = msg.accountId;
+        setSlots((prev) => {
+          let changed = false;
+          const next: Record<string, ProfileSlotMap[string]> = { ...prev };
+          for (const [realm, slot] of Object.entries(prev)) {
+            if (slot.accountId !== retired || slot.status === 'stale') continue;
+            next[realm] = { accountId: retired, status: 'stale' };
+            changed = true;
+          }
+          return changed ? next : prev;
+        });
+        return;
+      }
       if (msg.type === 'ACCOUNTS_CHANGED') {
-        void refreshAccounts();
+        // Tabs whose account became, or stopped being, the browser's own sign-in move between an
+        // ordinary frame and the profile slot by themselves (FrameStage keys frames by slot). A tab
+        // that now needs a slot another account holds says so and offers to switch; nothing here
+        // reloads the page, which would reload every embedded page of every site.
+        void loadAccounts();
         return;
       }
       if (msg.type === 'EMBED_OPEN_REQUEST') {
@@ -238,7 +346,14 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
         if (sender.tab || req.tabId !== tabIdRef.current || typeof req.url !== 'string') return;
         // A tab the user (or an extension) opened next to this one is left alone: only one that
         // appeared right after a click inside an embedded page is taken in (adoption.ts).
-        const adopted = embeddingRef.current && adoptionGate.claim() && openUrlRef.current(req.url).ok;
+        let adopted = false;
+        if (embeddingRef.current && adoptionGate.claim()) {
+          // It opens as the account of the page that was clicked, when it is the same sign-in.
+          const opener = stateRef.current.tabs.find((t) => t.id === lastGestureTab.current);
+          const target = embedTargetFor(req.url);
+          const accountId = opener && target && target.realm.id === opener.realm ? opener.accountId : undefined;
+          adopted = openUrlRef.current(req.url, accountId ? { accountId } : undefined).ok;
+        }
         sendResponse({ ok: true, adopted });
         return;
       }
@@ -295,10 +410,13 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
     const onWindowMessage = (event: MessageEvent) => {
       if (!isEmbedGestureMessage(event.data) || !event.source) return;
       // Only from a page embedded directly in this one.
-      const own = Array.from(document.querySelectorAll('iframe')).some(
+      const own = Array.from(document.querySelectorAll('iframe')).find(
         (frame) => frame.name.startsWith(EMBED_FRAME_NAME_PREFIX) && frame.contentWindow === event.source
       );
-      if (own) adoptionGate.noteGesture();
+      if (own) {
+        lastGestureTab.current = own.dataset.tab ?? null;
+        adoptionGate.noteGesture();
+      }
     };
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') adoptionGate.noteHidden();
@@ -329,10 +447,73 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
         visible,
         warmed,
         realms,
+        slots,
         maxLive: settings?.maxLiveFrames ?? 6,
       }),
-    [enabled, embedding, state.tabs, visible, warmed, realms, settings?.maxLiveFrames]
+    [enabled, embedding, state.tabs, visible, warmed, realms, slots, settings?.maxLiveFrames]
   );
+
+  // ---- profile slots ---------------------------------------------------------------------------
+  /**
+   * Fill this page's slot of `realm` with `accountId`: the worker installs the rules and names
+   * the addresses, the page loads them in hidden credentialless frames, and the worker confirms.
+   * A slot is filled once per page load; only a failed attempt may be tried again.
+   */
+  const claimProfile = useCallback(async (realm: string, accountId: string): Promise<void> => {
+    if (claiming.current.has(realm)) return;
+    const held = slotsRef.current[realm];
+    if (held && !(held.accountId === accountId && held.status === 'failed')) return;
+    claiming.current.add(realm);
+    const put = (slot: ProfileSlotMap[string] | null) => {
+      if (!alive.current) return;
+      setSlots((prev) => {
+        // A retired slot stays retired until the page reloads, whatever an answer in flight says.
+        if (prev[realm]?.status === 'stale') return prev;
+        const next = { ...prev };
+        if (slot) next[realm] = slot;
+        else delete next[realm];
+        return next;
+      });
+    };
+    put({ accountId, status: 'seeding' });
+    try {
+      const claim = await workspaceApi.claimProfile(realm, accountId);
+      if (!claim.ok) {
+        if (claim.code === 'browser_account') {
+          // It became the browser's own sign-in meanwhile: its tabs load in ordinary frames.
+          put(null);
+          await loadAccounts();
+        } else if (claim.code === 'needs_reload') {
+          // The worker holds this page's slot as it was before (another account, or a sign-in
+          // replaced since): only a reload gives the page a new partition.
+          put({ accountId, status: 'stale' });
+        } else {
+          put({ accountId, status: 'failed', error: claim.error });
+        }
+        return;
+      }
+      for (const url of claim.steps) await loadSeed(url);
+      const ready = await workspaceApi.profileReady(realm);
+      put(
+        ready.ok
+          ? { accountId, status: 'ready', truncated: claim.truncated }
+          : ready.code === 'needs_reload'
+            ? { accountId, status: 'stale' }
+            : { accountId, status: 'failed', error: ready.error }
+      );
+    } finally {
+      claiming.current.delete(realm);
+    }
+  }, [loadAccounts]);
+
+  // An account with a saved sign-in is loaded as soon as one of its tabs is shown.
+  const wanted = useMemo(
+    () => (enabled && embedding && ready ? wantedProfiles({ tabs: state.tabs, visible, realms, slots }) : []),
+    [enabled, embedding, ready, state.tabs, visible, realms, slots]
+  );
+  useEffect(() => {
+    for (const want of wanted) void claimProfile(want.realm, want.accountId);
+  }, [wanted, claimProfile]);
 
   useEffect(() => {
     // Remember what has been mounted, and forget closed tabs.
@@ -416,28 +597,45 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   const closeTab = useCallback((id: string) => dispatch({ type: 'close', id }), []);
   const activateTab = useCallback((id: string) => dispatch({ type: 'activate', id, now: Date.now() }), []);
 
-  const switchAccount = useCallback<WorkspaceController['switchAccount']>(
-    async (accountId) => {
-      const account = findAccount(realmsRef.current, accountId);
-      if (account) setSwitchingRealm(account.realm);
+  /** Run an account change that can move the browser's cookies, showing the realm as busy meanwhile. */
+  const changeAccounts = useCallback(
+    async (realm: string | null, work: () => Promise<AccountsChangeResult | WorkspaceFailure>) => {
+      if (realm) setBusyRealm(realm);
       try {
-        return applyChange(await workspaceApi.activateAccount(accountId));
+        return applyChange(await work());
       } finally {
-        if (alive.current) setSwitchingRealm(null);
+        if (alive.current) setBusyRealm(null);
       }
     },
     [applyChange]
   );
 
+  const realmOfAccount = useCallback((accountId: string) => findAccount(realmsRef.current, accountId)?.realm ?? null, []);
+
+  const useAsBrowserAccount = useCallback<WorkspaceController['useAsBrowserAccount']>(
+    (accountId) => changeAccounts(realmOfAccount(accountId), () => workspaceApi.activateAccount(accountId)),
+    [changeAccounts, realmOfAccount]
+  );
+
+  const beginBrowserSignIn = useCallback<WorkspaceController['beginBrowserSignIn']>(
+    (accountId) => changeAccounts(realmOfAccount(accountId), () => workspaceApi.beginBrowserSignIn(accountId)),
+    [changeAccounts, realmOfAccount]
+  );
+
+  const pendingRealm = () => realmsRef.current.find((r) => r.pendingSignIn)?.realm.id ?? null;
+
+  const finishBrowserSignIn = useCallback<WorkspaceController['finishBrowserSignIn']>(
+    () => changeAccounts(pendingRealm(), () => workspaceApi.finishBrowserSignIn()),
+    [changeAccounts]
+  );
+
+  const cancelBrowserSignIn = useCallback<WorkspaceController['cancelBrowserSignIn']>(
+    () => changeAccounts(pendingRealm(), () => workspaceApi.cancelBrowserSignIn()),
+    [changeAccounts]
+  );
+
   const addAccount = useCallback<WorkspaceController['addAccount']>(
-    async (details) => {
-      setSwitchingRealm(details.realm);
-      try {
-        return applyChange(await workspaceApi.addAccount(details));
-      } finally {
-        if (alive.current) setSwitchingRealm(null);
-      }
-    },
+    async (details) => applyChange(await workspaceApi.addAccount(details)),
     [applyChange]
   );
 
@@ -453,11 +651,59 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
       if (result.ok && account) {
         const fallback = result.realms.find((r) => r.realm.id === account.realm)?.accounts.find((a) => a.primary);
         if (fallback) dispatch({ type: 'account_removed', accountId, fallbackAccountId: fallback.id });
+        // Its cookies are still in this page's slot; a reload is what clears them.
+        if (slotsRef.current[account.realm]?.accountId === accountId) reloadSaved();
       }
       return result;
     },
     [applyChange]
   );
+
+  const showProfile = useCallback<WorkspaceController['showProfile']>(
+    async (accountId) => {
+      const account = findAccount(realmsRef.current, accountId);
+      if (account) await claimProfile(account.realm, accountId);
+    },
+    [claimProfile]
+  );
+
+  const switchProfile = useCallback<WorkspaceController['switchProfile']>(
+    async (id) => {
+      const current = stateRef.current;
+      const tab = current.tabs.find((t) => t.id === id);
+      if (!tab) return;
+      // After the reload the slot goes to the first shown tab that needs it: make that this one.
+      let next = workspaceReducer(current, { type: 'activate', id, now: Date.now() });
+      const pane = next.dashboard.panes.findIndex((key) => key !== null && threadTabId(key) === id);
+      if (pane >= 0) next = workspaceReducer(next, { type: 'dashboard_focus', index: pane });
+      try {
+        await db.kv.put({ key: KV_KEYS.workspaceState, value: next, updatedAt: new Date().toISOString() });
+      } catch {
+        // The reload still frees the slot; the person may have to choose the tab again.
+      }
+      reloadWorkspacePage();
+    },
+    [db]
+  );
+
+  const goToAccount = useCallback<WorkspaceController['goToAccount']>((accountId) => {
+    const account = findAccount(realmsRef.current, accountId);
+    if (!account) return { ok: false, reason: 'no_account', message: 'That account no longer exists.' };
+    const current = stateRef.current;
+    const own = current.tabs
+      .filter((t) => t.accountId === accountId && t.realm === account.realm)
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt)[0];
+    if (own) {
+      dispatch({ type: 'activate', id: own.id, now: Date.now() });
+      return { ok: true, tabId: own.id };
+    }
+    // No tab of this account yet: the same product the person is looking at, else the sign-in's home.
+    const showing = current.tabs.find((t) => t.id === current.activeTabId);
+    const sameProduct = showing && showing.realm === account.realm ? LAUNCH_PROVIDERS.find((p) => p.provider === showing.provider) : undefined;
+    const url = sameProduct?.url ?? realmById(account.realm)?.homeUrl;
+    if (!url) return { ok: false, reason: 'external', message: 'This sign-in has no page to open here.' };
+    return openUrlRef.current(url, { accountId });
+  }, []);
 
   const frameCommand = useCallback((id: string, command: 'back' | 'forward') => {
     const frameId = runtimesRef.current[id]?.frameId;
@@ -507,6 +753,21 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
 
   const runtime = useCallback((id: string) => runtimes[id] ?? EMPTY_RUNTIME, [runtimes]);
   const accountOf = useCallback((tab: SessionTab) => findAccount(realms, tab.accountId), [realms]);
+  const slotOf = useCallback((tab: SessionTab) => slotOfTab(tab, realms), [realms]);
+
+  const openStartPage = useCallback<WorkspaceController['openStartPage']>((url) => {
+    const target = embedTargetFor(url);
+    if (!target) return { ok: false, reason: 'external', message: 'This address opens in a Chrome tab.' };
+    // A tab already on that product is the landing; a second one would only be clutter.
+    const open = stateRef.current.tabs
+      .filter((t) => t.provider === target.provider)
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt)[0];
+    if (open) {
+      dispatch({ type: 'activate', id: open.id, now: Date.now() });
+      return { ok: true, tabId: open.id };
+    }
+    return openUrlRef.current(target.url);
+  }, []);
 
   return {
     enabled,
@@ -518,18 +779,27 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
     state,
     plan,
     runtime,
-    switchingRealm,
+    busyRealm,
+    slots,
+    profilesSaved,
+    slotOf,
     dispatch,
     openUrl,
+    openStartPage,
     openThread,
     closeTab,
     activateTab,
-    switchAccount,
+    goToAccount,
+    showProfile,
+    switchProfile,
+    useAsBrowserAccount,
+    beginBrowserSignIn,
+    finishBrowserSignIn,
+    cancelBrowserSignIn,
     addAccount,
     updateAccount,
     removeAccount,
     refreshAccounts,
-    openIsolated: (accountId, url) => workspaceApi.helperOpen(accountId, url),
     back: (id) => frameCommand(id, 'back'),
     forward: (id) => frameCommand(id, 'forward'),
     reload,

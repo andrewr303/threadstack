@@ -834,12 +834,28 @@ export interface SettingsRecord {
   activeView: WorkspaceView;
   /** How the Threads list is grouped. */
   threadsGroupBy: ThreadsGroupBy;
+  /** How the Threads list is ordered (kept across reloads; filters are not). */
+  threadsSort?: LensSort;
+  /** Grouping and order of the side navigation's session list. */
+  railLens?: SurfaceLens;
+  /** Grouping and order of the Dashboard's pinned bar. */
+  dashboardLens?: SurfaceLens;
   /** What the Threads detail pane shows: the summary, the live page, or both side by side. */
   detailMode: DetailMode;
   /** `solid` swaps translucent surfaces for opaque ones (comfort, contrast, slower GPUs). */
   surfaces: 'glass' | 'solid';
   /** Most embedded pages kept loaded at once (2 to 12). */
   maxLiveFrames: number;
+  /**
+   * The page the workspace lands on when it is opened: an https address of a provider
+   * Threadkeeper can show (Claude Code unless changed). Empty means "where I left off".
+   */
+  startPage: string;
+  /**
+   * Make sites that hide their own navigation inside a frame show it in the workspace
+   * (core/embed/profile-page.ts presentAsTopLevel). On unless switched off in Settings.
+   */
+  embedFullNavigation: boolean;
   /** Where Claude requests go. */
   aiBackend: AiBackend;
   anthropicApiKey: string;
@@ -892,10 +908,46 @@ export interface SettingsRecord {
   lastAiErrorAt?: string | null;
 }
 
-export const THREADS_GROUP_BY = ['none', 'project', 'repository', 'account'] as const;
+export const THREADS_GROUP_BY = ['none', 'project', 'repository', 'account', 'kind', 'provider', 'date', 'status'] as const;
 export type ThreadsGroupBy = (typeof THREADS_GROUP_BY)[number];
+
+/** What a session list can be grouped by, and how it can be ordered (the shared "lens"). */
+export const LENS_GROUP_BY = ['kind', 'provider', 'account', 'date', 'repository', 'project', 'status', 'none'] as const;
+export type LensGroupBy = (typeof LENS_GROUP_BY)[number];
+export const LENS_SORT = ['recent', 'oldest', 'created', 'title', 'messages'] as const;
+export type LensSort = (typeof LENS_SORT)[number];
+/** Group and order a surface remembers. Filters are never stored. */
+export interface SurfaceLens {
+  groupBy: LensGroupBy;
+  sortBy: LensSort;
+}
+export const DEFAULT_RAIL_LENS: SurfaceLens = { groupBy: 'kind', sortBy: 'recent' };
+export const DEFAULT_DASHBOARD_LENS: SurfaceLens = { groupBy: 'none', sortBy: 'recent' };
+
+function normalizeSurfaceLens(raw: unknown, fallback: SurfaceLens): SurfaceLens {
+  const value = raw && typeof raw === 'object' ? (raw as Partial<SurfaceLens>) : {};
+  return {
+    groupBy: LENS_GROUP_BY.includes(value.groupBy as LensGroupBy) ? (value.groupBy as LensGroupBy) : fallback.groupBy,
+    sortBy: LENS_SORT.includes(value.sortBy as LensSort) ? (value.sortBy as LensSort) : fallback.sortBy,
+  };
+}
 export const DETAIL_MODES = ['summary', 'live', 'split'] as const;
 export type DetailMode = (typeof DETAIL_MODES)[number];
+
+/** Where the workspace lands unless the person chose otherwise: Claude Code, which is also Claude's own way in. */
+export const DEFAULT_START_PAGE = 'https://claude.ai/code';
+
+/** A stored start page made safe: an https address of sensible length, or '' for "where I left off". */
+export function normalizeStartPage(value: unknown): string {
+  if (value === '') return '';
+  if (typeof value !== 'string' || value.length > 300) return DEFAULT_START_PAGE;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password ? parsed.href : DEFAULT_START_PAGE;
+  } catch {
+    return DEFAULT_START_PAGE;
+  }
+}
 
 const DEFAULT_ACCOUNT_IDS: Record<ProviderId, string> = {
   chatgpt: 'acct_chatgpt_primary',
@@ -998,6 +1050,8 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   detailMode: 'summary',
   surfaces: 'glass',
   maxLiveFrames: DEFAULT_MAX_LIVE_FRAMES,
+  startPage: DEFAULT_START_PAGE,
+  embedFullNavigation: true,
   aiBackend: 'anthropic',
   anthropicApiKey: '',
   aws: { ...DEFAULT_AWS_SETTINGS },
@@ -1078,6 +1132,9 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
     threadsGroupBy: THREADS_GROUP_BY.includes(base.threadsGroupBy as ThreadsGroupBy)
       ? (base.threadsGroupBy as ThreadsGroupBy)
       : DEFAULT_SETTINGS.threadsGroupBy,
+    threadsSort: LENS_SORT.includes(base.threadsSort as LensSort) ? (base.threadsSort as LensSort) : 'recent',
+    railLens: normalizeSurfaceLens(base.railLens, DEFAULT_RAIL_LENS),
+    dashboardLens: normalizeSurfaceLens(base.dashboardLens, DEFAULT_DASHBOARD_LENS),
     detailMode: DETAIL_MODES.includes(base.detailMode as DetailMode)
       ? (base.detailMode as DetailMode)
       : DEFAULT_SETTINGS.detailMode,
@@ -1086,6 +1143,8 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
       typeof base.maxLiveFrames === 'number' && Number.isFinite(base.maxLiveFrames)
         ? Math.min(12, Math.max(2, Math.round(base.maxLiveFrames)))
         : DEFAULT_SETTINGS.maxLiveFrames,
+    startPage: normalizeStartPage(base.startPage),
+    embedFullNavigation: base.embedFullNavigation !== false,
   };
 }
 

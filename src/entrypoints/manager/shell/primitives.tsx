@@ -69,11 +69,11 @@ export function ProviderMark({ provider, size = 'md' }: { provider: ProviderId |
 // ---------------------------------------------------------------------------------------------
 
 /** How an account is named in one line: its label, then who the site says it is. */
-export function accountSubtitle(account: AccountRecord): string {
-  if (account.mode === 'isolated') return 'Opens in its own Chrome window';
+export function accountSubtitle(account: AccountRecord, browserAccount = false): string {
   if (account.identity?.display) return account.identity.display;
-  if (account.signedIn === 'no') return 'Not signed in';
-  return account.primary ? 'This browser’s sign-in' : 'Identity not seen yet';
+  if (browserAccount || account.primary) return 'This browser’s sign-in';
+  if (!account.hasJar || account.signedIn === 'no') return 'Not signed in yet';
+  return 'Signed in, name not shown by the site';
 }
 
 /**
@@ -86,14 +86,14 @@ export function AccountChip({
   showName = true,
   fallbackLabel = 'Removed account',
 }: {
-  account: Pick<AccountRecord, 'label' | 'color' | 'mode'> | null;
-  /** Whether this account is signed in to its realm right now. */
+  account: Pick<AccountRecord, 'label' | 'color'> | null;
+  /** Whether this account is signed in (the browser's own sign-in, or a profile with a saved one). */
   active: boolean;
   showName?: boolean;
   fallbackLabel?: string;
 }) {
   const label = account?.label ?? fallbackLabel;
-  const state = account?.mode === 'isolated' ? 'separate window' : active ? 'signed in' : 'not signed in';
+  const state = active ? 'signed in' : 'not signed in';
   return (
     <span className="tk-acct" data-color={account?.color ?? 'none'} data-active={active ? 'true' : 'false'} title={`${label} (${state})`}>
       <span className="tk-acct-dot" aria-hidden="true" />

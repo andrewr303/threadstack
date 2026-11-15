@@ -2,6 +2,105 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
+## Side-by-side accounts, start page, full navigation, organizing sessions (2026-11-13)
+
+**Two accounts of one sign-in at once, inside the workspace** (`core/embed/profiles.ts`,
+`profile-slots.ts`, `profile-seed.ts`, `core/accounts/profile-jars.ts`, `set-cookie.ts`). Each realm now
+has two places an account can load in the workspace page. The *browser account* (the realm's active
+account) loads in ordinary frames with the browser's own cookies, as before. One more account per realm
+per page load, the *profile* account, loads in `credentialless` frames. Chromium gives every credentialless
+frame of a page one shared, throwaway cookie partition per site, gone when the page closes or reloads.
+That is why there is one profile account per realm per page load: showing a third account of the realm
+asks to reload the page ("Switch to …"), and nothing is signed out. Adding an account no longer touches
+any cookie (`add()` always stores `mode: 'embedded'`; accounts saved as `isolated` by earlier versions
+are read as embedded and open in the workspace like the rest).
+
+*Seeding.* Nothing can write cookies into that partition from outside (the cookies API cannot see it).
+So when the page claims a profile slot (`PROFILE_CLAIM`), the worker turns the account's saved jar into
+one declarativeNetRequest session rule per host (ids 2000–2999, priority 3): `tabIds: [the workspace
+tab]`, `resourceTypes: ['sub_frame']`, an exact `urlFilter` for
+`https://<host>/robots.txt?tk_profile_seed=<random nonce>`, and `append set-cookie` headers plus the usual
+removal of the framing headers. The page loads that address in a hidden credentialless frame; the
+browser stores the cookies in the partition; the rules are removed once every address has answered
+(`PROFILE_READY`). Measured: the partition keeps about 10 KB of cookies per site. The plan writes at
+most 9,200 bytes per site, leaves out analytics cookies first, and writes the sign-in cookies last. The
+browser's own Cloudflare clearance is carried over for the bot check, and an account's own cookie wins
+over it.
+
+*Keeping the jar current.* A non-blocking `webRequest.onHeadersReceived` listener (`responseHeaders`,
+`extraHeaders`; new `webRequest` permission) runs per workspace tab, for the realms' hosts only.
+Set-Cookie headers of responses in profile frames are applied to that account's live jar. Changes are
+saved 600 ms later through `service.writeJar`, encrypted like the other jars, and never for the
+browser account or during a switch of the realm. `document.cookie` writes in a profile frame are made
+`SameSite=None; Secure`, so the partition keeps them, and the original is sent on to the jar. Service
+workers and `SharedWorker` are refused in profile frames: their requests have no frame to attribute
+them to.
+
+*Which account a frame is.* Only a frame's own isolated-world content script can say what it is (it
+reads `window.credentialless`, which page scripts cannot change for it); a frame inside a known frame
+inherits its parent's kind. Responses of a frame not yet known are held for up to 20 seconds, then
+filed or dropped. Unknown frames have no account (they fail closed). A profile frame's captures and
+"who is signed in" reports are filed under its slot's account, and refused while the slot is not
+ready. They never change which account is the browser's.
+
+*Keeping one saved sign-in consistent* (from the security review of 2026-11-13). When an account's
+saved sign-in is replaced behind a page (it becomes the browser account or stops being it, finishes a
+browser sign-in, or is removed), the worker retires every slot showing it and sends `PROFILE_RETIRED`
+before `ACCOUNTS_CHANGED`. A retired slot files nothing, and its tabs say "<name>’s sign-in changed"
+and offer a reload. After a restart, slots whose account is now the browser's are retired too, since
+the switch recovery finished never reached that code. One account is shown in one workspace tab at a
+time (`profile_in_use`); a slot left by a page that went away is retired instead of blocking. Set-Cookie
+from a request that a page of another site started inside a profile frame is kept only when it is
+`SameSite=None`, as the browser does. Navigations of the frame itself, and requests between the hosts
+of one sign-in (chatgpt.com and auth.openai.com, grok.com and accounts.x.ai), are kept whole. A
+browser sign-in keeps the account's earlier saved sign-in until it finishes, so cancelling loses
+nothing, and it finishes by itself only when the site names someone after it began.
+
+*Signing an added account in.* "Sign in here" opens the site's sign-in page in the profile slot. For
+sign-ins that cannot finish in a frame (Google, Apple, passkeys, pop-ups), "Sign in with a browser tab"
+(`ACCOUNTS_SIGNIN_BEGIN` / `FINISH` / `CANCEL`) saves the browser's own cookies for the realm, clears
+them, and opens a tab. Two seconds after the site names who signed in, or when the person says so, it
+copies the new cookies into the added account's jar and puts the browser's cookies back. A journal
+(`accounts.signIn`) lets a worker that stopped halfway finish the job. Switching the realm's browser
+account, or removing the account that is signing in, is refused until the sign-in ends.
+
+*Workspace tab lifetime.* The extension cannot see its own page's address without the `tabs`
+permission, and tab events report frame loads in the workspace as the tab loading. So the page keeps a
+`tk-workspace` port open, with a beat every 20 seconds. The worker tracks the tab by that port and by
+the document that said hello. It forgets the tab's rules and slots only when the tab closes or shows
+another address, never on a frame load, a second workspace tab, or a worker restart.
+
+**Start page.** `settings.startPage` (default `https://claude.ai/code`, any https address, or "" for
+"where I left off") is opened once per browser tab of the workspace (sessionStorage
+`threadkeeper.landed`). It is skipped when the address asks for a thread, a view or a search.
+
+**Full navigation in frames.** claude.ai hides its sidebar and its chat/code switch when
+`window.self !== window.top`. For hosts in `TOP_LEVEL_VIEW_HOSTS` (`core/embed/frame.ts`), the
+isolated-world script marks a frame that sits directly in the workspace. A page-world script at
+`document_start` consumes the mark, declares a global `let self = window` (which shadows the window
+property for the page's own scripts), and makes `window.self` return `window.top`. If the inline script
+is blocked, nothing is changed. Settings → "Show each site’s full navigation" turns it off; the frame's
+name then carries the `n` option.
+
+**Organizing sessions** (`workspace/lens.ts`, `shell/OrganizeMenu.tsx`). One model of filter (type,
+provider, account), sort (recent, oldest, created, title, messages) and group serves the side
+navigation, Threads and the Dashboard's pinned bar. Group by type, provider, account, last active or
+repository; Threads also groups by project and status. Filters live for the page; the grouping and
+order are saved per surface (`railLens`, `dashboardLens`, `threadsGroupBy`, `threadsSort`).
+
+**Verified** with the built extension against stand-in sites (`scripts/run-profiles-e2e.mjs`, 40 checks,
+in Chromium 153 and Edge 157, no security rejections): landing on Claude Code with its navigation;
+adding a second account without signing anyone out; "Sign in here" in a credentialless frame while the
+browser stays signed in as the first; the jar saved encrypted; identity and a capture filed under each
+account; both accounts side by side in the Dashboard; the second account restored from its jar after a
+reload; a replaced sign-in retiring the slot and the reload it asks for; the browser-tab sign-in round
+trip. The spike in
+`docs/research/2026-11-13-embedded-profiles/spike` measured the partition, the seed rule and the
+navigation fix. **Not verified:** the real providers signed in (their sign-in flows, bot checks and
+cookie sizes inside a credentialless frame), and online history import for added accounts. Live
+capture of pages opened in a profile frame is filed per account; "Catch up" still reads only the
+browser account.
+
 ## Workspace: embedded sessions and accounts (2026-11-10)
 
 Session Control (the separate extension that kept a hand-made list of Claude Code session links per
@@ -61,7 +160,9 @@ crashed Chromium 153 when a credentialless frame held cookies). Realms that shar
 whole ecosystem (Google, GitHub, Microsoft) are never switched. Only cookies are swapped: other site data
 is shared between accounts. An account can instead live in its own Chrome profile window through the Mac
 helper (`mac-helper/`, native messaging host `com.threadkeeper.accounts`), which is the only way to have
-two accounts of one realm signed in at the same moment.
+two accounts of one realm signed in at the same moment. *(Superseded on 2026-11-13: a second account of a
+realm now loads beside the browser's own inside the workspace; see above. Switching the browser account
+works as described here.)*
 
 **Attribution.** A capture is filed under the realm's active account (`resolveForCapture`). The account
 that was signed in before accounts existed is the *primary* account and keeps the thread-key account id

@@ -246,11 +246,12 @@ describe('isolated half (startCookieBridge)', () => {
     vi.useRealTimers();
   });
 
-  const start = (alive = true) => {
+  const start = (alive = true, profile?: boolean) => {
     const bridge = startCookieBridge({
       doc,
       win: window,
       storage,
+      ...(profile === undefined ? {} : { profile }),
       send: (message, done) => {
         if (!alive) return false;
         sent.push(message);
@@ -266,10 +267,19 @@ describe('isolated half (startCookieBridge)', () => {
 
   it('asks the worker (no address sent), delivers the answer and caches it', () => {
     start();
-    expect(sent).toEqual([{ type: 'EMBED_COOKIES_GET' }]);
+    // Every message says which jar the frame uses; an ordinary frame uses the browser's.
+    expect(sent).toEqual([{ type: 'EMBED_COOKIES_GET', profile: false }]);
     answerNext({ ok: true, cookie: 'csrf=abc' });
     expect(delivered).toEqual([{ cookie: 'csrf=abc', ack: 0 }]);
     expect(storage.getItem(COOKIE_CACHE_KEY)).toBe('csrf=abc');
+  });
+
+  it('in a profile frame says so with every message, so the worker answers from that account', () => {
+    start(true, true);
+    expect(sent).toEqual([{ type: 'EMBED_COOKIES_GET', profile: true }]);
+    answerNext({ ok: true, cookie: 'csrf=abc' });
+    pageSets(1, 'theme=dark');
+    expect(sent.at(-1)).toEqual({ type: 'EMBED_COOKIE_SET', cookie: 'theme=dark', profile: true });
   });
 
   it('delivers the cached copy synchronously and again when the page half says it is ready', () => {
@@ -285,9 +295,12 @@ describe('isolated half (startCookieBridge)', () => {
     answerNext({ ok: true, cookie: 'csrf=abc' });
     pageSets(1, 'theme=dark');
     pageSets(2, 'lang=en');
-    expect(sent.slice(1)).toEqual([{ type: 'EMBED_COOKIE_SET', cookie: 'theme=dark' }]);
+    expect(sent.slice(1)).toEqual([{ type: 'EMBED_COOKIE_SET', cookie: 'theme=dark', profile: false }]);
     answerNext({ ok: true });
-    expect(sent.slice(2)).toEqual([{ type: 'EMBED_COOKIES_GET' }, { type: 'EMBED_COOKIE_SET', cookie: 'lang=en' }]);
+    expect(sent.slice(2)).toEqual([
+      { type: 'EMBED_COOKIES_GET', profile: false },
+      { type: 'EMBED_COOKIE_SET', cookie: 'lang=en', profile: false },
+    ]);
     answerNext({ ok: true, cookie: 'csrf=abc; theme=dark' });
     expect(delivered.at(-1)).toEqual({ cookie: 'csrf=abc; theme=dark', ack: 1 });
   });
@@ -306,7 +319,7 @@ describe('isolated half (startCookieBridge)', () => {
     start();
     pageSets(1, 'theme=dark');
     answerNext({ ok: true, cookie: 'csrf=same' });
-    expect(sent.at(-1)).toEqual({ type: 'EMBED_COOKIE_SET', cookie: 'theme=dark' });
+    expect(sent.at(-1)).toEqual({ type: 'EMBED_COOKIE_SET', cookie: 'theme=dark', profile: false });
   });
 
   it('refreshes once a second while visible, without overlapping requests', () => {

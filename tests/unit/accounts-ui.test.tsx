@@ -9,6 +9,7 @@ import { AddAccountDialog } from '../../src/entrypoints/manager/accounts/AddAcco
 import { AccountsSettings } from '../../src/entrypoints/manager/accounts/AccountsSettings.js';
 import { SessionControlImportSection } from '../../src/entrypoints/manager/accounts/SessionControlImportSection.js';
 import { applySessionControlImport } from '../../src/entrypoints/manager/accounts/sessionControlImport.js';
+import { realmHostOrigins } from '../../src/entrypoints/manager/accounts/common.js';
 import { configureWorkspaceClient } from '../../src/entrypoints/manager/workspace/client.js';
 import { WorkspaceProvider, type WorkspaceContextValue } from '../../src/entrypoints/manager/workspace/context.js';
 import type { WorkspaceController } from '../../src/entrypoints/manager/workspace/useWorkspace.js';
@@ -16,7 +17,7 @@ import { ThreadkeeperDB } from '../../src/core/db.js';
 import { DEFAULT_SETTINGS, buildThreadKey } from '../../src/core/schema.js';
 import { parseSessionControlBackup, planSessionControlImport } from '../../src/core/session-control-import.js';
 import { realmById } from '../../src/core/workspace/realms.js';
-import type { AccountRecord, RealmAccounts } from '../../src/core/workspace/types.js';
+import type { AccountRecord, RealmAccounts, SessionTab } from '../../src/core/workspace/types.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,7 +49,9 @@ const PRIMARY = account({
   identity: { key: 'k1', display: 'work@example.com', observedAt: '2026-01-01T00:00:00.000Z', source: 'network' },
 });
 const PERSONAL = account({ id: 'acct_aaaa', label: 'Personal', color: 'peach', hasJar: true, order: 1 });
-const WINDOWED = account({ id: 'acct_bbbb', label: 'Client', color: 'violet', mode: 'isolated', profileId: PROFILE, order: 2 });
+// Brought over from Session Control, where it had its own Chrome window: an account like any other
+// now, as the worker presents it, that still needs a sign-in.
+const WINDOWED = account({ id: 'acct_bbbb', label: 'Client', color: 'violet', profileId: PROFILE, signedIn: 'no', order: 2 });
 
 function realms(accounts: AccountRecord[] = [PRIMARY, PERSONAL, WINDOWED], active = 'primary~anthropic'): RealmAccounts[] {
   return [
@@ -59,15 +62,16 @@ function realms(accounts: AccountRecord[] = [PRIMARY, PERSONAL, WINDOWED], activ
 
 type Spies = ReturnType<typeof makeCtx>['spies'];
 
-function makeCtx(options: { realms?: RealmAccounts[]; enabled?: boolean; switchingRealm?: string | null } = {}) {
+function makeCtx(options: { realms?: RealmAccounts[]; enabled?: boolean; busyRealm?: string | null; tabs?: SessionTab[]; activeTabId?: string | null } = {}) {
   const list = options.realms ?? realms();
   const ok = (account: AccountRecord | null = null) => ({ ok: true as const, account, realms: list, switched: true });
   const spies = {
-    switchAccount: vi.fn(async (_id: string): Promise<unknown> => ok()),
+    goToAccount: vi.fn((_id: string): unknown => ({ ok: true as const, tabId: 'tab_1' })),
+    useAsBrowserAccount: vi.fn(async (_id: string): Promise<unknown> => ok()),
+    beginBrowserSignIn: vi.fn(async (_id: string): Promise<unknown> => ok()),
     addAccount: vi.fn(async (_input: unknown): Promise<unknown> => ok(account({ id: 'acct_new', label: 'New' }))),
     updateAccount: vi.fn(async (_id: string, _patch: unknown): Promise<unknown> => ok()),
     removeAccount: vi.fn(async (_id: string): Promise<unknown> => ok()),
-    openIsolated: vi.fn(async (_id: string, _url: string): Promise<unknown> => ({ ok: true })),
     openUrl: vi.fn((_url: string, _o?: unknown) => ({ ok: true as const, tabId: 'tab_1' })),
     refreshAccounts: vi.fn(async () => undefined),
     setView: vi.fn(),
@@ -79,12 +83,14 @@ function makeCtx(options: { realms?: RealmAccounts[]; enabled?: boolean; switchi
   const workspace = {
     enabled: options.enabled ?? true,
     realms: list,
-    switchingRealm: options.switchingRealm ?? null,
-    switchAccount: spies.switchAccount,
+    busyRealm: options.busyRealm ?? null,
+    state: { tabs: options.tabs ?? [], activeTabId: options.activeTabId ?? null },
+    goToAccount: spies.goToAccount,
+    useAsBrowserAccount: spies.useAsBrowserAccount,
+    beginBrowserSignIn: spies.beginBrowserSignIn,
     addAccount: spies.addAccount,
     updateAccount: spies.updateAccount,
     removeAccount: spies.removeAccount,
-    openIsolated: spies.openIsolated,
     openUrl: spies.openUrl,
     refreshAccounts: spies.refreshAccounts,
   } as unknown as WorkspaceController;
@@ -197,7 +203,7 @@ describe('AccountMenuButton', () => {
     return trigger;
   }
 
-  it('shows the sign-in and the signed-in account on the button, and a labelled menu when opened', async () => {
+  it('shows the sign-in and the account in front on the button, and a labelled menu when opened', async () => {
     const { value } = makeCtx();
     const trigger = await openMenu(value);
     expect(trigger.textContent).toContain('Claude');
@@ -205,56 +211,77 @@ describe('AccountMenuButton', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     const menu = byRole('menu')!;
     expect(menu.textContent).toContain('Claude accounts');
-    expect(menu.textContent).toContain('One account is signed in at a time. Switching reloads Claude tabs.');
+    expect(menu.textContent).toContain('Every account stays signed in. Choose one to go to its tabs.');
+    expect(menu.textContent).not.toContain('One account is signed in at a time');
   });
 
-  it('lists the embedded accounts as radios and marks the signed-in one with words', async () => {
+  it("lists every account as a radio, marks the one in front, and says in words which is the browser's and which still need a sign-in", async () => {
     const { value } = makeCtx();
     await openMenu(value);
     const radios = [...document.querySelectorAll('[role="menuitemradio"]')];
-    expect(radios.map((r) => r.querySelector('.tk-acct-item-name')?.textContent)).toEqual(['Work', 'Personal']);
-    expect(radios[0].getAttribute('aria-checked')).toBe('true');
-    expect(radios[0].textContent).toContain('Signed in');
+    // The account that used to open in its own window is listed like the others.
+    expect(radios.map((r) => r.querySelector('.tk-acct-item-name')?.textContent)).toEqual(['Work', 'Personal', 'Client']);
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+    expect(radios[0].textContent).toContain('This browser');
     expect(radios[0].textContent).toContain('work@example.com');
-    expect(radios[1].getAttribute('aria-checked')).toBe('false');
-    expect(radios[1].textContent).not.toContain('Signed in');
+    expect(radios[1].textContent).toContain('Signed in');
+    expect(radios[2].textContent).toContain('Sign in');
+    expect(radios[2].textContent).toContain('Not signed in yet');
+    expect(text()).not.toContain('In their own window');
   });
 
-  it('switches, announces, closes the menu and returns focus to the button', async () => {
+  it('puts the account the button stands for in front: the given one, else the shown tab\'s', async () => {
+    const shown: SessionTab = { id: 't1', provider: 'claude_code', realm: 'anthropic', accountId: PERSONAL.id, url: 'https://claude.ai/code', title: '', threadKey: null, createdAt: 1, lastActiveAt: 1 };
+    const { value } = makeCtx({ tabs: [shown], activeTabId: 't1' });
+    const trigger = await openMenu(value);
+    expect(trigger.textContent).toContain('Personal');
+    expect(byRole('menuitemradio', 'Personal')!.getAttribute('aria-checked')).toBe('true');
+    act(() => root.unmount());
+    root = createRoot(container);
+    mount(<AccountMenuButton realmId="anthropic" variant="toolbar" accountId={WINDOWED.id} />, value);
+    await press(container.querySelector('button')!);
+    expect(byRole('menuitemradio', 'Client')!.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('goes to the chosen account in Browse, announces it, closes the menu and returns focus, without changing any sign-in', async () => {
     const { value, spies } = makeCtx();
     const trigger = await openMenu(value);
     await press(byRole('menuitemradio', 'Personal')!);
-    expect(spies.switchAccount).toHaveBeenCalledWith('acct_aaaa');
-    expect(spies.announce).toHaveBeenCalledWith('Claude is now signed in as Personal.');
+    expect(spies.goToAccount).toHaveBeenCalledWith('acct_aaaa');
+    expect(spies.setView).toHaveBeenCalledWith('browse');
+    expect(spies.announce).toHaveBeenCalledWith('Showing Claude as Personal.');
+    expect(spies.useAsBrowserAccount).not.toHaveBeenCalled();
     expect(byRole('menu')).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('keeps the menu open and shows the error when a switch fails', async () => {
+  it('says an account that still needs a sign-in will ask how to sign in', async () => {
     const { value, spies } = makeCtx();
-    spies.switchAccount.mockResolvedValueOnce({ ok: false, error: 'Allow Threadkeeper to access Claude first.', code: 'needs_host_access' });
+    await openMenu(value);
+    await press(byRole('menuitemradio', 'Client')!);
+    expect(spies.goToAccount).toHaveBeenCalledWith('acct_bbbb');
+    expect(spies.announce).toHaveBeenCalledWith('Client is not signed in to Claude yet. Choose how to sign in.');
+  });
+
+  it('keeps the menu open and shows the error when the account cannot be shown', async () => {
+    const { value, spies } = makeCtx();
+    spies.goToAccount.mockReturnValueOnce({ ok: false, reason: 'no_account', message: 'That account no longer exists.' });
     await openMenu(value);
     await press(byRole('menuitemradio', 'Personal')!);
     expect(byRole('menu')).not.toBeNull();
-    expect(byRole('alert')!.textContent).toContain('Allow Threadkeeper to access Claude first.');
+    expect(byRole('alert')!.textContent).toContain('That account no longer exists.');
     expect(spies.announce).not.toHaveBeenCalled();
+    expect(spies.setView).not.toHaveBeenCalled();
   });
 
-  it('shows a busy state while this sign-in is being switched and ignores further choices', async () => {
-    const { value, spies } = makeCtx({ switchingRealm: 'anthropic' });
+  it('shows a busy state while a sign-in of this sign-in is changing, and marks the account signing in', async () => {
+    const pending = realms().map((r) =>
+      r.realm.id === 'anthropic' ? { ...r, pendingSignIn: { realm: 'anthropic', accountId: WINDOWED.id, returnToAccountId: PRIMARY.id, startedAt: '' } } : r
+    );
+    const { value } = makeCtx({ realms: pending, busyRealm: 'anthropic' });
     const trigger = await openMenu(value);
     expect(trigger.getAttribute('aria-busy')).toBe('true');
-    await press(byRole('menuitemradio', 'Personal')!);
-    expect(spies.switchAccount).not.toHaveBeenCalled();
-  });
-
-  it('lists a separate-window account under its own heading and opens its window', async () => {
-    const { value, spies } = makeCtx();
-    await openMenu(value);
-    expect(text()).toContain('In their own window');
-    await press(byRole('menuitem', 'Client')!);
-    expect(spies.openIsolated).toHaveBeenCalledWith('acct_bbbb', realmById('anthropic')!.homeUrl);
-    expect(spies.announce).toHaveBeenCalledWith('Opening Client in its own Chrome window.');
+    expect(byRole('menuitemradio', 'Client')!.textContent).toContain('Signing in…');
   });
 
   it('opens Add account for this sign-in and Manage accounts in Settings', async () => {
@@ -320,34 +347,30 @@ describe('AddAccountDialog', () => {
     expect(nameInput().maxLength).toBe(40);
   });
 
-  it('offers the six named colours and the two places an account can run, as radio groups', async () => {
+  it('offers the six named colours as one radio group, and nothing about where the account runs', async () => {
     const { value } = makeCtx();
     const { ref } = mountDialog(value);
     await open(ref);
     const groups = [...document.querySelectorAll('#tk-add-account-dialog [role="radiogroup"]')];
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(1);
     expect(groups[0].textContent).toBe('TealPeachVioletSageBlueGold');
-    expect(groups[1].textContent).toContain('In the workspace');
-    expect(groups[1].textContent).toContain('In its own Chrome window (Mac helper)');
-    expect(groups[1].querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    expect(text()).not.toContain('Where it runs');
+    expect(text()).not.toContain('Mac helper');
     // Teal, peach and violet are taken by the existing accounts, so the form starts on the next free colour.
     expect((groups[0].querySelector('input:checked') as HTMLInputElement).value).toBe('sage');
   });
 
-  it('says what will be signed out before the button is pressed, and what is saved', async () => {
+  it('says before the button is pressed that nothing is signed out, and how the sign-in happens', async () => {
     const { value } = makeCtx();
     const { ref } = mountDialog(value);
     await open(ref);
-    expect(text()).toContain(
-      'Claude will be signed out here and in your other Chrome tabs so you can sign in as this account. The sign-in for Work is saved and comes back when you switch to it.'
-    );
-    const isolated = document.querySelector<HTMLInputElement>('#tk-add-account-dialog input[value="isolated"]')!;
-    act(() => isolated.click());
-    expect(text()).not.toContain('will be signed out here');
-    expect(text()).toContain('Nothing is signed out here.');
+    expect(text()).toContain('Nothing is signed out.');
+    expect(text()).toContain('Google, Apple or a passkey');
+    expect(text()).toContain('encrypted, and never exported or sent anywhere');
+    expect(text()).not.toContain('will be signed out');
   });
 
-  it('adds an embedded account, opens its sign-in page for it in Browse and announces what to do', async () => {
+  it("adds the account after asking for the sign-in's hosts, opens its first tab in Browse and asks how to sign in", async () => {
     const permissions = { request: vi.fn(async () => true) };
     vi.stubGlobal('chrome', { permissions });
     const { value, spies } = makeCtx();
@@ -356,30 +379,15 @@ describe('AddAccountDialog', () => {
     type(nameInput(), '  Team  ');
     await press(submit());
 
-    // The sign-in's extra host is asked for in the click, before the account is added.
+    // Only the sign-in host on another domain is asked for, in the click, before the account is added.
+    expect(permissions.request).toHaveBeenCalledTimes(1);
     expect(permissions.request).toHaveBeenCalledWith({ origins: ['https://auth.openai.com/*'] });
     expect(spies.addAccount).toHaveBeenCalledWith({ realm: 'openai', mode: 'embedded', label: 'Team', color: 'teal' });
-    expect(spies.openUrl).toHaveBeenCalledWith('https://chatgpt.com/auth/login', { accountId: 'acct_new', title: 'Sign in' });
+    expect(spies.openUrl).toHaveBeenCalledWith('https://chatgpt.com/', { accountId: 'acct_new', title: 'ChatGPT · Team' });
     expect(spies.setView).toHaveBeenCalledWith('browse');
-    expect(spies.announce).toHaveBeenCalledWith(
-      'Sign in to ChatGPT as Team. If the sign-in needs a step that cannot run here, use Open in Chrome tab, then reload.'
-    );
+    expect(spies.announce).toHaveBeenCalledWith('Team was added for ChatGPT. Choose how to sign in to it.');
     expect(ref.current!.hasAttribute('open')).toBe(false);
     expect(onClosed).toHaveBeenCalled();
-  });
-
-  it('adds an account in its own window without opening a page here', async () => {
-    const { value, spies } = makeCtx();
-    const { ref } = mountDialog(value);
-    await open(ref);
-    type(nameInput(), 'Client');
-    act(() => document.querySelector<HTMLInputElement>('#tk-add-account-dialog input[value="isolated"]')!.click());
-    await press(submit());
-    expect(spies.addAccount).toHaveBeenCalledWith(expect.objectContaining({ realm: 'anthropic', mode: 'isolated', label: 'Client' }));
-    expect(spies.openUrl).not.toHaveBeenCalled();
-    expect(spies.setView).not.toHaveBeenCalled();
-    expect(spies.announce.mock.calls[0][0]).toContain('own Chrome window');
-    expect(ref.current!.hasAttribute('open')).toBe(false);
   });
 
   it('keeps a failure in the dialog with help, and retries after host access is allowed', async () => {
@@ -397,25 +405,14 @@ describe('AddAccountDialog', () => {
     expect(ref.current!.hasAttribute('open')).toBe(true);
     expect(spies.openUrl).not.toHaveBeenCalled();
 
+    // Claude needs no extra host to start with; the retry asks for the sign-in's whole set of hosts.
+    expect(permissions.request).not.toHaveBeenCalled();
     await press(button('Allow access to Claude and retry', alert));
-    expect(permissions.request).toHaveBeenCalledWith({ origins: ['https://*.claude.ai/*'] });
+    expect(permissions.request).toHaveBeenCalledWith({ origins: realmHostOrigins(realmById('anthropic')!) });
+    expect(realmHostOrigins(realmById('anthropic')!)).toEqual(['https://*.claude.ai/*']);
     expect(spies.addAccount).toHaveBeenCalledTimes(2);
     expect(spies.openUrl).toHaveBeenCalled();
     expect(ref.current!.hasAttribute('open')).toBe(false);
-  });
-
-  it('points to Settings, Accounts, Mac helper when the helper is unavailable', async () => {
-    const { value, spies } = makeCtx();
-    spies.addAccount.mockResolvedValueOnce({ ok: false, error: 'The Mac helper did not answer.', code: 'helper_unavailable' });
-    const { ref } = mountDialog(value);
-    await open(ref);
-    type(nameInput(), 'Client');
-    act(() => document.querySelector<HTMLInputElement>('#tk-add-account-dialog input[value="isolated"]')!.click());
-    await press(submit());
-    const alert = document.querySelector('#tk-add-account-dialog [role="alert"]')!;
-    expect(alert.textContent).toContain('Settings, Accounts, Mac helper');
-    await press(button('Open Mac helper settings', alert));
-    expect(spies.openSettings).toHaveBeenCalledWith('accounts');
   });
 
   it('starts empty each time it opens and closes without changes on Cancel', async () => {
@@ -435,27 +432,78 @@ describe('AddAccountDialog', () => {
 // ---- Settings, Accounts -------------------------------------------------------------------------
 
 describe('AccountsSettings', () => {
-  it('explains how switching works in the plain facts', () => {
+  it('explains how accounts work side by side in the plain facts', () => {
     const { value } = makeCtx();
     mount(<AccountsSettings />, value);
     const t = text();
-    expect(t).toContain('one account of each sign-in is signed in at a time');
+    expect(t).toContain('How accounts work');
+    expect(t).toContain('Nothing is signed out for it');
     expect(t).toContain('encrypted, never exported or sent anywhere');
-    expect(t).toContain('Only cookies are swapped');
+    expect(t).toContain('can be open at the same moment');
+    expect(t).toContain('about 10 KB of cookies per site');
     expect(t).toContain('never sees or stores your passwords');
+    expect(t).not.toContain('Only cookies are swapped');
+    expect(t).not.toContain('one account of each sign-in is signed in at a time');
   });
 
-  it('shows each account with who it is, whether it is signed in, and where it runs', () => {
+  it('shows each account with who it is, whether it is signed in, and where it is used', () => {
     const { value } = makeCtx();
     mount(<AccountsSettings />, value);
     const rows = [...container.querySelectorAll('.tk-acct-row')];
     expect(rows).toHaveLength(3);
     expect(rows[0].textContent).toContain('work@example.com');
-    expect(rows[0].textContent).toContain('Signed in now');
-    expect(rows[0].textContent).toContain('In the workspace');
+    expect(rows[0].textContent).toContain('The account this browser is signed in to');
+    expect(rows[0].textContent).toContain('In Threadkeeper and in your ordinary tabs');
     expect(rows[1].textContent).toContain('Identity not seen yet');
-    expect(rows[1].textContent).toContain('Not signed in now');
-    expect(rows[2].textContent).toContain('In its own Chrome window');
+    expect(rows[1].textContent).toContain('Signed in. Its sign-in is kept on this device, encrypted.');
+    expect(rows[1].textContent).toContain('Inside Threadkeeper only');
+    expect(rows[2].textContent).toContain('Not signed in yet');
+    expect(rows[2].textContent).not.toContain('own Chrome window');
+  });
+
+  it("offers a browser sign-in for each account but the browser's own, and making a signed-in one the browser's", () => {
+    const { value } = makeCtx();
+    mount(<AccountsSettings />, value);
+    const rows = [...container.querySelectorAll<HTMLElement>('.tk-acct-row')];
+    const names = (row: HTMLElement) => [...row.querySelectorAll('button')].map((b) => b.textContent ?? '');
+    expect(names(rows[0]).some((n) => n.includes('browser tab') || n.includes('browser’s sign-in'))).toBe(false);
+    expect(names(rows[1])).toEqual(expect.arrayContaining(['Sign in again with a browser tab', 'Make this the browser’s sign-in']));
+    expect(names(rows[2])).toContain('Sign in with a browser tab');
+    expect(names(rows[2])).not.toContain('Make this the browser’s sign-in');
+  });
+
+  it('starts a browser sign-in for an account and says where to finish it', async () => {
+    const { value, spies } = makeCtx();
+    mount(<AccountsSettings />, value);
+    const client = [...container.querySelectorAll<HTMLElement>('.tk-acct-row')][2];
+    await press(button('Sign in with a browser tab', client));
+    expect(spies.beginBrowserSignIn).toHaveBeenCalledWith('acct_bbbb');
+    expect(spies.announce).toHaveBeenCalledWith('Sign in to Claude as Client in the browser tab that opened.');
+  });
+
+  it("asks before making an account the browser's sign-in, and can be talked out of it", async () => {
+    const { value, spies } = makeCtx();
+    mount(<AccountsSettings />, value);
+    const personal = () => [...container.querySelectorAll<HTMLElement>('.tk-acct-row')][1];
+    await press(button('Make this the browser’s sign-in', personal()));
+    expect(spies.useAsBrowserAccount).not.toHaveBeenCalled();
+    expect(personal().textContent).toContain('Every Claude tab changes to this account');
+    await press(button('Keep as it is', personal()));
+    expect(spies.useAsBrowserAccount).not.toHaveBeenCalled();
+    await press(button('Make this the browser’s sign-in', personal()));
+    await press(button('Change the browser’s sign-in', personal()));
+    expect(spies.useAsBrowserAccount).toHaveBeenCalledWith('acct_aaaa');
+    expect(spies.announce).toHaveBeenCalledWith('This browser is now signed in to Claude as Personal.');
+  });
+
+  it('keeps those actions unavailable while an account of the sign-in is signing in through the browser', () => {
+    const pending = realms().map((r) =>
+      r.realm.id === 'anthropic' ? { ...r, pendingSignIn: { realm: 'anthropic', accountId: WINDOWED.id, returnToAccountId: PRIMARY.id, startedAt: '' } } : r
+    );
+    const { value } = makeCtx({ realms: pending });
+    mount(<AccountsSettings />, value);
+    const client = [...container.querySelectorAll<HTMLElement>('.tk-acct-row')][2];
+    expect(button('Sign in with a browser tab', client).disabled).toBe(true);
   });
 
   it('renames an account inline and saves it with updateAccount', async () => {
@@ -751,7 +799,31 @@ describe('SettingsDialog additions', () => {
     const names = [...document.querySelectorAll('.tk-settings-nav .tk-nav-item > span:first-child')].map((n) => n.textContent);
     expect(names.indexOf('Accounts')).toBe(names.indexOf('Capture') + 1);
     await press(button('Accounts', document.querySelector('.tk-settings-nav')!));
-    expect(document.querySelector('[data-testid="settings-panel-accounts"]')!.textContent).toContain('How switching works');
+    expect(document.querySelector('[data-testid="settings-panel-accounts"]')!.textContent).toContain('How accounts work');
+  });
+
+  it('chooses the start page, Claude Code unless changed, or where the person left off', async () => {
+    const onPatch = await mountSettings();
+    const select = document.querySelector<HTMLSelectElement>('select[aria-describedby="tk-start-page-hint"]')!;
+    expect(select.value).toBe('https://claude.ai/code');
+    expect([...select.options].map((o) => o.textContent)).toEqual(expect.arrayContaining(['Where I left off', 'Claude Code', 'Claude', 'ChatGPT', 'Codex', 'Grok']));
+    expect(document.getElementById('tk-start-page-hint')!.textContent).toContain('Claude Code is also the way in to the rest of Claude');
+    await act(async () => {
+      select.value = '';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onPatch).toHaveBeenCalledWith({ startPage: '' });
+  });
+
+  it("switches each site's full navigation off and on", async () => {
+    const onPatch = await mountSettings();
+    const toggle = [...document.querySelectorAll<HTMLInputElement>('label.tk-toggle input')].find((i) =>
+      i.parentElement!.textContent!.includes('Show each site’s full navigation')
+    )!;
+    expect(toggle.checked).toBe(true);
+    expect(toggle.parentElement!.textContent).toContain('hide their sidebar and menus');
+    await press(toggle);
+    expect(onPatch).toHaveBeenCalledWith({ embedFullNavigation: false });
   });
 
   it('turns surfaces solid with the toggle and keeps pages loaded within 2 to 12', async () => {

@@ -1,6 +1,8 @@
 // The Threads view on the full page: grouping, the workspace filters, the detail pane's modes, the
 // agent run block and the related-thread reasons. Components are rendered by hand inside a
 // WorkspaceProvider; no database or service worker is involved.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +15,8 @@ import { DetailPane, type DetailPaneProps } from '../../src/entrypoints/manager/
 import { NavRail, type NavRailProps } from '../../src/entrypoints/manager/threads/NavRail.js';
 import { resetThreadGrouping } from '../../src/entrypoints/manager/threads/grouping.js';
 import { matchesRunFilter, type RunFilter } from '../../src/entrypoints/manager/threads/filters.js';
+import type { ThreadSortMode } from '../../src/entrypoints/manager/BulkActions.js';
+import type { SessionKind } from '../../src/entrypoints/manager/workspace/lens.js';
 import { useThreadSearch } from '../../src/entrypoints/manager/hooks/useThreadSearch.js';
 import { SemanticNeighbors, ThreadOverview, type RelatedThread } from '../../src/entrypoints/manager/ThreadOverview.js';
 import { WorkspaceProvider, type ThreadAccount, type WorkspaceContextValue } from '../../src/entrypoints/manager/workspace/context.js';
@@ -231,11 +235,13 @@ interface HarnessProps {
   repositoryFilter?: string | null;
   accountFilter?: string | null;
   runFilter?: RunFilter;
+  typeFilter?: SessionKind | 'all';
+  sortMode?: ThreadSortMode;
   onResult?: (result: ReturnType<typeof useThreadSearch>) => void;
   listOverrides?: Partial<ListPaneProps>;
 }
 
-function Harness({ conversations, settings = DEFAULT_SETTINGS, repositoryFilter, accountFilter, runFilter, onResult, listOverrides }: HarnessProps) {
+function Harness({ conversations, settings = DEFAULT_SETTINGS, repositoryFilter, accountFilter, runFilter, typeFilter = 'all', sortMode = 'recent', onResult, listOverrides }: HarnessProps) {
   const searchIndex = React.useMemo(() => {
     const index = new MemorySearchIndex();
     index.loadSnapshot({ conversations });
@@ -258,17 +264,21 @@ function Harness({ conversations, settings = DEFAULT_SETTINGS, repositoryFilter,
     coverageFilter: 'all',
     kindFilter: 'all',
     activeQueue: 'all',
-    sortMode: 'recent',
+    sortMode,
     repositoryFilter,
     accountFilter,
     runFilter,
+    typeFilter,
     accountIdOf: (c) => accountOfThread(c).account?.id ?? null,
+    accountOrder: REALMS.flatMap((r) => r.accounts.map((a) => a.id)),
   });
   onResult?.(result);
   const props: ListPaneProps = {
     repositoryFilter,
     accountFilter,
     runFilter,
+    typeFilter,
+    onTypeFilterChange: vi.fn(),
     onRepositoryFilterChange: vi.fn(),
     onAccountFilterChange: vi.fn(),
     onRunFilterChange: vi.fn(),
@@ -296,7 +306,7 @@ function Harness({ conversations, settings = DEFAULT_SETTINGS, repositoryFilter,
     kindFilter: 'all',
     stateFilter: 'all',
     coverageFilter: 'all',
-    sortMode: 'recent',
+    sortMode,
     checkedKeys: new Set(),
     isCompact: false,
     stillPaired: false,
@@ -435,9 +445,14 @@ describe('Threads list: grouping', () => {
       </WorkspaceProvider>
     );
     expect(headers().map(headerName).sort()).toEqual(['ChatGPT · Work', 'Claude · Personal', 'Claude · Work'].sort());
-    const group = q('[role="radiogroup"][aria-label="Group by"]')!;
-    expect([...group.querySelectorAll('[role="radio"]')].map((r) => r.textContent)).toEqual(['None', 'Project', 'Repository', 'Account']);
-    await click(group.querySelectorAll('button')[2]);
+    const group = q<HTMLSelectElement>('select[aria-label="Group by"]')!;
+    expect(group.value).toBe('account');
+    // Two providers and several accounts are in play, so Provider and Account are offered, in the
+    // Threads order. Type is left out: every thread here is a coding session, one bucket only.
+    expect([...group.options].map((o) => o.textContent)).toEqual([
+      'None', 'Project', 'Repository', 'Account', 'Provider', 'Last active', 'Status',
+    ]);
+    await choose(group, 'repository');
     expect(onPatchSettings).toHaveBeenCalledWith({ threadsGroupBy: 'repository' });
   });
 
@@ -474,7 +489,7 @@ describe('Threads list: workspace filters', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(bar.getAttribute('data-filters-open')).toBe('false');
     expect(q('input[type="search"]')).not.toBeNull();
-    expect(q('[role="radiogroup"][aria-label="Group by"]')).not.toBeNull();
+    expect(q('select[aria-label="Group by"]')).not.toBeNull();
     expect(q('select[aria-label="View mode"]')).not.toBeNull();
     expect(q('select[aria-label="Sort threads"]')).not.toBeNull();
     expect([...q('.tk-filter-row')!.children].slice(0, 3).map((el) => el.getAttribute('aria-label') ?? el.textContent)).toEqual([
@@ -554,6 +569,249 @@ describe('Threads list: workspace filters', () => {
     expect(chip.textContent).toContain('acme/app');
     await click(chip.querySelector('button'));
     expect(onRepositoryFilterChange).toHaveBeenCalledWith(null);
+  });
+});
+
+describe('Threads list: the lens (type filter, more groupings, order)', () => {
+  /** A coding session on two accounts, a Codex session in review, a finished chat and a bot. */
+  function mixed() {
+    return {
+      claude: conv({ provider: 'claude_code', accountId: 'stored_work', repository: 'acme/app', title: 'Retry webhooks', createdAt: '2026-10-01T10:00:00', updatedAt: '2026-11-10T09:00:00' }),
+      codex: conv({ provider: 'codex', accountId: 'stored_openai', repository: 'acme/app', title: 'Queue line moves', workflowState: 'needs_review', createdAt: '2026-11-08T10:00:00', updatedAt: '2026-11-09T09:00:00' }),
+      chat: conv({ provider: 'chatgpt', accountId: 'stored_openai', title: 'Release notes', workflowState: 'done', createdAt: '2026-11-05T10:00:00', updatedAt: '2026-11-03T09:00:00' }),
+      bot: conv({ provider: 'grok_bot', accountId: 'stored_openai', title: 'Nightly digest', createdAt: '2026-11-09T10:00:00', updatedAt: '2026-11-01T09:00:00' }),
+    };
+  }
+  const all = () => Object.values(mixed());
+
+  async function hitTitles(props: Partial<HarnessProps>, conversations: ConversationRecord[] = all()) {
+    let result!: ReturnType<typeof useThreadSearch>;
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness conversations={conversations} onResult={(r) => (result = r)} {...props} />
+      </WorkspaceProvider>
+    );
+    return result.listHits.map((h) => h.conversation.title);
+  }
+
+  it('narrows by type', async () => {
+    expect((await hitTitles({ typeFilter: 'coding' })).sort()).toEqual(['Queue line moves', 'Retry webhooks']);
+    expect(await hitTitles({ typeFilter: 'chats' })).toEqual(['Release notes']);
+    expect(await hitTitles({ typeFilter: 'bots' })).toEqual(['Nightly digest']);
+    expect(await hitTitles({ typeFilter: 'more' })).toEqual([]);
+    expect(await hitTitles({ typeFilter: 'all' })).toHaveLength(4);
+    // Together with the other filters (AND).
+    expect(await hitTitles({ typeFilter: 'coding', accountFilter: OPENAI_WORK.id })).toEqual(['Queue line moves']);
+  });
+
+  it('offers a Type filter beside the provider filter, and it counts toward "Filters"', async () => {
+    const onTypeFilterChange = vi.fn();
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness conversations={all()} typeFilter="chats" listOverrides={{ onTypeFilterChange }} />
+      </WorkspaceProvider>
+    );
+    const select = q<HTMLSelectElement>('select[aria-label="Filter by type"]')!;
+    expect([...select.options].map((o) => o.textContent)).toEqual(['All types', 'Coding sessions', 'Chats', 'Bots', 'Other']);
+    expect(select.value).toBe('chats');
+    const row = [...q('.tk-filter-row')!.children].map((el) => el.getAttribute('aria-label') ?? el.textContent);
+    expect(row.indexOf('Filter by type')).toBe(row.indexOf('Filter by provider') + 1);
+    expect(q('.tk-thr-filters-toggle')!.textContent).toBe('Filters · 1');
+    await choose(select, 'coding');
+    expect(onTypeFilterChange).toHaveBeenCalledWith('coding');
+  });
+
+  it('shows a removable chip for each active workspace filter, with one action to clear them all', async () => {
+    const l = mixed();
+    const handlers = {
+      onTypeFilterChange: vi.fn(),
+      onProviderFilterChange: vi.fn(),
+      onAccountFilterChange: vi.fn(),
+      onRepositoryFilterChange: vi.fn(),
+      onRunFilterChange: vi.fn(),
+    };
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness
+          conversations={[l.claude]}
+          typeFilter="coding"
+          accountFilter={PERSONAL.id}
+          repositoryFilter="acme/app"
+          runFilter="needs_you"
+          listOverrides={{ providerFilter: 'claude_code', ...handlers }}
+        />
+      </WorkspaceProvider>
+    );
+    const chips = qa('.tk-thr-chips .tk-thr-filter-chip');
+    expect(q('.tk-thr-chips')!.getAttribute('aria-label')).toBe('Active filters');
+    expect(chips.map((c) => c.firstElementChild!.textContent)).toEqual([
+      'Type: Coding sessions',
+      'Provider: Claude Code',
+      'Account: Claude · Personal',
+      'Repository: acme/app',
+      'Run state: Needs you',
+    ]);
+    expect(chips.map((c) => c.querySelector('button')!.getAttribute('aria-label'))).toEqual([
+      'Remove type filter Coding sessions',
+      'Remove provider filter Claude Code',
+      'Remove account filter Claude · Personal',
+      'Remove repository filter acme/app',
+      'Remove run state filter Needs you',
+    ]);
+    await click(chips[0].querySelector('button'));
+    expect(handlers.onTypeFilterChange).toHaveBeenLastCalledWith('all');
+    await click(chips[1].querySelector('button'));
+    expect(handlers.onProviderFilterChange).toHaveBeenLastCalledWith('all');
+    await click(chips[2].querySelector('button'));
+    expect(handlers.onAccountFilterChange).toHaveBeenLastCalledWith(null);
+    await click(chips[4].querySelector('button'));
+    expect(handlers.onRunFilterChange).toHaveBeenLastCalledWith('all');
+    // One action clears every one of them.
+    for (const fn of Object.values(handlers)) fn.mockClear();
+    await click(byText('.tk-thr-chips button', 'Clear filters'));
+    expect(handlers.onTypeFilterChange).toHaveBeenCalledWith('all');
+    expect(handlers.onProviderFilterChange).toHaveBeenCalledWith('all');
+    expect(handlers.onAccountFilterChange).toHaveBeenCalledWith(null);
+    expect(handlers.onRepositoryFilterChange).toHaveBeenCalledWith(null);
+    expect(handlers.onRunFilterChange).toHaveBeenCalledWith('all');
+  });
+
+  it('shows no chips without an active filter, nor on the side panel', async () => {
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness conversations={all()} />
+      </WorkspaceProvider>
+    );
+    expect(q('.tk-thr-chips')).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render(
+      <WorkspaceProvider value={makeContext({ surface: 'sidepanel' })}>
+        <Harness conversations={all()} typeFilter="chats" />
+      </WorkspaceProvider>
+    );
+    expect(q('.tk-thr-chips')).toBeNull();
+    expect(q('select[aria-label="Filter by type"]')).toBeNull();
+  });
+
+  it('the empty-state button clears the type filter too', async () => {
+    const l = mixed();
+    const onTypeFilterChange = vi.fn();
+    const onRepositoryFilterChange = vi.fn();
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness conversations={[l.claude]} typeFilter="bots" listOverrides={{ onTypeFilterChange, onRepositoryFilterChange }} />
+      </WorkspaceProvider>
+    );
+    expect(qa('.tk-row-item')).toHaveLength(0);
+    const clear = byText('.tk-empty-state button', /Clear type, repository, account and run filters/)!;
+    await click(clear);
+    expect(onTypeFilterChange).toHaveBeenCalledWith('all');
+    expect(onRepositoryFilterChange).toHaveBeenCalledWith(null);
+  });
+
+  it('offers every grouping when the library has several types, providers and accounts, in the Threads order', async () => {
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness conversations={all()} />
+      </WorkspaceProvider>
+    );
+    const select = q<HTMLSelectElement>('select[aria-label="Group by"]')!;
+    expect([...select.options].map((o) => o.textContent)).toEqual(['None', 'Project', 'Repository', 'Account', 'Type', 'Provider', 'Last active', 'Status']);
+    expect(select.value).toBe('none');
+  });
+
+  it('groups by type: coding sessions, chats, bots, then other', async () => {
+    const settings: SettingsRecord = { ...DEFAULT_SETTINGS, threadsGroupBy: 'kind' };
+    let result!: ReturnType<typeof useThreadSearch>;
+    const library = all().reverse();
+    await render(
+      <WorkspaceProvider value={makeContext({ settings })}>
+        <Harness conversations={library} settings={settings} onResult={(r) => (result = r)} />
+      </WorkspaceProvider>
+    );
+    expect(headers().map(headerName)).toEqual(['Coding sessions', 'Chats', 'Bots']);
+    expect(headers().map((h) => h.querySelector('.tk-thr-group-count')?.textContent)).toEqual(['2', '1', '1']);
+    expect(headers().map((h) => h.closest('.tk-thr-group')!.getAttribute('data-group'))).toEqual(['kind:coding', 'kind:chats', 'kind:bots']);
+    // The order the rows are drawn in is the order the keys are in.
+    const drawn = qa('.tk-row-item .tk-row-title').map((n) => n.textContent);
+    const titleOf = new Map(library.map((c) => [c.threadKey, c.title]));
+    expect(result.viewKeys.map((k) => titleOf.get(k))).toEqual(drawn);
+  });
+
+  it('groups by provider, biggest first and then by name', async () => {
+    const l = mixed();
+    const extra = conv({ provider: 'claude_code', accountId: 'stored_personal', title: 'Landing page' });
+    const settings: SettingsRecord = { ...DEFAULT_SETTINGS, threadsGroupBy: 'provider' };
+    await render(
+      <WorkspaceProvider value={makeContext({ settings })}>
+        <Harness conversations={[l.chat, l.codex, l.claude, extra, l.bot]} settings={settings} />
+      </WorkspaceProvider>
+    );
+    expect(headers().map(headerName)).toEqual(['Claude Code', 'ChatGPT', 'Codex', 'Grok Bot']);
+  });
+
+  it('groups by status in the workflow order', async () => {
+    const settings: SettingsRecord = { ...DEFAULT_SETTINGS, threadsGroupBy: 'status' };
+    await render(
+      <WorkspaceProvider value={makeContext({ settings })}>
+        <Harness conversations={all()} settings={settings} />
+      </WorkspaceProvider>
+    );
+    expect(headers().map(headerName)).toEqual(['Active', 'Needs review', 'Done']);
+    expect(headers().map((h) => h.querySelector('.tk-thr-group-count')?.textContent)).toEqual(['2', '1', '1']);
+  });
+
+  it('groups by when it was last active, by local calendar day', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 10, 15, 0, 0));
+    try {
+      const settings: SettingsRecord = { ...DEFAULT_SETTINGS, threadsGroupBy: 'date' };
+      await render(
+        <WorkspaceProvider value={makeContext({ settings })}>
+          <Harness conversations={all()} settings={settings} />
+        </WorkspaceProvider>
+      );
+      // Claude today (10 Nov), Codex yesterday (9 Nov), the chat 7 days back, the bot 9 days back.
+      expect(headers().map(headerName)).toEqual(['Today', 'Yesterday', 'Previous 7 days', 'Previous 30 days']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('groups by account in sign-in order, not the order the threads came in', async () => {
+    const l = mixed();
+    const personal = conv({ provider: 'claude_code', accountId: 'stored_personal', title: 'Landing page' });
+    const settings: SettingsRecord = { ...DEFAULT_SETTINGS, threadsGroupBy: 'account' };
+    await render(
+      <WorkspaceProvider value={makeContext({ settings })}>
+        <Harness conversations={[l.codex, personal, l.claude]} settings={settings} />
+      </WorkspaceProvider>
+    );
+    expect(headers().map(headerName)).toEqual(['Claude · Work', 'Claude · Personal', 'ChatGPT · Work']);
+  });
+
+  it('keeps a group header sticky while its group is open', () => {
+    const css = readFileSync(join(__dirname, '../../src/entrypoints/manager/styles/30-threads.css'), 'utf8');
+    expect(css).toMatch(/\.tk-thr-group-head\[aria-expanded="true"\]\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/);
+    expect(css).not.toMatch(/\.tk-thr-group-head\s*\{[^}]*position:\s*sticky/);
+  });
+
+  it('adds "Recently created" to the order and orders the list by creation time', async () => {
+    const onSortModeChange = vi.fn();
+    expect(await hitTitles({ sortMode: 'created' })).toEqual(['Nightly digest', 'Queue line moves', 'Release notes', 'Retry webhooks']);
+    const sort = q<HTMLSelectElement>('select[aria-label="Sort threads"]')!;
+    expect([...sort.options].map((o) => o.textContent)).toEqual(['Recent activity', 'Oldest first', 'Recently created', 'Title A–Z', 'Most messages']);
+    expect(sort.value).toBe('created');
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render(
+      <WorkspaceProvider value={makeContext()}>
+        <Harness conversations={all()} listOverrides={{ onSortModeChange }} />
+      </WorkspaceProvider>
+    );
+    await choose(q<HTMLSelectElement>('select[aria-label="Sort threads"]')!, 'created');
+    expect(onSortModeChange).toHaveBeenCalledWith('created');
   });
 });
 

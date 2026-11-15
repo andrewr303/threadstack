@@ -150,6 +150,8 @@
               "Recent activity"
             <option value="oldest">
               "Oldest first"
+            <option value="created">
+              "Recently created"
             <option value="title">
               "Title A–Z"
             <option value="messages">
@@ -1061,6 +1063,58 @@
         <section class="tk-settings-section">
           <h3 class="tk-settings-h3">
             "Workspace"
+          <div class="tk-field-row">
+            <label class="tk-field">
+              "Start page"
+              <select class="tk-select" aria-describedby="tk-start-page-hint"> {value="https://claude.ai/code"}
+                <option value="">
+                  "Where I left off"
+                <option value="https://claude.ai/code">
+                  "Claude Code"
+                <option value="https://chatgpt.com/codex">
+                  "Codex"
+                <option value="https://cursor.com/agents">
+                  "Cursor agents"
+                <option value="https://github.com/copilot">
+                  "GitHub Copilot"
+                <option value="https://jules.google.com/">
+                  "Jules"
+                <option value="https://app.devin.ai/">
+                  "Devin"
+                <option value="https://chatgpt.com/">
+                  "ChatGPT"
+                <option value="https://claude.ai/new">
+                  "Claude"
+                <option value="https://grok.com/">
+                  "Grok"
+                <option value="https://x.com/i/grok">
+                  "Grok on X"
+                <option value="https://gemini.google.com/app">
+                  "Gemini"
+                <option value="https://www.perplexity.ai/">
+                  "Perplexity"
+                <option value="https://chat.deepseek.com/">
+                  "DeepSeek"
+                <option value="https://chat.mistral.ai/chat">
+                  "Le Chat"
+                <option value="https://copilot.microsoft.com/">
+                  "Copilot"
+                <option value="https://x.com/i/chat">
+                  "Grok Bot"
+                <option value="https://chatgpt.com/dots">
+                  "ChatGPT dots"
+                <option value="https://muse.ai/">
+                  "Muse"
+                <option value="https://claude.ai/duet">
+                  "Claude Duet"
+          <p id="tk-start-page-hint" class="tk-settings-note">
+            "The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat and code."
+          <label class="tk-toggle">
+            <input type="checkbox" checked=""> {checked=true}
+            <span>
+              "Show each site’s full navigation"
+              <span class="tk-toggle-hint">
+                "Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
           <label class="tk-toggle">
             <input type="checkbox"> {checked=false}
             <span>

@@ -2,12 +2,13 @@ import 'fake-indexeddb/auto';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { AccountService } from '../../src/core/accounts/contract.js';
 import { realmById } from '../../src/core/workspace/realms.js';
-import type { AccountRecord, AccountsChangeResult, RealmAccounts, WorkspaceBroadcast } from '../../src/core/workspace/types.js';
+import type { AccountRecord, AccountsChangeResult, PendingSignIn, RealmAccounts, WorkspaceBroadcast } from '../../src/core/workspace/types.js';
 import {
   WorkspaceTabs,
   decideNewTabAdoption,
   handleWorkspaceCommand,
   sanitizeIdentity,
+  type ProfileCommands,
   type WorkspaceCommandDeps,
 } from '../../src/core/embed/workspace-tabs.js';
 import { helperOpen, helperPing, type HelperEnv } from '../../src/core/embed/helper.js';
@@ -49,11 +50,35 @@ function fakeAccounts(overrides: Partial<AccountService> = {}): AccountService &
     activate: async (...args) => (calls.push(['activate', args]), change(SECOND, true)),
     update: async (...args) => (calls.push(['update', args]), change(SECOND, false)),
     remove: async (...args) => (calls.push(['remove', args]), change(null, false)),
+    account: async (id) => REALMS[0].accounts.find((a) => a.id === id) ?? null,
+    readJar: async () => null,
+    writeJar: async () => undefined,
+    deviceCookies: async () => [],
+    snapshotBrowserAccount: async () => undefined,
+    noteProfileIdentity: async () => null,
+    beginBrowserSignIn: async (...args) => (calls.push(['beginBrowserSignIn', args]), change(PRIMARY, true)),
+    finishBrowserSignIn: async (...args) => (calls.push(['finishBrowserSignIn', args]), change(PRIMARY, true)),
+    cancelBrowserSignIn: async (...args) => (calls.push(['cancelBrowserSignIn', args]), change(PRIMARY, true)),
+    pendingSignIn: async () => null,
     noteIdentity: async () => null,
     recover: async () => undefined,
     ...overrides,
   };
   return Object.assign(svc, { calls });
+}
+
+/** Profile commands that record what they were asked. */
+function fakeProfiles(): ProfileCommands & { calls: Array<[string, unknown[]]> } {
+  const calls: Array<[string, unknown[]]> = [];
+  return {
+    calls,
+    available: true,
+    claim: async (...args) => (calls.push(['claim', args]), { ok: true, realm: args[1], accountId: args[2], steps: ['https://chatgpt.com/robots.txt?tk_profile_seed=abcdef0123'], signedIn: true, truncated: false }),
+    ready: async (...args) => (calls.push(['ready', args]), { ok: true }),
+    reset: async (...args) => void calls.push(['reset', args]),
+    accountReplaced: async (...args) => void calls.push(['accountReplaced', args]),
+    flush: async (...args) => void calls.push(['flush', args]),
+  };
 }
 
 function deps(accounts: AccountService | null) {
@@ -86,12 +111,136 @@ describe('workspace commands', () => {
   it('WORKSPACE_HELLO registers the tab, installs its rule and lists realms', async () => {
     const svc = fakeAccounts();
     const { d, rules } = deps(svc);
-    expect(await handleWorkspaceCommand({ type: 'WORKSPACE_HELLO' }, 11, d)).toEqual({ ok: true, tabId: 11, embedding: true, realms: REALMS });
+    expect(await handleWorkspaceCommand({ type: 'WORKSPACE_HELLO' }, 11, d)).toEqual({ ok: true, tabId: 11, embedding: true, profiles: false, realms: REALMS });
     expect(d.tabs.has(11)).toBe(true);
     expect([...rules.values()][0].condition).toEqual({ tabIds: [11], resourceTypes: ['sub_frame'] });
     // Without an account service the tab still registers.
     const bare = deps(null);
-    expect(await handleWorkspaceCommand({ type: 'WORKSPACE_HELLO' }, 12, bare.d)).toEqual({ ok: true, tabId: 12, embedding: true, realms: [] });
+    expect(await handleWorkspaceCommand({ type: 'WORKSPACE_HELLO' }, 12, bare.d)).toEqual({ ok: true, tabId: 12, embedding: true, profiles: false, realms: [] });
+  });
+
+  it("a new page in a tab starts with empty profile slots, and says whether profiles' sign-ins are saved", async () => {
+    const { d } = deps(fakeAccounts());
+    const profiles = fakeProfiles();
+    d.profiles = profiles;
+    expect(await handleWorkspaceCommand({ type: 'WORKSPACE_HELLO' }, 11, d)).toMatchObject({ ok: true, profiles: true });
+    expect(profiles.calls).toEqual([['reset', [11]]]);
+    profiles.available = false;
+    expect(await handleWorkspaceCommand({ type: 'WORKSPACE_HELLO' }, 11, d)).toMatchObject({ ok: true, profiles: false });
+  });
+
+  it('passes profile claims for this tab through with checked fields', async () => {
+    const { d } = deps(fakeAccounts());
+    const profiles = fakeProfiles();
+    d.profiles = profiles;
+    expect(await handleWorkspaceCommand({ type: 'PROFILE_CLAIM', realm: 'openai', accountId: PRIMARY.id, tabId: 99 }, 11, d)).toMatchObject({ ok: true, steps: [expect.stringContaining('tk_profile_seed')] });
+    expect(await handleWorkspaceCommand({ type: 'PROFILE_READY', realm: 'openai' }, 11, d)).toEqual({ ok: true });
+    // The tab is always the sender's own, never one the message names.
+    expect(profiles.calls).toEqual([
+      ['claim', [11, 'openai', PRIMARY.id]],
+      ['ready', [11, 'openai']],
+    ]);
+    for (const bad of [
+      { type: 'PROFILE_CLAIM', realm: 42, accountId: PRIMARY.id },
+      { type: 'PROFILE_CLAIM', realm: 'openai', accountId: '' },
+      { type: 'PROFILE_READY', realm: { id: 'openai' } },
+    ]) {
+      expect(await handleWorkspaceCommand(bad, 11, d), JSON.stringify(bad)).toMatchObject({ ok: false });
+    }
+    expect(profiles.calls).toHaveLength(2);
+    // Without profile support, or without accounts, nothing is claimed.
+    expect(await handleWorkspaceCommand({ type: 'PROFILE_CLAIM', realm: 'openai', accountId: PRIMARY.id }, 11, deps(fakeAccounts()).d)).toMatchObject({ ok: false });
+    const noAccounts = deps(null);
+    noAccounts.d.profiles = fakeProfiles();
+    expect(await handleWorkspaceCommand({ type: 'PROFILE_CLAIM', realm: 'openai', accountId: PRIMARY.id }, 11, noAccounts.d)).toMatchObject({ ok: false });
+  });
+
+  it('starts a browser sign-in: opens the sign-in page, drops the stale copy and tells the pages', async () => {
+    const svc = fakeAccounts();
+    const { d, broadcasts } = deps(svc);
+    const profiles = fakeProfiles();
+    const opened: string[] = [];
+    d.profiles = profiles;
+    d.openSignInTab = async (url) => void opened.push(url);
+    const res = await handleWorkspaceCommand({ type: 'ACCOUNTS_SIGNIN_BEGIN', accountId: PRIMARY.id }, 11, d);
+    expect(res).toMatchObject({ ok: true, switched: true });
+    expect(svc.calls.find(([n]) => n === 'beginBrowserSignIn')?.[1]).toEqual([PRIMARY.id]);
+    expect(opened).toEqual([realmById('openai')!.signInUrl]);
+    expect(profiles.calls).toContainEqual(['accountReplaced', [PRIMARY.id]]);
+    expect(broadcasts).toEqual([{ type: 'ACCOUNTS_CHANGED', realm: 'openai', activeAccountId: SECOND.id, switched: true }]);
+    expect(await handleWorkspaceCommand({ type: 'ACCOUNTS_SIGNIN_BEGIN', accountId: 7 }, 11, d)).toMatchObject({ ok: false, code: 'unknown_account' });
+  });
+
+  it('a failed sign-in start opens nothing and tells nobody', async () => {
+    const svc = fakeAccounts({ beginBrowserSignIn: async () => ({ ok: false, error: 'Another account is still signing in.', code: 'signin_pending' }) });
+    const { d, broadcasts } = deps(svc);
+    const opened: string[] = [];
+    d.openSignInTab = async (url) => void opened.push(url);
+    expect(await handleWorkspaceCommand({ type: 'ACCOUNTS_SIGNIN_BEGIN', accountId: PRIMARY.id }, 11, d)).toMatchObject({ ok: false, code: 'signin_pending' });
+    expect(opened).toEqual([]);
+    expect(broadcasts).toEqual([]);
+  });
+
+  it('finishing or cancelling a sign-in closes its tab and drops both stale copies', async () => {
+    const pending: PendingSignIn = { realm: 'openai', accountId: PRIMARY.id, returnToAccountId: SECOND.id, startedAt: '' };
+    for (const type of ['ACCOUNTS_SIGNIN_FINISH', 'ACCOUNTS_SIGNIN_CANCEL'] as const) {
+      const svc = fakeAccounts({ pendingSignIn: async () => pending });
+      const { d, broadcasts } = deps(svc);
+      const profiles = fakeProfiles();
+      let closed = 0;
+      d.profiles = profiles;
+      d.closeSignInTab = async () => void closed++;
+      expect(await handleWorkspaceCommand({ type }, 11, d)).toMatchObject({ ok: true });
+      expect(svc.calls.map(([n]) => n)).toContain(type === 'ACCOUNTS_SIGNIN_FINISH' ? 'finishBrowserSignIn' : 'cancelBrowserSignIn');
+      expect(closed).toBe(1);
+      expect(profiles.calls).toEqual([
+        ['accountReplaced', [PRIMARY.id]],
+        ['accountReplaced', [SECOND.id]],
+      ]);
+      expect(broadcasts).toHaveLength(1);
+    }
+  });
+
+  it('removing an account, or making it the browser account, drops the stale copy of its cookies; renaming does not', async () => {
+    const { d } = deps(fakeAccounts());
+    const profiles = fakeProfiles();
+    d.profiles = profiles;
+    await handleWorkspaceCommand({ type: 'ACCOUNTS_UPDATE', accountId: SECOND.id, label: 'Client' }, 11, d);
+    expect(profiles.calls).toEqual([]);
+    await handleWorkspaceCommand({ type: 'ACCOUNTS_ACTIVATE', accountId: SECOND.id }, 11, d);
+    await handleWorkspaceCommand({ type: 'ACCOUNTS_REMOVE', accountId: SECOND.id }, 11, d);
+    expect(profiles.calls).toEqual([
+      // What its pages changed is saved before its jar goes into the browser.
+      ['flush', [SECOND.id]],
+      ['accountReplaced', [SECOND.id]],
+      ['accountReplaced', [SECOND.id]],
+    ]);
+  });
+
+  it("removing the browser's own account also retires the account the browser goes to", async () => {
+    const afterRemoval: RealmAccounts[] = [{ ...REALMS[0], accounts: [PRIMARY], activeAccountId: PRIMARY.id }];
+    const { d } = deps(fakeAccounts({ remove: async () => ({ ok: true, account: null, realms: afterRemoval, switched: true }) }));
+    const profiles = fakeProfiles();
+    d.profiles = profiles;
+    await handleWorkspaceCommand({ type: 'ACCOUNTS_REMOVE', accountId: SECOND.id }, 11, d);
+    expect(profiles.calls).toEqual([
+      ['accountReplaced', [SECOND.id]],
+      ['accountReplaced', [PRIMARY.id]],
+    ]);
+  });
+
+  it('retires the slots of a replaced account before announcing the change', async () => {
+    const { d, broadcasts } = deps(fakeAccounts());
+    const order: string[] = [];
+    const profiles = fakeProfiles();
+    profiles.accountReplaced = async (accountId) => {
+      // Still nothing announced while the slots are being retired.
+      order.push(`retire ${accountId} after ${broadcasts.length} broadcasts`);
+    };
+    d.profiles = profiles;
+    await handleWorkspaceCommand({ type: 'ACCOUNTS_ACTIVATE', accountId: SECOND.id }, 11, d);
+    expect(order).toEqual([`retire ${SECOND.id} after 0 broadcasts`]);
+    expect(broadcasts.map((b) => b.type)).toEqual(['ACCOUNTS_CHANGED']);
   });
 
   it('delegates account changes with checked fields and broadcasts the realm afterwards', async () => {
@@ -218,7 +367,11 @@ describe('new windows opened from the workspace', () => {
 const fake = vi.hoisted(() => ({
   resolveForCapture: vi.fn(),
   noteIdentity: vi.fn(),
+  noteProfileIdentity: vi.fn(),
   list: vi.fn(),
+  account: vi.fn(),
+  readJar: vi.fn(),
+  writeJar: vi.fn(),
 }));
 
 vi.mock('../../src/core/accounts/service.js', () => ({
@@ -230,6 +383,16 @@ vi.mock('../../src/core/accounts/service.js', () => ({
     activate: async () => ({ ok: false, error: 'x' }),
     update: async () => ({ ok: false, error: 'x' }),
     remove: async () => ({ ok: false, error: 'x' }),
+    account: fake.account,
+    readJar: fake.readJar,
+    writeJar: fake.writeJar,
+    deviceCookies: async () => [],
+    snapshotBrowserAccount: async () => undefined,
+    noteProfileIdentity: fake.noteProfileIdentity,
+    beginBrowserSignIn: async () => ({ ok: false, error: 'x' }),
+    finishBrowserSignIn: async () => ({ ok: false, error: 'x' }),
+    cancelBrowserSignIn: async () => ({ ok: false, error: 'x' }),
+    pendingSignIn: async () => null,
     noteIdentity: fake.noteIdentity,
     recover: async () => undefined,
   }),
@@ -318,13 +481,15 @@ describe('service worker wiring', () => {
         set: async () => null,
         remove: async () => ({}),
       },
+      permissions: { contains: async () => true, onAdded: event('permissions.onAdded'), onRemoved: event('permissions.onRemoved') },
     });
     await import('../../src/entrypoints/background.js');
   });
 
   it('registers a workspace tab on hello and refuses the side panel', async () => {
     fake.list.mockResolvedValue(REALMS);
-    expect(await call({ type: 'WORKSPACE_HELLO' }, workspacePage)).toEqual({ ok: true, tabId: 11, embedding: true, realms: REALMS });
+    // This stand-in browser has no webRequest: a profile's sign-in would not be saved, and the page is told.
+    expect(await call({ type: 'WORKSPACE_HELLO' }, workspacePage)).toEqual({ ok: true, tabId: 11, embedding: true, profiles: false, realms: REALMS });
     expect([...sessionRules.values()]).toEqual([expect.objectContaining({ condition: { tabIds: [11], resourceTypes: ['sub_frame'] } })]);
     expect(await call({ type: 'WORKSPACE_HELLO' }, sidePanel)).toMatchObject({ ok: false });
     expect(await call({ type: 'HELPER_PING' }, workspacePage)).toMatchObject({ ok: false, code: 'helper_unavailable' });
@@ -375,16 +540,21 @@ describe('service worker wiring', () => {
       captureSource: 'dom_observer',
       messages: [{ sourceMessageId: 'm1', role: 'user', content: 'hi', createdAt: null }],
     };
+    // The frame's content script says what it is first (an ordinary frame), as every document does.
+    expect(await call({ type: 'EMBED_HELLO', pane: 'tab_1', url: 'https://chatgpt.com/c/c2', title: '', profile: false }, embeddedFrame('https://chatgpt.com/c/c2'))).toMatchObject({ ok: true });
     expect(await call({ type: 'PASSIVE_DOM_CAPTURE', payload }, embeddedFrame('https://chatgpt.com/c/c2'))).toMatchObject({ ok: true, status: 'stored' });
+    // A frame that never said what it is could be another account's: nothing is filed for it.
+    const unknown = { ...embeddedFrame('https://chatgpt.com/c/c2'), frameId: 8 };
+    expect(await call({ type: 'PASSIVE_DOM_CAPTURE', payload: { ...payload, sourceConversationId: 'c3', canonicalUrl: 'https://chatgpt.com/c/c3' } }, { ...unknown, url: 'https://chatgpt.com/c/c3' })).toMatchObject({ ok: false, skipped: 'no_account' });
     // The same frame inside an unremembered tab is refused.
     const stray = { ...embeddedFrame('https://chatgpt.com/c/c2'), tab: { id: 77, url: `${MANAGER}?surface=page` } };
     expect(await call({ type: 'PASSIVE_DOM_CAPTURE', payload }, stray)).toMatchObject({ ok: false });
   });
 
   it('answers embedded frames: hello, cookies from the sender address, agent state, identity', async () => {
-    expect(await call({ type: 'EMBED_HELLO', pane: 'tab_1', url: 'https://evil.example/', title: '' }, embeddedFrame('https://chatgpt.com/c/c1'))).toEqual({ ok: true, frameId: 7, tabId: 11 });
+    expect(await call({ type: 'EMBED_HELLO', pane: 'tab_1', url: 'https://evil.example/', title: '', profile: false }, embeddedFrame('https://chatgpt.com/c/c1'))).toEqual({ ok: true, frameId: 7, tabId: 11 });
     // The cookie answer is for the frame's own address, without HttpOnly cookies, whatever the message says.
-    expect(await call({ type: 'EMBED_COOKIES_GET', url: 'https://claude.ai/' }, embeddedFrame('https://chatgpt.com/c/c1'))).toEqual({ ok: true, cookie: 'csrf=t0k' });
+    expect(await call({ type: 'EMBED_COOKIES_GET', url: 'https://claude.ai/', profile: false }, embeddedFrame('https://chatgpt.com/c/c1'))).toEqual({ ok: true, cookie: 'csrf=t0k' });
     expect(await call({ type: 'EMBED_COOKIES_GET' }, providerTab('https://chatgpt.com/c/c1'))).toMatchObject({ ok: false });
 
     sent.length = 0;
@@ -408,6 +578,83 @@ describe('service worker wiring', () => {
     expect(fake.noteIdentity).toHaveBeenCalledWith('chatgpt', { key: 'h1', display: 'me@example.com', detail: null, source: 'network' });
     expect(sent).toContainEqual({ type: 'ACCOUNTS_CHANGED', realm: 'openai', activeAccountId: SECOND.id, switched: false });
     expect(await call({ type: 'ACCOUNT_IDENTITY', provider: 'claude', identity: null }, providerTab('https://chatgpt.com/'))).toMatchObject({ ok: false });
+  });
+
+  it("files a profile frame's capture, cookies and identity under the profile's account, never the browser's", async () => {
+    fake.list.mockResolvedValue(REALMS);
+    fake.account.mockImplementation(async (id: string) => REALMS[0].accounts.find((a) => a.id === id) ?? null);
+    const jarCookie = (name: string, value: string, httpOnly: boolean) => ({
+      name, value, domain: 'chatgpt.com', hostOnly: true, path: '/', secure: true, httpOnly, sameSite: 'lax' as const, session: false, expirationDate: 4102444800,
+    });
+    fake.readJar.mockResolvedValue([jarCookie('__Secure-next-auth.session-token', 'PRIMARY-SECRET', true), jarCookie('csrf', 'primary-csrf', false)]);
+    fake.writeJar.mockResolvedValue(undefined);
+    await call({ type: 'WORKSPACE_HELLO' }, workspacePage);
+
+    // The browser account loads in ordinary frames; only another account can take the slot.
+    expect(await call({ type: 'PROFILE_CLAIM', realm: 'openai', accountId: SECOND.id }, workspacePage)).toMatchObject({ ok: false, code: 'browser_account' });
+    const claim = await call({ type: 'PROFILE_CLAIM', realm: 'openai', accountId: PRIMARY.id }, workspacePage);
+    expect(claim).toMatchObject({ ok: true, realm: 'openai', accountId: PRIMARY.id, signedIn: true, truncated: false });
+    const steps = claim.steps as string[];
+    expect(steps).toEqual([expect.stringMatching(/^https:\/\/chatgpt\.com\/robots\.txt\?tk_profile_seed=[0-9a-f]{24}$/)]);
+    // One rule, for this tab and that one address, adding the account's cookies to its answer.
+    const seedRules = [...sessionRules.values()].filter((r) => (r as { id: number }).id >= 2000) as Array<{ condition: Record<string, unknown>; action: { responseHeaders: Array<{ header: string; operation: string; value?: string }> } }>;
+    expect(seedRules).toHaveLength(1);
+    expect(seedRules[0].condition).toEqual({ tabIds: [11], urlFilter: `|${steps[0]}|`, resourceTypes: ['sub_frame'] });
+    expect(seedRules[0].action.responseHeaders.filter((h) => h.header === 'set-cookie').map((h) => h.value)).toEqual([
+      'csrf=primary-csrf; Path=/; Expires=Fri, 01 Jan 2100 00:00:00 GMT; Secure; SameSite=Lax',
+      '__Secure-next-auth.session-token=PRIMARY-SECRET; Path=/; Expires=Fri, 01 Jan 2100 00:00:00 GMT; Secure; HttpOnly; SameSite=Lax',
+    ]);
+    expect(await call({ type: 'PROFILE_READY', realm: 'openai' }, workspacePage)).toEqual({ ok: true });
+    expect([...sessionRules.values()].some((r) => (r as { id: number }).id >= 2000)).toBe(false);
+    // A page shows one profile per sign-in; another one needs the page reloaded.
+    expect(await call({ type: 'PROFILE_CLAIM', realm: 'openai', accountId: ISOLATED.id }, workspacePage)).toMatchObject({ ok: false, code: 'needs_reload' });
+
+    const profileFrame = (url: string) => ({ ...embeddedFrame(url), frameId: 9 });
+    expect(await call({ type: 'EMBED_HELLO', pane: 'tab_2', url: '', title: '', profile: true }, profileFrame('https://chatgpt.com/c/p1'))).toMatchObject({ ok: true, frameId: 9 });
+
+    // Script cookies come from the profile's own jar, never the browser's, and never HttpOnly ones.
+    expect(await call({ type: 'EMBED_COOKIES_GET', profile: true }, profileFrame('https://chatgpt.com/c/p1'))).toEqual({ ok: true, cookie: 'csrf=primary-csrf' });
+    expect(await call({ type: 'EMBED_COOKIE_SET', cookie: 'theme=dark; Path=/', profile: true }, profileFrame('https://chatgpt.com/c/p1'))).toEqual({ ok: true });
+    expect(await call({ type: 'EMBED_COOKIES_GET', profile: true }, profileFrame('https://chatgpt.com/c/p1'))).toEqual({ ok: true, cookie: 'csrf=primary-csrf; theme=dark' });
+
+    const before = fake.resolveForCapture.mock.calls.length;
+    const payload = {
+      provider: 'chatgpt',
+      sourceConversationId: 'p1',
+      branchId: 'main',
+      canonicalUrl: 'https://chatgpt.com/c/p1',
+      title: 'Profile chat',
+      createdAt: null,
+      updatedAt: null,
+      coverage: 'partial',
+      captureSource: 'dom_observer',
+      messages: [{ sourceMessageId: 'm1', role: 'user', content: 'hi', createdAt: null }],
+    };
+    // The browser is signed in as SECOND; this page is PRIMARY's (which keeps its pre-accounts id).
+    expect(await call({ type: 'PASSIVE_DOM_CAPTURE', payload }, profileFrame('https://chatgpt.com/c/p1'))).toMatchObject({
+      ok: true,
+      status: 'stored',
+      threadKey: 'chatgpt:acct_chatgpt_primary:ws_personal:p1:main',
+    });
+    expect(fake.resolveForCapture.mock.calls.length).toBe(before);
+
+    // Who signed in there is that profile's identity; the browser's own is not touched.
+    fake.noteIdentity.mockClear();
+    fake.noteProfileIdentity.mockResolvedValue({ realm: 'openai', activeAccountId: PRIMARY.id, reassigned: false, updated: true });
+    expect(await call({ type: 'ACCOUNT_IDENTITY', provider: 'chatgpt', identity: { key: 'h2', display: 'p@example.com', source: 'network' } }, profileFrame('https://chatgpt.com/'))).toEqual({ ok: true });
+    expect(fake.noteProfileIdentity).toHaveBeenCalledWith(PRIMARY.id, { key: 'h2', display: 'p@example.com', detail: null, source: 'network' });
+    expect(fake.noteIdentity).not.toHaveBeenCalled();
+
+    // What the page set is saved to the profile's jar shortly after.
+    await new Promise((r) => setTimeout(r, 750));
+    const saved = fake.writeJar.mock.calls.find(([id]) => id === PRIMARY.id)?.[1] as Array<{ name: string }> | undefined;
+    expect(saved?.map((c) => c.name).sort()).toEqual(['__Secure-next-auth.session-token', 'csrf', 'theme']);
+
+    // A reloaded page starts over: the frame is unknown again and nothing is filed for it.
+    await call({ type: 'WORKSPACE_HELLO' }, workspacePage);
+    const again = { ...payload, sourceConversationId: 'p2', canonicalUrl: 'https://chatgpt.com/c/p2' };
+    expect(await call({ type: 'PASSIVE_DOM_CAPTURE', payload: again }, profileFrame('https://chatgpt.com/c/p2'))).toMatchObject({ ok: false, skipped: 'no_account' });
+    expect(await call({ type: 'EMBED_COOKIES_GET', profile: true }, profileFrame('https://chatgpt.com/c/p2'))).toEqual({ ok: true, cookie: '' });
   });
 
   it('offers the ids for "Switch account" when a thread belongs to another account', async () => {

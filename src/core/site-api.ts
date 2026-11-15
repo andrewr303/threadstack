@@ -365,6 +365,18 @@ export function parseSiteDataMessage(data: unknown): SiteDataMessage | null {
 
 export const IDENTITY_MESSAGE_SOURCE = 'threadkeeper-identity';
 
+/**
+ * Posted by the isolated content script once it listens: the page-world observer then posts the
+ * last identity response it saw again. The observer starts with the page and the content script
+ * only once the page is idle, so a page that asks who is signed in early would otherwise go
+ * unheard. What is re-posted is the page's own response, which its scripts can read anyway.
+ */
+export const IDENTITY_REPLAY_SOURCE = 'threadkeeper-identity-replay';
+
+export function isIdentityReplayRequest(data: unknown): boolean {
+  return Boolean(data) && typeof data === 'object' && (data as { source?: unknown }).source === IDENTITY_REPLAY_SOURCE;
+}
+
 /** Identity responses larger than this are not read: an account or session document is small. */
 export const MAX_IDENTITY_BODY_CHARS = 64 * 1024;
 
