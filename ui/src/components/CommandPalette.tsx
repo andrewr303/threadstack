@@ -1,6 +1,7 @@
 import { AgentIdentity } from "@/components/AgentIdentity";
 import { useCombinedInboxTasksEnabled } from "@/hooks/useCombinedInboxTasksEnabled";
 import { useState, useEffect, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { useLocation, useNavigate } from "@/lib/router";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "../context/CompanyContext";
@@ -222,7 +223,10 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={(v) => {
-        setOpen(v);
+        // Radix invokes accepted Escape closes from a native listener. Commit that close
+        // before returning so the host can lower its frame before the next pointer input.
+        if (v) setOpen(true);
+        else flushSync(() => setOpen(false));
         if (v && isMobile) setSidebarOpen(false);
       }}>
       <CommandInput

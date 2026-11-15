@@ -51,6 +51,7 @@ const mockAuthApi = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
 const mockBrowserSessionsApi = vi.hoisted(() => ({ search: vi.fn(), open: vi.fn() }));
+const nativeDialogState = vi.hoisted(() => ({ enabled: false }));
 
 vi.mock("../context/CompanyContext", () => ({
   useCompany: () => companyState,
@@ -105,8 +106,11 @@ vi.mock("./Identity", () => ({
   Identity: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
-vi.mock("@/components/ui/command", () => ({
-  CommandDialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
+vi.mock("@/components/ui/command", async () => {
+  const actual = await vi.importActual<typeof import("@/components/ui/command")>("@/components/ui/command");
+  return {
+  CommandDialog: (props: { open: boolean; onOpenChange?: (open: boolean) => void; children: ReactNode }) => nativeDialogState.enabled
+    ? <actual.CommandDialog {...props} /> : props.open ? <div>{props.children}</div> : null,
   CommandEmpty: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CommandGroup: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CommandInput: ({
@@ -143,7 +147,8 @@ vi.mock("@/components/ui/command", () => ({
   ),
   CommandList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CommandSeparator: () => <hr />,
-}));
+};
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -198,6 +203,7 @@ describe("CommandPalette", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    nativeDialogState.enabled = false;
     container = document.createElement("div");
     document.body.appendChild(container);
     dialogState.openNewIssue.mockReset();
@@ -229,6 +235,53 @@ describe("CommandPalette", () => {
 
   afterEach(() => {
     container.remove();
+  });
+
+  it("commits an accepted native Escape close before the next input can be dispatched", async () => {
+    nativeDialogState.enabled = true;
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    vi.stubGlobal("CSS", { escape: (value: string) => value });
+    const { root, queryClient } = renderWithQueryClient(<CommandPalette />, container);
+    try {
+      act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true })); });
+      await flush();
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="Command search"]')!;
+      expect(document.querySelector('[data-slot="dialog-content"][data-state="open"]')).not.toBeNull();
+      // Intentionally outside act/flushSync: either helper would conceal a queued React close.
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", false);
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(document.querySelector('[data-slot="dialog-content"][data-state="open"]')).toBeNull();
+    } finally {
+      act(() => root.unmount());
+      queryClient.clear();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("retains Radix's native Escape refusal before committing a later accepted close", async () => {
+    nativeDialogState.enabled = true;
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    vi.stubGlobal("CSS", { escape: (value: string) => value });
+    let refuse = true;
+    const guard = (event: KeyboardEvent) => { if (refuse && event.key === "Escape") event.preventDefault(); };
+    document.addEventListener("keydown", guard, true);
+    const { root, queryClient } = renderWithQueryClient(<CommandPalette />, container);
+    try {
+      act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true })); });
+      await flush();
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="Command search"]')!;
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", false);
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(document.querySelector('[data-slot="dialog-content"][data-state="open"]')).not.toBeNull();
+      refuse = false;
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(document.querySelector('[data-slot="dialog-content"][data-state="open"]')).toBeNull();
+    } finally {
+      document.removeEventListener("keydown", guard, true);
+      act(() => root.unmount());
+      queryClient.clear();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("includes routine execution issues in search queries", async () => {

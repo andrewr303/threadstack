@@ -80,6 +80,40 @@ describe("Threadkeeper fused mode (REQ-6)", () => {
     return { host, postMessage, parent, send };
   };
 
+  it("bounds session-selection handoff to the authenticated fused Threads slot", () => {
+    const { host, postMessage, send } = connect({ fusedAvailable: () => true });
+    const activation = { view: "threads" as const, x: 300, y: 100 };
+    expect(host.reportSlotActivation?.(activation)).toBe(false);
+    send({ type: "hello" });
+    expect(host.reportSlotActivation?.(activation)).toBe(false);
+    host.reportSlot({ view: "threads", rect: { x: 240, y: 48, width: 800, height: 600 }, scheme: "light" });
+    expect(host.reportSlotActivation?.(activation)).toBe(true);
+    expect(postMessage).toHaveBeenLastCalledWith({ source: "paperclip-ui", v: 1, type: "slot-activate", ...activation }, origin);
+    for (const invalid of [{ ...activation, x: 239 }, { ...activation, y: 648 }, { ...activation, x: NaN }, { ...activation, y: Infinity }, { ...activation, view: "browse" }]) {
+      expect(host.reportSlotActivation?.(invalid as typeof activation)).toBe(false);
+    }
+    host.reportSlot(null);
+    expect(host.reportSlotActivation?.(activation)).toBe(false);
+    host.disconnect();
+    expect(host.reportSlotActivation?.(activation)).toBe(false);
+  });
+
+  it("refuses slot activation while switching, after availability loss and on other plugin views", () => {
+    let available = false;
+    const { host, send } = connect({ fusedAvailable: () => available });
+    const activation = { view: "threads" as const, x: 300, y: 100 };
+    const rect = { x: 240, y: 48, width: 800, height: 600 };
+    send({ type: "hello" }); host.reportSlot({ view: "threads", rect, scheme: "light" });
+    expect(host.reportSlotActivation(activation)).toBe(false);
+    available = true; host.announceMode();
+    expect(host.reportSlotActivation(activation)).toBe(false); // new mode needs a fresh slot
+    host.reportSlot({ view: "browse", rect, scheme: "light" });
+    expect(host.reportSlotActivation(activation)).toBe(false);
+    host.reportSlot({ view: "threads", rect, scheme: "light" });
+    available = false;
+    expect(host.reportSlotActivation(activation)).toBe(false);
+  });
+
   it("announces fused mode only while the Threadkeeper pages are available and re-announces a change once", () => {
     let available = false;
     const { host, postMessage, send } = connect({ fusedAvailable: () => available });

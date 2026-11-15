@@ -330,6 +330,36 @@
   color: var(--text-2);
 }
 
+/* The native top layer keeps task pickers above the live page and outside the scrolling row. */
+.tk-thread-links-content,
+.tk-thread-links-dialog .tk-paperclip-task-links,
+.tk-thread-links-dialog .tk-paperclip-task-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tk-thread-links-content {
+  margin-top: 12px;
+}
+
+.tk-thread-links-dialog .tk-field-row,
+.tk-thread-links-dialog .tk-filter-row {
+  align-items: center;
+}
+
+.tk-thread-links-dialog .tk-btn {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tk-thread-links-dialog h4,
+.tk-thread-links-dialog p {
+  margin: 0;
+}
+
 @container (max-width: 760px) {
   .tk-detail-controls .tk-thr-action-label {
     position: absolute;

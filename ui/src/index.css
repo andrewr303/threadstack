@@ -5781,8 +5781,31 @@ html[data-threadkeeper-slot] .paperclip-app-shell::before {
     var(--tk-slot-x) calc(var(--tk-slot-y) + var(--tk-slot-h)),
     var(--tk-slot-x) var(--tk-slot-y));
 }
+/* Mobile Layout normally follows document height. The fused page has only an absolute slot,
+   so establish the same bounded flex chain as desktop before the first placement report. */
+.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) :is(.app-main-row, .app-content-row) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) .app-content-column {
+  flex: 1;
+  min-height: 0;
+}
+.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) .app-breadcrumb {
+  flex-shrink: 0;
+}
 #main-content:has(.threadkeeper-slot) {
   position: relative;
+  min-height: 0;
   padding: 0;
   overflow: hidden;
   scrollbar-gutter: auto;

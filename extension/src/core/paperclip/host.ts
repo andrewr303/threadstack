@@ -7,6 +7,8 @@ export type PaperclipHostMessage =
   | { type: 'open-view'; view: 'browse' | 'threads' | 'dashboard' }
   | { type: 'open-session'; threadKey: string }
   | { type: 'open-link'; url: string }
+  /** A native click Chromium sent to the just-closed frame instead of the visible Threads list. */
+  | { type: 'slot-activate'; view: 'threads'; x: number; y: number }
   /** REQ-6 fused mode: the page's content rectangle, in the Paperclip frame's own viewport. */
   | { type: 'slot'; view: FusedView | null; rect: PaperclipRect | null; scheme: 'light' | 'dark' }
   /** `open` counts blocking overlays; `regions` are notices to cut out of the view. */
@@ -15,6 +17,7 @@ export type PaperclipHostMessage =
 export type FusedView = 'browse' | 'threads' | 'dashboard';
 export interface PaperclipRect { x: number; y: number; width: number; height: number }
 export const MAX_NOTICE_REGIONS = 8;
+export const SLOT_ACTIVATION_WINDOW_MS = 250;
 /** Paperclip route segment → shell view. */
 const SLOT_VIEWS: Record<string, FusedView> = { browse: 'browse', threads: 'threads', 'session-board': 'dashboard' };
 
@@ -50,6 +53,12 @@ export function parsePaperclipHostMessage(
   if (message.source !== 'paperclip-ui' || message.v !== 1) return null;
   if (message.type === 'ready') return { type: 'ready', mode: message.mode === 'fused' ? 'fused' : 'switching' };
   if (message.type === 'disconnected') return { type: 'disconnected' };
+  if (message.type === 'slot-activate') {
+    const { x, y } = message;
+    return message.view === 'threads' && typeof x === 'number' && Number.isFinite(x)
+      && typeof y === 'number' && Number.isFinite(y) && x >= 0 && y >= 0 && x < bounds.width && y < bounds.height
+      ? { type: 'slot-activate', view: 'threads', x, y } : null;
+  }
   if (message.type === 'route') {
     const path = paperclipPath(message.path);
     return path ? { type: 'route', path, title: typeof message.title === 'string' ? message.title.slice(0, 300) : '' } : null;

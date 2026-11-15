@@ -17,7 +17,7 @@ export function linkedTaskPath(link: Pick<SessionLink, 'issueIdentifier' | 'issu
 }
 
 /** Founder-owned links are distinct from imported run references. */
-export function PaperclipTaskLinks({ conv }: { conv: ConversationRecord }) {
+export function PaperclipTaskLinks({ conv, onNavigate }: { conv: ConversationRecord; onNavigate?: () => void }) {
   const workspace = useOptionalWorkspaceContext();
   const connection = useContext(PaperclipConnectionContext);
   const [links, setLinks] = useState<SessionLink[]>([]);
@@ -99,7 +99,7 @@ export function PaperclipTaskLinks({ conv }: { conv: ConversationRecord }) {
   return <section className="tk-paperclip-task-links" aria-label="Linked Paperclip tasks">
     {links.length > 0 && <h4>Linked tasks</h4>}
     {links.map(link => <div className="tk-field-row" key={link.id}>
-      <button type="button" className="tk-btn" onClick={() => workspace?.openPaperclip?.(linkedTaskPath(link, companies.find(company => company.id === link.companyId)))}>{link.issueIdentifier || link.issueId} · {link.issueTitle || 'Paperclip task'}</button>
+      <button type="button" className="tk-btn" onClick={() => { onNavigate?.(); workspace?.openPaperclip?.(linkedTaskPath(link, companies.find(company => company.id === link.companyId))); }}>{link.issueIdentifier || link.issueId} · {link.issueTitle || 'Paperclip task'}</button>
       <span className="tk-muted">{link.issueStatus || 'Status unavailable'}</span>
       <button type="button" className="tk-btn" disabled={busy || !running} onClick={() => void mutate('unlink', link.issueId, link.companyId)} aria-label={`Unlink ${link.issueIdentifier || link.issueId}`}>Unlink</button>
     </div>)}

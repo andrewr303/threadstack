@@ -29,8 +29,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname)) thr
 if (fixture.port !== 3217) throw new Error('Only the disposable port 3217 instance is allowed.');
 const marker = process.env.TK_FUSED_RECOVERY_MARKER || '/tmp/threadkeeper-paperclip-recovery.json';
 const output = path.resolve(process.env.TK_PAPERCLIP_E2E_OUT || path.join(forkRoot, '.acceptances/paperclip-merge/round-17'));
+const telemetryOnly = process.env.TK_FUSED_TELEMETRY_ONLY === '1';
 if (fs.existsSync(path.join(output, 'results.json')) || fs.existsSync(path.join(output, 'seal.json'))) throw new Error('Refusing to overwrite a retained acceptance round.');
 fs.mkdirSync(path.join(output, 'assets'), { recursive: true });
+fs.copyFileSync(fileURLToPath(import.meta.url), path.join(output, 'assets/runner.mjs'));
 const prefix = fixture.companyPrefix;
 const base = `/${encodeURIComponent(prefix)}`;
 
@@ -54,8 +56,8 @@ const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'tk-fused-e2e-'));
 const cases = [];
 const events = [];
 const diagnostics = {};
-let context, page, helper, sw, browserVersion, mainVideoPath;
-const syntheticChatHtml = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Synthetic chat fixture</title><style>
+let context, helperContext, page, helper, sw, browserVersion, mainVideoPath;
+const syntheticChatHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create Research Agent Plugin</title><style>
 html,body{margin:0;min-height:100%;background:#111310;color:#e9ece7;font:16px/1.6 system-ui}main{max-width:760px;margin:auto;padding:24px}h1{font-size:20px;margin:0 0 24px}article{margin:24px 0}small{color:#b5c0b0}.question{margin-left:18%;padding:14px 20px;background:#28332c;border-radius:20px}footer{position:sticky;bottom:0;padding:16px;background:#111310}textarea{width:100%;box-sizing:border-box;padding:14px;background:#242a25;color:#e9ece7;border:1px solid #526053;border-radius:18px;font:inherit}</style></head><body data-tk-fixture-chat><main><small>Isolated synthetic conversation · no provider account</small><h1>Research workspace layout</h1><article class="question">Keep the navigation and controls compact so I can see more of this conversation.</article><article>The thread title and view controls share one row. Search and session navigation live in one sidebar, leaving the conversation the remaining width.</article><article>These messages are test data. This route is fulfilled locally by the test runner.</article><footer><textarea aria-label="Synthetic chat message" placeholder="Continue the synthetic conversation…"></textarea></footer></main></body></html>`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const record = (kind, detail) => { events.push({ at: new Date().toISOString(), kind, ...detail }); };
@@ -65,7 +67,8 @@ const sourceSnapshot = () => {
   const walk = directory => {
     for (const entry of fs.readdirSync(path.join(forkRoot, directory), { withFileTypes: true })) {
       const name = path.posix.join(directory, entry.name);
-      if (entry.isDirectory()) walk(name);
+      if (entry.isDirectory() && !['__tests__', '__snapshots__'].includes(entry.name)) walk(name);
+      else if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) continue;
       else if (entry.isFile()) hashes[name] = crypto.createHash('sha256').update(fs.readFileSync(path.join(forkRoot, name))).digest('hex');
     }
   };
@@ -186,6 +189,13 @@ async function waitFusedOn(view = 'threads', timeout = 60_000) {
     return m && m.workbench?.fused === 'true' && m.shellData?.view === view && m.threadsView.visible ? m : null;
   }, Boolean, timeout, `fused ${view}`);
 }
+async function resizedFused(width) {
+  await page.setViewportSize({ width, height: 900 });
+  return until(async () => {
+    const state = await measure();
+    return state.viewport.w === width && state.frameRect?.width === width && within(state.shell, state.slot, 1) ? state : null;
+  }, Boolean, 10_000, `frame and shell placement converged after resize to ${width}`);
+}
 async function clickFrameLink(href) {
   const f = await frame();
   const link = f.locator(`aside a[href="${href}"]`).first();
@@ -210,7 +220,8 @@ async function seedThreads() {
     for (let i = 0; i < 40; i++) {
       const provider = i === 0 ? 'chatgpt' : 'claude_code';
       const accountId = i === 0 ? 'acct_chatgpt_primary' : 'acct_claude_code_primary';
-      rows.push({ threadKey: `${provider}:${accountId}:default:fused_seed_${i}:main`, provider, accountId, workspaceId: 'default', sourceConversationId: `fused_seed_${i}`, branchId: 'main', parentBranchId: null, siblingBranchIds: [], canonicalUrl: i === 0 ? 'https://chatgpt.com/c/fused_layout_chat' : `https://claude.ai/code/session_fused_${i}`, title: i === 0 ? 'Create Research Agent Plugin' : `Fused seed thread ${i + 1}`, manualTitleOverride: null, createdAt: now, updatedAt: new Date(Date.now() - i * 60000).toISOString(), lastCapturedAt: now, sourceRevision: 1, contentHash: 'fused-seed', coverage: 'full', captureSource: 'manual', messageCount: 1, project: 'General research', categoryLocked: true, tags: [], manualTags: [], workflowState: 'active', manualNotes: '', pinned: false, snoozedUntil: null, dismissedQueues: [], cloudExcluded: false, cloudTaskStatus: 'unsupported', isSyntheticBenchmark: false, latestDecisionText: null, latestDecisionMsgIndex: null, latestDecisionSpeaker: null, nextStepText: null, nextStepMsgIndex: null, nextStepSpeaker: null, agentState: null });
+      const sourceConversationId = i === 0 ? 'fused_layout_chat' : `fused_seed_${i}`;
+      rows.push({ threadKey: `${provider}:${accountId}:default:${sourceConversationId}:main`, provider, accountId, workspaceId: 'default', sourceConversationId, branchId: 'main', parentBranchId: null, siblingBranchIds: [], canonicalUrl: i === 0 ? 'https://chatgpt.com/c/fused_layout_chat' : `https://claude.ai/code/session_fused_${i}`, title: i === 0 ? 'Create Research Agent Plugin' : `Fused seed thread ${i + 1}`, manualTitleOverride: null, createdAt: now, updatedAt: new Date(Date.now() - i * 60000).toISOString(), lastCapturedAt: now, sourceRevision: 1, contentHash: 'fused-seed', coverage: 'full', captureSource: 'manual', messageCount: 1, project: 'General research', categoryLocked: true, tags: [], manualTags: [], workflowState: 'active', manualNotes: '', pinned: false, snoozedUntil: null, dismissedQueues: [], cloudExcluded: false, cloudTaskStatus: 'unsupported', isSyntheticBenchmark: false, latestDecisionText: null, latestDecisionMsgIndex: null, latestDecisionSpeaker: null, nextStepText: null, nextStepMsgIndex: null, nextStepSpeaker: null, agentState: null });
     }
     await globalThis.__threadkeeperDb.conversations.bulkPut(rows);
   }, { now });
@@ -218,6 +229,10 @@ async function seedThreads() {
 
 // ---- case runner ---------------------------------------------------------------------------------
 async function runCase(id, name, acs, action, prerequisites = ['setup']) {
+  if (telemetryOnly && !['setup', 'fused-direct-entry', 'fused-palette', 'fused-mobile-entry'].includes(id)) {
+    await notRun(id, name, acs, 'Diagnostic run restricted to setup, direct entry, immediate palette input and narrow cold entry.');
+    return;
+  }
   const blocked = prerequisites.filter(p => cases.find(c => c.id === p)?.status !== 'pass');
   if (blocked.length) { cases.push({ id, name, acs, status: 'not_run', observation: `Prerequisite did not pass: ${blocked.join(', ')}`, evidence: [] }); return; }
   const startedAt = new Date().toISOString();
@@ -230,6 +245,27 @@ async function runCase(id, name, acs, action, prerequisites = ['setup']) {
   } catch (error) {
     let state = null;
     try { evidence.push(await shot(`${id}-failed`)); state = await measure(); } catch {}
+    // Keep independent cases independent: a failed narrow layout or search assertion must
+    // not strand all later cases at a narrow viewport or behind the same query.
+    try {
+      await page?.keyboard.press('Escape');
+      if (page?.viewportSize()?.width !== 1280 || page?.viewportSize()?.height !== 900) await page.setViewportSize({ width: 1280, height: 900 });
+      const searchTab = page?.locator('.tk-rail .tk-list-sidebar').getByRole('tab', { name: 'Search', exact: true });
+      if (await searchTab?.isVisible()) await searchTab.click({ timeout: 3000 });
+      const query = page?.locator('.tk-rail .tk-search-input');
+      if (await query?.isVisible()) await query.fill('', { timeout: 3000 });
+    } catch (cleanupError) { detail.caseCleanupError = String(cleanupError); }
+    // A failed layout assertion during the outage must not leave the disposable service
+    // stopped. The watcher still checks port/process ownership before it starts anything.
+    if (id === 'fused-offline') {
+      try {
+        if (JSON.parse(fs.readFileSync(marker, 'utf8')).phase === 'stopped') {
+          fs.writeFileSync(marker, JSON.stringify({ phase: 'request_start', at: new Date().toISOString(), reason: 'Restore owned fixture after failed offline case' }));
+          const restored = await until(async () => JSON.parse(fs.readFileSync(marker, 'utf8')).phase, value => value === 'started' || value === 'watcher_error', 120_000, 'restore owned service after case failure');
+          detail.fixtureRestoredAfterFailure = restored;
+        }
+      } catch (restoreError) { detail.fixtureRestoreError = String(restoreError); }
+    }
     cases.push({ id, name, acs, status: error instanceof Fail ? 'fail' : 'fail', startedAt, completedAt: new Date().toISOString(), observation: error instanceof Fail ? error.message : (error.stack || String(error)), detail, failingState: state, evidence });
   }
   const last = cases.at(-1);
@@ -249,6 +285,9 @@ try {
     args: ['--headless=new', '--no-first-run', '--no-default-browser-check', `--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
   });
   browserVersion = context.browser()?.version() || 'unknown';
+  // Reuse the persistent profile's initial page, and do pixel decoding in an unrecorded
+  // helper context, so only the actual test page needs continuous video encoding.
+  page = context.pages()[0] ?? await context.newPage();
   await context.route(/^https?:\/\//, route => {
     const requested = new URL(route.request().url());
     if (requested.origin === 'https://chatgpt.com' && requested.pathname === '/c/fused_layout_chat' && route.request().isNavigationRequest()) {
@@ -268,6 +307,38 @@ try {
       new PerformanceObserver(list => { for (const e of list.getEntries()) window.__tkLong.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: true });
     } catch { window.__tkLongSupported = false; }
   });
+  if (telemetryOnly) await context.addInitScript(() => {
+    window.__tkInputTimeline = [];
+    const label = element => element instanceof Element ? { tag: element.tagName, role: element.getAttribute('role'), slot: element.getAttribute('data-slot'), state: element.getAttribute('data-state'), cls: String(element.className).slice(0, 110) } : null;
+    const read = (kind, extra = {}) => {
+      const doc = document;
+      const wb = doc.querySelector('.tk-workbench');
+      const frame = doc.querySelector('.tk-view-paperclip');
+      const layers = [...doc.querySelectorAll('[data-slot="dialog-overlay"], [role="dialog"], [role="alertdialog"]')].map(element => ({ ...label(element), pointerEvents: getComputedStyle(element).pointerEvents, display: getComputedStyle(element).display, visibility: getComputedStyle(element).visibility }));
+      window.__tkInputTimeline.push({ at: performance.timeOrigin + performance.now(), realm: wb ? 'shell' : 'paperclip', kind, raised: wb?.getAttribute('data-fused-raised') ?? null, frameZ: frame ? getComputedStyle(frame).zIndex : null, bodyPointerEvents: doc.body ? getComputedStyle(doc.body).pointerEvents : null, layers, ...extra });
+      if (window.__tkInputTimeline.length > 1600) window.__tkInputTimeline.shift();
+    };
+    for (const name of ['keydown', 'keyup', 'pointerdown', 'pointerup', 'click']) document.addEventListener(name, event => {
+      if (name.startsWith('key') && event.key !== 'Escape') return;
+      read(name, { key: event.key, target: label(event.target), point: 'clientX' in event ? { x: event.clientX, y: event.clientY, hit: label(document.elementFromPoint(event.clientX, event.clientY)) } : null });
+    }, true);
+    window.addEventListener('message', event => {
+      if (event.data?.source === 'paperclip-ui' && event.data.type === 'overlay') read('overlay-received', { reportedOpen: event.data.open });
+    });
+    const observe = () => {
+      new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+          const element = mutation.target;
+          if (!(element instanceof Element)) continue;
+          if (mutation.attributeName === 'data-fused-raised' || (mutation.attributeName === 'style' && element === document.body)
+            || (mutation.attributeName === 'data-state' && (element.matches('[data-slot="dialog-overlay"], [role="dialog"], [role="alertdialog"]')))) {
+            read('attribute-changed', { attribute: mutation.attributeName, value: element.getAttribute(mutation.attributeName), target: label(element) });
+          }
+        }
+      }).observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-fused-raised', 'data-state', 'style'] });
+    };
+    if (document.documentElement) observe(); else document.addEventListener('DOMContentLoaded', observe, { once: true });
+  });
   await context.addInitScript(() => {
     if (location.origin !== 'http://127.0.0.1:3217' || window.parent === window) return;
     window.__tkLog = []; const t0 = performance.now();
@@ -279,8 +350,8 @@ try {
   check(new URL(sw.url()).host === extensionId, 'Path-derived extension ID loaded', { expected: extensionId, observed: new URL(sw.url()).host });
   const loadedManifest = await sw.evaluate(() => chrome.runtime.getManifest());
   check(loadedManifest.version_name === manifest.version_name, 'Browser manifest matches the build', { disk: manifest.version_name, browser: loadedManifest.version_name });
-  helper = await context.newPage(); await helper.goto('about:blank');
-  page = await context.newPage();
+  helperContext = await context.browser().newContext();
+  helper = await helperContext.newPage(); await helper.goto('about:blank');
   mainVideoPath = await page.video()?.path();
   page.on('pageerror', error => record('page-error', { message: error.message }));
   page.on('console', message => { if (message.type() === 'error') record('console-error', { text: message.text().slice(0, 600) }); });
@@ -380,6 +451,7 @@ try {
     // Regression assertion: every zero-delay click must land. Compute the target BEFORE Escape,
     // so no hidden DOM/state wait masks the first pointer event after the close.
     const stats = {};
+    const telemetry = [];
     for (const delay of [0, 100, 300]) {
       let ok = 0; const tries = 4;
       for (let k = 0; k < tries; k++) {
@@ -390,19 +462,57 @@ try {
         const target = 0;
         const pt = await page.locator('.tk-shell .tk-row-btn').nth(target).boundingBox();
         check(pt && pt.width > 0 && pt.height > 0, 'Immediate click target has a visible box before Escape', pt);
+        const telemetryStart = Date.now();
         await page.keyboard.press('Escape'); if (delay) await sleep(delay);
         await page.mouse.click(pt.x + pt.width / 2, pt.y + pt.height / 2);
-        if (await until(selectedIndex, v => v === target, 1_500, 'row').then(() => true, () => false)) ok += 1;
+        const landed = await until(selectedIndex, v => v === target, 1_500, 'row').then(() => true, () => false);
+        if (landed) ok += 1;
+        if (telemetryOnly) {
+          const shellEvents = await page.evaluate(start => (window.__tkInputTimeline ?? []).filter(event => event.at >= start - 10), telemetryStart);
+          const childEvents = await f.evaluate(start => (window.__tkInputTimeline ?? []).filter(event => event.at >= start - 10), telemetryStart);
+          telemetry.push({ delay, attempt: k, target, point: pt, landed, events: [...shellEvents, ...childEvents].sort((a, b) => a.at - b.at) });
+        }
       }
       stats[`${delay}ms`] = `${ok}/${tries}`;
     }
     ctx.detail.clickLandsAfterEscape = stats;
+    if (telemetryOnly) ctx.detail.inputTimeline = telemetry;
     const problems = [...(withoutSettle.problems ?? []).map(x => `[no settle] ${x}`), ...(withSettle.problems ?? []).map(x => `[settle] ${x}`)];
     if (stats['0ms'] !== '4/4') problems.push(`Immediate click regression: ${stats['0ms']} zero-delay clicks reached the target (expected 4/4)`);
     check(problems.length === 0, problems.join('; '), { clickLandsAfterEscape: stats });
     return 'Meta+K from a focused row opened the palette (frame raised, on top, view visible under it by luminance correlation); typing reached it; Escape closed it; a row click right afterwards worked with and without a settle.';
   });
 
+
+  await runCase('fused-mobile-entry', 'Cold narrow Threads entry fills the mobile slot and keeps one usable Sessions drawer', ['entry', 'UI-sidebar', 'UI-header'], async ctx => {
+    const observations = [];
+    for (const width of [700, 480]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${directUrl}&threadKey=${encodeURIComponent('chatgpt:acct_chatgpt_primary:default:fused_layout_chat:main')}`);
+      const mobile = await until(async () => {
+        const state = await measure().catch(() => null);
+        return state?.workbench?.fused === 'true' && state.shellData?.view === 'threads' && state.slot?.height > 500 && within(state.shell, state.slot, 1) ? state : null;
+      }, Boolean, 30_000, `cold ${width}px entry with a nonzero content slot`);
+      const rows = { width, shell: mobile.shell, slot: mobile.slot, frame: mobile.frameRect };
+      await page.getByRole('button', { name: 'Expand navigation', exact: true }).click();
+      const index = page.locator('.tk-rail .tk-list-sidebar');
+      const query = index.getByRole('searchbox', { name: 'Search conversations, decisions, and messages', exact: true });
+      await query.fill('29');
+      await until(() => index.locator('.tk-row-title').first().innerText(), title => title.trim() === 'Fused seed thread 29', 15_000, 'matching session in narrow drawer');
+      await ctx.shot(`-${width}-drawer`);
+      await index.locator('.tk-row-btn').filter({ hasText: 'Fused seed thread 29' }).click();
+      await page.locator('.tk-detail-title').filter({ hasText: 'Fused seed thread 29' }).waitFor({ state: 'visible' });
+      rows.selectedTitle = await page.locator('.tk-detail-title').innerText();
+      rows.sidebarIndexes = await page.locator('.tk-rail .tk-list-sidebar').count();
+      rows.duplicateMainIndexes = await page.locator('.tk-view-threads .tk-list-pane').count();
+      check(rows.sidebarIndexes === 1 && rows.duplicateMainIndexes === 0, 'One Sessions drawer selects the chat without a duplicate main list', rows);
+      observations.push(rows);
+      await ctx.shot(`-${width}-chat`);
+    }
+    ctx.detail.layouts = observations;
+    await resizedFused(1280);
+    return 'Fresh Threads entries at700px and480px fill a nonzero mobile content slot. The single Sessions drawer searches and opens the matching chat; the main pane remains the selected conversation.';
+  });
 
   // ---------------------------------------------------------------- fused-entries (AC-1)
   await runCase('fused-entries', 'Paperclip sidebar shows Browse, Threads, Session board', ['AC-1'], async ctx => {
@@ -575,10 +685,12 @@ try {
     const index = page.locator('.tk-rail .tk-list-sidebar');
     check(await index.count() === 1 && await page.locator('.tk-view-threads .tk-list-pane').count() === 0,
       'There is exactly one thread index, in the existing Sessions rail', { railIndexes: await index.count(), duplicateMainIndexes: await page.locator('.tk-view-threads .tk-list-pane').count() });
-    const query = index.getByRole('textbox', { name: 'Search conversations, decisions, and messages', exact: true });
-    await query.fill('Fused seed thread 29');
-    await until(() => index.locator('.tk-row-btn').count(), n => n === 1, 15_000, 'one matching sidebar session');
-    await index.locator('.tk-row-btn').click();
+    const query = index.getByRole('searchbox', { name: 'Search conversations, decisions, and messages', exact: true });
+    // Local search intentionally matches any query term, so use a unique term rather than
+    // incorrectly expecting an AND/substring match for the common words in every seed title.
+    await query.fill('29');
+    await until(() => index.locator('.tk-row-title').first().innerText(), title => title.trim() === 'Fused seed thread 29', 15_000, 'the matching sidebar session ranks first');
+    await index.locator('.tk-row-btn').filter({ hasText: 'Fused seed thread 29' }).click();
     await page.locator('.tk-detail-title').filter({ hasText: 'Fused seed thread 29' }).waitFor();
     ctx.detail.filteredSelection = { query: await query.inputValue(), selectedTitle: await page.locator('.tk-detail-title').innerText(), rows: await index.locator('.tk-row-btn').count() };
     await ctx.shot('-search');
@@ -611,7 +723,7 @@ try {
     await until(async () => Boolean(await fixtureFrame()?.locator('[data-tk-fixture-chat]').count()), Boolean, 20_000, 'locally fulfilled synthetic chat frame');
     const layouts = [];
     for (const width of [1600, 1280, 700]) {
-      await page.setViewportSize({ width, height: 900 });
+      await resizedFused(width);
       const geometry = await until(() => page.evaluate(() => {
         const rect = e => e ? e.getBoundingClientRect().toJSON() : null;
         const header = document.querySelector('.tk-detail-header');
@@ -633,7 +745,19 @@ try {
     }
     ctx.detail.layouts = layouts;
     ctx.detail.providerFixture = 'Synthetic HTML served by the browser runner at one known ChatGPT-shaped test URL. No real provider account or network access.';
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await resizedFused(1280);
+    const taskLinks = page.getByRole('button', { name: 'Task links', exact: true });
+    await taskLinks.click();
+    const taskDialog = page.getByRole('dialog', { name: 'Task and session links', exact: true });
+    await taskDialog.waitFor({ state: 'visible' });
+    const taskBox = await taskDialog.boundingBox();
+    ctx.detail.taskLinksDialogOnTop = await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest('dialog')), center(taskBox));
+    check(ctx.detail.taskLinksDialogOnTop, 'Task links opens above the live provider frame', ctx.detail);
+    await ctx.shot('-task-links');
+    await page.keyboard.press('Escape');
+    await taskDialog.waitFor({ state: 'hidden' });
+    ctx.detail.taskLinksFocusReturned = await taskLinks.evaluate(element => element === document.activeElement);
+    check(ctx.detail.taskLinksFocusReturned, 'Escape closes Task links and returns focus to its single-row trigger', ctx.detail);
     await page.getByRole('radio', { name: 'Summary', exact: true }).click();
     return 'At 1600, 1280 and 700px widths, the title shares one row with view tabs and the controls remain on one row. The live synthetic conversation has at least 580px of vertical space in each 900px viewport.';
   });
@@ -642,7 +766,7 @@ try {
     await goThreads();
     const layouts = [];
     for (const width of [1280, 700]) {
-      await page.setViewportSize({ width, height: 900 });
+      await resizedFused(width);
       if (width < 900) await page.getByRole('button', { name: 'Expand navigation', exact: true }).click();
       const index = page.locator('.tk-rail .tk-list-sidebar');
       await index.getByRole('tab', { name: 'Ask', exact: true }).click();
@@ -850,6 +974,7 @@ try {
   record('runner-error', { error: error.stack || String(error) }); process.exitCode = 1;
 } finally {
   try { diagnostics.hostLog = await (await frame().catch(() => null))?.evaluate(() => window.__tkLog ?? null); } catch {}
+  if (helperContext) await helperContext.close().catch(() => {});
   if (context) await context.close().catch(() => {});
   if (mainVideoPath) diagnostics.video = path.relative(output, mainVideoPath);
   diagnostics.artifactProvenance = artifactProvenance;
@@ -863,4 +988,3 @@ try {
   console.log(JSON.stringify({ complete: true, counts: result.counts, output }));
   if (cases.some(c => c.status === 'fail')) process.exitCode = 1;
 }
-

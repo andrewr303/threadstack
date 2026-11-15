@@ -86,6 +86,10 @@ test('MAX_NOTICE_REGIONS matches between the extension host and the Paperclip UI
   assert.equal(constant('extensionHost', 'MAX_NOTICE_REGIONS'), constant('uiHost', 'MAX_NOTICE_REGIONS'));
 });
 
+test('the post-overlay session-selection window matches on both sides', () => {
+  assert.equal(constant('extensionHost', 'SLOT_ACTIVATION_WINDOW_MS'), constant('uiHost', 'SLOT_ACTIVATION_WINDOW_MS'));
+});
+
 function descendants(node, predicate) {
   if (!node || typeof node !== 'object') return [];
   return [

@@ -67,6 +67,7 @@ export function ThreadkeeperHostBridge() {
       if (event instanceof CustomEvent) host.openView(event.detail?.view);
     };
     const click = (event: MouseEvent) => {
+      if (fusion?.activateSlot(event)) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!anchor || anchor.hasAttribute("download")) return;

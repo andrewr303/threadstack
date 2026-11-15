@@ -17,6 +17,7 @@ parallel lists of the same library.
 |---|---|
 | Thread title | Place the Summary / Live / Split switch beside the thread title in the same header row. Keep the title readable and the selected mode apparent. |
 | Thread controls | Put category, category lock, workflow status, Open original, Copy handoff, Pin to dashboard, Open in Browse, and Delete in one compact row. Icons or shortened visible labels may save width; complete accessible names and tooltips must identify each action. |
+| Task links | Keep Task links in that same controls row. A native dialog contains the existing task picker and imported references; link, unlink, navigation, Escape and focus return remain available. |
 | Narrow detail pane | Keep the controls in one row with every control reachable by keyboard and pointer, including the final action. Horizontal scrolling or compact labels may adapt that row; clipped and unreachable controls do not satisfy the request. |
 | Sessions navigation | Merge the Threads list's search, Ask, filters, sorting, grouping, and selection functionality into the existing Sessions sidebar. Full-page Threads has one session/results list and the selected conversation in the main pane. |
 | Sidebar results | Preserve title, account/provider context, current selection, live/run state, and grouping. Search, queue/project filtering, bulk selection and actions, and keyboard row navigation remain available. Less-used controls may use an explicit disclosure. |
@@ -40,3 +41,18 @@ capture the actual rendered interface at wide and narrow sizes, including:
 Use synthetic conversations and documented local fixtures where real accounts are unavailable.
 Label those fixtures and keep real-provider delivery and native-consent gaps separate. New
 receipts for this cycle are pending; historical browser rounds do not prove this layout.
+
+## Browser repairs discovered during this cycle
+
+The mobile Paperclip layout must give the absolute slot a bounded parent height through its flex
+ancestors before placement is acknowledged. A zero-height measurement remains invalid; the shell
+does not substitute a fabricated rectangle.
+
+Chromium can send the first post-Escape click to the closed frame's old compositor hit-test
+surface. Accepted palette closes and validated overlay closes commit synchronously. A narrow
+`slot-activate` message additionally recovers session-row selection for a real primary,
+unmodified click in the empty, placed Threads slot within 250 ms of an observed blocking-overlay
+close. Both sides require fused mode and bounded coordinates; the shell accepts one connected,
+registered row from its current library only. This channel never invokes arbitrary DOM controls
+or agent/provider actions. Open overlays, untrusted or modified events, stale windows, different
+views and duplicate accepted packets are refused. See `REQ-6-design.md` for the message boundary.

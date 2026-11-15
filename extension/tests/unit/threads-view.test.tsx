@@ -1062,7 +1062,7 @@ describe('Detail pane: facts and actions', () => {
     expect(onProjectChange).toHaveBeenCalledWith('Other');
     expect(onWorkflowStateChange).toHaveBeenCalledWith('waiting');
     expect(onToggleLock).toHaveBeenCalledWith(true);
-    const names = ['Open original', 'Copy handoff', 'Pin to dashboard', 'Open in Browse', 'Delete'];
+    const names = ['Open original', 'Copy handoff', 'Pin to dashboard', 'Open in Browse', 'Task links', 'Delete'];
     for (const name of names) {
       const control = row.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!;
       expect(control).not.toBeNull();

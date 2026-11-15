@@ -378,6 +378,71 @@ describe('fused window (real App)', () => {
     expect(selected()).toBe(before);
   });
 
+  it('lowers the frame before the validated native close-message handler returns', async () => {
+    await mountFused();
+    await fromPaperclip({ type: 'overlay', open: true, regions: [] });
+    expect(q('.tk-workbench').getAttribute('data-fused-raised')).toBe('true');
+    // A browser message and the following pointer event are separate native tasks. Wrapping
+    // this dispatch in act would hide the deferred React commit reproduced in round 24.
+    const environment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const previous = environment.IS_REACT_ACT_ENVIRONMENT;
+    environment.IS_REACT_ACT_ENVIRONMENT = false;
+    try {
+      window.dispatchEvent(new MessageEvent('message', { origin: ORIGIN, source: frame().contentWindow, data: { source: 'paperclip-ui', v: 1, type: 'overlay', open: false, regions: [] } }));
+      expect(q('.tk-workbench').hasAttribute('data-fused-raised')).toBe(false);
+    } finally {
+      environment.IS_REACT_ACT_ENVIRONMENT = previous;
+    }
+    await settle();
+  });
+
+  it('recovers only one existing Threads row selection immediately after a real overlay close', async () => {
+    await mountFused();
+    const rows = [...host.querySelectorAll<HTMLButtonElement>('.tk-row-btn')];
+    const target = rows[3]!;
+    const next = rows[4]!;
+    const point = vi.fn((): Element => target);
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const previous = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: point });
+    const activate = () => fromPaperclip({ type: 'slot-activate', view: 'threads', x: 250, y: 100 });
+    try {
+      await activate(); // No overlay closed: no selection capability.
+      expect(target.getAttribute('aria-selected')).toBe('false');
+      await fromPaperclip({ type: 'overlay', open: true, regions: [] });
+      await activate();
+      expect(target.getAttribute('aria-selected')).toBe('false');
+      await fromPaperclip({ type: 'overlay', open: false, regions: [] });
+      // Even in the close window this channel cannot activate arbitrary toolbar controls.
+      const control = q('button[aria-label="Delete"]');
+      const clicked = vi.fn();
+      control.addEventListener('click', clicked);
+      point.mockReturnValue(control);
+      await activate();
+      expect(clicked).not.toHaveBeenCalled();
+      point.mockReturnValue(target);
+      await activate();
+      expect(target.getAttribute('aria-selected')).toBe('true');
+      expect(document.activeElement).toBe(target);
+      point.mockReturnValue(next);
+      await activate(); // A duplicate packet cannot select a second row.
+      expect(next.getAttribute('aria-selected')).toBe('false');
+      await fromPaperclip({ type: 'overlay', open: true, regions: [] });
+      await fromPaperclip({ type: 'overlay', open: false, regions: [] });
+      clock.mockReturnValue(now + 251);
+      await activate();
+      expect(next.getAttribute('aria-selected')).toBe('false');
+      await fromPaperclip({ type: 'overlay', open: false, regions: [] });
+      await activate(); // Repeated closed reports cannot renew an expired close window.
+      expect(next.getAttribute('aria-selected')).toBe('false');
+    } finally {
+      clock.mockRestore();
+      if (previous) Object.defineProperty(document, 'elementFromPoint', previous);
+      else Reflect.deleteProperty(document, 'elementFromPoint');
+    }
+  });
+
   it('still moves through rows with plain j and k in fused mode', async () => {
     const { send } = await mountFused();
     const selected = () => q('.tk-row-btn[aria-selected="true"] .tk-row-title').textContent;

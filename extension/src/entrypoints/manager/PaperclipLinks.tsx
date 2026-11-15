@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { parseThreadKey, type ConversationRecord } from '../../core/schema.js';
 import { providerLabel } from '../../core/providers.js';
 import { PaperclipTaskLinks } from './PaperclipTaskLinks.js';
+import { openModal } from './shared.js';
+import { Icon } from './shell/icons.js';
+import { useOptionalWorkspaceContext } from './workspace/context.js';
 
 export interface SessionLink {
   threadKey: string;
@@ -35,18 +39,63 @@ export function sessionLinks(conv: ConversationRecord, conversations: Conversati
   return { kind: 'sessions', links: [] };
 }
 
-/** "Linked session" note in the thread detail. */
-export function PaperclipLinks({
-  conv,
-  conversations,
-  onSelect,
-}: {
+interface PaperclipLinksProps {
   conv: ConversationRecord;
   conversations: ConversationRecord[];
   onSelect: (threadKey: string) => void;
+  /** Full-page thread controls keep the picker in a native dialog, outside the live-page header. */
+  compact?: boolean;
+}
+
+/** "Linked session" note in the thread detail; the full page opens it from its controls row. */
+export function PaperclipLinks({ compact, ...props }: PaperclipLinksProps) {
+  return compact ? <ThreadLinksDialog {...props} /> : <ThreadLinksContent {...props} />;
+}
+
+function ThreadLinksDialog(props: PaperclipLinksProps) {
+  const workspace = useOptionalWorkspaceContext();
+  const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocus = useRef(false);
+  const dialogId = useId();
+  const dismiss = (focus = true) => { restoreFocus.current = focus; setOpen(false); };
+  useEffect(() => {
+    restoreFocus.current = false;
+    setOpen(false);
+  }, [props.conv.threadKey, workspace?.view]);
+  useEffect(() => {
+    if (open) openModal(dialogRef);
+    else if (restoreFocus.current) { restoreFocus.current = false; triggerRef.current?.focus(); }
+  }, [open]);
+  if (props.conv.provider === 'paperclip' && sessionLinks(props.conv, props.conversations).links.length === 0) return null;
+  return <>
+    <button ref={triggerRef} type="button" className="tk-btn tk-thr-action" aria-label="Task links" title="Task links" aria-haspopup="dialog" aria-expanded={open} aria-controls={dialogId} onClick={() => setOpen(true)}>
+      <Icon name="pullRequest" size={14} />
+      <span className="tk-thr-action-label">Task links</span>
+    </button>
+    {open && createPortal(
+      <dialog ref={dialogRef} id={dialogId} className="tk-modal-dialog tk-thread-links-dialog" aria-label="Task and session links" onClose={() => dismiss()} onCancel={event => { event.preventDefault(); dismiss(); }}>
+        <h2 className="tk-section-h2">Task and session links</h2>
+        <div className="tk-thread-links-content">
+          <ThreadLinksContent {...props} onSelect={threadKey => { dismiss(false); props.onSelect(threadKey); }} onNavigate={() => dismiss(false)} />
+        </div>
+        <div className="tk-dialog-actions"><button type="button" className="tk-btn" onClick={() => dismiss()}>Close</button></div>
+      </dialog>, document.body
+    )}
+  </>;
+}
+
+function ThreadLinksContent({
+  conv,
+  conversations,
+  onSelect,
+  onNavigate,
+}: PaperclipLinksProps & {
+  onNavigate?: () => void;
 }) {
   const { kind, links } = sessionLinks(conv, conversations);
-  if (links.length === 0) return <PaperclipTaskLinks conv={conv} />;
+  if (links.length === 0) return <PaperclipTaskLinks conv={conv} onNavigate={onNavigate} />;
   const missing = links.filter((l) => !l.conv);
   return (
     <><div className="tk-filter-row" style={{ marginTop: 4 }} data-testid="paperclip-links">
@@ -66,6 +115,6 @@ export function PaperclipLinks({
           {missing.length === 1 ? 'it' : 'them'}.
         </span>
       )}
-    </div><PaperclipTaskLinks conv={conv} /></>
+    </div><PaperclipTaskLinks conv={conv} onNavigate={onNavigate} /></>
   );
 }

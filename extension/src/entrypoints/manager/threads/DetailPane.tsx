@@ -429,7 +429,7 @@ export function DetailPane({
               </div>
             )}
 
-            <PaperclipLinks conv={conversation} conversations={conversations} onSelect={onSelectThread} />
+            {!onPage && <PaperclipLinks conv={conversation} conversations={conversations} onSelect={onSelectThread} />}
 
             <div className="tk-detail-controls" role="group" aria-label="Thread controls" tabIndex={0}>
               <select
@@ -524,6 +524,7 @@ export function DetailPane({
                 </button>
               )}
               {onPage && <ThreadWorkspaceActions conversation={conversation} />}
+              {onPage && <PaperclipLinks compact conv={conversation} conversations={conversations} onSelect={onSelectThread} />}
               <button type="button" className="tk-btn tk-btn-danger tk-thr-action" aria-label="Delete" title="Delete" onClick={() => void onDelete()}>
                 <Icon name="trash" size={14} />
                 <span className="tk-thr-action-label">Delete</span>

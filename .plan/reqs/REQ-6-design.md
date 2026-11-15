@@ -62,3 +62,21 @@ The founder also requested the compact title/actions and unified Sessions sideba
 `REQ-6-ui-supplement.md`. Those layout changes apply inside the same content rectangle and retain
 the layered variant's one view switch, mounted provider frames, and overlay behavior. Fresh browser
 evidence is required after the change; the earlier spike and rounds are historical evidence only.
+
+### First-click handoff after an overlay
+
+Rounds 24 and 25 captured a native click arriving in the closed Paperclip slot even after the
+parent's DOM had lowered the frame. This is Chromium's cross-process hit-test propagation delay;
+waiting in the test would conceal it. The accepted-close handlers now commit synchronously, and
+the following additive message preserves an existing session-selection intent:
+
+`{ source: "paperclip-ui", v: 1, type: "slot-activate", view: "threads", x, y }`
+
+Coordinates use the Paperclip frame's viewport. The page requires the verified fused host, a
+trusted primary unmodified native click on its current empty acknowledged Threads slot, a fresh
+scan showing no blocking overlay, and an observed close within 250 ms. The shell repeats its
+origin/source, fused-view, recent-close and coordinate checks, then resolves only a connected
+registered session-row button under that point. It selects that existing conversation and
+consumes the close window. It never dispatches an arbitrary click or activates a toolbar,
+credential, destructive, provider or agent control. Both packages export the same 250 ms limit;
+the routine cross-package contract test checks it.

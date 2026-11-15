@@ -13,9 +13,12 @@ export function threadkeeperSlotView(pluginKey: string | null | undefined, route
 }
 
 export const MAX_NOTICE_REGIONS = 8;
+export const SLOT_ACTIVATION_WINDOW_MS = 250;
 export type ColorScheme = "light" | "dark";
 export interface ThreadkeeperRect { x: number; y: number; width: number; height: number }
 export interface ThreadkeeperSlot { view: ThreadkeeperSlotView; rect: ThreadkeeperRect; scheme: ColorScheme }
+/** Native input that Chromium delivered to the empty slot just after its overlay closed. */
+export interface ThreadkeeperSlotActivation { view: "threads"; x: number; y: number }
 
 export function finiteRect(rect: ThreadkeeperRect | null | undefined): rect is ThreadkeeperRect {
   return Boolean(rect) && [rect!.x, rect!.y, rect!.width, rect!.height].every(Number.isFinite) && rect!.width > 0 && rect!.height > 0;
@@ -97,6 +100,7 @@ export function createThreadkeeperHost(options: HostOptions) {
   let parentOrigin: string | null = null;
   let announcedMode: "fused" | "switching" | null = null;
   let lastSlot: string | null = null;
+  let reportedSlot: ThreadkeeperSlot | null = null;
   const currentMode = () => (options.fusedAvailable?.() ? "fused" : "switching");
   const post = (body: Record<string, unknown>): boolean => {
     if (!parentOrigin) return false;
@@ -118,6 +122,7 @@ export function createThreadkeeperHost(options: HostOptions) {
         parentOrigin = event.origin;
         announcedMode = currentMode();
         lastSlot = null;
+        reportedSlot = null;
         post({ type: "ready", mode: announcedMode });
         reportRoute();
         options.onConnection?.(true);
@@ -154,6 +159,7 @@ export function createThreadkeeperHost(options: HostOptions) {
       announcedMode = mode;
       // A new `ready` restarts the shell's slot window, so the current placement must follow it.
       lastSlot = null;
+      reportedSlot = null;
       return post({ type: "ready", mode });
     },
     /** The page's content rectangle in this document's viewport, or null when no Threadkeeper page shows. */
@@ -165,10 +171,21 @@ export function createThreadkeeperHost(options: HostOptions) {
         const { x, y, width, height } = slot.rect;
         body = { type: "slot", view: slot.view, rect: { x, y, width, height }, scheme: slot.scheme };
       } else body = { type: "slot", view: null, rect: null, scheme };
+      reportedSlot = slot ? { ...slot, rect: { ...slot.rect } } : null;
       const key = JSON.stringify(body);
       if (key === lastSlot) return false;
       lastSlot = key;
       return post(body);
+    },
+    /** Only session selection is eligible; the shell resolves the point against its current list. */
+    reportSlotActivation(activation: ThreadkeeperSlotActivation): boolean {
+      if (!parentOrigin || announcedMode !== "fused" || currentMode() !== "fused"
+        || activation.view !== "threads" || reportedSlot?.view !== "threads"
+        || !Number.isFinite(activation.x) || !Number.isFinite(activation.y)) return false;
+      const { x, y, width, height } = reportedSlot.rect;
+      if (activation.x < Math.max(0, x) || activation.y < Math.max(0, y)
+        || activation.x >= x + width || activation.y >= y + height) return false;
+      return post({ type: "slot-activate", view: "threads", x: activation.x, y: activation.y });
     },
     /** `open` counts blocking overlays only; notices travel as rectangles the shell cuts out of its view. */
     reportOverlay(report: { open: boolean; regions: readonly ThreadkeeperRect[] }): boolean {
@@ -191,6 +208,7 @@ export function createThreadkeeperHost(options: HostOptions) {
       parentOrigin = null;
       announcedMode = null;
       lastSlot = null;
+      reportedSlot = null;
       options.onConnection?.(false);
     },
   };

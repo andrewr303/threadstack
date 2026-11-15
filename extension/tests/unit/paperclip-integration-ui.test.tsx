@@ -2,7 +2,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaperclipBridgeSettings } from '../../src/entrypoints/manager/PaperclipBridgeSettings.js';
-import { PaperclipTaskLinks, linkedTaskPath } from '../../src/entrypoints/manager/PaperclipTaskLinks.js';
+import { linkedTaskPath } from '../../src/entrypoints/manager/PaperclipTaskLinks.js';
+import { PaperclipLinks } from '../../src/entrypoints/manager/PaperclipLinks.js';
 import { WorkspaceProvider, type WorkspaceContextValue } from '../../src/entrypoints/manager/workspace/context.js';
 import { configureWorkspaceClient } from '../../src/entrypoints/manager/workspace/client.js';
 import { PaperclipConnectionContext } from '../../src/entrypoints/manager/PaperclipConnection.js';
@@ -16,7 +17,7 @@ const companies = [{ id: 'company-a', name: 'Acme', issuePrefix: 'ACME' }];
 beforeEach(() => { host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
 afterEach(() => { act(() => root.unmount()); host.remove(); configureWorkspaceClient({ send: null }); vi.unstubAllGlobals(); });
 async function settle(ms = 0) { await act(async () => { await new Promise(resolve => setTimeout(resolve, ms)); }); }
-function button(label: string) { const result = [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === label); if (!result) throw new Error(`Missing button ${label}`); return result; }
+function button(label: string) { const result = [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === label); if (!result) throw new Error(`Missing button ${label}`); return result; }
 function state(): PublicBridgeState { return { serverUrl: 'http://localhost:3100', companies: {}, policy: { enabled: false, providers: [], disabledAt: 0 }, allowRemoteModels: false, shareTranscripts: false }; }
 
 describe('browser-session settings', () => {
@@ -97,6 +98,7 @@ describe('thread task links', () => {
       sent.push(command);
       const input = command as { action?: string; payload?: { companyId?: string; issueId?: string; threadKey?: string } };
       if (input.action === 'link') links.push({ id: 'link-a', companyId: 'company-a', issueId: 'task-a', threadKey: 'thread-a', origin: 'user', creator: 'founder', createdAt: new Date().toISOString(), issueIdentifier: 'ACME-12', issueTitle: 'Ship the change', issueStatus: 'todo' });
+      if (input.action === 'unlink') links.splice(0, links.length);
       const data = input.action === 'status' ? structuredClone(current) : input.action === 'tasks' ? { tasks: [{ id: 'task-a', identifier: 'ACME-12', title: 'Ship the change', status: 'todo' }] } : input.action === 'links' ? { links: [...links] } : { actions: [] };
       return { ok: true, data };
     } });
@@ -104,12 +106,61 @@ describe('thread task links', () => {
     const conv = { provider: 'claude', threadKey: 'thread-a' } as ConversationRecord;
     const context = { surface: 'page', settings: DEFAULT_SETTINGS, openPaperclip } as unknown as WorkspaceContextValue;
     const connection = { snapshot: { state: 'running' as const, origin: 'http://localhost:3100' }, retry: vi.fn(), setup: vi.fn(), allowAccess: vi.fn() };
-    await act(async () => root.render(<WorkspaceProvider value={context}><PaperclipConnectionContext.Provider value={connection}><PaperclipTaskLinks conv={conv} /></PaperclipConnectionContext.Provider></WorkspaceProvider>));
+    await act(async () => root.render(<WorkspaceProvider value={context}><PaperclipConnectionContext.Provider value={connection}><PaperclipLinks compact conv={conv} conversations={[conv]} onSelect={vi.fn()} /></PaperclipConnectionContext.Provider></WorkspaceProvider>));
     await settle();
+    expect(host.querySelector('.tk-paperclip-task-links')).toBeNull();
+    await act(async () => button('Task links').click()); await settle();
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[aria-label="Task and session links"]')!;
+    expect(dialog?.open).toBe(true);
+    expect(host.contains(dialog)).toBe(false);
     await act(async () => button('Link to a task').click()); await settle(280);
     await act(async () => button('ACME-12 · Ship the change · todo').click()); await settle();
     expect(sent).toContainEqual({ type: 'PAPERCLIP_INTEGRATION', action: 'link', payload: { companyId: 'company-a', issueId: 'task-a', threadKey: 'thread-a' } });
+    await act(async () => button('Unlink').click()); await settle();
+    expect(sent).toContainEqual({ type: 'PAPERCLIP_INTEGRATION', action: 'unlink', payload: { companyId: 'company-a', issueId: 'task-a', threadKey: 'thread-a' } });
+    expect(document.querySelector('dialog')?.textContent).not.toContain('ACME-12 · Ship the change');
+    await act(async () => button('Link to a task').click()); await settle(280);
+    await act(async () => button('ACME-12 · Ship the change · todo').click()); await settle();
     await act(async () => button('ACME-12 · Ship the change').click());
     expect(openPaperclip).toHaveBeenCalledWith('/ACME/issues/ACME-12');
+    expect(document.querySelector('dialog[aria-label="Task and session links"]')).toBeNull();
+  });
+
+  it('keeps offline messages and imported references inside the compact dialog, and closes on thread navigation', async () => {
+    configureWorkspaceClient({ send: async () => ({ ok: true, data: state() }) });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(companies), { status: 200 })));
+    const conv = { provider: 'codex', threadKey: 'thread-a' } as ConversationRecord;
+    const issue = { provider: 'paperclip', threadKey: 'issue-a', title: 'Ship the change', linkedThreadKeys: ['thread-a'] } as ConversationRecord;
+    const onSelect = vi.fn();
+    const context = { surface: 'page', view: 'threads', settings: DEFAULT_SETTINGS } as unknown as WorkspaceContextValue;
+    const render = async (current = conv, view = 'threads') => act(async () => root.render(
+      <WorkspaceProvider value={{ ...context, view } as WorkspaceContextValue}>
+        <PaperclipLinks compact conv={current} conversations={[conv, issue]} onSelect={onSelect} />
+      </WorkspaceProvider>
+    ));
+    await render();
+    const trigger = host.querySelector<HTMLButtonElement>('[aria-label="Task links"]')!;
+    expect(trigger).not.toBeNull();
+    await act(async () => trigger.click()); await settle();
+    expect(document.querySelector('dialog')?.textContent).toContain('Paperclip · Ship the change');
+    await act(async () => button('Link to a task').click());
+    expect(document.querySelector('dialog')?.textContent).toContain('Paperclip is not running.');
+    await act(async () => button('Paperclip · Ship the change').click());
+    expect(onSelect).toHaveBeenCalledWith('issue-a');
+    expect(document.querySelector('dialog')).toBeNull();
+    await act(async () => trigger.click()); await settle();
+    await act(async () => button('Close').click());
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await act(async () => trigger.click()); await settle();
+    await act(async () => document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })));
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await act(async () => trigger.click()); await settle();
+    await render({ ...conv, threadKey: 'thread-b' });
+    expect(document.querySelector('dialog')).toBeNull();
+    await act(async () => trigger.click()); await settle();
+    await render({ ...conv, threadKey: 'thread-b' }, 'browse');
+    expect(document.querySelector('dialog')).toBeNull();
   });
 });

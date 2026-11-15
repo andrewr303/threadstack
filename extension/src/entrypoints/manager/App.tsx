@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   DETAIL_MODES,
   getDisplayTitle,
@@ -57,7 +58,7 @@ import { PaperclipView, type PaperclipFrameControl, type PaperclipNavigation } f
 import { INITIAL_FUSION, fusedRoute, fusionReducer, usePaperclipFusionDom, type FusionAction } from './PaperclipFusion.js';
 import { PaperclipConnectionContext, usePaperclipConnection } from './PaperclipConnection.js';
 import { normalizeServerUrl } from '../../core/paperclip/client.js';
-import { paperclipPageAddress, paperclipPath, paperclipPathForUrl, type PaperclipHostMessage } from '../../core/paperclip/host.js';
+import { SLOT_ACTIVATION_WINDOW_MS, paperclipPageAddress, paperclipPath, paperclipPathForUrl, type PaperclipHostMessage } from '../../core/paperclip/host.js';
 import { usePaperclipManagerActions } from './paperclip-actions.js';
 
 type Surface = 'overlay' | 'page' | 'sidepanel';
@@ -344,8 +345,14 @@ export function App() {
   // Eager loading starts on Paperclip's home route. Keep the shell's requested entry until
   // its matching slot arrives; old home-page slots may still be queued during navigation.
   const fusedEntryRef = useRef<Exclude<WorkspaceView, 'paperclip'> | null>(null);
+  const fusedOverlayClosedAt = useRef(Number.NEGATIVE_INFINITY);
   // Without the server the shell shows its own rail and view switch (FR-6); a new `ready` resumes.
-  useEffect(() => { if (!paperclipRunning) fuse({ type: 'offline' }); }, [paperclipRunning, fuse]);
+  useEffect(() => {
+    if (!paperclipRunning) {
+      fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      fuse({ type: 'offline' });
+    }
+  }, [paperclipRunning, fuse]);
   usePaperclipFusionDom({
     fused,
     state: fusion,
@@ -1196,7 +1203,10 @@ export function App() {
         address.searchParams.set('pc', message.path);
         window.history.replaceState(null, '', address.href);
       } else if (view === 'paperclip') window.history.replaceState(null, '', paperclipPageAddress(window.location.href, message.path));
-    } else if (message.type === 'ready') fuse({ type: 'ready', mode: message.mode, at: Date.now() });
+    } else if (message.type === 'ready') {
+      fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      fuse({ type: 'ready', mode: message.mode, at: Date.now() });
+    }
     else if (message.type === 'slot') {
       const firstSlot = !fusionRef.current.engaged;
       const state = fuse({ type: 'slot', view: message.view, rect: message.rect, at: Date.now() });
@@ -1217,8 +1227,34 @@ export function App() {
         fusedViewRef.current = target;
         if (target !== view) setView(target);
       }
-    } else if (message.type === 'overlay') fuse({ type: 'overlay', open: message.open, regions: message.regions, at: Date.now() });
-    else if (message.type === 'open-view') setView(message.view);
+    } else if (message.type === 'overlay') {
+      const action = { type: 'overlay', open: message.open, regions: message.regions, at: Date.now() } as const;
+      if (message.open) fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      else if (fusionRef.current.overlayOpen) fusedOverlayClosedAt.current = action.at;
+      // This message has passed the frame's origin/source checks. Commit an accepted close
+      // in this native task, before the next pointer event can hit the raised frame.
+      if (!message.open && fusionRef.current.overlayOpen) flushSync(() => { fuse(action); });
+      else fuse(action);
+    } else if (message.type === 'slot-activate') {
+      // Chromium may deliver the first post-Escape click to the old OOPIF hit-test surface.
+      // Recover only an existing session-row selection, never a generic toolbar/DOM action.
+      const state = fusionRef.current;
+      if (!fused || view !== 'threads' || state.slotView !== 'threads' || state.overlayOpen
+        || Date.now() - fusedOverlayClosedAt.current > SLOT_ACTIVATION_WINDOW_MS) return;
+      const frame = paperclipControl.current?.frame();
+      const box = frame?.getBoundingClientRect();
+      const slot = state.rect;
+      if (!frame || !box || !slot) return;
+      const x = box.left + frame.clientLeft + message.x, y = box.top + frame.clientTop + message.y;
+      if (x < slot.x || y < slot.y || x >= slot.x + slot.width || y >= slot.y + slot.height) return;
+      const row = document.elementFromPoint(x, y)?.closest('button.tk-row-btn');
+      if (!(row instanceof HTMLButtonElement) || !row.isConnected || !row.closest('.tk-list-sidebar')) return;
+      const key = [...rowRefs.current].find(([, element]) => element === row)?.[0];
+      if (!key || !conversationByKey.has(key)) return;
+      fusedOverlayClosedAt.current = Number.NEGATIVE_INFINITY;
+      handleSelectThread(key);
+      row.focus();
+    } else if (message.type === 'open-view') setView(message.view);
     else if (message.type === 'open-session') {
       const thread = conversationByKey.get(message.threadKey);
       if (thread) openSession(thread, 'browse');

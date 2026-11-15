@@ -50,7 +50,11 @@ export function useWorkbenchKeyboard({
     const getOpenInnerModal = () =>
       dialogRefs
         .map((ref) => ref.current)
-        .find((d) => d && (d.open || d.hasAttribute('open')));
+        .find((d) => d && (d.open || d.hasAttribute('open'))) ??
+      // Feature-owned native dialogs (such as task links) need the same keyboard boundary.
+      // Keep the registered innermost-first order; otherwise prefer the focused top-layer dialog.
+      document.activeElement?.closest<HTMLDialogElement>('dialog[open]') ??
+      [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1);
 
     const handleEscapeStep = () => {
       const openModalEl = getOpenInnerModal();
