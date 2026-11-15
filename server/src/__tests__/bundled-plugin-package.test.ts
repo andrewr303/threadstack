@@ -6,6 +6,7 @@ import { createBundledPluginPackageResolver } from "../services/bundled-plugin-p
 import { BUNDLED_PLUGIN_CATALOG, resolveBundledPluginInstalls } from "../services/bundled-plugins.js";
 import { readDistributionPluginCatalog } from "../services/distribution-plugin-catalog.js";
 
+import browserSessions from "../../../packages/plugins/plugin-browser-sessions/src/manifest.js";
 import boxd from "../../../packages/plugins/sandbox-providers/boxd/src/manifest.js";
 import createos from "../../../packages/plugins/sandbox-providers/createos/src/manifest.js";
 import cloudflare from "../../../packages/plugins/sandbox-providers/cloudflare/src/manifest.js";
@@ -16,7 +17,7 @@ import kubernetes from "../../../packages/plugins/sandbox-providers/kubernetes/s
 import modal from "../../../packages/plugins/sandbox-providers/modal/src/manifest.js";
 import novita from "../../../packages/plugins/sandbox-providers/novita/src/manifest.js";
 
-const manifests = { boxd, createos, cloudflare, daytona, e2b, "exe-dev": exe_dev, kubernetes, modal, novita };
+const manifests = { "browser-sessions": browserSessions, boxd, createos, cloudflare, daytona, e2b, "exe-dev": exe_dev, kubernetes, modal, novita };
 const roots: string[] = [];
 function fixture() { const result = bundledImageFixture(); roots.push(result.root); return result; }
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -76,6 +77,7 @@ describe("bundled image package identity", () => {
     writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify(pkg));
     writeFileSync(path.join(packageRoot, "dist", "manifest.js"), `export default ${JSON.stringify(manifest)};`);
     writeFileSync(path.join(packageRoot, "dist", "worker.js"), "export default {};");
+    if (pkg.paperclipPlugin.ui) mkdirSync(path.join(packageRoot, pkg.paperclipPlugin.ui), { recursive: true });
     const installs = resolveBundledPluginInstalls([entry.key], { catalogRoot: root, enforceCatalogRoot: true, distributionPlugins: [], env: {} });
     const resolver = createBundledPluginPackageResolver(installs);
     const registration = { pluginKey: entry.pluginKey, packageName: pkg.name, version: manifest.version, manifestJson: manifest };

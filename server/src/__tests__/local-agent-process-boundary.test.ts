@@ -4,7 +4,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import express from "express";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Db } from "@paperclipai/db";
 import { actorMiddleware } from "../middleware/auth.js";
 import {
@@ -13,6 +13,8 @@ import {
   defaultLocalProcessInspector,
   type LocalProcessInspector,
   findPeerPidInDarwinNetstat,
+  findPeerPidInDarwinLsof,
+  findDarwinPeerPids,
   findSocketInProcNet,
 } from "../middleware/local-agent-process-boundary.js";
 
@@ -112,6 +114,99 @@ describe.skipIf(!supported)("implicit local board access from local processes", 
     } finally {
       await new Promise((resolve) => nested.server.close(resolve));
     }
+  });
+});
+
+describe.skipIf(process.platform !== "darwin")("real IPv6 local board process inspection", () => {
+  let server: Server;
+  let url: string;
+  beforeAll(async () => { ({ server, url } = await startServer({}, "::1")); });
+  afterAll(async () => { await new Promise(resolve => server.close(resolve)); });
+  it("keeps an ordinary IPv6 operator authorized", async () => {
+    expect(await runChild(process.execPath, ["-e", fetchScript, url], operatorEnvironment()))
+      .toEqual({ type: "board", source: "local_implicit" });
+  });
+  it("refuses an IPv6 agent process without credentials", async () => {
+    expect(await runChild(process.execPath, ["-e", fetchScript, url], {
+      ...operatorEnvironment(), PAPERCLIP_RUN_ID: "ipv6-owned-agent-run",
+    })).toEqual({ type: "none", source: "none" });
+  });
+  it("refuses an IPv6 agent tool that clears its own environment", async () => {
+    const agentProcess = "const cp=require('node:child_process');process.stdout.write(cp.execFileSync(process.execPath,['-e',process.argv[1],process.argv[2]],{env:{}}));";
+    expect(await runChild(process.execPath, ["-e", agentProcess, fetchScript, url], {
+      ...operatorEnvironment(), PAPERCLIP_AGENT_ID: "ipv6-owned-agent",
+    })).toEqual({ type: "none", source: "none" });
+  });
+});
+
+describe("Darwin lsof socket fields", () => {
+  const peer = { address: "127.0.0.1", port: 54321 };
+  const endpoint = { address: "127.0.0.1", port: 3100 };
+  it("selects the exact client tuple rather than the server side or another connection", () => {
+    const output = "p100\nf10\nn127.0.0.1:3100->127.0.0.1:54321\np200\nf11\nn127.0.0.1:54321->127.0.0.1:3100\np300\nf12\nn127.0.0.1:54322->127.0.0.1:3100\n";
+    expect(findPeerPidInDarwinLsof(output, peer, endpoint)).toBe(200);
+  });
+  it("accepts bracketed IPv6 and normalizes expanded loopback and mapped IPv4", () => {
+    expect(findPeerPidInDarwinLsof("p200\nf11\nn[::1]:54321->[0:0:0:0:0:0:0:1]:3100\n",
+      { address: "::1", port: 54321 }, { address: "::1", port: 3100 })).toBe(200);
+    expect(findPeerPidInDarwinLsof("p200\nf11\nn[::ffff:127.0.0.1]:54321->127.0.0.1:3100\n",
+      { address: "::ffff:127.0.0.1", port: 54321 }, endpoint)).toBe(200);
+  });
+  it("deduplicates repeated descriptors of one owner but refuses distinct matching owners", () => {
+    const row = "f11\nn127.0.0.1:54321->127.0.0.1:3100\n";
+    expect(findPeerPidInDarwinLsof(`p200\n${row}${row}`, peer, endpoint)).toBe(200);
+    expect(findPeerPidInDarwinLsof(`p200\n${row}p201\n${row}`, peer, endpoint)).toBeNull();
+  });
+  it.each([
+    "", "not lsof output", "p0\nf11\nn127.0.0.1:54321->127.0.0.1:3100\n",
+    "p9007199254740992\nf11\nn127.0.0.1:54321->127.0.0.1:3100\n",
+    "p200\nf11\npinvalid\nf12\nn127.0.0.1:54321->127.0.0.1:3100\n",
+    "p200\nn127.0.0.1:54321->127.0.0.1:3100\n",
+    "p200\nf11\nn127.0.0.1:54321->127.0.0.1:3100->127.0.0.1:3100\n",
+    "p200\nf11\nn127.0.0.1:54321->127.0.0.1:3100garbage\n",
+    "p200\nf11\nn127.0.0.2:54321->127.0.0.1:3100\n",
+  ])("refuses missing or malformed ownership without retaining a stale PID (%s)", output => {
+    expect(findPeerPidInDarwinLsof(output, peer, endpoint)).toBeNull();
+  });
+});
+
+describe("Darwin socket inspection capability boundaries", () => {
+  const socket = { remoteAddress: "127.0.0.1", remotePort: 54321, localAddress: "127.0.0.1", localPort: 3100 };
+  const netstatHeader = "Proto Local Address Foreign Address process:pid\n";
+  type CommandFailure = Error & { code?: string | number };
+  function commands(result: (command: string) => { error?: CommandFailure; stdout?: string; stderr?: string }) {
+    return vi.fn((command: string, _args: string[], _options: object,
+      callback: (error: CommandFailure | null, stdout: string, stderr: string) => void) => {
+      const value = result(command);
+      queueMicrotask(() => callback(value.error ?? null, value.stdout ?? "", value.stderr ?? ""));
+      return {} as ChildProcess;
+    });
+  }
+  it("keeps supported netstat missing-owner results and avoids a second command", async () => {
+    const exec = commands(() => ({ stdout: netstatHeader }));
+    expect(await findDarwinPeerPids([socket], exec as unknown as typeof execFile)).toEqual([null]);
+    expect(exec).toHaveBeenCalledTimes(1);
+  });
+  it.each(["ENOENT", "ETIMEDOUT", "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"])("preserves unsupported inspection on lsof capability failure %s", async code => {
+    const exec = commands(command => command === "netstat" ? {} : { error: Object.assign(new Error(code), { code }) });
+    expect(await findDarwinPeerPids([socket], exec as unknown as typeof execFile)).toBe("unsupported");
+    const lsof = exec.mock.calls[1]!;
+    expect(lsof[0]).toBe("lsof");
+    expect(lsof[1]).toContain("-iTCP:3100");
+    expect(lsof[2]).toMatchObject({ timeout: 5_000, maxBuffer: 1024 * 1024 });
+    expect(lsof[2]).not.toHaveProperty("shell");
+  });
+  it("treats a successful empty selection as missing ownership, including lsof's no-match exit code", async () => {
+    const exec = commands(command => command === "netstat" ? {} : { error: Object.assign(new Error("No matches"), { code: 1 }) });
+    expect(await findDarwinPeerPids([socket], exec as unknown as typeof execFile)).toEqual([null]);
+  });
+  it("never turns a malformed port into a command argument", async () => {
+    const exec = commands(() => ({}));
+    expect(await findDarwinPeerPids([
+      { ...socket, localPort: "3100; touch /tmp/untrusted" as unknown as number },
+      { ...socket, localPort: -1 }, { ...socket, localPort: 1.5 }, { ...socket, localPort: 65536 },
+    ], exec as unknown as typeof execFile)).toEqual([null, null, null, null]);
+    expect(exec).not.toHaveBeenCalled();
   });
 });
 

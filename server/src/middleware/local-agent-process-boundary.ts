@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { readdir, readFile, readlink } from "node:fs/promises";
 import path from "node:path";
+import { isIP } from "node:net";
 import { logger } from "./logger.js";
 
 export const AGENT_RUN_ENVIRONMENT_MARKERS = [
@@ -13,6 +14,7 @@ export const AGENT_RUN_ENVIRONMENT_MARKERS = [
 const RUNNER_DAEMON_EXECUTABLE = "paperclip-runnerd";
 const MAX_ANCESTRY_DEPTH = 64;
 const COMMAND_TIMEOUT_MS = 5_000;
+const DARWIN_SOCKET_SNAPSHOT_MAX_BYTES = 1024 * 1024;
 
 export type LocalPeerClassification = "operator" | "agent_run" | "unsupported";
 
@@ -116,6 +118,43 @@ export function findPeerPidInDarwinNetstat(
   return null;
 }
 
+function validPort(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 65535;
+}
+
+function lsofEndpoint(value: string): { address: string; port: number } | null {
+  const match = /^(?:\[([^\]]+)\]|([^:]+)):(\d+)$/.exec(value);
+  if (!match) return null;
+  const address = match[1] ?? match[2]!;
+  const port = Number(match[3]);
+  return isIP(address) && validPort(port) ? { address: normalizeLoopbackAddress(address), port } : null;
+}
+
+/** lsof -Fpn supplies process/file records, not a table: never carry ownership across a new PID. */
+export function findPeerPidInDarwinLsof(output: string,
+  peer: { address: string; port: number }, server: { address: string; port: number }): number | null {
+  let pid: number | null = null;
+  let file = false;
+  const owners = new Set<number>();
+  for (const line of output.split("\n")) {
+    if (line.startsWith("p")) {
+      const value = /^p([1-9]\d*)$/.exec(line)?.[1];
+      pid = value && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+      file = false;
+    } else if (line.startsWith("f")) {
+      file = pid !== null && /^f\d+$/.test(line);
+    } else if (line.startsWith("n") && file && pid !== null) {
+      const tuple = line.slice(1).split("->");
+      if (tuple.length !== 2) continue;
+      const local = lsofEndpoint(tuple[0]!);
+      const remote = lsofEndpoint(tuple[1]!);
+      if (local?.address === normalizeLoopbackAddress(peer.address) && local.port === peer.port
+        && remote?.address === normalizeLoopbackAddress(server.address) && remote.port === server.port) owners.add(pid);
+    }
+  }
+  return owners.size === 1 ? [...owners][0]! : null;
+}
+
 function parseEnvironmentBlock(entries: string[]): Map<string, string> {
   const environment = new Map<string, string>();
   for (const entry of entries) {
@@ -126,9 +165,9 @@ function parseEnvironmentBlock(entries: string[]): Map<string, string> {
   return environment;
 }
 
-function runCommand(command: string, args: string[]): Promise<string | null> {
+function runCommand(command: string, args: string[], execute = execFile): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile(command, args, { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
+    execute(command, args, { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
       (error, stdout) => resolve(error ? null : stdout));
   });
 }
@@ -282,15 +321,44 @@ export function parseDarwinProcessEnvironmentLine(command: string): {
   return { executable: tokens[0] || null, environment };
 }
 
+export async function findDarwinPeerPids(sockets: readonly LocalPeerEndpoints[], execute = execFile): Promise<LocalPeerOwner[] | "unsupported"> {
+  if (!sockets.length) return [];
+  const valid = sockets.map(socket => validPort(socket.localPort) && validPort(socket.remotePort));
+  if (!valid.some(Boolean)) return sockets.map(() => null);
+  const output = await runCommand("netstat", ["-anv", "-p", "tcp"], execute);
+  const owners = sockets.map((socket, index) => {
+    if (!valid[index]) return null;
+    if (output === null) return "unsupported" as const;
+    const { peer, server } = endpoints(socket);
+    return findPeerPidInDarwinNetstat(output, peer, server);
+  });
+  const ports = [...new Set(sockets.flatMap((socket, index) => owners[index] === "unsupported" ? [socket.localPort] : []))];
+  if (!ports.length) return owners;
+  // Some macOS hosts expose no TCP table through netstat even though lsof can inspect the
+  // same sockets. Query only the requested server ports, then require the exact client tuple.
+  const fields = await new Promise<string | null>(resolve => {
+    execute("lsof", ["-nP", "-a", "-sTCP:ESTABLISHED", "-Fpn", ...ports.map(port => `-iTCP:${port}`)],
+      { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS, maxBuffer: DARWIN_SOCKET_SNAPSHOT_MAX_BYTES },
+      (error, stdout, stderr) => {
+        // lsof exits 1 for an empty selection. That is missing ownership, not an unavailable
+        // inspector. A failed, timed-out or truncated command remains unsupported as before.
+        const emptySelection = error?.code === 1 && stdout === "" && stderr === "";
+        resolve(!error || emptySelection ? stdout : null);
+      });
+  });
+  if (fields === null) return owners.every(owner => owner === "unsupported") ? "unsupported" : owners;
+  return owners.map((owner, index) => {
+    if (owner !== "unsupported") return owner;
+    const { peer, server } = endpoints(sockets[index]!);
+    const pid = findPeerPidInDarwinLsof(fields, peer, server);
+    if (pid === null) return null;
+    try { process.kill(pid, 0); return pid; }
+    catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM" ? pid : null; }
+  });
+}
+
 const darwinInspector: LocalProcessInspector = {
-  async findPeerPids(sockets) {
-    const output = await runCommand("netstat", ["-anv", "-p", "tcp"]);
-    if (output === null) return "unsupported";
-    return sockets.map((socket) => {
-      const { peer, server } = endpoints(socket);
-      return findPeerPidInDarwinNetstat(output, peer, server);
-    });
-  },
+  findPeerPids: findDarwinPeerPids,
   async ancestorPids(pid) {
     const parents = await darwinParentTable();
     return parents ? darwinChain(parents, pid, new Set()) : null;
