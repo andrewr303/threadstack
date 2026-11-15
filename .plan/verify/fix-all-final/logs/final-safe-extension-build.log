@@ -1,0 +1,8 @@
+Built Threadkeeper 0.5.0 (build 20261115.045806-da486db17d) to /tmp/tk-build
+Extension ID: fppogpcbhhomlkmpaffjfkkbahchmlbi
+
+Next: reload the extension so the browser picks up the new manifest.
+  Edge:   edge://extensions   → Threadkeeper → Reload
+  Chrome: chrome://extensions → Threadkeeper → Reload
+The extensions page should then show version 0.5.0 (build 20261115.045806-da486db17d).
+If you forget, the extension reloads itself within a few minutes, and an open library page offers a one-click Reload.

@@ -1,0 +1,20 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:25). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.0.3 /Users/andrew/dev/threadkeeper/paperclip/ui
+
+(node:79662) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79663) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  16 passed (16)
+      Tests  151 passed (151)
+   Start at  21:25:36
+   Duration  17.06s (environment 41%, import 30%, transform 22%, tests 7%)
+
+     Import  436 modules were evaluated 2744 times · 9.46s total, 30% of tracked time
+             ~3.33s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+

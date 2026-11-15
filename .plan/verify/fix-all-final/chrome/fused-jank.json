@@ -1,0 +1,56 @@
+{
+  "id": "fused-jank",
+  "name": "Long-task probe: 5 s idle and 20 rapid dialog open/close cycles with Threads fused",
+  "acs": [
+    "probe"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:52:09.786Z",
+  "completedAt": "2026-11-15T05:52:16.286Z",
+  "observation": "Idle 5 s: frame 0 long tasks (0 ms), shell 0 (0 ms). 20 cycles in 817 ms: frame 0 (0 ms, max 0), shell 0 (0 ms, max 0).",
+  "detail": {
+    "idle5s": {
+      "frame": {
+        "supported": true,
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "durationsMs": []
+      },
+      "shell": {
+        "supported": true,
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "durationsMs": []
+      }
+    },
+    "cycles20": {
+      "frame": {
+        "supported": true,
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "durationsMs": []
+      },
+      "shell": {
+        "supported": true,
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0,
+        "durationsMs": []
+      },
+      "elapsedMs": 817,
+      "cyclesWithFrameRaised": 19,
+      "failedCycles": 0
+    },
+    "afterwards": {
+      "fused": "true",
+      "raised": null,
+      "shellWithinSlot": true
+    }
+  },
+  "evidence": [
+    "fused-jank.png"
+  ]
+}

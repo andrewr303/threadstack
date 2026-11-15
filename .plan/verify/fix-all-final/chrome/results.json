@@ -1,0 +1,884 @@
+{
+  "completedAt": "2026-11-15T05:52:58.958Z",
+  "browser": {
+    "executablePath": "/Users/andrew/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "version": "156.0.8078.4",
+    "colorScheme": "dark"
+  },
+  "build": {
+    "version": "0.5.0",
+    "versionName": "0.5.0 (build 20261115.054541-a44541df70)",
+    "buildId": "20261115.054541-a44541df70",
+    "builtAt": "2026-11-15T05:45:41.421Z"
+  },
+  "extensionId": "offhmjmiccalfahcdkdhcddbnealijkm",
+  "revision": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+  "origin": "http://127.0.0.1:3217",
+  "companyPrefix": "THR",
+  "manifestFixture": {
+    "grantedOrigins": [
+      "http://127.0.0.1/*",
+      "http://localhost/*",
+      "https://chatgpt.com/*"
+    ],
+    "restored": true
+  },
+  "counts": {
+    "pass": 16,
+    "fail": 0,
+    "not_run": 0
+  },
+  "cases": [
+    {
+      "id": "setup",
+      "name": "Connect through Settings, seed synthetic threads, enter the fused window",
+      "acs": [
+        "setup"
+      ],
+      "status": "pass",
+      "observation": "Connected to http://127.0.0.1:3217 through Settings; 40 synthetic threads seeded.",
+      "evidence": [
+        "setup.png"
+      ]
+    },
+    {
+      "id": "fused-direct-entry",
+      "name": "Manager opened at ?view=threads with the server running reaches fused Threads",
+      "acs": [
+        "entry"
+      ],
+      "status": "pass",
+      "observation": "Opened surface=page&view=threads without visiting the Paperclip view; fused Threads in 573 ms (shell within 1 px of slot).",
+      "evidence": [
+        "fused-direct-entry.png"
+      ]
+    },
+    {
+      "id": "fused-palette",
+      "name": "Meta+K from a thread row opens Paperclip palette over the visible view",
+      "acs": [
+        "AC-4",
+        "AC-6"
+      ],
+      "status": "pass",
+      "observation": "Meta+K from a focused row opened the palette (frame raised, on top, view visible under it by luminance correlation); typing reached it; Escape closed it; a row click right afterwards worked with and without a settle.",
+      "evidence": [
+        "fused-palette-open.png",
+        "fused-palette-outside-dismiss.png"
+      ]
+    },
+    {
+      "id": "fused-mobile-entry",
+      "name": "Cold narrow Threads entry fills the mobile slot and keeps one usable Sessions drawer",
+      "acs": [
+        "entry",
+        "UI-sidebar",
+        "UI-header"
+      ],
+      "status": "pass",
+      "observation": "Fresh Threads entries at700px and480px fill a nonzero mobile content slot. The single Sessions drawer searches and opens the matching chat; the main pane remains the selected conversation.",
+      "evidence": [
+        "fused-mobile-entry-700-drawer.png",
+        "fused-mobile-entry-700-chat.png",
+        "fused-mobile-entry-480-drawer.png",
+        "fused-mobile-entry-480-chat.png"
+      ]
+    },
+    {
+      "id": "fused-entries",
+      "name": "Paperclip sidebar shows Browse, Threads, Session board",
+      "acs": [
+        "AC-1"
+      ],
+      "status": "pass",
+      "observation": "Sidebar lists Browse (/THR/browse), Threads (/THR/threads), Session board (/THR/session-board); a real click on each reached its path and the matching shell view.",
+      "evidence": [
+        "fused-entries-browse.png",
+        "fused-entries-dashboard.png",
+        "fused-entries-threads.png"
+      ]
+    },
+    {
+      "id": "fused-in-place",
+      "name": "Threads view inside the content rectangle; one switch; no reload",
+      "acs": [
+        "AC-3",
+        "AC-7"
+      ],
+      "status": "pass",
+      "observation": "Threads view lies inside the slot with Paperclip sidebar on top at its entries; one switch group (Paperclip nav) and none in the shell; same view node and same frame timeOrigin after Tasks and back.",
+      "evidence": [
+        "fused-in-place-threads.png",
+        "fused-in-place-paperclip-page.png"
+      ]
+    },
+    {
+      "id": "fused-placement",
+      "name": "View edges follow the slot through resize and sidebar changes",
+      "acs": [
+        "AC-9"
+      ],
+      "status": "pass",
+      "observation": "8 placements measured (viewport resizes, sidebar drag, collapse/expand); max edge delta 0 px.",
+      "evidence": [
+        "fused-placement-1000x700.png",
+        "fused-placement-collapsed.png"
+      ]
+    },
+    {
+      "id": "fused-layering",
+      "name": "Paperclip's content rectangle goes transparent after the shell sends placed; opaque again on leaving",
+      "acs": [
+        "REQ-6-design"
+      ],
+      "status": "pass",
+      "observation": "Attribute: threads on Threads, removed on Tasks, threads again on return, browse on Browse (first set after 2 ms).",
+      "evidence": [
+        "fused-layering-threads.png",
+        "fused-layering-tasks.png"
+      ]
+    },
+    {
+      "id": "fused-input",
+      "name": "Real pointer input: row click, wheel scroll, Paperclip sidebar click",
+      "acs": [],
+      "status": "pass",
+      "observation": "Row click selected \"Fused seed thread 4\" (index 3); wheel scrolled the list 0 -> 700; sidebar click reached Paperclip (/THR/issues).",
+      "evidence": [
+        "fused-input-on-tasks.png"
+      ]
+    },
+    {
+      "id": "single-session-sidebar",
+      "name": "One Sessions sidebar owns search, filters, grouping and selection",
+      "acs": [
+        "UI-sidebar"
+      ],
+      "status": "pass",
+      "observation": "The existing Sessions rail contains the only thread index. Search selected the matching chat, filter/sort/group controls opened there, grouping changed, and Select all remained usable.",
+      "evidence": [
+        "single-session-sidebar-search.png",
+        "single-session-sidebar-filters.png",
+        "single-session-sidebar-bulk.png"
+      ]
+    },
+    {
+      "id": "compact-chat-header",
+      "name": "Title and view tabs share a row; controls use one row; chat receives the remaining space",
+      "acs": [
+        "UI-header",
+        "UI-chat-space"
+      ],
+      "status": "pass",
+      "observation": "At 1600, 1280 and 700px widths, the title shares one row with view tabs and the controls remain on one row. The live synthetic conversation has at least 580px of vertical space in each 900px viewport.",
+      "evidence": [
+        "compact-chat-header-1600.png",
+        "compact-chat-header-1280.png",
+        "compact-chat-header-700.png",
+        "compact-chat-header-task-links.png"
+      ]
+    },
+    {
+      "id": "sidebar-ask-layout",
+      "name": "Ask has a full-width multiline question field and an accessible action below it",
+      "acs": [
+        "UI-ask"
+      ],
+      "status": "pass",
+      "observation": "The Ask question field spans the Sessions sidebar at desktop and narrow widths, keeps four readable lines without a scrollbar for the two-line draft, and places its enabled action below the field.",
+      "evidence": [
+        "sidebar-ask-layout-1280.png",
+        "sidebar-ask-layout-700.png"
+      ]
+    },
+    {
+      "id": "fused-notice",
+      "name": "A real Paperclip toast shows over the view; dismiss works; view stays clickable",
+      "acs": [
+        "AC-5"
+      ],
+      "status": "pass",
+      "observation": "Toast \"Created THR-22Open THR-22\" appeared (overlap with shell: yes), was on top, view row click selected index 6, dismiss button click removed it.",
+      "evidence": [
+        "fused-notice-toast.png"
+      ]
+    },
+    {
+      "id": "fused-jank",
+      "name": "Long-task probe: 5 s idle and 20 rapid dialog open/close cycles with Threads fused",
+      "acs": [
+        "probe"
+      ],
+      "status": "pass",
+      "observation": "Idle 5 s: frame 0 long tasks (0 ms), shell 0 (0 ms). 20 cycles in 817 ms: frame 0 (0 ms, max 0), shell 0 (0 ms, max 0).",
+      "evidence": [
+        "fused-jank.png"
+      ]
+    },
+    {
+      "id": "fused-fallback",
+      "name": "An ordinary tab at /THR/threads offers Open this in Threadkeeper",
+      "acs": [
+        "AC-2"
+      ],
+      "status": "pass",
+      "observation": "The ordinary tab at /THR/threads shows the heading \"Open this in Threadkeeper\" and no slot.",
+      "evidence": [
+        "fused-fallback.png"
+      ]
+    },
+    {
+      "id": "fused-offline",
+      "name": "Server stop keeps Threads with the shell rail; restart resumes fused mode",
+      "acs": [
+        "AC-8"
+      ],
+      "status": "pass",
+      "observation": "Stopped the owned server (pid 11971); Threads stayed mounted with the shell rail and switch (Browse/Threads/Dashboard/Paperclip); after restart fused mode resumed on /THR/threads (same view node: true).",
+      "evidence": [
+        "fused-offline-offline.png",
+        "fused-offline-standalone-1280.png",
+        "fused-offline-standalone-ask-1280.png",
+        "fused-offline-standalone-700.png",
+        "fused-offline-standalone-ask-700.png",
+        "fused-offline-resumed.png"
+      ]
+    }
+  ],
+  "diagnostics": {
+    "hostLog": [
+      [
+        185,
+        "msg",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"hello\"}"
+      ],
+      [
+        204,
+        "msg",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"placed\",\"view\":null}"
+      ],
+      [
+        206,
+        "msg",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"navigate\",\"path\":\"/THR/threads\"}"
+      ],
+      [
+        211,
+        "msg",
+        "{\"source\":\"threadkeeper-shell\",\"v\":1,\"type\":\"placed\",\"view\":\"threads\"}"
+      ],
+      [
+        213,
+        "slot-attr",
+        "threads"
+      ]
+    ],
+    "video": "assets/page@3c27c0ff3d4ecfeb8c49fb1b7b3e4669.webm",
+    "artifactProvenance": {
+      "setup.png": {
+        "capturedAt": "2026-11-15T05:51:44.434Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "8bda8160ba23391dda423d4c96eb89e22c3873eacdc7c55e9eb0a14894545ade"
+      },
+      "fused-direct-entry.png": {
+        "capturedAt": "2026-11-15T05:51:45.155Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "ef6c4d8b72c9d0cf7f6ae72925c4b34429138d901a774b19e35e0ea075d3d0cd"
+      },
+      "fused-palette-open.png": {
+        "capturedAt": "2026-11-15T05:51:45.949Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "8d722e5284ea2cfef724778650d0d01b02bfd1e43e6a23a2050ac4b33db6e0ea"
+      },
+      "fused-palette-outside-dismiss.png": {
+        "capturedAt": "2026-11-15T05:51:51.734Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "a9aca1a1bbb8a8c9e95cc45e1a48bc8262b6ddfd8db3bb812e9fb845d2c1257f"
+      },
+      "fused-mobile-entry-700-drawer.png": {
+        "capturedAt": "2026-11-15T05:51:52.166Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "b42a73b93078b33dbf4cc24faf664b4a75a5d7d4ffde7002235f539fe3f7610a"
+      },
+      "fused-mobile-entry-700-chat.png": {
+        "capturedAt": "2026-11-15T05:51:52.478Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "6c4c4ec6451e570261e839effbec58006c6144fb4020752e623b7bcaf69e88c4"
+      },
+      "fused-mobile-entry-480-drawer.png": {
+        "capturedAt": "2026-11-15T05:51:52.976Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 480,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "c4ed1f94434d5be1b15b8083fb17ff0dfd556e3b4c43d0e900079bf6c8645855"
+      },
+      "fused-mobile-entry-480-chat.png": {
+        "capturedAt": "2026-11-15T05:51:53.394Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 480,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "fd2c031786475b29b9d8c8d844697aa7b31ecc4c4801cc4797ba186d39983d39"
+      },
+      "fused-entries-browse.png": {
+        "capturedAt": "2026-11-15T05:51:53.628Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=browse&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fbrowse",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "1f3f2fd63b68ebfaaa25b60197865944936fd5a88e79b6af8df707254bb5d945"
+      },
+      "fused-entries-dashboard.png": {
+        "capturedAt": "2026-11-15T05:51:53.820Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=dashboard&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fsession-board",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "1c11995bbe691ee98ac4e77b025d909e6c225c15bf1dec73fe19ba1935dc63f9"
+      },
+      "fused-entries-threads.png": {
+        "capturedAt": "2026-11-15T05:51:53.916Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "73262149ca34e96351f75a8de478f448ad624e2929f7fac909869a222849ccd3"
+      },
+      "fused-in-place-threads.png": {
+        "capturedAt": "2026-11-15T05:51:53.983Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "73262149ca34e96351f75a8de478f448ad624e2929f7fac909869a222849ccd3"
+      },
+      "fused-in-place-paperclip-page.png": {
+        "capturedAt": "2026-11-15T05:51:54.040Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=paperclip&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fissues%3Fview%3Dall",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "8d8cda35f291a0516393923be367709aead1c1dc5e1143c3590e010d8f34c76d"
+      },
+      "fused-placement-1000x700.png": {
+        "capturedAt": "2026-11-15T05:51:56.057Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1000,
+          "height": 700
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "984d257dd3490cd4b81ba72557c15bf2d8aaac9792ba2b1106c929bc01e9ddeb"
+      },
+      "fused-placement-collapsed.png": {
+        "capturedAt": "2026-11-15T05:52:00.940Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "43f8fbb054715f57029b2418f2e074e7cf944bbffffec9c248484241a33db976"
+      },
+      "fused-layering-threads.png": {
+        "capturedAt": "2026-11-15T05:52:01.921Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "b274206ec646faa4365372c8a6a5f539c769ba5c4d9edd3fe334b0b74894a815"
+      },
+      "fused-layering-tasks.png": {
+        "capturedAt": "2026-11-15T05:52:02.001Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=paperclip&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fissues%3Fview%3Dall",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "d0bd5c47ee2137e48ba4cc90dea1b23e6985c07d54d9e6d5752ba4ddfcb7b780"
+      },
+      "fused-input-on-tasks.png": {
+        "capturedAt": "2026-11-15T05:52:02.665Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=paperclip&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fissues%3Fview%3Dall",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "a5edc606965254c446fd7223c5efb814e5b35b1f4243ef901ec89c773bf81d9b"
+      },
+      "single-session-sidebar-search.png": {
+        "capturedAt": "2026-11-15T05:52:02.926Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "deb7b7bb30ed28a01713d4c2335704de3c2a8aa4cb0e05745408111c06a89b4b"
+      },
+      "single-session-sidebar-filters.png": {
+        "capturedAt": "2026-11-15T05:52:03.149Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "94e63ccf4440f84b5b95a8905ceda7683ccb40bc83f105e46efe3fe74dccb334"
+      },
+      "single-session-sidebar-bulk.png": {
+        "capturedAt": "2026-11-15T05:52:03.425Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "e9979eb00564c7fbbd034b108b52a9fc6e01f3c713fe8cc56749039cd3788f0e"
+      },
+      "compact-chat-header-1600.png": {
+        "capturedAt": "2026-11-15T05:52:03.900Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1600,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "f8458dd02521644459a8cf2eb67e1aabf1acf62785d9f74098da92b9af28a891"
+      },
+      "compact-chat-header-1280.png": {
+        "capturedAt": "2026-11-15T05:52:04.101Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "ef55f0d739d3a0fee4e4a0971657743288c47c3f029d7c9e250c0400c9114b8e"
+      },
+      "compact-chat-header-700.png": {
+        "capturedAt": "2026-11-15T05:52:04.335Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "a931529bd2491d5d4064930a349101878bda373120d13165e9390bd8ca3b70da"
+      },
+      "compact-chat-header-task-links.png": {
+        "capturedAt": "2026-11-15T05:52:04.855Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "98d51f35f9b9c73f8ecc216483268a35465754d9c4f1e564e6b1ff5a1464bc5d"
+      },
+      "sidebar-ask-layout-1280.png": {
+        "capturedAt": "2026-11-15T05:52:05.045Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "af7ed5559684eb8766e4e1c90a44909117a8d5273487c720ebacad424c69ff13"
+      },
+      "sidebar-ask-layout-700.png": {
+        "capturedAt": "2026-11-15T05:52:05.730Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "272ee17fe1e73f1fec050459be71434c781ccadc1da213e8f5d7c4a882ad8945"
+      },
+      "fused-notice-toast.png": {
+        "capturedAt": "2026-11-15T05:52:06.727Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "23756d6bbab05327a517ff96a8a899e40ab8be0767555db434fdd15cc7240692"
+      },
+      "fused-jank.png": {
+        "capturedAt": "2026-11-15T05:52:16.214Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "8c08209fd82694d154e22f70dbf32159253772fd2a6603c2372fcf8967c612a2"
+      },
+      "fused-fallback.png": {
+        "capturedAt": "2026-11-15T05:52:16.636Z",
+        "url": "http://127.0.0.1:3217/THR/threads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "dd1014dc01f7a66d98e02af581c1c89ace3ba6aab0c8f0f25db3956e6b04d0c4"
+      },
+      "fused-offline-offline.png": {
+        "capturedAt": "2026-11-15T05:52:48.007Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "bb8822f4c5b7ad847eb924c90f4e5d371f80d1eec00b0a8c1f53ca3cb5919225"
+      },
+      "fused-offline-standalone-1280.png": {
+        "capturedAt": "2026-11-15T05:52:48.116Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "54e285ecda814089fadbc893368b7a4588d92b54719fa39cc39b04498a5f8c18"
+      },
+      "fused-offline-standalone-ask-1280.png": {
+        "capturedAt": "2026-11-15T05:52:48.211Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "0228f396967fcd55ba3939125c03d65d2e1800c8ee59d21554f4fad08033fe75"
+      },
+      "fused-offline-standalone-700.png": {
+        "capturedAt": "2026-11-15T05:52:48.450Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "9c45fd37197c7bdec6a50cd0b8b1a38d035add32133199cf3b6923f811a7cb8d"
+      },
+      "fused-offline-standalone-ask-700.png": {
+        "capturedAt": "2026-11-15T05:52:48.925Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "26e112a5ce7bc825d0ff240ba6e02e33b42df969c50c1245d59416c547f25ab3"
+      },
+      "fused-offline-resumed.png": {
+        "capturedAt": "2026-11-15T05:52:57.458Z",
+        "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&threadKey=chatgpt%3Aacct_chatgpt_primary%3Adefault%3Afused_layout_chat%3Amain&pc=%2FTHR%2Fthreads",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "tool": "Playwright Page.screenshot",
+        "sha256": "60cc0cb938f130b6f6e57118bc56ff4f38d571e3fb5f235c301b1bdd49f04de6"
+      }
+    },
+    "sourceHashesUnchangedDuringRun": true
+  },
+  "events": [
+    {
+      "at": "2026-11-15T05:51:43.648Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:03.629Z",
+      "kind": "synthetic-provider-document",
+      "url": "https://chatgpt.com/c/fused_layout_chat",
+      "note": "Locally fulfilled test data; no provider connection or real account."
+    },
+    {
+      "at": "2026-11-15T05:52:17.076Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:17.078Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:17.078Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:18.082Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:20.080Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:20.086Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:22.083Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:23.085Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:25.091Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:26.088Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:27.088Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:29.092Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:32.092Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:32.096Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:35.098Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:35.101Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:37.098Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:38.106Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:41.110Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:42.102Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:44.113Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:47.106Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:47.116Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:50.100Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:50.119Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:52.109Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:53.122Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "at": "2026-11-15T05:52:57.157Z",
+      "kind": "console-error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    }
+  ]
+}

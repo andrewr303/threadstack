@@ -1,0 +1,15 @@
+# Primary mouse-press recovery boundary
+
+Changed only `ThreadkeeperHostBridge.tsx`, the fusion classifier and their two test files. Host report API, parent parser/admission/selection, cross-package250ms limit and external-anchor click handling remain unchanged.
+
+The corrected round35 diagnostic deliberately delayed transport to achieve a real trusted pointerdown in the empty child slot and a real trusted pointerup over the parent row. Neither realm emitted click. This demonstrates why click-only recovery cannot handle that split boundary. The injection is explicit evidence of this failure class; it does not establish the cause of Edge round30.
+
+Recovery now runs from a captured pointerdown listener before Radix outside-pointerdown handlers. It requires the actual native event to be trusted, type pointerdown, pointerType mouse, isPrimary true, button0, buttons1, no modifiers and not defaultPrevented. No flags/detail/trust are normalized or invented. Native pointerdown detail0 is accepted because this boundary does not use click detail. Keyboard, touch, pen, secondary/nonprimary pointers and synthetic events stay on their ordinary native path.
+
+Every existing current-empty-connected-registered-placed-Threads slot, fresh-all-overlay scan, recent accepted close250ms, finite in-slot coordinate and authenticated/fused host gate remains. If an overlay is still open at captured down, the event is rejected before its later outside handler might dismiss it; that dismissal gesture cannot become a row selection. The existing parent resolves only one known registered session row, never arbitrary DOM actions. No extra close packet was added to the final source. Natural per-sender FIFO remains the ordering guarantee.
+
+RED before production change:3failed/10passed in the two focused files. Failures exposed missing captured-pointerdown registration, rejection of a real-shaped primary mouse press (detail0), and classifier refusal of that press. Tests explicitly use classifier records for positive trusted-flag logic and never claim those records are browser-trusted events. The mounted real bridge test verifies captured-pointerdown registration and actual programmatic-event rejection. Existing open-before-dismiss and all guard cases remain green.
+
+Final validation:57tests pass across host/fusion/bridge/boot/overlay suites; UI tsc exits0; scoped diff whitespace clean. Exact final logs and source hashes are in `ui-slot-pointerdown-receipt.json`. Initial typecheck exposed only implicit-any destructuring in the new listener-spy test; the test annotation was corrected, then the final commands reran successfully. Intermediate tests overlapping the rejected extra-close proposal are retained but not the final evidence. Final accepted-source validation uses distinct `ui-slot-pointerdown-accepted-final-*` logs.
+
+The required ult-debugger router and TypeScript workflow were followed; triage output for original RED is retained. No browser, build, commit or push was performed by this worker.

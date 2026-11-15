@@ -1,0 +1,25 @@
+{
+  "id": "single-session-sidebar",
+  "name": "One Sessions sidebar owns search, filters, grouping and selection",
+  "acs": [
+    "UI-sidebar"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:29.541Z",
+  "completedAt": "2026-11-15T05:54:30.190Z",
+  "observation": "The existing Sessions rail contains the only thread index. Search selected the matching chat, filter/sort/group controls opened there, grouping changed, and Select all remained usable.",
+  "detail": {
+    "filteredSelection": {
+      "query": "29",
+      "selectedTitle": "Fused seed thread 29",
+      "rows": 1
+    },
+    "grouping": "provider",
+    "selectedAll": true
+  },
+  "evidence": [
+    "single-session-sidebar-search.png",
+    "single-session-sidebar-filters.png",
+    "single-session-sidebar-bulk.png"
+  ]
+}

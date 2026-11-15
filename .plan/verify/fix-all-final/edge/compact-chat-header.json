@@ -1,0 +1,590 @@
+{
+  "id": "compact-chat-header",
+  "name": "Title and view tabs share a row; controls use one row; chat receives the remaining space",
+  "acs": [
+    "UI-header",
+    "UI-chat-space"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:30.190Z",
+  "completedAt": "2026-11-15T05:54:31.558Z",
+  "observation": "At 1600, 1280 and 700px widths, the title shares one row with view tabs and the controls remain on one row. The live synthetic conversation has at least 580px of vertical space in each 900px viewport.",
+  "detail": {
+    "layouts": [
+      {
+        "viewport": {
+          "width": 1600,
+          "height": 900
+        },
+        "header": {
+          "x": 519,
+          "y": 129,
+          "width": 1064,
+          "height": 110.390625,
+          "top": 129,
+          "right": 1583,
+          "bottom": 239.390625,
+          "left": 519
+        },
+        "title": {
+          "x": 519,
+          "y": 134,
+          "width": 767.796875,
+          "height": 24,
+          "top": 134,
+          "right": 1286.796875,
+          "bottom": 158,
+          "left": 519
+        },
+        "mode": {
+          "x": 1298.796875,
+          "y": 129,
+          "width": 284.203125,
+          "height": 34,
+          "top": 129,
+          "right": 1583,
+          "bottom": 163,
+          "left": 1298.796875
+        },
+        "controls": {
+          "x": 519,
+          "y": 192.390625,
+          "width": 1064,
+          "height": 38,
+          "top": 192.390625,
+          "right": 1583,
+          "bottom": 230.390625,
+          "left": 519
+        },
+        "controlRects": [
+          {
+            "x": 522,
+            "y": 195.390625,
+            "width": 140,
+            "height": 32,
+            "top": 195.390625,
+            "right": 662,
+            "bottom": 227.390625,
+            "left": 522
+          },
+          {
+            "x": 668,
+            "y": 195.390625,
+            "width": 54,
+            "height": 32,
+            "top": 195.390625,
+            "right": 722,
+            "bottom": 227.390625,
+            "left": 668
+          },
+          {
+            "x": 728,
+            "y": 195.390625,
+            "width": 128,
+            "height": 32,
+            "top": 195.390625,
+            "right": 856,
+            "bottom": 227.390625,
+            "left": 728
+          },
+          {
+            "x": 862,
+            "y": 195.390625,
+            "width": 86.109375,
+            "height": 32,
+            "top": 195.390625,
+            "right": 948.109375,
+            "bottom": 227.390625,
+            "left": 862
+          },
+          {
+            "x": 954.109375,
+            "y": 195.390625,
+            "width": 88.203125,
+            "height": 32,
+            "top": 195.390625,
+            "right": 1042.3125,
+            "bottom": 227.390625,
+            "left": 954.109375
+          },
+          {
+            "x": 1048.3125,
+            "y": 195.390625,
+            "width": 57.359375,
+            "height": 32,
+            "top": 195.390625,
+            "right": 1105.671875,
+            "bottom": 227.390625,
+            "left": 1048.3125
+          },
+          {
+            "x": 1111.671875,
+            "y": 195.390625,
+            "width": 83.546875,
+            "height": 32,
+            "top": 195.390625,
+            "right": 1195.21875,
+            "bottom": 227.390625,
+            "left": 1111.671875
+          },
+          {
+            "x": 1201.21875,
+            "y": 195.390625,
+            "width": 98.171875,
+            "height": 32,
+            "top": 195.390625,
+            "right": 1299.390625,
+            "bottom": 227.390625,
+            "left": 1201.21875
+          },
+          {
+            "x": 1305.390625,
+            "y": 195.390625,
+            "width": 78.078125,
+            "height": 32,
+            "top": 195.390625,
+            "right": 1383.46875,
+            "bottom": 227.390625,
+            "left": 1305.390625
+          }
+        ],
+        "controlsOverflow": {
+          "clientWidth": 1064,
+          "scrollWidth": 1064
+        },
+        "live": {
+          "x": 519,
+          "y": 251.390625,
+          "width": 1064,
+          "height": 635.609375,
+          "top": 251.390625,
+          "right": 1583,
+          "bottom": 887,
+          "left": 519
+        },
+        "detail": {
+          "x": 502,
+          "y": 116,
+          "width": 1098,
+          "height": 784,
+          "top": 116,
+          "right": 1600,
+          "bottom": 900,
+          "left": 502
+        },
+        "duplicateMainIndexes": 0,
+        "liveFrame": {
+          "slot": {
+            "x": 519,
+            "y": 251.390625,
+            "width": 1064,
+            "height": 635.609375,
+            "top": 251.390625,
+            "right": 1583,
+            "bottom": 887,
+            "left": 519
+          },
+          "frame": {
+            "x": 519,
+            "y": 251,
+            "width": 1064,
+            "height": 636,
+            "top": 251,
+            "right": 1583,
+            "bottom": 887,
+            "left": 519
+          }
+        }
+      },
+      {
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "header": {
+          "x": 519,
+          "y": 163,
+          "width": 744,
+          "height": 110.390625,
+          "top": 163,
+          "right": 1263,
+          "bottom": 273.390625,
+          "left": 519
+        },
+        "title": {
+          "x": 519,
+          "y": 168,
+          "width": 447.796875,
+          "height": 24,
+          "top": 168,
+          "right": 966.796875,
+          "bottom": 192,
+          "left": 519
+        },
+        "mode": {
+          "x": 978.796875,
+          "y": 163,
+          "width": 284.203125,
+          "height": 34,
+          "top": 163,
+          "right": 1263,
+          "bottom": 197,
+          "left": 978.796875
+        },
+        "controls": {
+          "x": 519,
+          "y": 226.390625,
+          "width": 744,
+          "height": 38,
+          "top": 226.390625,
+          "right": 1263,
+          "bottom": 264.390625,
+          "left": 519
+        },
+        "controlRects": [
+          {
+            "x": 522,
+            "y": 229.390625,
+            "width": 140,
+            "height": 32,
+            "top": 229.390625,
+            "right": 662,
+            "bottom": 261.390625,
+            "left": 522
+          },
+          {
+            "x": 668,
+            "y": 229.390625,
+            "width": 54,
+            "height": 32,
+            "top": 229.390625,
+            "right": 722,
+            "bottom": 261.390625,
+            "left": 668
+          },
+          {
+            "x": 728,
+            "y": 229.390625,
+            "width": 128,
+            "height": 32,
+            "top": 229.390625,
+            "right": 856,
+            "bottom": 261.390625,
+            "left": 728
+          },
+          {
+            "x": 862,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 894,
+            "bottom": 261.390625,
+            "left": 862
+          },
+          {
+            "x": 900,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 932,
+            "bottom": 261.390625,
+            "left": 900
+          },
+          {
+            "x": 938,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 970,
+            "bottom": 261.390625,
+            "left": 938
+          },
+          {
+            "x": 976,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 1008,
+            "bottom": 261.390625,
+            "left": 976
+          },
+          {
+            "x": 1014,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 1046,
+            "bottom": 261.390625,
+            "left": 1014
+          },
+          {
+            "x": 1052,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 1084,
+            "bottom": 261.390625,
+            "left": 1052
+          }
+        ],
+        "controlsOverflow": {
+          "clientWidth": 744,
+          "scrollWidth": 744
+        },
+        "live": {
+          "x": 519,
+          "y": 285.390625,
+          "width": 744,
+          "height": 601.609375,
+          "top": 285.390625,
+          "right": 1263,
+          "bottom": 887,
+          "left": 519
+        },
+        "detail": {
+          "x": 502,
+          "y": 150,
+          "width": 778,
+          "height": 750,
+          "top": 150,
+          "right": 1280,
+          "bottom": 900,
+          "left": 502
+        },
+        "duplicateMainIndexes": 0,
+        "liveFrame": {
+          "slot": {
+            "x": 519,
+            "y": 285.390625,
+            "width": 744,
+            "height": 601.609375,
+            "top": 285.390625,
+            "right": 1263,
+            "bottom": 887,
+            "left": 519
+          },
+          "frame": {
+            "x": 519,
+            "y": 285,
+            "width": 744,
+            "height": 602,
+            "top": 285,
+            "right": 1263,
+            "bottom": 887,
+            "left": 519
+          }
+        }
+      },
+      {
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "header": {
+          "x": 89,
+          "y": 163,
+          "width": 594,
+          "height": 110.390625,
+          "top": 163,
+          "right": 683,
+          "bottom": 273.390625,
+          "left": 89
+        },
+        "title": {
+          "x": 89,
+          "y": 168,
+          "width": 480,
+          "height": 24,
+          "top": 168,
+          "right": 569,
+          "bottom": 192,
+          "left": 89
+        },
+        "mode": {
+          "x": 581,
+          "y": 163,
+          "width": 102,
+          "height": 34,
+          "top": 163,
+          "right": 683,
+          "bottom": 197,
+          "left": 581
+        },
+        "controls": {
+          "x": 89,
+          "y": 226.390625,
+          "width": 594,
+          "height": 38,
+          "top": 226.390625,
+          "right": 683,
+          "bottom": 264.390625,
+          "left": 89
+        },
+        "controlRects": [
+          {
+            "x": 92,
+            "y": 229.390625,
+            "width": 140,
+            "height": 32,
+            "top": 229.390625,
+            "right": 232,
+            "bottom": 261.390625,
+            "left": 92
+          },
+          {
+            "x": 238,
+            "y": 229.390625,
+            "width": 54,
+            "height": 32,
+            "top": 229.390625,
+            "right": 292,
+            "bottom": 261.390625,
+            "left": 238
+          },
+          {
+            "x": 298,
+            "y": 229.390625,
+            "width": 128,
+            "height": 32,
+            "top": 229.390625,
+            "right": 426,
+            "bottom": 261.390625,
+            "left": 298
+          },
+          {
+            "x": 432,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 464,
+            "bottom": 261.390625,
+            "left": 432
+          },
+          {
+            "x": 470,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 502,
+            "bottom": 261.390625,
+            "left": 470
+          },
+          {
+            "x": 508,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 540,
+            "bottom": 261.390625,
+            "left": 508
+          },
+          {
+            "x": 546,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 578,
+            "bottom": 261.390625,
+            "left": 546
+          },
+          {
+            "x": 584,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 616,
+            "bottom": 261.390625,
+            "left": 584
+          },
+          {
+            "x": 622,
+            "y": 229.390625,
+            "width": 32,
+            "height": 32,
+            "top": 229.390625,
+            "right": 654,
+            "bottom": 261.390625,
+            "left": 622
+          }
+        ],
+        "controlsOverflow": {
+          "clientWidth": 594,
+          "scrollWidth": 594
+        },
+        "live": {
+          "x": 89,
+          "y": 285.390625,
+          "width": 594,
+          "height": 601.609375,
+          "top": 285.390625,
+          "right": 683,
+          "bottom": 887,
+          "left": 89
+        },
+        "detail": {
+          "x": 72,
+          "y": 150,
+          "width": 628,
+          "height": 750,
+          "top": 150,
+          "right": 700,
+          "bottom": 900,
+          "left": 72
+        },
+        "duplicateMainIndexes": 0,
+        "liveFrame": {
+          "slot": {
+            "x": 89,
+            "y": 285.390625,
+            "width": 594,
+            "height": 601.609375,
+            "top": 285.390625,
+            "right": 683,
+            "bottom": 887,
+            "left": 89
+          },
+          "frame": {
+            "x": 89,
+            "y": 285,
+            "width": 594,
+            "height": 602,
+            "top": 285,
+            "right": 683,
+            "bottom": 887,
+            "left": 89
+          }
+        }
+      }
+    ],
+    "providerFixture": "Synthetic HTML served by the browser runner at one known ChatGPT-shaped test URL. No real provider account or network access.",
+    "taskLinksComputedStyle": {
+      "backgroundColor": "rgb(28, 26, 23)",
+      "opacity": "1",
+      "animationName": "tk-dialog-in",
+      "backdrop": {
+        "backgroundColor": "rgba(10, 9, 8, 0.55)",
+        "opacity": "1"
+      },
+      "activeFiniteAnimations": 0
+    },
+    "taskLinksDialogOnTop": true,
+    "taskLinksFocusReturned": true
+  },
+  "evidence": [
+    "compact-chat-header-1600.png",
+    "compact-chat-header-1280.png",
+    "compact-chat-header-700.png",
+    "compact-chat-header-task-links.png"
+  ]
+}

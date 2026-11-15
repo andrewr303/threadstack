@@ -154,3 +154,6 @@ EPIC-2 Paperclip inside the extension
 | REQ-8/TASK-1 | .plan/tasks/REQ-8/TASK-1-read-bounded-untrusted-sessions.md | planned |
 | REQ-9 | .plan/reqs/REQ-9-sessions-linked-to-tasks.md | in-progress |
 | REQ-9/TASK-1 | .plan/tasks/REQ-9/TASK-1-link-sessions-to-current-tasks.md | planned |
+
+Latest repair delivery: [compact UI and verified source report](verify/fix-all-final/report.md).
+Both final browsers pass 16/16; formal completion statuses are unchanged.

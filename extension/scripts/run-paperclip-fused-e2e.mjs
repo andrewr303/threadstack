@@ -9,6 +9,10 @@
 // Env: TK_PAPERCLIP_RUNTIME (fixture JSON, default /tmp/threadkeeper-acceptance-runtime.json),
 // TK_FUSED_RECOVERY_MARKER (owned stop/start marker, default /tmp/threadkeeper-paperclip-recovery.json),
 // TK_FUSED_SKIP_OFFLINE=1 skips the owned-server stop/start case.
+// TK_FUSED_DARK=1 emulates the dark OS scheme. TK_FUSED_CASES selects explicit case IDs.
+// TK_FUSED_TELEMETRY_ONLY=1 is diagnostic; TK_FUSED_PALETTE_TRIES allows4..16 zero-delay probes.
+// TK_FUSED_SPLIT_PROBE=1 enables the declared FIFO transport-delay fault; never final acceptance.
+// TK_FUSED_TWO_PRESS_PROBE=1 targets two legitimate presses in one held closing-surface window.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +20,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { installFusedInputTelemetry, installSplitPointerInterceptor, runSplitPointerProbe, verifyOutsidePaletteDismiss } from './paperclip-fused-telemetry.mjs';
 
 const extensionRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const forkRoot = path.resolve(extensionRoot, '..');
@@ -30,9 +35,14 @@ if (fixture.port !== 3217) throw new Error('Only the disposable port 3217 instan
 const marker = process.env.TK_FUSED_RECOVERY_MARKER || '/tmp/threadkeeper-paperclip-recovery.json';
 const output = path.resolve(process.env.TK_PAPERCLIP_E2E_OUT || path.join(forkRoot, '.acceptances/paperclip-merge/round-17'));
 const telemetryOnly = process.env.TK_FUSED_TELEMETRY_ONLY === '1';
+const controlledProbe = process.env.TK_FUSED_SPLIT_PROBE === '1' || process.env.TK_FUSED_TWO_PRESS_PROBE === '1';
+if (process.env.TK_FUSED_SPLIT_PROBE === '1' && process.env.TK_FUSED_TWO_PRESS_PROBE === '1') throw new Error('Use one controlled fault probe per round.');
+const selectedCases = process.env.TK_FUSED_CASES ? new Set(process.env.TK_FUSED_CASES.split(',').filter(Boolean)) : null;
+const colorScheme = process.env.TK_FUSED_DARK === '1' ? 'dark' : 'light';
 if (fs.existsSync(path.join(output, 'results.json')) || fs.existsSync(path.join(output, 'seal.json'))) throw new Error('Refusing to overwrite a retained acceptance round.');
 fs.mkdirSync(path.join(output, 'assets'), { recursive: true });
 fs.copyFileSync(fileURLToPath(import.meta.url), path.join(output, 'assets/runner.mjs'));
+fs.copyFileSync(new URL('./paperclip-fused-telemetry.mjs', import.meta.url), path.join(output, 'assets/input-telemetry.mjs'));
 const prefix = fixture.companyPrefix;
 const base = `/${encodeURIComponent(prefix)}`;
 
@@ -146,6 +156,7 @@ async function measure() {
     const slot = document.querySelector('.threadkeeper-slot');
     return {
       path: location.pathname, timeOrigin: performance.timeOrigin,
+      paperclipTheme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
       slot: rect(slot), slotAttr: document.documentElement.getAttribute('data-threadkeeper-slot'),
       slotVars: ['--tk-slot-x', '--tk-slot-y', '--tk-slot-w', '--tk-slot-h'].map(k => document.documentElement.style.getPropertyValue(k)),
       viewport: { w: innerWidth, h: innerHeight },
@@ -162,6 +173,7 @@ async function measure() {
     const view = document.querySelector('.tk-view-threads');
     return {
       workbench: wb ? { ...wb.dataset } : null, url: location.search,
+      threadkeeperTheme: document.documentElement.getAttribute('data-theme'),
       shell: rect(document.querySelector('.tk-shell')), shellData: document.querySelector('.tk-shell') ? { ...document.querySelector('.tk-shell').dataset } : null,
       shellStyle: document.querySelector('.tk-shell')?.getAttribute('style') ?? null,
       frameRect: rect(frameEl), frameZ: frameEl ? getComputedStyle(frameEl.closest('.tk-view-paperclip') ?? frameEl).zIndex : null,
@@ -196,6 +208,15 @@ async function resizedFused(width) {
     return state.viewport.w === width && state.frameRect?.width === width && within(state.shell, state.slot, 1) ? state : null;
   }, Boolean, 10_000, `frame and shell placement converged after resize to ${width}`);
 }
+async function settledLiveFrame() {
+  const geometry = await until(() => page.evaluate(() => {
+    const slot = document.querySelector('.tk-thr-live');
+    const frame = [...document.querySelectorAll('iframe.tk-frame')].find(element => element.src === 'https://chatgpt.com/c/fused_layout_chat' && getComputedStyle(element).display !== 'none');
+    return { slot: slot?.getBoundingClientRect().toJSON(), frame: frame?.getBoundingClientRect().toJSON() };
+  }), value => within(value.slot, value.frame, 1), 10_000, 'provider frame follows its actual live slot');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  return geometry;
+}
 async function clickFrameLink(href) {
   const f = await frame();
   const link = f.locator(`aside a[href="${href}"]`).first();
@@ -229,6 +250,10 @@ async function seedThreads() {
 
 // ---- case runner ---------------------------------------------------------------------------------
 async function runCase(id, name, acs, action, prerequisites = ['setup']) {
+  if (selectedCases && !selectedCases.has(id)) {
+    await notRun(id, name, acs, 'Outside the explicitly selected targeted capture scope.');
+    return;
+  }
   if (telemetryOnly && !['setup', 'fused-direct-entry', 'fused-palette', 'fused-mobile-entry'].includes(id)) {
     await notRun(id, name, acs, 'Diagnostic run restricted to setup, direct entry, immediate palette input and narrow cold entry.');
     return;
@@ -245,6 +270,12 @@ async function runCase(id, name, acs, action, prerequisites = ['setup']) {
   } catch (error) {
     let state = null;
     try { evidence.push(await shot(`${id}-failed`)); state = await measure(); } catch {}
+    if (telemetryOnly && id === 'fused-palette') {
+      detail.inputAtFailure = {
+        shell: await page.evaluate(() => (window.__tkInputTimeline ?? []).slice(-400)).catch(() => []),
+        child: await frameOf()?.evaluate(() => (window.__tkInputTimeline ?? []).slice(-400)).catch(() => []),
+      };
+    }
     // Keep independent cases independent: a failed narrow layout or search assertion must
     // not strand all later cases at a narrow viewport or behind the same query.
     try {
@@ -280,7 +311,7 @@ async function notRun(id, name, acs, reason) {
 try {
   fs.writeFileSync(manifestPath, fixtureManifestBytes);
   context = await chromium.launchPersistentContext(profile, {
-    executablePath, headless: true, viewport: { width: 1280, height: 900 },
+    executablePath, headless: true, viewport: { width: 1280, height: 900 }, colorScheme,
     recordVideo: { dir: path.join(output, 'assets'), size: { width: 1280, height: 900 } },
     args: ['--headless=new', '--no-first-run', '--no-default-browser-check', `--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
   });
@@ -292,7 +323,7 @@ try {
     const requested = new URL(route.request().url());
     if (requested.origin === 'https://chatgpt.com' && requested.pathname === '/c/fused_layout_chat' && route.request().isNavigationRequest()) {
       record('synthetic-provider-document', { url: requested.href, note: 'Locally fulfilled test data; no provider connection or real account.' });
-      return route.fulfill({ status: 200, contentType: 'text/html', body: syntheticChatHtml });
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: syntheticChatHtml });
     }
     const hostname = requested.hostname;
     if (['127.0.0.1', 'localhost', '[::1]'].includes(hostname)) return route.continue();
@@ -307,38 +338,8 @@ try {
       new PerformanceObserver(list => { for (const e of list.getEntries()) window.__tkLong.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: true });
     } catch { window.__tkLongSupported = false; }
   });
-  if (telemetryOnly) await context.addInitScript(() => {
-    window.__tkInputTimeline = [];
-    const label = element => element instanceof Element ? { tag: element.tagName, role: element.getAttribute('role'), slot: element.getAttribute('data-slot'), state: element.getAttribute('data-state'), cls: String(element.className).slice(0, 110) } : null;
-    const read = (kind, extra = {}) => {
-      const doc = document;
-      const wb = doc.querySelector('.tk-workbench');
-      const frame = doc.querySelector('.tk-view-paperclip');
-      const layers = [...doc.querySelectorAll('[data-slot="dialog-overlay"], [role="dialog"], [role="alertdialog"]')].map(element => ({ ...label(element), pointerEvents: getComputedStyle(element).pointerEvents, display: getComputedStyle(element).display, visibility: getComputedStyle(element).visibility }));
-      window.__tkInputTimeline.push({ at: performance.timeOrigin + performance.now(), realm: wb ? 'shell' : 'paperclip', kind, raised: wb?.getAttribute('data-fused-raised') ?? null, frameZ: frame ? getComputedStyle(frame).zIndex : null, bodyPointerEvents: doc.body ? getComputedStyle(doc.body).pointerEvents : null, layers, ...extra });
-      if (window.__tkInputTimeline.length > 1600) window.__tkInputTimeline.shift();
-    };
-    for (const name of ['keydown', 'keyup', 'pointerdown', 'pointerup', 'click']) document.addEventListener(name, event => {
-      if (name.startsWith('key') && event.key !== 'Escape') return;
-      read(name, { key: event.key, target: label(event.target), point: 'clientX' in event ? { x: event.clientX, y: event.clientY, hit: label(document.elementFromPoint(event.clientX, event.clientY)) } : null });
-    }, true);
-    window.addEventListener('message', event => {
-      if (event.data?.source === 'paperclip-ui' && event.data.type === 'overlay') read('overlay-received', { reportedOpen: event.data.open });
-    });
-    const observe = () => {
-      new MutationObserver(mutations => {
-        for (const mutation of mutations) {
-          const element = mutation.target;
-          if (!(element instanceof Element)) continue;
-          if (mutation.attributeName === 'data-fused-raised' || (mutation.attributeName === 'style' && element === document.body)
-            || (mutation.attributeName === 'data-state' && (element.matches('[data-slot="dialog-overlay"], [role="dialog"], [role="alertdialog"]')))) {
-            read('attribute-changed', { attribute: mutation.attributeName, value: element.getAttribute(mutation.attributeName), target: label(element) });
-          }
-        }
-      }).observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-fused-raised', 'data-state', 'style'] });
-    };
-    if (document.documentElement) observe(); else document.addEventListener('DOMContentLoaded', observe, { once: true });
-  });
+  if (telemetryOnly || controlledProbe) await installFusedInputTelemetry(context);
+  if (controlledProbe) await installSplitPointerInterceptor(context, origin);
   await context.addInitScript(() => {
     if (location.origin !== 'http://127.0.0.1:3217' || window.parent === window) return;
     window.__tkLog = []; const t0 = performance.now();
@@ -385,6 +386,17 @@ try {
     ctx.detail.msToFused = Date.now() - start; ctx.detail.url = page.url(); ctx.detail.state = { path: m.path, workbench: m.workbench, shell: m.shell, slot: m.slot };
     check(m.rows >= 30, 'Seeded rows rendered', m.rows);
     return `Opened ${directUrl.split('?')[1]} without visiting the Paperclip view; fused Threads in ${ctx.detail.msToFused} ms (shell within 1 px of slot).`;
+  });
+
+  if (process.env.TK_FUSED_SPLIT_PROBE === '1') await runCase('fused-pointer-split-probe', 'Fault probe: native down in the empty childslot, native up in the parent', ['diagnostic'], async ctx => {
+    await goThreads();
+    await verifyOutsidePaletteDismiss({ page, frame: await frame(), until, check, ctx });
+    return runSplitPointerProbe({ page, frame: await frame(), origin, until, check, ctx });
+  });
+  if (process.env.TK_FUSED_TWO_PRESS_PROBE === '1') await runCase('fused-two-press-probe', 'Fault probe: two distinct native presses on the old childsurface', ['diagnostic'], async ctx => {
+    await goThreads();
+    await verifyOutsidePaletteDismiss({ page, frame: await frame(), until, check, ctx });
+    return runSplitPointerProbe({ page, frame: await frame(), origin, until, check, ctx, twoPresses: true });
   });
 
   // ---------------------------------------------------------------- fused-palette (AC-4, AC-6)
@@ -452,16 +464,40 @@ try {
     // so no hidden DOM/state wait masks the first pointer event after the close.
     const stats = {};
     const telemetry = [];
+    if (telemetryOnly) ctx.detail.inputTimeline = telemetry;
+    const preconditions = [];
+    ctx.detail.immediateClickPreconditionContract = 'Before Escape: row1 is selected and focused, then the actual focused palette is fully visible and the parent is raised with the iframe on top at its input. No wait follows Escape before the native click.';
+    ctx.detail.immediateClickPreconditions = preconditions;
+    const zeroTries = telemetryOnly ? Math.min(16, Math.max(4, Number(process.env.TK_FUSED_PALETTE_TRIES) || 4)) : 4;
     for (const delay of [0, 100, 300]) {
-      let ok = 0; const tries = 4;
+      let ok = 0; const tries = delay === 0 ? zeroTries : 4;
       for (let k = 0; k < tries; k++) {
         await goThreads(); const f = await f0(); const input = f.locator('[cmdk-input]').first();
-        const r1 = await page.evaluate(() => { const l = document.querySelector('.tk-shell .tk-row-list'); l.scrollTop = 0; const r = document.querySelectorAll('.tk-shell .tk-row-btn')[1].getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-        await page.mouse.click(r1.x, r1.y); await page.keyboard.press('Meta+k');
-        if (!(await input.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false))) continue;
+        await page.locator('.tk-shell .tk-row-list').evaluate(list => { list.scrollTop = 0; });
+        const resetRow = page.locator('.tk-shell .tk-row-btn').nth(1);
+        await resetRow.click(); // Stable/receives-events checks are setup BEFORE Escape.
+        await until(selectedIndex, value => value === 1, 5000, 'reset row1 actually selected before opening the palette');
+        const resetFocused = await page.locator('.tk-shell .tk-row-btn').nth(1).evaluate(row => row === document.activeElement);
+        check(resetFocused, 'Reset row1 has keyboard focus before Meta+K', { delay, attempt: k });
+        await page.keyboard.press('Meta+k');
+        await input.waitFor({ state: 'visible', timeout: 5000 });
+        const inputBox = await input.boundingBox();
+        const ready = await until(async () => ({
+          child: await f.evaluate(() => {
+            const input = document.querySelector('[cmdk-input]'), dialog = input?.closest('[role="dialog"]');
+            return { focused: input === document.activeElement, visible: Boolean(input?.getClientRects().length), opacity: dialog ? Number(getComputedStyle(dialog).opacity) : 0 };
+          }),
+          parent: await page.evaluate(point => ({ raised: document.querySelector('.tk-workbench')?.getAttribute('data-fused-raised'), iframeOwnsPoint: document.elementFromPoint(point.x, point.y)?.tagName === 'IFRAME' }), center(inputBox)),
+        }), state => state.child.focused && state.child.visible && state.child.opacity >= 0.99 && state.parent.raised === 'true' && state.parent.iframeOwnsPoint, 5000, 'actual palette ready before Escape');
+        preconditions.push({ delay, attempt: k, resetSelected: 1, resetFocused, ready });
         const target = 0;
         const pt = await page.locator('.tk-shell .tk-row-btn').nth(target).boundingBox();
         check(pt && pt.width > 0 && pt.height > 0, 'Immediate click target has a visible box before Escape', pt);
+        if (telemetryOnly) {
+          const point = center(pt);
+          await page.evaluate(value => { window.__tkProbePoint = value; }, point);
+          await f.evaluate(value => { window.__tkProbePoint = value; }, point);
+        }
         const telemetryStart = Date.now();
         await page.keyboard.press('Escape'); if (delay) await sleep(delay);
         await page.mouse.click(pt.x + pt.width / 2, pt.y + pt.height / 2);
@@ -477,8 +513,9 @@ try {
     }
     ctx.detail.clickLandsAfterEscape = stats;
     if (telemetryOnly) ctx.detail.inputTimeline = telemetry;
+    await verifyOutsidePaletteDismiss({ page, frame: await frame(), until, check, ctx });
     const problems = [...(withoutSettle.problems ?? []).map(x => `[no settle] ${x}`), ...(withSettle.problems ?? []).map(x => `[settle] ${x}`)];
-    if (stats['0ms'] !== '4/4') problems.push(`Immediate click regression: ${stats['0ms']} zero-delay clicks reached the target (expected 4/4)`);
+    if (stats['0ms'] !== `${zeroTries}/${zeroTries}`) problems.push(`Immediate click regression: ${stats['0ms']} zero-delay clicks reached the target (expected ${zeroTries}/${zeroTries})`);
     check(problems.length === 0, problems.join('; '), { clickLandsAfterEscape: stats });
     return 'Meta+K from a focused row opened the palette (frame raised, on top, view visible under it by luminance correlation); typing reached it; Escape closed it; a row click right afterwards worked with and without a settle.';
   });
@@ -511,6 +548,8 @@ try {
     }
     ctx.detail.layouts = observations;
     await resizedFused(1280);
+    await page.locator('.tk-rail .tk-search-input').fill('');
+    await until(() => page.locator('.tk-shell .tk-row-btn').count(), count => count >= 40, 15_000, 'all sessions restored after narrow search');
     return 'Fresh Threads entries at700px and480px fill a nonzero mobile content slot. The single Sessions drawer searches and opens the matching chat; the main pane remains the selected conversation.';
   });
 
@@ -701,10 +740,11 @@ try {
     await index.getByRole('combobox', { name: 'Sort threads', exact: true }).waitFor({ state: 'visible' });
     const grouping = index.getByRole('combobox', { name: 'Group by', exact: true });
     await grouping.selectOption('provider');
-    ctx.detail.grouping = await grouping.inputValue();
+    ctx.detail.grouping = await until(() => grouping.inputValue(), value => value === 'provider', 5_000, 'saved provider grouping');
     check(ctx.detail.grouping === 'provider', 'Grouping can be changed within Sessions', ctx.detail);
     await ctx.shot('-filters');
     await grouping.selectOption('none');
+    await until(() => grouping.inputValue(), value => value === 'none', 5_000, 'saved ungrouped list');
     await filters.click();
     const selectAll = index.getByRole('checkbox', { name: 'Select all in view', exact: true });
     await selectAll.check();
@@ -741,6 +781,7 @@ try {
       check(geometry.header.height <= 160 && geometry.live.height >= 580,
         `The compact header leaves at least 580px of a 900px window for live chat at ${width}`, geometry);
       check(geometry.duplicateMainIndexes === 0, 'Chat pane is not split by a duplicate list column', geometry);
+      geometry.liveFrame = await settledLiveFrame();
       await ctx.shot(`-${width}`);
     }
     ctx.detail.layouts = layouts;
@@ -750,6 +791,12 @@ try {
     await taskLinks.click();
     const taskDialog = page.getByRole('dialog', { name: 'Task and session links', exact: true });
     await taskDialog.waitFor({ state: 'visible' });
+    ctx.detail.taskLinksComputedStyle = await taskDialog.evaluate(async dialog => {
+      const finite = animation => Number.isFinite(animation.effect?.getComputedTiming().endTime);
+      await Promise.all(dialog.getAnimations({ subtree: true }).filter(finite).map(animation => animation.finished.catch(() => {})));
+      const style = getComputedStyle(dialog), backdrop = getComputedStyle(dialog, '::backdrop');
+      return { backgroundColor: style.backgroundColor, opacity: style.opacity, animationName: style.animationName, backdrop: { backgroundColor: backdrop.backgroundColor, opacity: backdrop.opacity }, activeFiniteAnimations: dialog.getAnimations({ subtree: true }).filter(animation => finite(animation) && animation.playState === 'running').length };
+    });
     const taskBox = await taskDialog.boundingBox();
     ctx.detail.taskLinksDialogOnTop = await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest('dialog')), center(taskBox));
     check(ctx.detail.taskLinksDialogOnTop, 'Task links opens above the live provider frame', ctx.detail);
@@ -905,7 +952,9 @@ try {
   if (process.env.TK_FUSED_SKIP_OFFLINE === '1') await notRun('fused-offline', 'Server stop keeps Threads with the shell rail; restart resumes fused mode', ['AC-8'], 'Skipped by TK_FUSED_SKIP_OFFLINE=1.');
   else await runCase('fused-offline', 'Server stop keeps Threads with the shell rail; restart resumes fused mode', ['AC-8'], async ctx => {
     await goThreads();
-    await page.locator('.tk-shell .tk-row-btn').filter({ hasText: 'Create Research Agent Plugin' }).click();
+    // Live capture can add another library identity for this synthetic URL. Reopen the
+    // exact existing workspace session rather than choosing between two matching titles.
+    await page.locator('.tk-shell .tk-row-btn[data-open="true"]').filter({ hasText: 'Create Research Agent Plugin' }).click();
     await page.getByRole('radio', { name: 'Live', exact: true }).click();
     // Ownership check before the owned stop path is used: the listener on 3217 must be the recorded source server.
     const meta = JSON.parse(fs.readFileSync(process.env.TK_PAPERCLIP_RUNTIME || '/tmp/threadkeeper-acceptance-runtime.json', 'utf8'));
@@ -939,6 +988,7 @@ try {
         'Standalone Threads has one Sessions index and a compact header', layout);
       check(Math.abs(layout.title.y + layout.title.height / 2 - layout.modes.y - layout.modes.height / 2) <= 2 && layout.actionRects.every(r => Math.abs(r.y + r.height / 2 - layout.controls.y - layout.controls.height / 2) <= 8),
         'Standalone title/tabs and controls each fit one row', layout);
+      layout.liveFrame = await settledLiveFrame();
       await ctx.shot(`-standalone-${width}`);
       if (width < 900) await page.getByRole('button', { name: 'Expand navigation', exact: true }).click();
       const index = page.locator('.tk-rail .tk-list-sidebar');
@@ -983,7 +1033,7 @@ try {
   const currentSha = crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex');
   const fixtureSha = crypto.createHash('sha256').update(fixtureManifestBytes).digest('hex');
   if (currentSha === fixtureSha) fs.writeFileSync(manifestPath, originalManifestBytes);
-  const result = { completedAt: new Date().toISOString(), browser: { executablePath, version: browserVersion }, build: diskBuild, extensionId, revision, origin, companyPrefix: prefix, manifestFixture: { grantedOrigins, restored: crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex') === crypto.createHash('sha256').update(originalManifestBytes).digest('hex') }, counts: Object.fromEntries(['pass', 'fail', 'not_run'].map(s => [s, cases.filter(c => c.status === s).length])), cases: cases.map(({ id, name, acs, status, observation, evidence }) => ({ id, name, acs, status, observation: String(observation).slice(0, 600), evidence })), diagnostics, events: events.slice(0, 200) };
+  const result = { completedAt: new Date().toISOString(), browser: { executablePath, version: browserVersion, colorScheme }, build: diskBuild, extensionId, revision, origin, companyPrefix: prefix, manifestFixture: { grantedOrigins, restored: crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex') === crypto.createHash('sha256').update(originalManifestBytes).digest('hex') }, counts: Object.fromEntries(['pass', 'fail', 'not_run'].map(s => [s, cases.filter(c => c.status === s).length])), cases: cases.map(({ id, name, acs, status, observation, evidence }) => ({ id, name, acs, status, observation: String(observation).slice(0, 600), evidence })), diagnostics, events: events.slice(0, 200) };
   fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ complete: true, counts: result.counts, output }));
   if (cases.some(c => c.status === 'fail')) process.exitCode = 1;

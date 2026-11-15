@@ -1,0 +1,419 @@
+
+ RUN  v3.2.7 /Users/andrew/dev/threadkeeper/paperclip/extension
+
+ ✓ tests/unit/dock-scale.test.ts (1 test) 1817ms
+   ✓ library scale > reconciles, searches and counts 4000 threads within budget  1816ms
+ ✓ tests/unit/accounts-service.test.ts (53 tests) 1512ms
+ ✓ tests/unit/organizer.test.ts (31 tests) 291ms
+stderr | tests/unit/workspace-commands.test.ts > service worker wiring
+[threadkeeper] account switch recovery failed
+
+ ✓ tests/unit/workspace-commands.test.ts (26 tests) 1311ms
+   ✓ service worker wiring > files a profile frame's capture, cookies and identity under the profile's account, never the browser's  764ms
+ ✓ tests/unit/paperclip-actions.test.ts (10 tests) 1786ms
+   ✓ browser action safety > reports a held action's verdict before its deadline so Paperclip receives it in time (plugin follow-up 3)  1141ms
+ ✓ tests/unit/backup.test.ts (7 tests) 2831ms
+   ✓ backup and restore > restores a whole library into an empty one, settings included  1943ms
+   ✓ backup and restore > refuses files that are not backups and reports a backup that was cut short  802ms
+ ✓ tests/unit/threads-view.test.tsx (40 tests) 623ms
+ ✓ tests/unit/paperclip-sync.test.ts (18 tests) 1648ms
+   ✓ Paperclip sync > pages through many issues  374ms
+ ✓ tests/unit/manager-app.test.tsx (47 tests) 19481ms
+   ✓ manager workbench DOM > page surface, library just opened  373ms
+   ✓ manager workbench DOM > page surface, cards view  726ms
+   ✓ manager workbench DOM > page surface, Settings dialog open  426ms
+   ✓ manager workbench DOM > page surface, Organize dialog open  577ms
+   ✓ manager workbench DOM > page surface, Organize dialog with a typed instruction and its keyword preview  363ms
+   ✓ manager workbench interactions > preserves a deep link while settings hydrate and clears it only for a later server change  1049ms
+   ✓ manager workbench interactions > uses the existing sidebar as the only Threads index and opens it for the search shortcut  482ms
+   ✓ manager workbench interactions > opens the narrow navigation drawer and focuses search with one slash press  482ms
+   ✓ manager workbench interactions > search reopens navigation after the person collapses it during the same visit  407ms
+   ✓ manager workbench interactions > opens Paperclip in a dedicated frame and preserves it while switching views  456ms
+   ✓ manager workbench interactions > Escape dismisses the account menu before the narrow workspace drawer  434ms
+   ✓ manager workbench interactions > Escape closes a dialog, then the narrow workspace drawer, then the checked rows  543ms
+   ✓ manager workbench interactions > "j" and "k" move the opened thread and focus its row  1383ms
+   ✓ manager workbench interactions > Escape closes the innermost dialog first, then the next  519ms
+   ✓ manager workbench interactions > Escape clears checked rows once no dialog is open  530ms
+   ✓ manager workbench interactions > typing in search filters the rows and persists the query  457ms
+   ✓ manager workbench interactions > the row checkbox selects a row without opening it, and select-all reaches the whole view  326ms
+   ✓ manager workbench interactions > the page theme toggle persists the new theme and flips the document theme  385ms
+   ✓ manager workbench interactions > collapsing the nav rail persists, and the view mode select persists  318ms
+   ✓ manager workbench interactions > a new project is created from the nav rail  375ms
+   ✓ manager workbench interactions > manual edits, status and project change are written through to the library  536ms
+   ✓ manager workbench interactions > the page registers only when needed and keeps local preferences local  829ms
+   ✓ manager workbench interactions > the sidepanel registers only when needed and keeps local preferences local  548ms
+   ✓ manager workbench interactions > remembers the Threads order across a reload  600ms
+   ✓ manager workbench interactions > "Show all" in the side navigation opens Threads narrowed to that type, with a chip to remove it  418ms
+   ✓ manager workbench interactions > the sidebar Organize menu regroups the rail and the choice is saved  376ms
+   ✓ manager workbench landing > stays where the person left off when they chose that, or once the tab has already landed  342ms
+   ✓ manager workbench landing > follows a link that names a thread instead of landing  626ms
+   ✓ manager workbench landing > never lands on the side panel  441ms
+ ✓ tests/unit/online-import.test.ts (51 tests) 1349ms
+   ✓ orchestrator review fixes > a page that keeps sending heartbeats is not timed out, even well past the idle limit  331ms
+ ✓ tests/unit/workspace-demo.test.ts (7 tests) 635ms
+ ✓ tests/unit/paperclip-bridge.test.ts (14 tests) 487ms
+ ✓ tests/unit/summary-v2.test.ts (21 tests) 250ms
+ ✓ tests/unit/paperclip-integration-ui.test.tsx (9 tests) 774ms
+   ✓ thread task links > links a shared session to the chosen task and opens the dedicated app view  640ms
+stdout | tests/unit/retrieval-eval.test.ts > offline retrieval evaluation (synthetic fixtures, on-device path) > reports the labelled query set before and after
+variant | recall@5 | recall@10 | MRR | nDCG@10 | no-answer results
+manager first stage, baseline | 0.885 | 0.935 | 0.87 | 0.871 | 0.5
+manager lexical only | 0.885 | 0.935 | 0.83 | 0.835 | 0.5
+manager first stage, current | 0.885 | 0.935 | 0.87 | 0.871 | 0.5
+Still search (dock), current | 0.831 | 0.863 | 0.783 | 0.804 | 0
+(per-query detail: /var/folders/z3/_ntjy7xn1bx50p4g4jlfc31w0000gn/T/threadkeeper-retrieval-eval.json)
+
+ ✓ tests/unit/retrieval-eval.test.ts (1 test) 356ms
+ ✓ tests/unit/backup-helper.test.ts (6 tests) 299ms
+ ✓ tests/unit/core.test.ts (17 tests) 215ms
+ ✓ tests/unit/capture.test.ts (48 tests) 93ms
+ ✓ tests/unit/accounts-ui.test.tsx (48 tests) 482ms
+ ✓ tests/unit/dock-ui.test.ts (24 tests) 384ms
+ ✓ tests/unit/dock-sync.test.ts (15 tests) 339ms
+ ✓ tests/unit/paperclip-fused.test.tsx (28 tests) 18116ms
+   ✓ fused window (real App) > lays the same mounted Threads view over the reported rectangle with no second view switch (AC-3, AC-7, AC-9)  454ms
+   ✓ fused window (real App) > acknowledges each placement so the page turns transparent only under a placed view (F-2)  655ms
+   ✓ fused window (real App) > re-sends placed when ready+slot or slot null+slot view arrive in one batch (quality F-1)  1035ms
+   ✓ fused window (real App) > switches views without engaging when the page is not fused (F-2 fallback)  926ms
+   ✓ fused window (real App) > fuses from a plain Threads entry once Paperclip is connected and running, and keeps its host grant (FR-6, round-3 observation)  607ms
+   ✓ fused window (real App) > keeps a direct Threads entry while the real frame first reports its home page and stale empty slots  1019ms
+   ✓ fused window (real App) > waits for the company route before navigating a direct entry, without losing the requested view  631ms
+   ✓ fused window (real App) > keeps an explicit Paperclip entry on its own page  355ms
+   ✓ fused window (real App) > ignores a rectangle outside the window and keeps the placement (AC-11)  469ms
+   ✓ fused window (real App) > follows Paperclip pages without remounting views, and sends Paperclip to the page of a view the shell opens (AC-3)  563ms
+   ✓ fused window (real App) > raises Paperclip for a blocking overlay, opens its palette with Command+K from the view and returns focus (AC-4, AC-6)  872ms
+   ✓ fused window (real App) > opens the palette with Command+K on a thread row without moving the selection (AC-6, F-3)  704ms
+   ✓ fused window (real App) > lowers the frame before the validated native close-message handler returns  440ms
+   ✓ fused window (real App) > recovers only one existing Threads row selection immediately after a real overlay close  927ms
+   ✓ fused window (real App) > still moves through rows with plain j and k in fused mode  414ms
+   ✓ fused window (real App) > cuts a notice out of the view instead of raising Paperclip (AC-5)  310ms
+   ✓ fused window (real App) > asks Paperclip about an overlay open for 60 s and restores the view when it reports none (FR-3 negative)  1554ms
+   ✓ fused window (real App) > shows the shell rail with Threads still mounted when the server stops, and fuses again on ready (AC-8)  5595ms
+ ✓ tests/unit/browse-view.test.tsx (31 tests) 316ms
+ ✓ tests/unit/bulk.test.ts (28 tests) 221ms
+ ✓ tests/unit/dock-query.test.ts (16 tests) 258ms
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > gives each pane a slot for its thread tab and a name
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > focuses a pane from its header
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > unpins and opens in Browse from the pane header
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > swaps a session from the menu and closes it with Escape, returning focus
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > offers unplaced pinned sessions in an empty pane, or says all are placed
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView > focuses a pane with Alt+number only while the dashboard is showing
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView: organizing the pinned bar > keeps a session that is already in a pane in its pane when the filter hides its chip
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+stderr | tests/unit/dashboard-view.test.tsx > DashboardView: organizing the pinned bar > tells an empty pane that the filters hide the other pinned sessions, with a way back
+Warning: An update to RestingPage inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at RestingPage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/RestingPage.tsx:23:3)
+    at div
+    at FrameSlot (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:215:3)
+    at section
+    at DashboardPane (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardPane.tsx:20:26)
+    at div
+    at div
+    at DashboardView (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/dashboard/DashboardView.tsx:31:60)
+    at FrameStage (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/FrameStage.tsx:28:3)
+    at WorkspaceProvider (/Users/andrew/dev/threadkeeper/paperclip/extension/src/entrypoints/manager/workspace/context.tsx:13:30)
+
+ ✓ tests/unit/dashboard-view.test.tsx (24 tests) 199ms
+ ✓ tests/unit/rail.test.tsx (32 tests) 269ms
+ ✓ tests/unit/dock-background.test.ts (4 tests) 134ms
+ ✓ tests/unit/paperclip-bridge-client.test.ts (21 tests) 168ms
+ ✓ tests/unit/dock-review-fixes.test.ts (8 tests) 137ms
+ ✓ tests/unit/cli-sessions.test.ts (36 tests) 91ms
+ ✓ tests/unit/rerank.test.ts (26 tests) 68ms
+ ✓ tests/unit/site-data.test.ts (22 tests) 53ms
+ ✓ tests/unit/catch-up.test.ts (11 tests) 60ms
+ ✓ tests/unit/paperclip-integration-runtime.test.ts (8 tests) 201ms
+ ✓ tests/unit/frame-stage.test.tsx (14 tests) 191ms
+ ✓ tests/unit/paperclip-settings.test.ts (15 tests) 83ms
+ ✓ tests/unit/accounts-crypto.test.ts (4 tests) 23ms
+ ✓ tests/unit/paperclip-delivery.test.ts (14 tests) 167ms
+ ✓ tests/unit/dock-protocol.test.ts (18 tests) 6ms
+ ✓ tests/unit/online-import-ui.test.tsx (4 tests) 45ms
+ ✓ tests/unit/embed-content.test.ts (24 tests) 75ms
+ ✓ tests/unit/host-access.test.ts (7 tests) 71ms
+ ✓ tests/unit/history-sync.test.ts (37 tests) 94ms
+ ✓ tests/unit/dock-pairing.test.ts (13 tests) 98ms
+ ✓ tests/unit/merge.test.ts (13 tests) 47ms
+ ✓ tests/unit/aws.test.ts (6 tests) 7ms
+ ✓ tests/unit/paperclip-hints.test.ts (5 tests) 56ms
+ ✓ tests/unit/model-apis.test.ts (27 tests) 31ms
+ ✓ tests/unit/thread-search.test.tsx (6 tests) 77ms
+ ✓ tests/unit/dock-payload.test.ts (15 tests) 57ms
+ ✓ tests/unit/agent-run.test.ts (26 tests) 58ms
+ ✓ tests/unit/openai-bedrock.test.ts (7 tests) 17ms
+ ✓ tests/unit/providers-adapters.test.ts (28 tests) 63ms
+ ✓ tests/unit/search-retrieval.test.ts (5 tests) 48ms
+ ✓ tests/unit/paperclip-connection.test.tsx (2 tests) 13ms
+ ✓ tests/unit/bedrock-embeddings.test.ts (10 tests) 53ms
+ ✓ tests/unit/paperclip-view.test.tsx (11 tests) 57ms
+ ✓ tests/unit/providers-content-xchat.test.ts (3 tests) 27ms
+ ✓ tests/unit/threads-sidebar.test.tsx (4 tests) 64ms
+ ✓ tests/unit/accounts-set-cookie.test.ts (36 tests) 18ms
+ ✓ tests/unit/workbench-keyboard-dialog.test.tsx (2 tests) 15ms
+ ✓ tests/unit/agent-state.test.ts (7 tests) 20ms
+ ✓ tests/unit/paperclip-connection-status.test.tsx (13 tests) 24ms
+ ✓ tests/unit/paperclip-credentials.test.ts (18 tests) 64ms
+ ✓ tests/unit/paperclip-credentials-ui.test.tsx (3 tests) 29ms
+ ✓ tests/unit/cookie-shim.test.ts (23 tests) 9ms
+ ✓ tests/unit/repository.test.ts (20 tests) 39ms
+ ✓ tests/unit/providers-content-site.test.ts (5 tests) 35ms
+ ✓ tests/unit/paperclip-automatic-links.test.ts (4 tests) 44ms
+ ✓ tests/unit/profile-slots.test.ts (40 tests) 8ms
+ ✓ tests/unit/profile-seed.test.ts (19 tests) 11ms
+ ✓ tests/unit/model-response-validation.test.ts (30 tests) 23ms
+ ✓ tests/unit/message-identity.test.ts (6 tests) 21ms
+ ✓ tests/unit/ai-backends.test.ts (9 tests) 43ms
+ ✓ tests/unit/providers-custom-sites.test.ts (18 tests) 12ms
+ ✓ tests/unit/paperclip-client.test.ts (17 tests) 18ms
+ ✓ tests/unit/third-party-sites.test.ts (12 tests) 15ms
+ ✓ tests/unit/providers-registry.test.ts (108 tests) 15ms
+ ✓ tests/unit/embed-gate.test.ts (15 tests) 10ms
+ ✓ tests/unit/profile-jars.test.ts (24 tests) 8ms
+ ✓ tests/unit/profiles.test.ts (46 tests) 13ms
+ ✓ tests/unit/paperclip-integration-client.test.ts (4 tests) 5ms
+ ✓ tests/unit/lens.test.ts (41 tests) 10ms
+ ✓ tests/unit/cookie-bridge.test.ts (16 tests) 7ms
+ ✓ tests/unit/paperclip-lifecycle.test.ts (20 tests) 13ms
+ ✓ tests/unit/paperclip-manager-actions.test.ts (12 tests) 8ms
+ ✓ tests/unit/workspace-state.test.ts (30 tests) 9ms
+ ✓ tests/unit/related.test.ts (6 tests) 7ms
+ ✓ tests/unit/session-control-import.test.ts (8 tests) 6ms
+ ✓ tests/unit/diagnostics.test.ts (14 tests) 5ms
+ ✓ tests/unit/paperclip-mapper.test.ts (18 tests) 4ms
+ ✓ tests/unit/accounts-identity.test.ts (11 tests) 4ms
+ ✓ tests/unit/launch.test.ts (23 tests) 4ms
+ ✓ tests/unit/embed-rules.test.ts (13 tests) 5ms
+ ✓ tests/unit/paperclip-host.test.ts (10 tests) 5ms
+ ✓ tests/unit/frame-names.test.ts (37 tests) 3ms
+ ✓ tests/unit/profile-page.test.ts (21 tests) 5ms
+ ✓ tests/unit/paperclip-observations.test.ts (9 tests) 5ms
+ ✓ tests/unit/accounts-cookies.test.ts (14 tests) 9ms
+ ✓ tests/unit/paperclip-integration-contract.test.ts (8 tests) 2ms
+ ✓ tests/unit/capture-check.test.ts (10 tests) 3ms
+ ✓ tests/unit/workspace-adoption.test.ts (8 tests) 2ms
+ ✓ tests/unit/paperclip-helper.test.ts (6 tests) 421ms
+   ✓ fixed Paperclip helper registration > records a source shim without registering a service, and ignores message paths  331ms
+ ✓ tests/unit/bundle-weight.test.ts (5 tests) 47ms
+ ✓ tests/unit/mac-helper.test.ts (31 tests) 817ms
+   ✓ installer: browsers and extension IDs > starts through the launcher with an empty PATH, and when the recorded Node.js is gone  408ms
+
+ Test Files  106 passed (106)
+      Tests  1957 passed (1957)
+   Start at  21:48:54
+   Duration  52.04s (transform 2.38s, setup 0ms, collect 12.12s, tests 60.68s, environment 17.03s, prepare 3.52s)
+

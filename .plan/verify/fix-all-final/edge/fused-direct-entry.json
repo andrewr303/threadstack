@@ -1,0 +1,46 @@
+{
+  "id": "fused-direct-entry",
+  "name": "Manager opened at ?view=threads with the server running reaches fused Threads",
+  "acs": [
+    "entry"
+  ],
+  "status": "pass",
+  "startedAt": "2026-11-15T05:54:11.041Z",
+  "completedAt": "2026-11-15T05:54:11.715Z",
+  "observation": "Opened surface=page&view=threads without visiting the Paperclip view; fused Threads in 535 ms (shell within 1 px of slot).",
+  "detail": {
+    "msToFused": 535,
+    "url": "chrome-extension://offhmjmiccalfahcdkdhcddbnealijkm/manager.html?surface=page&view=threads&pc=%2FTHR%2Fthreads",
+    "state": {
+      "path": "/THR/threads",
+      "workbench": {
+        "surface": "page",
+        "view": "threads",
+        "fused": "true"
+      },
+      "shell": {
+        "x": 240,
+        "y": 60,
+        "width": 1040,
+        "height": 840,
+        "top": 60,
+        "right": 1280,
+        "bottom": 900,
+        "left": 240
+      },
+      "slot": {
+        "x": 240,
+        "y": 60,
+        "width": 1040,
+        "height": 840,
+        "top": 60,
+        "right": 1280,
+        "bottom": 900,
+        "left": 240
+      }
+    }
+  },
+  "evidence": [
+    "fused-direct-entry.png"
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "runtime": {
+    "node": "v26.13.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "head": "258c14f8da4761932a6c2e7d7255e0c09cb1f7d7",
+  "files": {
+    ".github/workflows/pr.yml": "ef08050f5631a51c73f0eba0990abbf7e0623981cf93a733db074436ba9459c8",
+    ".github/workflows/threadkeeper-pr.yml": "9df210e4964ba7668eb860066e9ad9090f2778816ff15aa3fe65078eeddd0c70",
+    "scripts/threadkeeper-ci.test.mjs": "b02d3b39f78cdc96897f90541328c5e10b3ff4ae4c2f7480862fa368425c4fb6",
+    ".plan/verify/fork-ci-implementation.md": "89054a9cd2ac281d1707349a302f56db52f15bec5ae2e3e6b0f39e6fc946c09d"
+  },
+  "workflows": [
+    {
+      "file": ".github/workflows/pr.yml",
+      "yaml": "valid",
+      "shellBlocks": 0
+    },
+    {
+      "file": ".github/workflows/threadkeeper-pr.yml",
+      "yaml": "valid",
+      "shellBlocks": 15
+    }
+  ],
+  "selectedTests": {
+    "count": 30,
+    "files": [
+      "ui/src/api/browser-sessions.test.ts",
+      "ui/src/components/BrowserSessionCredentialSettings.test.tsx",
+      "ui/src/components/CommandPalette.test.tsx",
+      "ui/src/components/CoordinatorSidebar.test.tsx",
+      "ui/src/components/IssueDetailTabBar.test.tsx",
+      "ui/src/components/ThreadkeeperSlot.test.tsx",
+      "ui/src/components/search/BrowserSessionResults.test.tsx",
+      "ui/src/context/LiveUpdatesProvider.recovery.test.tsx",
+      "ui/src/lib/hosted-live-transport.test.ts",
+      "ui/src/lib/threadkeeper-boot-channel.test.ts",
+      "ui/src/lib/threadkeeper-host-bridge.test.ts",
+      "ui/src/lib/threadkeeper-host-fusion.test.ts",
+      "ui/src/lib/threadkeeper-host-slot.test.ts",
+      "ui/src/lib/threadkeeper-host.test.ts",
+      "ui/src/lib/threadkeeper-overlays.test.ts",
+      "ui/src/pages/CompanySettingsPluginPage.test.tsx",
+      "ui/src/pages/InviteLanding.test.tsx",
+      "ui/src/pages/PluginPage.test.tsx",
+      "server/src/__tests__/bundled-plugins.test.ts",
+      "server/src/__tests__/cli-invocation-safety.test.ts",
+      "server/src/__tests__/company-live-events-stream.test.ts",
+      "server/src/__tests__/http-log-policy.test.ts",
+      "server/src/__tests__/logger-browser-session-redaction.test.ts",
+      "server/src/__tests__/plugin-install-autobuild.test.ts",
+      "server/src/__tests__/plugin-scoped-api-routes.test.ts",
+      "server/src/__tests__/redact-sensitive.test.ts",
+      "server/src/__tests__/static-index-html.test.ts",
+      "server/src/__tests__/tool-access-policy-service.test.ts",
+      "server/src/__tests__/tool-gateway.test.ts",
+      "server/src/__tests__/workspace-runtime.test.ts"
+    ]
+  },
+  "upstreamRoutingUnchanged": true,
+  "upstreamTrustedWorkflowUnchanged": true,
+  "sdkWorkingTreeStaleInputs": [],
+  "hostedExecution": "not_run",
+  "fullPaperclipQualification": false
+}

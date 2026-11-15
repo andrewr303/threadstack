@@ -334,3 +334,29 @@ All REQ and TASK statuses retain their unfinished values. The live extension, or
 and user service remain outside the authorized test/deploy boundary. Broad Paperclip
 qualification, native consent, real providers/keys, helper/launchd, MV3 suspension, and live-library
 continuity remain visible until actual evidence resolves them.
+
+## Fix-all and compact-chat delivery, 2026-11-14
+
+The later request authorized repairs through a new PR. The earlier open-defect lists are historical;
+the current source repairs and requested compact UI are verified in
+`verify/fix-all-final/report.md`. Chrome round 43 and Edge round 44 each pass all 16 journeys, including
+strict immediate input, correct mobile sizing, the one-row header/controls, unified Sessions list,
+Ask, task-link dialog and actual owned-server recovery. The full extension suite passes 1,957 tests;
+independent ordered spec/quality supplements pass. Gesture recovery uses host-owned sequence IDs
+within the original 250 ms window; it can select only a registered existing session row.
+
+The fork source and Threadkeeper history are prepared on
+`fix/threadkeeper-integration-and-chat-layout` for `AVRCORP/threadkeeper` → `main`. Paperclip is at
+the repository root and Threadkeeper under `extension/`; the URL-less gitlink is removed. The
+actual publication result is linked to the owning Synara thread. Source evidence precedes hosted
+CI; inspect the PR checks rather than inferring a hosted pass from local logs.
+
+The live manifest bytes/mtime and original Git head are unchanged. The historical 443-file baseline
+now differs in 80 tracked files from the currently clean original checkout; this run does not claim
+historical snapshot parity. The approved profile work remains in the integration and merged
+Threadkeeper history. All owned temporary browsers, server, PostgreSQL and watcher were closed.
+
+All original REQ/TASK statuses remain in progress. Full Paperclip qualification, native consent,
+real providers/keys, helper/service installation, MV3 suspension, live deployment/library continuity
+and original formal gate/decision differences are not certified. No further permission is needed
+to review this concrete PR; live installation remains a separate action.

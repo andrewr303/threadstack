@@ -1,0 +1,54 @@
+{
+  "sourceCommit": "4619c07b2a8dcd864e1315ef4964ae2bb0c27490",
+  "observedAt": "2026-11-15T06:00:00.887273+00:00",
+  "browserRounds": {
+    "chrome": {
+      "browser": {
+        "executablePath": "/Users/andrew/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "version": "156.0.8078.4",
+        "colorScheme": "dark"
+      },
+      "counts": {
+        "pass": 16,
+        "fail": 0,
+        "not_run": 0
+      },
+      "mediaAndStructure": "pass",
+      "sourceFilesMatched": 2022,
+      "build": {
+        "version": "0.5.0",
+        "versionName": "0.5.0 (build 20261115.054541-a44541df70)",
+        "buildId": "20261115.054541-a44541df70",
+        "builtAt": "2026-11-15T05:45:41.421Z"
+      }
+    },
+    "edge": {
+      "browser": {
+        "executablePath": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "version": "157.0.4341.46",
+        "colorScheme": "dark"
+      },
+      "counts": {
+        "pass": 16,
+        "fail": 0,
+        "not_run": 0
+      },
+      "mediaAndStructure": "pass",
+      "sourceFilesMatched": 2022,
+      "build": {
+        "version": "0.5.0",
+        "versionName": "0.5.0 (build 20261115.054541-a44541df70)",
+        "buildId": "20261115.054541-a44541df70",
+        "builtAt": "2026-11-15T05:45:41.421Z"
+      }
+    }
+  },
+  "liveManifest": {
+    "bytesUnchanged": true,
+    "mtimeUnchanged": true
+  },
+  "originalHeadUnchanged": true,
+  "historicalSnapshotParity": "80 historical baseline files differ from the now-clean tracked original checkout; no historical 443-file parity claim is made. See original-snapshot-preservation.json.",
+  "layoutAndBehavior": "Title modes together, one controls row with Task links dialog, one Sessions index, full-width Ask, correct mobile placement and native gesture recovery verified by mapped browser cases.",
+  "formalPlanCompletion": false
+}

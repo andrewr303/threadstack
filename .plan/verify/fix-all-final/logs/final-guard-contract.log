@@ -1,0 +1,28 @@
+(node:97054) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the extension reports an action verdict before the plugin times it out, and a cancel inside the settle window (4.316917ms)
+✔ the timing check catches a one-sided change (guards the check itself) (16.733917ms)
+✔ MAX_NOTICE_REGIONS matches between the extension host and the Paperclip UI (0.369041ms)
+✔ the post-overlay session-selection window matches on both sides (0.238417ms)
+✔ the plugin pages and UI host expose the same Threadkeeper routes (0.167209ms)
+✔ browse round-trips through PluginPage, the host parser, fusion and App placement as browse (1.092417ms)
+✔ threads round-trips through PluginPage, the host parser, fusion and App placement as threads (0.21875ms)
+✔ session-board round-trips through PluginPage, the host parser, fusion and App placement as dashboard (0.16175ms)
+✔ checks refuse unsafe script or workspace edits before running anything (13.256125ms)
+✔ checks and deployment force path IDs, with no inherited live destination (1.014166ms)
+✔ whole-fork command plan checks both toolchains and stops through argv execution (0.674ms)
+✔ guard tests are wired into package.json and both check modes (0.311667ms)
+✔ a lockfile importer or a non-18 React installation fails the guard (2.930042ms)
+✔ an output path that is a symlink fails the guard before anything runs (1.6915ms)
+✔ the built manifest must exist, be fresh and carry no key; a stale build is replaced, not trusted (4.121916ms)
+✔ deployment refuses relative, unsafe and aliased targets (6.262042ms)
+✔ deployment allows other folders inside the home directory, such as the documented live folder (2.708834ms)
+✔ the deploy entry point exits 1 and writes nothing when TK_LIVE_DIR is missing or relative (376.094542ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 628.444709
