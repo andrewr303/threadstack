@@ -308,11 +308,14 @@ describe('Dexie v3 migration', () => {
 
     const db = new ThreadkeeperDB(name);
     const settings = await ensureStarterCollectionsAndSettings(db);
-    // v3 added the dock tables; v4 adds accounts, their cookie jars and the workspace values.
-    expect(db.verno).toBe(4);
+    // v3 added the dock tables; v4 adds accounts, their cookie jars and the workspace values;
+    // v5 adds the Table view's columns and values.
+    expect(db.verno).toBe(5);
     expect(await db.accounts.count()).toBe(0);
     expect(await db.accountJars.count()).toBe(0);
     expect(await db.kv.count()).toBe(0);
+    expect(await db.tableColumns.count()).toBe(0);
+    expect(await db.tableCells.where('threadKey').equals('k1').count()).toBe(0);
     expect(settings.theme).toBe('dark');
     expect(settings.sidebarDock.pairedId).toBe('');
     expect(await db.conversations.count()).toBe(1);

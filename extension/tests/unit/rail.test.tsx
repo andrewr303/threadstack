@@ -333,11 +333,15 @@ describe('Rail: views, tools and the collapsed strip', () => {
     const group = container.querySelector('[role="radiogroup"]')!;
     expect(group.getAttribute('aria-label')).toBe('View');
     const radios = [...group.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
-    expect(radios.map((r) => r.textContent)).toEqual(['Browse', 'Threads', 'Dashboard', 'Paperclip']);
+    // Icons only (five names do not fit the rail); each keeps its name for assistive technology.
+    expect(radios.map((r) => r.getAttribute('aria-label'))).toEqual(['Browse', 'Threads', 'Table', 'Dashboard', 'Paperclip']);
+    expect(radios.map((r) => r.getAttribute('title'))).toEqual(['Browse', 'Threads', 'Table', 'Dashboard', 'Paperclip']);
     expect(radios[0].getAttribute('aria-checked')).toBe('true');
     click(radios[2]);
-    expect(onViewChange).toHaveBeenCalledWith('dashboard');
+    expect(onViewChange).toHaveBeenCalledWith('table');
     click(radios[3]);
+    expect(onViewChange).toHaveBeenCalledWith('dashboard');
+    click(radios[4]);
     expect(onViewChange).toHaveBeenCalledWith('paperclip');
     act(() => {
       radios[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));

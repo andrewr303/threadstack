@@ -145,7 +145,7 @@
 .tk-rail-seg .tk-seg-item {
   flex-direction: column;
   gap: 2px;
-  min-height: 44px;
+  min-height: 36px;
   padding: 4px 1px;
   border-radius: var(--r-row);
   font-size: var(--fs-12);
