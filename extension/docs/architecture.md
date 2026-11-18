@@ -2,6 +2,55 @@
 
 The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
 
+## Table view: every thread as a row, with columns the person and Claude fill (2026-11-17)
+
+**Where it lives.** `table` is a fifth workspace view (`WORKSPACE_VIEWS`), full page only, rendered by
+`manager/table/TableView.tsx`. A table needs the page's width, which Threads gives to its list and
+detail. The expanded rail's view switch is now icon-only because five names do not fit its 48px slots
+(each keeps its name as the accessible name and tooltip). The view stays mounted like the others but
+computes and renders nothing while hidden, so a large library costs nothing on other views. Paperclip's
+fused mode has no slot for it: Paperclip's sidebar decides the view there, and the shell never routes
+Paperclip to a Table page (`App.tsx` skips `fusedRoute` for `table`).
+
+**Data** (`core/thread-table.ts`, Dexie v5). Built-in columns (title, type from the provider's
+category, provider, created, last active, status, project, topics, work type, messages, repository,
+account) are read from the conversation and its resolved insight and never stored. Columns the person
+adds are `tableColumns` rows (`text`, `number`, `checkbox`, `select`, `multi_select`, with choices and
+instructions); each value is a `tableCells` row keyed `columnId|threadKey` with `source: 'manual' | 'ai'`.
+An empty cell has no row. Every write goes through `coerceCellValue`, which checks the type, matches
+choices without case and stores them as the column spells them. Removing a choice removes it from the
+values that used it. Deleting a thread deletes its cells (`deleteConversationCascade`); backups carry
+both tables, with cells restored only alongside their thread (`THREAD_CHILD_TABLES`). Hidden columns
+and the sort are `settings.threadsTable`, normalized by `normalizeTableLayout`.
+
+**The ownership rule.** A manual value is the person's. `applyAiCells` reads each cell inside its
+transaction and skips any that became manual while Claude was working; planning leaves manual cells out
+of the request; the cell editor saves nothing when a value is opened and left unchanged, so looking at
+an AI value does not take it over. "Clear Claude's values" deletes only `ai` rows, which is the undo for
+a fill.
+
+**Claude** (`core/table-fill.ts`, `ai/claude.ts`). `planColumnFill` splits the requested rows into
+those to send, manual cells kept, cells already filled (mode `empty`) and threads that may not leave the
+browser (`remoteAllowedKeys`), and estimates the cost. `runColumnFill` sends 20 threads per request,
+re-checks privacy before each batch, and describes each thread by its facts, gist, summary (clipped to
+700 characters), topics, outcome and last ask, falling back to the opening message only when there is no summary.
+The output schema is built per column: a select or multi_select with choices is a `z.enum`, so Claude
+cannot invent a choice; one with no choices lets Claude name them, and the new choices are added to the
+column. Up to 12 of the person's own values (from shareable threads) go along as examples. Text values
+and reasons that match `containsPromptInjectionAttempt` are dropped. A failed request ends the run with
+its message and keeps every value already written; an `AbortSignal` stops it between requests
+and cancels an Anthropic request in flight. `suggestTableColumns` reads the 60 most recent shareable threads (title, type, provider, gist, topics)
+and returns proposals that pass `normalizeColumnDraft` against the existing names. Neither counts
+against `dailyAiAnalysisLimit`: both run only when the person starts them, after a dialog showing what
+will be sent and roughly what it costs.
+
+**Verified** with unit tests (`tests/unit/thread-table.test.ts`, `tests/unit/table-view.test.tsx`,
+the v2 → v5 migration in `dock-payload.test.ts`) and, in Chromium against the built extension with the
+Anthropic endpoint stubbed, the whole flow: columns from Claude, a hand-set value, the fill dialog, the
+fill, and the hand-set value kept and used as an example rather than sent for filling. **Not verified:**
+real Claude output quality for column fills, Bedrock and OpenAI-on-Bedrock request shapes for the new
+calls (they reuse the same paths as library organization), and the view inside Paperclip's fused mode.
+
 ## Side-by-side accounts, start page, full navigation, organizing sessions (2026-11-13)
 
 **Two accounts of one sign-in at once, inside the workspace** (`core/embed/profiles.ts`,

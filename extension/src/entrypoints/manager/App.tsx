@@ -49,6 +49,7 @@ import { AddAccountDialog } from './accounts/AddAccountDialog.js';
 import { PendingSignInBanner } from './accounts/PendingSignInBanner.js';
 import { BrowseView } from './browse/BrowseView.js';
 import { DashboardView } from './dashboard/DashboardView.js';
+import { TableView } from './table/TableView.js';
 import { Rail } from './shell/Rail.js';
 import { FrameStage } from './workspace/FrameStage.js';
 import { WorkspaceProvider, type ThreadAccount, type WorkspaceContextValue } from './workspace/context.js';
@@ -58,7 +59,7 @@ import { PaperclipView, type PaperclipFrameControl, type PaperclipNavigation } f
 import { INITIAL_FUSION, fusedRoute, fusionReducer, usePaperclipFusionDom, type FusionAction } from './PaperclipFusion.js';
 import { PaperclipConnectionContext, usePaperclipConnection } from './PaperclipConnection.js';
 import { normalizeServerUrl } from '../../core/paperclip/client.js';
-import { SLOT_ACTIVATION_WINDOW_MS, paperclipPageAddress, paperclipPath, paperclipPathForUrl, type PaperclipHostMessage } from '../../core/paperclip/host.js';
+import { SLOT_ACTIVATION_WINDOW_MS, paperclipPageAddress, paperclipPath, paperclipPathForUrl, type FusedView, type PaperclipHostMessage } from '../../core/paperclip/host.js';
 import { usePaperclipManagerActions } from './paperclip-actions.js';
 
 type Surface = 'overlay' | 'page' | 'sidepanel';
@@ -344,7 +345,7 @@ export function App() {
   const fusedViewRef = useRef<WorkspaceView | null>(null);
   // Eager loading starts on Paperclip's home route. Keep the shell's requested entry until
   // its matching slot arrives; old home-page slots may still be queued during navigation.
-  const fusedEntryRef = useRef<Exclude<WorkspaceView, 'paperclip'> | null>(null);
+  const fusedEntryRef = useRef<FusedView | null>(null);
   const fusedOverlayClosedAt = useRef(Number.NEGATIVE_INFINITY);
   const fusedLastActivationSequence = useRef(0);
   // Without the server the shell shows its own rail and view switch (FR-6); a new `ready` resumes.
@@ -736,7 +737,8 @@ export function App() {
   // Fused: a view the shell chose itself (opening a session, a link, a Paperclip open-view)
   // takes Paperclip to that page, so its content rectangle and the shown view stay one place.
   useEffect(() => {
-    if (!fused || view === 'paperclip' || fusedViewRef.current === view) return;
+    // The Table has no page of its own in Paperclip: it stays over the rectangle it was opened in.
+    if (!fused || view === 'paperclip' || view === 'table' || fusedViewRef.current === view) return;
     const path = fusedRoute(view, paperclipRouteRef.current);
     if (!path) return;
     fusedViewRef.current = view;
@@ -1214,7 +1216,7 @@ export function App() {
       const firstSlot = !fusionRef.current.engaged;
       const state = fuse({ type: 'slot', view: message.view, rect: message.rect, at: Date.now() });
       if (state.engaged) {
-        if (firstSlot && view !== 'paperclip' && message.view !== view) {
+        if (firstSlot && view !== 'paperclip' && view !== 'table' && message.view !== view) {
           fusedEntryRef.current = view;
           // The fused-view effect sends navigation once a company prefix is known. If
           // the first route was '/', the route handler sends it when that prefix arrives.
@@ -1336,6 +1338,17 @@ export function App() {
                   <div className="tk-columns" data-detail-mode={detailMode}>
                     {detailPane}
                   </div>
+                </section>
+                <section className="tk-view tk-view-table" aria-label="Table" hidden={view !== 'table'}>
+                  <TableView
+                    projectNames={projectNames}
+                    aiReady={aiReady}
+                    onThreadsEdited={async (keys, { privacy }) => {
+                      if (privacy) dockSyncNow(keys, { privacy: true });
+                      else dockSyncNow(keys);
+                      await reloadAll(selectedKeyRef.current);
+                    }}
+                  />
                 </section>
                 <section className="tk-view tk-view-dashboard" aria-label="Dashboard" hidden={view !== 'dashboard'}>
                   <DashboardView />

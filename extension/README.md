@@ -4,7 +4,7 @@ Threadkeeper is a Chrome / Edge (Manifest V3) extension that captures your conve
 
 Everything is stored locally in your browser. AI analysis is optional and uses your own Anthropic API key or AWS account (Amazon Bedrock or Claude Platform on AWS).
 
-The full-page workspace combines **Browse** (embedded provider tabs), **Threads** (summaries, related threads, and grouping by repository, account, project, type, provider, date or status) and **Dashboard** (pinned sessions in up to four panes). It opens on Claude Code, with Claude's own sidebar and chat/code switch showing; Settings → Workspace changes the start page. Sessions save through automatic capture. The rail groups sessions by type (coding sessions, chats, bots) or by provider, account, last active or repository; its **Organize** menu, also on the Dashboard, filters by type, provider and account, and sorts by recent activity, creation date, title or number of messages. Each thread can show its summary, live page, or both.
+The full-page workspace combines **Browse** (embedded provider tabs), **Threads** (summaries, related threads, and grouping by repository, account, project, type, provider, date or status), **Table** (every thread as a row, with columns you add and Claude can fill) and **Dashboard** (pinned sessions in up to four panes). It opens on Claude Code, with Claude's own sidebar and chat/code switch showing; Settings → Workspace changes the start page. Sessions save through automatic capture. The rail groups sessions by type (coding sessions, chats, bots) or by provider, account, last active or repository; its **Organize** menu, also on the Dashboard, filters by type, provider and account, and sorts by recent activity, creation date, title or number of messages. Each thread can show its summary, live page, or both.
 
 Use **Add account** to add another account of a provider. Two accounts of one provider work at the same time inside the workspace: the one your browser is signed in to, and one more in frames with their own cookies, which Threadkeeper saves encrypted and puts back each time the page loads. Move between accounts from the tabs, the sessions in the rail, or the account menu. Opening a third account of the same provider reloads the workspace; nobody is signed out. **Sign in here** signs an added account in inside the workspace. If the sign-in goes through Google, Apple, a passkey or a pop-up, **Sign in with a browser tab** sets your browser's own sign-in aside, lets you sign in, then puts it back. **Use as browser account** still changes which account the rest of the browser uses. Sessions you open under an added account are saved under that account; **Catch up** still imports only the browser's account. This has been tested against stand-in sites, not yet against each real provider signed in. Session Control backups can be imported through Import / Export.
 
@@ -56,6 +56,15 @@ Status is set automatically too (*active*, *needs review* when the assistant is 
 
 **Many threads at once:** tick rows (shift-click for a range, or select all in view) to move them to a project, set their status, add a tag, pin or unpin them, make them local-only, export them as a Markdown handoff or a Portable bundle, or delete them. Every bulk edit can be undone. The list sorts by recent activity, oldest first, title or message count.
 
+**Table view** (full page only): every thread is one row of a table you can sort by any column (click its header) and search across titles, summaries and column values (`/` focuses the search).
+
+- **Built-in columns** come from the thread itself: Title, Type (coding agent, chat, agent, app builder, search, companion), Provider, Created, Last active, Status, Project and Topics. Work type, Messages, Repository and Account start hidden. **Columns** shows or hides any of them. Status and Project are editable in the table and behave exactly as they do in a thread's detail; a click on a title opens the thread in Threads.
+- **Your own columns** hold text, a number, a checkbox, one choice or several choices. Add one with **+** or **Columns → New column…**, and give it a sentence on what belongs in it: Claude reads that sentence when it fills the column.
+- **Columns from Claude…** proposes columns that fit your recent threads, or drafts the one you describe ("whether the thread ended with code that shipped"). Nothing is added until you press **Add column** (or **Edit first**).
+- **Fill empty cells with Claude** (a column's **⋯** menu) reads each thread's title, gist, summary and topics, never its whole transcript, 20 threads per request. Before it starts, a dialog says how many threads it will read, what it leaves alone and an estimated cost. It fills the rows the current search shows, values appear as each request returns, and **Stop** keeps what was written. A choice column created with no choices gets its choices from Claude on the first fill.
+- **Your values win.** A value you type or pick is yours: Claude never replaces it, and the values you set are sent to Claude as examples to follow. Values Claude wrote carry an **AI** mark with its reason as the tooltip; editing one makes it yours. **Refill Claude's values** re-asks only for cells Claude filled, and **Clear Claude's values** removes them while yours stay.
+- Columns and values are stored with the library, removed with a deleted thread, and included in whole-library backups. They are not part of Portable bundles or Markdown handoffs, and they are not sent to Still.
+
 ### 4. Finds and answers
 - **Search** fuses keyword, phrase, fuzzy and semantic (vector) matches across titles, gists, summaries, topics, decisions and full message text. With a reranker on, pressing Enter re-reads the top candidates and puts the most relevant first.
 - **Ask** your library a question ("What did I decide about the Stripe webhook retries?") and Claude answers from your own threads with clickable `[T1]` citations.
@@ -104,6 +113,7 @@ Threadkeeper can feed **Still**, a separate sidebar extension, so your AI thread
 - Nothing is sent anywhere unless you add a key. Threads marked **local-only**, and threads already filed in a local-only project (the starter *Personal* area), are never sent to Claude, embedding APIs or the Worker. The check happens when a thread is analyzed, so a brand-new conversation that nothing has filed yet *is* sent before Claude can recognize it as personal — mark such conversations local-only, or switch off automatic Claude analysis.
 - Because the library frame must load from the extension's fixed ID (required for Edge, see Troubleshooting), a website can detect that Threadkeeper is installed by probing that URL. It cannot read anything: unauthenticated frames are rejected and the database is extension-only.
 - A daily limit (default 150 analyses) caps Claude usage; Settings shows a cost estimate for your library and model.
+- Filling a Table column or asking for columns runs only when you start it, and skips local-only threads and threads in local-only projects, re-checked before every request. It sends titles, gists, summaries, topics and your own values from threads that may leave the browser. These requests are not counted against the daily analysis limit; the fill dialog shows an estimated cost before anything is sent.
 
 ## Embeddings
 
@@ -285,7 +295,9 @@ src/
     auto-organize.ts     Project filing precedence, k-NN, clustering
     pipeline.ts          Capture → analyze → embed → file; debounced, leased Claude job queue
     library-organize.ts  Library-wide plans (Claude or local) for Auto-organize / Organize…
-    db.ts, schema.ts     Dexie schema (v3), identity, tombstones, settings normalization
+    thread-table.ts      Table view: built-in columns, column and value validation, sorting, storage
+    table-fill.ts        Table view: Claude fills a column in batches (privacy re-checked per batch) or drafts columns
+    db.ts, schema.ts     Dexie schema (v5), identity, tombstones, settings normalization
     dock/                Still (Sidebar Dock) link: protocol + validators, pairing state, payloads,
                          outbox/ledger/reconcile/drain, read queries, external handler
     search.ts            Hybrid lexical + vector retrieval

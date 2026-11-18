@@ -1,0 +1,120 @@
+/* Table view: the bar, the scrolling table and its cells, the column menus and dialogs. Prefix tk-table-.
+   The bar is chrome (glass); the table is something a person reads and edits, so it is opaque. */
+.tk-table-view { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--gap); }
+.tk-table-none { align-items: center; justify-content: center; }
+
+.tk-table-bar {
+  display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; min-height: 40px; flex-wrap: wrap;
+  padding: 3px 6px; border-radius: var(--r-chrome);
+}
+.tk-table-search { display: flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 0; max-width: 420px; color: var(--text-3); }
+.tk-table-search .tk-input { flex: 1; min-width: 0; }
+.tk-table-count { font-size: var(--fs-12); color: var(--text-3); white-space: nowrap; margin-right: auto; }
+.tk-table-progress { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-12); color: var(--text-2); }
+.tk-table-progress progress { width: 96px; height: 6px; accent-color: var(--accent); }
+
+.tk-table-notice {
+  display: flex; align-items: center; gap: 8px; margin: 0; flex: none; padding: 6px 6px 6px 12px;
+  border-radius: var(--r-row); background: var(--surface-2); border: 1px solid var(--line); font-size: var(--fs-13); color: var(--text-2);
+}
+.tk-table-notice > span { flex: 1; min-width: 0; }
+
+.tk-table-scroll {
+  flex: 1; min-height: 0; min-width: 0; overflow: auto; overscroll-behavior: contain;
+  border-radius: var(--r-panel); background: var(--surface); border: 1px solid var(--line);
+}
+.tk-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: var(--fs-13); color: var(--text); }
+.tk-table th, .tk-table td {
+  padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle;
+  white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis;
+}
+.tk-table thead th {
+  position: sticky; top: 0; z-index: 2; padding: 0 4px 0 6px; height: 36px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line-2); font-weight: 600; font-size: var(--fs-12); color: var(--text-2);
+}
+/* The title stays in view while the other columns scroll sideways. */
+.tk-table [data-col="title"] { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 240px; max-width: 360px; border-right: 1px solid var(--line); }
+.tk-table thead [data-col="title"] { z-index: 3; background: var(--surface-2); }
+.tk-table tbody tr:hover > * { background: var(--surface-2); }
+.tk-table tbody th { font-weight: 400; }
+.tk-table-addcol { width: 100%; }
+
+.tk-table-th { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.tk-table-sort {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1; height: 30px; padding: 0 6px;
+  border: 0; border-radius: var(--r-ctl); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.tk-table-sort:hover { background: var(--ctl-hover); color: var(--text); }
+.tk-table-sortmark { font-size: 9px; color: var(--accent); min-width: 9px; }
+.tk-table-colmenu { flex: none; width: 26px; height: 26px; }
+
+.tk-table-titlecell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tk-table-title {
+  display: block; max-width: 100%; padding: 0; border: 0; background: transparent; color: var(--text);
+  font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+}
+.tk-table-title:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.tk-table-gist { font-size: var(--fs-12); color: var(--text-3); max-width: 100%; }
+.tk-table-provider { display: inline-flex; align-items: center; gap: 6px; }
+.tk-table-empty { color: var(--text-disabled); }
+.tk-table-text { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+
+.tk-table-chips { display: inline-flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; max-width: 260px; }
+.tk-table-chip {
+  display: inline-block; padding: 1px 7px; border-radius: var(--r-cap); background: var(--surface-3); color: var(--text-2);
+  font-size: var(--fs-12); white-space: nowrap;
+}
+
+.tk-table-select {
+  min-height: 28px; max-width: 200px; padding: 0 6px; border: 1px solid transparent; border-radius: var(--r-ctl);
+  background: transparent; color: var(--text); font: inherit; font-size: var(--fs-13); cursor: pointer;
+}
+.tk-table-select:hover, .tk-table-select:focus-visible { border-color: var(--field-border); background: var(--ctl-fill); }
+
+.tk-table-cellbtn {
+  display: inline-flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; padding: 0 4px; margin: 0 -4px;
+  border: 1px solid transparent; border-radius: var(--r-ctl); background: transparent; color: inherit; font: inherit; text-align: left; cursor: text;
+}
+.tk-table-cellbtn:hover { border-color: var(--line-2); }
+.tk-table-input { min-height: 28px; width: 100%; min-width: 140px; }
+.tk-table-check { display: inline-flex; align-items: center; gap: 6px; }
+.tk-table-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+/* A value Claude wrote: a word, never only a colour. Its reason is the tooltip. */
+.tk-table-ai {
+  flex: none; padding: 0 4px; border-radius: var(--r-ctl); border: 1px solid var(--accent-line);
+  color: var(--accent); font-size: var(--fs-11); font-weight: 600; line-height: 15px;
+}
+
+.tk-table-multi {
+  display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 6px 8px; min-width: 160px;
+  border: 1px solid var(--field-border); border-radius: var(--r-ctl); background: var(--surface);
+}
+.tk-table-multi label { display: flex; align-items: center; gap: 6px; }
+.tk-table-multi .tk-btn { align-self: flex-end; min-height: 26px; }
+
+.tk-table-nomatch { margin: 0; padding: 24px; text-align: center; color: var(--text-2); }
+.tk-table-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px; }
+
+.tk-table-menu { position: fixed; z-index: 100; width: min(280px, calc(100vw - 16px)); min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.tk-table-menu .tk-pop-item:disabled { color: var(--text-disabled); }
+.tk-table-danger { color: var(--danger); }
+
+.tk-table-hint { font-size: var(--fs-12); color: var(--text-3); }
+.tk-table-error { margin: 8px 0 0; color: var(--danger); font-size: var(--fs-13); }
+.tk-table-form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.tk-table-form textarea.tk-input { padding-top: 6px; resize: vertical; }
+.tk-table-dialog p { font-size: var(--fs-13); line-height: 1.5; }
+
+.tk-table-proposals { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tk-table-proposal {
+  display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px;
+  border-radius: var(--r-row); background: var(--surface-2); border: 1px solid var(--line);
+}
+.tk-table-proposal-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; font-size: var(--fs-13); }
+.tk-table-proposal-actions { display: flex; gap: 6px; flex: none; align-items: center; }
+
+@media (max-width: 760px) {
+  .tk-table [data-col="title"] { min-width: 150px; max-width: 46vw; }
+  .tk-table-proposal { flex-direction: column; }
+}

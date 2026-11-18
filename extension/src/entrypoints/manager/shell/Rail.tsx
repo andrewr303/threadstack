@@ -38,9 +38,16 @@ export interface RailProps {
 const VIEWS: ReadonlyArray<{ value: WorkspaceView; label: string; icon: IconName }> = [
   { value: 'browse', label: 'Browse', icon: 'browse' },
   { value: 'threads', label: 'Threads', icon: 'threads' },
+  { value: 'table', label: 'Table', icon: 'table' },
   { value: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
   { value: 'paperclip', label: 'Paperclip', icon: 'window' },
 ];
+
+/**
+ * The expanded rail's switch shows icons only: five names do not fit its width ("Dashboard" needs
+ * about 60px of a 48px slot). Each name stays the button's accessible name and tooltip.
+ */
+const RAIL_SEGMENTS = VIEWS.map((option) => ({ ...option, hideLabel: true }));
 
 /** Same width as the `max-width: 899px` rules in styles/10-shell.css. */
 const NARROW_QUERY = '(max-width: 899px)';
@@ -170,7 +177,7 @@ export function Rail({
           </nav>
         ) : (
           <div className="tk-rail-views">
-            <Segmented label="View" value={view} options={VIEWS} onChange={changeView} className="tk-rail-seg" />
+            <Segmented label="View" value={view} options={RAIL_SEGMENTS} onChange={changeView} className="tk-rail-seg" />
           </div>
         )}
 

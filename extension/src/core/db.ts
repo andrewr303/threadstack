@@ -26,6 +26,8 @@ import {
   type ThreadVectorRecord,
   type StoredHandleRecord,
   type ProjectSource,
+  type TableCellRecord,
+  type TableColumnRecord,
 } from './schema.js';
 import { normalizeTags } from './organization.js';
 import { looksDerivedTitle, mergeCapturedMessages } from './merge.js';
@@ -59,6 +61,9 @@ export class ThreadkeeperDB extends Dexie {
   accountJars!: Table<AccountJarRecord, string>;
   /** Small single-writer values (active accounts, workspace layout). See KV_KEYS. */
   kv!: Table<KvRecord, string>;
+  /** Columns the person added to the Table view, and the value each thread has in them. */
+  tableColumns!: Table<TableColumnRecord, string>;
+  tableCells!: Table<TableCellRecord, string>;
 
   constructor(dbName = 'ThreadkeeperDB') {
     super(dbName);
@@ -137,6 +142,12 @@ export class ThreadkeeperDB extends Dexie {
       accounts: 'id, realm',
       accountJars: 'accountId',
       kv: 'key',
+    });
+    // v5: the Table view's own columns and their values. New tables only; built-in columns
+    // (provider, type, dates, status…) are read from the conversation and never stored.
+    this.version(5).stores({
+      tableColumns: 'id, createdAt',
+      tableCells: 'cellKey, columnId, threadKey',
     });
   }
 }
@@ -865,6 +876,7 @@ export async function deleteConversationCascade(
       db.tombstones,
       db.insights,
       db.threadVectors,
+      db.tableCells,
     ],
     async () => {
       const existing = await db.conversations.get(threadKey);
@@ -887,6 +899,7 @@ export async function deleteConversationCascade(
       await db.summaries.delete(threadKey);
       await db.insights.where('threadKey').equals(threadKey).delete();
       await db.threadVectors.where('threadKey').equals(threadKey).delete();
+      await db.tableCells.where('threadKey').equals(threadKey).delete();
       await db.relationships.where('fromThreadKey').equals(threadKey).delete();
       await db.relationships.where('toThreadKey').equals(threadKey).delete();
 
@@ -1003,6 +1016,7 @@ export async function deleteConversationsCascade(
       db.tombstones,
       db.insights,
       db.threadVectors,
+      db.tableCells,
     ],
     async () => {
       let deleted = 0;

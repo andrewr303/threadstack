@@ -531,6 +531,88 @@ export interface ThreadInsight {
   agentRun?: AgentRunFacts | null;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Table view: columns the person (or Claude, on their say-so) adds, and one value per thread
+// ---------------------------------------------------------------------------------------------
+
+export const TABLE_COLUMN_TYPES = ['text', 'number', 'checkbox', 'select', 'multi_select'] as const;
+export type TableColumnType = (typeof TABLE_COLUMN_TYPES)[number];
+
+/** A column added to the Table view. Built-in columns (provider, dates…) are not stored. */
+export interface TableColumnRecord {
+  /** `col_<random>`. */
+  id: string;
+  name: string;
+  type: TableColumnType;
+  /** The choices of a select or multi_select column, in display order; [] for other types. */
+  options: string[];
+  /** What belongs in the column. Claude reads it when filling; the header shows it as a tooltip. */
+  instructions: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Who defined it: typed by the person, or drafted by Claude and accepted by them. */
+  createdBy: 'user' | 'ai';
+}
+
+/** A cell's value. An empty cell has no record at all. */
+export type TableCellValue = string | number | boolean | string[];
+
+export interface TableCellRecord {
+  /** `${columnId}|${threadKey}`. */
+  cellKey: string;
+  columnId: string;
+  threadKey: string;
+  value: TableCellValue;
+  /** `manual` values are the person's and are never replaced by Claude. */
+  source: 'manual' | 'ai';
+  /** Claude's one-line reason (AI values only). */
+  reason: string | null;
+  /** Model that wrote an AI value. */
+  model: string | null;
+  /** Revision of the thread the value was written against. */
+  sourceRevision: number;
+  updatedAt: string;
+}
+
+export function tableCellKey(columnId: string, threadKey: string): string {
+  return `${columnId}|${threadKey}`;
+}
+
+export const TABLE_SORT_DIRECTIONS = ['asc', 'desc'] as const;
+export interface TableSort {
+  /** A built-in column id or a stored column id. */
+  column: string;
+  direction: (typeof TABLE_SORT_DIRECTIONS)[number];
+}
+
+/** What the Table view remembers: which columns are hidden and how rows are ordered. */
+export interface ThreadsTableLayout {
+  hidden: string[];
+  sort: TableSort | null;
+}
+
+/** Built-in columns that start hidden; every other column (stored ones included) starts shown. */
+export const DEFAULT_TABLE_HIDDEN = ['kind', 'messages', 'repository', 'account'] as const;
+export const DEFAULT_TABLE_LAYOUT: ThreadsTableLayout = {
+  hidden: [...DEFAULT_TABLE_HIDDEN],
+  sort: { column: 'updated', direction: 'desc' },
+};
+
+export function normalizeTableLayout(raw: unknown): ThreadsTableLayout {
+  const value = raw && typeof raw === 'object' ? (raw as Partial<Record<keyof ThreadsTableLayout, unknown>>) : {};
+  const hidden = Array.isArray(value.hidden)
+    ? Array.from(new Set(value.hidden.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 80))).slice(0, 200)
+    : [...DEFAULT_TABLE_LAYOUT.hidden];
+  const s = value.sort && typeof value.sort === 'object' ? (value.sort as Partial<TableSort>) : null;
+  const sort =
+    value.sort === null
+      ? null
+      : s && typeof s.column === 'string' && s.column.length > 0 && s.column.length <= 80 && TABLE_SORT_DIRECTIONS.includes(s.direction as TableSort['direction'])
+        ? { column: s.column, direction: s.direction as TableSort['direction'] }
+        : DEFAULT_TABLE_LAYOUT.sort;
+  return { hidden, sort };
+}
+
 export function insightKeyFor(source: ThreadInsight['source'], threadKey: string): string {
   return `${source}|${threadKey}`;
 }
@@ -845,6 +927,8 @@ export interface SettingsRecord {
   threadsGroupBy: ThreadsGroupBy;
   /** How the Threads list is ordered (kept across reloads; filters are not). */
   threadsSort?: LensSort;
+  /** Hidden columns and row order of the Table view. */
+  threadsTable?: ThreadsTableLayout;
   /** Grouping and order of the side navigation's session list. */
   railLens?: SurfaceLens;
   /** Grouping and order of the Dashboard's pinned bar. */
@@ -1144,6 +1228,7 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
       ? (base.threadsGroupBy as ThreadsGroupBy)
       : DEFAULT_SETTINGS.threadsGroupBy,
     threadsSort: LENS_SORT.includes(base.threadsSort as LensSort) ? (base.threadsSort as LensSort) : 'recent',
+    threadsTable: normalizeTableLayout(base.threadsTable),
     railLens: normalizeSurfaceLens(base.railLens, DEFAULT_RAIL_LENS),
     dashboardLens: normalizeSurfaceLens(base.dashboardLens, DEFAULT_DASHBOARD_LENS),
     detailMode: DETAIL_MODES.includes(base.detailMode as DetailMode)

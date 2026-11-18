@@ -36,6 +36,8 @@ const LIBRARY_TABLES = [
   'insights',
   'threadVectors',
   'accounts',
+  'tableColumns',
+  'tableCells',
 ] as const;
 
 /**
@@ -64,7 +66,7 @@ export interface BackupMeta {
 }
 
 /** Tables whose rows belong to one thread (`threadKey`), restored only with their thread. */
-const THREAD_CHILD_TABLES = new Set(['messages', 'chunks', 'vectors', 'summaries', 'insights', 'threadVectors']);
+const THREAD_CHILD_TABLES = new Set(['messages', 'chunks', 'vectors', 'summaries', 'insights', 'threadVectors', 'tableCells']);
 
 export interface RestoreResult {
   /** Rows added, per table. */

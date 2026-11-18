@@ -226,8 +226,8 @@ export interface SessionTab {
 export const DASHBOARD_LAYOUTS = [1, 2, 3, 4] as const;
 export type DashboardLayout = (typeof DASHBOARD_LAYOUTS)[number];
 
-export type WorkspaceView = 'browse' | 'threads' | 'dashboard' | 'paperclip';
-export const WORKSPACE_VIEWS: readonly WorkspaceView[] = ['browse', 'threads', 'dashboard', 'paperclip'];
+export type WorkspaceView = 'browse' | 'threads' | 'table' | 'dashboard' | 'paperclip';
+export const WORKSPACE_VIEWS: readonly WorkspaceView[] = ['browse', 'threads', 'table', 'dashboard', 'paperclip'];
 
 export interface WorkspaceState {
   version: 1;

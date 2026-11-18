@@ -189,9 +189,11 @@ function qa<T extends Element = HTMLElement>(selector: string): T[] {
   return Array.from(host.querySelectorAll<T>(selector));
 }
 
+/** A button by its visible text, or by its accessible name when it shows only an icon. */
 function button(text: string | RegExp, within: ParentNode = host): HTMLButtonElement {
+  const names = (b: HTMLButtonElement) => [(b.textContent ?? '').trim(), b.getAttribute('aria-label') ?? ''];
   const found = Array.from(within.querySelectorAll('button')).find((b) =>
-    typeof text === 'string' ? (b.textContent ?? '').trim() === text : text.test(b.textContent ?? '')
+    names(b).some((name) => (typeof text === 'string' ? name === text : text.test(name)))
   );
   if (!found) throw new Error(`no button ${String(text)}`);
   return found;
