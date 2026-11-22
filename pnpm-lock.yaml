@@ -547,8 +547,8 @@ importers:
         specifier: 1.0.88
         version: 1.0.88
       '@github/copilot-linux-x64':
-        specifier: 1.0.88
-        version: 1.0.88
+        specifier: 1.0.114
+        version: 1.0.114
     devDependencies:
       '@paperclipai/paperclip-eval-kernel':
         specifier: workspace:*
@@ -1151,8 +1151,8 @@ importers:
         specifier: 1.0.88
         version: 1.0.88
       '@github/copilot-linux-x64':
-        specifier: 1.0.88
-        version: 1.0.88
+        specifier: 1.0.114
+        version: 1.0.114
     devDependencies:
       '@opentelemetry/context-async-hooks':
         specifier: 2.10.0
@@ -2802,8 +2802,8 @@ packages:
     os: [darwin]
     hasBin: true
 
-  '@github/copilot-linux-x64@1.0.88':
-    resolution: {integrity: sha512-wNigl8rqixvtYoRtygNf1NQIXx77MWC6XyqoV7fcfvSwWI3GJCltnczaNLbC611K9Hex39KyiUR5ZmGhQ+LzLw==}
+  '@github/copilot-linux-x64@1.0.114':
+    resolution: {integrity: sha512-gHnINm9ffFqz+G19cQUqRe3lsTAQO3Tbdj7r7Bx1ktZvC5X6iXd/nfo1DRTj9magb52aGRiuwB3yvD1lkW68xQ==}
     cpu: [x64]
     os: [linux]
     hasBin: true
@@ -5091,6 +5091,7 @@ packages:
   '@sapphire/shapeshift@4.0.0':
     resolution: {integrity: sha512-d9dUmWVA7MMiKobL3VpLF8P2aeanRTu6ypG2OIaEv/ZHH/SUQ2iHOVyi5wAPjQ+HmnMuL0whK9ez8I/raWbtIg==}
     engines: {node: '>=v16'}
+    deprecated: Shapeshift was created when other validation libraries had significant limitations in performance and error reporting. Those advantages have diminished as libraries such as Zod have become faster and improved their error messages, while also gaining broader environment support, a larger community, and custom error printers.
 
   '@sapphire/snowflake@3.5.5':
     resolution: {integrity: sha512-xzvBr1Q1c4lCe7i6sRnrofxeO1QTP/LKQ6A6qy0iB4x5yfiSfARMEQEghojzTNALDTcv8En04qYNIco9/K9eZQ==}
@@ -11026,7 +11027,7 @@ snapshots:
   '@github/copilot-darwin-x64@1.0.88':
     optional: true
 
-  '@github/copilot-linux-x64@1.0.88':
+  '@github/copilot-linux-x64@1.0.114':
     optional: true
 
   '@grpc/grpc-js@1.14.5':
