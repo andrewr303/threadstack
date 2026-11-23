@@ -314,14 +314,21 @@ describe('account service: refusals', () => {
     expect(env.cookies).toEqual([]);
   });
 
-  it('needs host access for at least one cookie domain', async () => {
+  it('needs host access for at least one app cookie domain', async () => {
     const { env, service } = setup();
     env.denied.add('https://claude.ai/*');
     expect(await service.add({ realm: ANTHROPIC, mode: 'embedded' })).toMatchObject({ ok: false, code: 'needs_host_access' });
     env.denied.clear();
     for (const d of ['chatgpt.com', 'chat.openai.com']) env.denied.add(`https://${d}/*`);
-    // auth.openai.com alone is enough to proceed.
+    expect(await service.add({ realm: 'openai', mode: 'embedded' })).toMatchObject({ ok: false, code: 'needs_host_access' });
+    env.denied.delete('https://chat.openai.com/*');
     expect((await service.add({ realm: 'openai', mode: 'embedded' })).ok).toBe(true);
+  });
+
+  it('requires Cursor app access even when its old authentication host is granted', async () => {
+    const { env, service } = setup();
+    env.denied.add('https://cursor.com/*');
+    expect(await service.add({ realm: 'cursor', mode: 'embedded' })).toMatchObject({ ok: false, code: 'needs_host_access' });
   });
 
   it('an account asked for as "isolated" is an ordinary account that keeps the profile id it came with', async () => {
@@ -782,7 +789,7 @@ describe('account service: signing a profile in through the browser', () => {
 
     const bCookies = env.signIn('B');
     env.advance(SWITCH_SETTLE_MS + 1);
-    await service.noteIdentity('claude', B);
+    await service.noteIdentity('claude', B, (await service.pendingSignIn())!);
     const done = ok(await service.finishBrowserSignIn());
     expect(done.switched).toBe(true);
     expect(done.account).toMatchObject({ id: b, hasJar: true, signedIn: 'yes' });
@@ -869,14 +876,37 @@ describe('account service: signing a profile in through the browser', () => {
     expect(sorted((await restarted.readJar(b))!)).toEqual(sorted(first));
   });
 
-  it('finishing without having signed in keeps the account signed out', async () => {
+  it('keeps the sign-in open if Finish is clicked before login completes', async () => {
     const { env, service } = setup();
     const p = env.signIn('P');
     const b = (await addAccount(service)).account!.id;
     ok(await service.beginBrowserSignIn(b));
-    const done = ok(await service.finishBrowserSignIn());
-    expect(done.account).toMatchObject({ id: b, hasJar: false, signedIn: 'no' });
+    expect(await service.finishBrowserSignIn()).toMatchObject({ ok: false, code: 'signin_incomplete' });
+    expect(await service.pendingSignIn()).toMatchObject({ accountId: b });
+    ok(await service.cancelBrowserSignIn());
     expect(sorted(env.realmCookies())).toEqual(sorted(p));
+  });
+
+  it('does not finish a second-account sign-in when SSO picks the browser account again', async () => {
+    const { env, service } = setup();
+    const original = env.signIn('P');
+    await service.noteIdentity('claude', B);
+    const target = (await addAccount(service, 'Second account')).account!.id;
+    ok(await service.beginBrowserSignIn(target));
+
+    env.signIn('P');
+    env.advance(SWITCH_SETTLE_MS + 1);
+    await service.noteIdentity('claude', B, (await service.pendingSignIn())!);
+    expect(await service.finishBrowserSignIn()).toMatchObject({ ok: false, code: 'signin_wrong_account' });
+    expect(await service.activeAccount(ANTHROPIC)).toMatchObject({ id: target });
+
+    const next = env.signIn('B');
+    const other = { ...B, key: 'claude:cccc', display: 'another@example.com' };
+    await service.noteIdentity('claude', other, (await service.pendingSignIn())!);
+    ok(await service.finishBrowserSignIn());
+    expect(sorted(env.realmCookies())).toEqual(sorted(original));
+    expect(sorted((await service.readJar(target))!)).toEqual(sorted(next));
+    expect(await service.account(target)).toMatchObject({ identity: { key: other.key } });
   });
 
   it('allows one sign-in at a time and nothing that would move cookies under it', async () => {
@@ -922,21 +952,40 @@ describe('account service: signing a profile in through the browser', () => {
     expect(sorted((await restarted.readJar(b))!)).toEqual(sorted(bCookies));
   });
 
-  it('when the person signs in as an account that already exists, that account keeps the sign-in', async () => {
+  it('protects the saved sign-in of another profile if SSO selects it', async () => {
     const { env, service } = setup();
     env.signIn('P');
     const b = (await addAccount(service, 'Work')).account!.id;
     await service.noteProfileIdentity(b, B);
+    const saved = [{ ...env.realmCookies()[0], value: 'existing Work session' }];
+    await service.writeJar(b, saved);
     const c = (await addAccount(service, 'Spare')).account!.id;
     ok(await service.beginBrowserSignIn(c));
     // Signed in as Work's person instead of a new one.
-    const bCookies = env.signIn('B');
-    env.advance(SWITCH_SETTLE_MS + 1);
-    expect(await service.noteIdentity('claude', B)).toMatchObject({ activeAccountId: b, reassigned: true });
-    ok(await service.finishBrowserSignIn());
+    env.signIn('B');
+    expect(await service.noteIdentity('claude', B)).toMatchObject({ activeAccountId: c, updated: false });
+    expect(await service.noteIdentity('claude', B, (await service.pendingSignIn())!)).toMatchObject({ activeAccountId: c, named: null });
+    expect(await service.finishBrowserSignIn()).toMatchObject({ ok: false, code: 'signin_wrong_account' });
+    ok(await service.cancelBrowserSignIn());
     expect((await service.activeAccount(ANTHROPIC))?.id).toBe(PRIMARY);
-    expect(sorted((await service.readJar(b))!)).toEqual(sorted(bCookies));
+    expect(await service.readJar(b)).toEqual(saved);
     expect(await service.account(c)).toMatchObject({ hasJar: false });
+  });
+
+  it('ignores a delayed completion from an earlier attempt for the same account', async () => {
+    const { env, service } = setup();
+    env.signIn('P');
+    const target = (await addAccount(service)).account!.id;
+    ok(await service.beginBrowserSignIn(target));
+    const first = (await service.pendingSignIn())!;
+    ok(await service.cancelBrowserSignIn(first.attemptId));
+    ok(await service.beginBrowserSignIn(target));
+    env.signIn('B');
+    await service.noteIdentity('claude', B, first);
+    expect((await service.pendingSignIn())?.identity).toBeUndefined();
+    expect(await service.finishBrowserSignIn(first.attemptId, true)).toMatchObject({ ok: false, code: 'not_allowed' });
+    expect(await service.finishBrowserSignIn((await service.pendingSignIn())?.attemptId, true)).toMatchObject({ ok: false, code: 'signin_incomplete' });
+    ok(await service.finishBrowserSignIn());
   });
 });
 

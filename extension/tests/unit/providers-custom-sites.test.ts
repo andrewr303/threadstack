@@ -105,7 +105,7 @@ describe('runtime content scripts', () => {
     const plan = planCaptureScripts({
       authorizedHosts: { poe: true, meta_ai: true, kimi: true, chatgpt: true, muse: false },
       sites,
-      granted: (origins) => !origins.includes('https://www.meta.ai/*'),
+      granted: (origins) => !origins.includes('https://www.meta.ai/*') && !origins.includes('https://cursor.com/*'),
       registered: [
         { id: 'tk-provider-muse', matches: ['https://muse.ai/*'] },
         { id: 'tk-provider-poe', matches: ['https://old.poe.com/*'] },
@@ -141,6 +141,17 @@ describe('runtime content scripts', () => {
     for (const s of [...plan.register, ...plan.update]) expect(s).toMatchObject({ allFrames: true, persistAcrossSessions: true });
   });
 
+  it('registers Cursor identity observation with host permission and capture off', () => {
+    const input = { authorizedHosts: {}, sites: [], registered: [] };
+    const expected = 'tk-provider-cursor_agents~site-data';
+    const plan = planCaptureScripts({ ...input, granted: () => true });
+    expect(plan.register.find((script) => script.id === expected)).toMatchObject({
+      js: ['content-scripts/site-data-main.js'], runAt: 'document_start', world: 'MAIN',
+      matches: ['https://cursor.com/*', 'https://www.cursor.com/*'],
+    });
+    expect(planCaptureScripts({ ...input, granted: () => false, registered: plan.register }).unregister).toContain(expected);
+  });
+
   it('re-registers a script registered top-frame-only by an older version', () => {
     const scripts = planCaptureScripts({ authorizedHosts: { kimi: true }, sites: [], granted: () => true, registered: [] }).register;
     const current = scripts.map((s) => ({ ...s }));
@@ -162,7 +173,7 @@ describe('runtime content scripts', () => {
       unregister: vi.fn(async (ids: string[]) => {
         for (const id of ids) registered.splice(registered.findIndex((s) => s.id === id), 1);
       }),
-      contains: vi.fn(async () => true),
+      contains: vi.fn(async (origins: string[]) => !origins.includes('https://cursor.com/*')),
     };
     const poe = providerScriptId('poe');
     const first = await reconcileCaptureScripts(env, { authorizedHosts: { poe: true }, sites: [] });

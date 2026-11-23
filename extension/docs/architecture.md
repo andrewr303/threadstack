@@ -98,7 +98,9 @@ browser sign-in, or is removed), the worker retires every slot showing it and se
 before `ACCOUNTS_CHANGED`. A retired slot files nothing, and its tabs say "<name>’s sign-in changed"
 and offer a reload. After a restart, slots whose account is now the browser's are retired too, since
 the switch recovery finished never reached that code. One account is shown in one workspace tab at a
-time (`profile_in_use`); a slot left by a page that went away is retired instead of blocking. Set-Cookie
+time. If a second workspace tab needs it, **Move account here** retires the first tab's partition and
+seeds the second from the latest live jar. Other accounts stay loaded. A slot left by a page that went
+away is retired instead of blocking. Set-Cookie
 from a request that a page of another site started inside a profile frame is kept only when it is
 `SameSite=None`, as the browser does. Navigations of the frame itself, and requests between the hosts
 of one sign-in (chatgpt.com and auth.openai.com, grok.com and accounts.x.ai), are kept whole. A
@@ -108,8 +110,12 @@ nothing, and it finishes by itself only when the site names someone after it beg
 *Signing an added account in.* "Sign in here" opens the site's sign-in page in the profile slot. For
 sign-ins that cannot finish in a frame (Google, Apple, passkeys, pop-ups), "Sign in with a browser tab"
 (`ACCOUNTS_SIGNIN_BEGIN` / `FINISH` / `CANCEL`) saves the browser's own cookies for the realm, clears
-them, and opens a tab. Two seconds after the site names who signed in, or when the person says so, it
-copies the new cookies into the added account's jar and puts the browser's cookies back. A journal
+them, and opens a tab. Cursor offers this route first. Its account observer runs when Cursor host
+access is granted, independent of conversation capture. Reports from the tab opened for the current
+attempt can complete it automatically. **I’ve signed in** can also finish a sign-in once the site
+has an app session cookie. If the site identifies a different saved account, the pending attempt
+stays open while the user chooses a different login or cancels. **Open sign-in tab** focuses or
+reopens the tab. Finishing saves the new sign-in and restores the browser's previous account. A journal
 (`accounts.signIn`) lets a worker that stopped halfway finish the job. Switching the realm's browser
 account, or removing the account that is signing in, is refused until the sign-in ends.
 

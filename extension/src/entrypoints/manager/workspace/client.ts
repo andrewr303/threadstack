@@ -75,10 +75,11 @@ export const workspaceApi = {
   /** Make the account the browser's own sign-in for its realm (changes every tab). */
   activateAccount: (accountId: string) => call<AccountsChangeResult>({ type: 'ACCOUNTS_ACTIVATE', accountId }),
   beginBrowserSignIn: (accountId: string) => call<AccountsChangeResult>({ type: 'ACCOUNTS_SIGNIN_BEGIN', accountId }),
-  finishBrowserSignIn: () => call<AccountsChangeResult>({ type: 'ACCOUNTS_SIGNIN_FINISH' }),
-  cancelBrowserSignIn: () => call<AccountsChangeResult>({ type: 'ACCOUNTS_SIGNIN_CANCEL' }),
+  resumeBrowserSignIn: (attemptId: string) => call<{ ok: true }>({ type: 'ACCOUNTS_SIGNIN_RESUME', attemptId }),
+  finishBrowserSignIn: (attemptId: string) => call<AccountsChangeResult>({ type: 'ACCOUNTS_SIGNIN_FINISH', attemptId }),
+  cancelBrowserSignIn: (attemptId: string) => call<AccountsChangeResult>({ type: 'ACCOUNTS_SIGNIN_CANCEL', attemptId }),
   /** Show a profile account in this page's slot of its realm; answers the addresses to load. */
-  claimProfile: (realm: string, accountId: string) => call<ProfileClaimResult>({ type: 'PROFILE_CLAIM', realm, accountId }),
+  claimProfile: (realm: string, accountId: string, move: boolean) => call<ProfileClaimResult>({ type: 'PROFILE_CLAIM', realm, accountId, move }),
   profileReady: (realm: string) => call<{ ok: true }>({ type: 'PROFILE_READY', realm }),
   updateAccount: (accountId: string, patch: { label?: string; color?: AccountColor }) =>
     call<AccountsChangeResult>({ type: 'ACCOUNTS_UPDATE', accountId, ...patch }),

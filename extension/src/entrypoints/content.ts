@@ -492,7 +492,7 @@ function sendToExtension(message: EmbedFrameEvent, done?: (response: unknown) =>
 
 // ---- Who is signed in -----------------------------------------------------
 
-const sentIdentityKeys = new Set<string>();
+let lastIdentityKey: string | null = null;
 
 /**
  * Identity responses from the MAIN-world observer (site-data-main.ts). Any page script can post
@@ -513,8 +513,8 @@ function onIdentityWindowMessage(event: MessageEvent): void {
     return;
   }
   if (!identity || typeof identity.key !== 'string' || !identity.key) return;
-  if (sentIdentityKeys.has(identity.key)) return;
-  sentIdentityKeys.add(identity.key);
+  if (lastIdentityKey === identity.key) return;
+  lastIdentityKey = identity.key;
   sendToExtension({ type: 'ACCOUNT_IDENTITY', provider, identity });
 }
 
@@ -536,6 +536,7 @@ function checkSignedOut(): void {
   }
   if (!login) return;
   signedOutSent = true;
+  lastIdentityKey = null;
   const onPage = detectProviderFromUrl(window.location.href);
   const provider = onPage && realm.providers.includes(onPage) ? onPage : realm.providers[0];
   sendToExtension({ type: 'ACCOUNT_IDENTITY', provider, identity: null });

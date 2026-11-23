@@ -227,6 +227,11 @@ export interface CaptureScriptPlan {
 /** Suffixes of the embedding scripts registered next to each content.js (whose id has none). */
 const BRIDGE_SUFFIX = '~bridge';
 const COOKIE_MAIN_SUFFIX = '~cookie-main';
+const CURSOR_ACCOUNT_PROVIDER = 'cursor_agents';
+
+function needsProviderScripts(id: CaptureProviderId, authorized: boolean | undefined): boolean {
+  return id === CURSOR_ACCOUNT_PROVIDER || authorized === true;
+}
 
 /**
  * The scripts for one provider or site: content.js under the id it always had, plus the two
@@ -269,9 +274,22 @@ export function planCaptureScripts(input: {
   };
   for (const id of CAPTURE_PROVIDER_IDS) {
     const patterns = runtimeMatchPatterns(id);
-    if (patterns.length === 0 || !input.authorizedHosts[id]) continue;
+    if (patterns.length === 0 || !needsProviderScripts(id, input.authorizedHosts[id])) continue;
     if (!input.granted(toOriginMatchPatterns(patterns))) continue;
-    want(providerScriptId(id), patterns);
+    const scriptId = providerScriptId(id);
+    want(scriptId, patterns);
+    if (id === CURSOR_ACCOUNT_PROVIDER) {
+      const observer: CaptureScript = {
+        id: `${scriptId}~site-data`,
+        matches: patterns,
+        js: ['content-scripts/site-data-main.js'],
+        runAt: 'document_start',
+        world: 'MAIN',
+        allFrames: true,
+        persistAcrossSessions: true,
+      };
+      wanted.set(observer.id, observer);
+    }
   }
   const sitePatterns = new Set<string>();
   for (const site of input.sites) {
@@ -336,7 +354,8 @@ export async function reconcileCaptureScripts(
     const grants = new Map<string, boolean>();
     const askFor = new Set<string>();
     for (const id of CAPTURE_PROVIDER_IDS) {
-      if (input.authorizedHosts[id] && runtimeMatchPatterns(id).length > 0) askFor.add(JSON.stringify(toOriginMatchPatterns(runtimeMatchPatterns(id))));
+      const patterns = runtimeMatchPatterns(id);
+      if (patterns.length > 0 && needsProviderScripts(id, input.authorizedHosts[id])) askFor.add(JSON.stringify(toOriginMatchPatterns(patterns)));
     }
     for (const site of input.sites) if (site.enabled) askFor.add(JSON.stringify([originMatchPattern(site.origin)]));
     for (const key of askFor) grants.set(key, await env.contains(JSON.parse(key) as string[]).catch(() => false));
