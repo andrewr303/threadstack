@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.js';
 import { useWorkspaceContext } from '../workspace/context.js';
 import { realmById, switchableRealms, type RealmInfo } from '../../../core/workspace/realms.js';
+import { runtimePermissionOrigins } from '../../../core/providers.js';
 import type { AccountColor, WorkspaceFailure } from '../../../core/workspace/types.js';
 import { ACCOUNT_COLORS, COLOR_LABELS, MAX_ACCOUNT_NAME, realmHostOrigins, requestOrigins, useMounted } from './common.js';
 
@@ -93,10 +94,11 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
     const label = name.trim();
     setBusy(true);
     setFailure(null);
-    // Chrome shows a permission prompt only in response to a click, so this comes first. Only a
-    // sign-in host on another domain is asked for; the sign-in's own host is held from install,
-    // and a refusal of that comes back as needs_host_access, which offers the wider request.
-    if (asking && info.extraHostPatterns.length > 0) await requestOrigins(info.extraHostPatterns);
+    // Ask during the click. Most account sites are granted at install; Cursor's app is optional.
+    const origins = info.preferBrowserSignIn
+      ? [...new Set([...info.providers.flatMap(runtimePermissionOrigins), ...info.extraHostPatterns])]
+      : info.extraHostPatterns;
+    if (asking && origins.length > 0) await requestOrigins(origins);
     const result = await workspace.addAccount({ realm: info.id, mode: 'embedded', label, color });
     if (!mounted.current) return;
     setBusy(false);

@@ -27,6 +27,7 @@ export const CONNECTABLE_APP_SLUGS = new Set([
   "linear",
   "google-sheets",
   "context7",
+  "treg",
   "shopify",
   "composio",
   "gmail",

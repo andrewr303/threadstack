@@ -134,6 +134,24 @@ test('deployment refuses relative, unsafe and aliased targets', () => {
   } finally { fs.rmSync(base, { recursive: true, force: true }); }
 });
 
+test('deployment accepts an existing path-based Threadkeeper build at the checkout’s legacy Edge location', () => {
+  const home = temp();
+  try {
+    const fork = path.join(home, 'fork');
+    const live = path.join(fork, '.output', 'chrome-mv3');
+    fs.mkdirSync(live, { recursive: true });
+    const deploy = () => deploymentEnv({ TK_LIVE_DIR: live }, { home, fork });
+    assert.throws(deploy, /dedicated build folder/);
+    const manifest = path.join(live, 'manifest.json');
+    fs.writeFileSync(manifest, JSON.stringify({ name: 'Threadkeeper', manifest_version: 3, key: 'existing-key' }));
+    assert.throws(deploy, /dedicated build folder/);
+    fs.writeFileSync(manifest, JSON.stringify({ name: 'Threadkeeper', manifest_version: 3 }));
+    assert.equal(deploy().TK_STABLE_ID, '0');
+    fs.symlinkSync(fork, live + '.staging');
+    assert.throws(deploy, /dedicated build folder/);
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
 test('deployment allows other folders inside the home directory, such as the documented live folder', () => {
   const base = temp();
   try {

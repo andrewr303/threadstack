@@ -1,0 +1,47 @@
+{
+  "findings": {
+    "100 cookies of 20 bytes": {
+      "rule": "accepted",
+      "count": 100,
+      "bytes": 2698,
+      "first": "c000",
+      "last": "c099"
+    },
+    "170 cookies of 20 bytes": {
+      "rule": "accepted",
+      "count": 170,
+      "bytes": 4588,
+      "first": "c000",
+      "last": "c169"
+    },
+    "10 cookies of 1000 bytes": {
+      "rule": "accepted",
+      "count": 10,
+      "bytes": 10068,
+      "first": "c000",
+      "last": "c009"
+    },
+    "40 cookies of 1000 bytes": {
+      "rule": "accepted",
+      "count": 10,
+      "bytes": 10068,
+      "first": "c030",
+      "last": "c039"
+    },
+    "80 cookies of 1000 bytes": {
+      "rule": "accepted",
+      "count": 10,
+      "bytes": 10068,
+      "first": "c070",
+      "last": "c079"
+    },
+    "20 cookies of 3900 bytes": {
+      "rule": "accepted",
+      "count": 2,
+      "bytes": 7812,
+      "first": "c018",
+      "last": "c019"
+    }
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36"
+}

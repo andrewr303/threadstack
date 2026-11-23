@@ -31,6 +31,16 @@ function withBridge(data: unknown) {
 const context = { companyId: "company", companyPrefix: "THR", projectId: null, entityId: "task-a", entityType: "issue", userId: "board" };
 const policy = { enabled: false, providers: [], disabledAt: 0 };
 const settings = (actions: unknown[]) => ({ connected: true, shared: true, lastSeenAt: new Date().toISOString(), browser: "Edge", sessionCount: 2, warning: null, versionMismatch: false, policy, effectivePolicy: policy, trustedAgentIds: [], eventsEnabled: true, agents: [{ id: "agent-a", name: "Builder", status: "idle" }], credentials: { linkedKeys: [], allowSecretTransfer: false }, actions });
+it.each([
+  { paired: true, connected: true },
+  { paired: true, connected: false },
+  { paired: false, connected: false },
+])("offers code confirmation only before pairing ($paired, $connected)", ({ paired, connected }) => {
+  withBridge({ ...settings([]), paired, connected, shared: false, lastSeenAt: null });
+  const html = renderToStaticMarkup(createElement(SettingsPage, { context }));
+  expect(html.includes("Confirm pairing code")).toBe(!paired);
+});
+
 it("REQ-11 F-6: shows the contract texts and the empty Recent actions state", () => {
   withBridge(settings([]));
   const html = renderToStaticMarkup(createElement(SettingsPage, { context }));

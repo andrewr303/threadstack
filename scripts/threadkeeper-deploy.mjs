@@ -23,6 +23,17 @@ function realResolve(p) {
 }
 const within = (inner, outer) => inner === outer || inner.startsWith(outer.endsWith(path.sep) ? outer : outer + path.sep);
 
+function isLegacyLiveBuild(target, fork) {
+  const relative = path.join('.output', 'chrome-mv3');
+  if (target !== path.join(fork, relative) || realResolve(target) !== path.join(realResolve(fork), relative)) return false;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(target, 'manifest.json'), 'utf8'));
+    return manifest.name === 'Threadkeeper' && manifest.manifest_version === 3 && !Object.hasOwn(manifest, 'key')
+      && !fs.lstatSync(target + '.staging', { throwIfNoEntry: false })
+      && !fs.readdirSync(target, { recursive: true, withFileTypes: true }).some(entry => entry.isSymbolicLink());
+  } catch { return false; }
+}
+
 export function deploymentEnv(env = process.env, { home = os.homedir(), fork = path.resolve(here, '..') } = {}) {
   if (!env.TK_LIVE_DIR?.trim()) throw new Error('Set TK_LIVE_DIR to the folder your browser loads Threadkeeper from.');
   const refusal = new Error('TK_LIVE_DIR must name an absolute dedicated build folder.');
@@ -30,10 +41,11 @@ export function deploymentEnv(env = process.env, { home = os.homedir(), fork = p
   if (!path.isAbsolute(env.TK_LIVE_DIR) || path.dirname(target) === target || target === path.resolve('.')) throw refusal;
   // Symlinks are resolved first, so an alias cannot name the fork, the home folder or the check output.
   const real = realResolve(target);
-  // Refuse the home folder and its parents, the fork and anything inside it, and the check output
-  // and anything inside it. Other folders under home (the live folder) are allowed.
+  // The existing legacy unpacked build is the only in-checkout destination.
   const build = [realResolve('/tmp/tk-build'), realResolve('/tmp/tk-build.staging')];
-  if (path.dirname(real) === real || within(realResolve(home), real) || within(real, realResolve(fork)) || build.some(b => within(real, b))) throw refusal;
+  if (path.dirname(real) === real || within(realResolve(home), real) || build.some(b => within(real, b))) throw refusal;
+  if (within(real, realResolve(fork)) && !isLegacyLiveBuild(target, fork)) throw refusal;
+  if (within(target, fork) && !within(real, realResolve(fork))) throw refusal;
   return { ...env, TK_OUT_DIR: target, TK_STABLE_ID: '0' };
 }
 

@@ -1,0 +1,58 @@
+[profiles-e2e] ok — the build asks for webRequest, so the cookies of an added account can be followed
+[profiles-e2e] fixture build: {
+  "version": "0.5.0",
+  "versionName": "0.5.0 (build 20261123.201535-5adc60f8a)",
+  "buildId": "20261123.201535-5adc60f8a",
+  "builtAt": "2026-11-23T20:15:35.418Z"
+}
+[profiles-e2e] extension: chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page
+[profiles-e2e] browser: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36
+[profiles-e2e] ok — an ordinary tab is signed in as A
+[profiles-e2e] ok — as a top-level page the stand-in shows its navigation
+[profiles-e2e] ok — the workspace lands on Claude Code
+[profiles-e2e] ok — in an ordinary frame with the browser account, A
+[profiles-e2e] ok — the framed page's own check reads top-level
+[profiles-e2e] ok — so it shows its own navigation inside the workspace
+[profiles-e2e] ok — the add dialog promises no sign-out
+[profiles-e2e] ok — Work is an added account without a sign-in yet
+[profiles-e2e] ok — adding it leaves the browser's sign-in exactly as it was
+[profiles-e2e] ok — Work's page loads in a credentialless frame (the workspace's own cookie partition)
+[profiles-e2e] ok — Work is signed in as B inside the workspace
+[profiles-e2e] ok — with its navigation shown too
+[profiles-e2e] ok — the browser account's page did not turn into B
+[profiles-e2e] ok — the browser is still signed in as A after B signed in
+[profiles-e2e] ok — and so is the ordinary tab
+[profiles-e2e] ok — Work keeps its name and records who signed in there
+[profiles-e2e] ok — Work's sign-in is kept, encrypted, not as readable text
+[profiles-e2e] ok — the browser account's identity is untouched
+[profiles-e2e] ok — a session opened as Work is filed under Work
+[profiles-e2e] ok — the browser account's sessions stay under it
+[profiles-e2e] ok — the Dashboard shows A and Work side by side, both signed in at once
+[profiles-e2e] ok — after a reload Work is signed in again from its saved sign-in, without signing in
+[profiles-e2e] ok — the browser is still A
+[profiles-e2e] ok — no seeding rule is left once the account is in place
+[profiles-e2e] ok — making Work the browser account puts its sign-in in the browser
+[profiles-e2e] ok — and making A the browser account again puts A back
+[profiles-e2e] ok — Work's pane no longer shows the page loaded with its old cookies; it asks for a reload
+[profiles-e2e] ok — Work's sign-in is saved again, from the browser
+[profiles-e2e] ok — after that reload Work is signed in from its new saved sign-in, beside A
+[profiles-e2e] ok — moving Work leaves A visible in the original workspace
+[profiles-e2e] ok — the second workspace shows Work signed in after the move and the original pauses Work
+[profiles-e2e] ok — closing the second workspace releases Work for the first workspace
+[profiles-e2e] ok — adding Client signs nothing out
+[profiles-e2e] ok — starting Client's browser sign-in sets the browser's sign-in aside
+[profiles-e2e] ok — the realm's sign-in page opens in an ordinary tab
+[profiles-e2e] ok — while it is open the browser holds no Claude sign-in
+[profiles-e2e] ok — once the site names Client, Client's sign-in is kept and the browser is A again
+[profiles-e2e] ok — the sign-in is over
+[profiles-e2e] ok — Client records who signed in
+[profiles-e2e] ok — and the sign-in tab is closed
+[profiles-e2e] ok — Cursor account identity is observed with conversation capture disabled
+[profiles-e2e] ok — Cursor offers browser-tab sign-in first
+[profiles-e2e] ok — finishing before Cursor login keeps it open and shows a recovery message
+[profiles-e2e] ok — a duplicate Cursor account is rejected
+[profiles-e2e] ok — the second Cursor login is visible in Threadkeeper and the original is restored in Chrome
+[profiles-e2e] ok — framed by another site the page still finds itself framed and hides its navigation
+[profiles-e2e] ok — with "Show each site’s full navigation" off, the workspace leaves the check alone
+[profiles-e2e] security rejections recorded during the run: 0
+[profiles-e2e] 48 checks passed

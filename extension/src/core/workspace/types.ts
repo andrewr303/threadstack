@@ -139,6 +139,15 @@ export interface PendingSignIn {
   /** The account that was the browser's own before, restored when the sign-in ends. */
   returnToAccountId: string;
   startedAt: string;
+  /** Identifies this attempt across delayed replies and worker restarts. */
+  attemptId?: string;
+  /** Identity confirmed by the tab opened for this sign-in. */
+  identity?: AccountIdentity;
+  wrongAccount?: true;
+}
+
+export function signInAttemptId(pending: PendingSignIn): string {
+  return pending.attemptId ?? pending.startedAt;
 }
 
 /** What a page needs to draw accounts: the realm, its accounts and which one the browser holds. */
@@ -297,16 +306,17 @@ export type WorkspaceCommand =
    * realm's sign-in page opens in an ordinary tab, and ACCOUNTS_SIGNIN_FINISH puts things back.
    */
   | { type: 'ACCOUNTS_SIGNIN_BEGIN'; accountId: string }
+  | { type: 'ACCOUNTS_SIGNIN_RESUME'; attemptId: string }
   /** Keep what the browser is signed in to now as the pending account's jar and restore the browser's own. */
-  | { type: 'ACCOUNTS_SIGNIN_FINISH' }
+  | { type: 'ACCOUNTS_SIGNIN_FINISH'; attemptId?: string }
   /** Give the pending sign-in up: restore the browser's own sign-in, keep nothing. */
-  | { type: 'ACCOUNTS_SIGNIN_CANCEL' }
+  | { type: 'ACCOUNTS_SIGNIN_CANCEL'; attemptId?: string }
   /**
    * Show `accountId` in this tab's profile slot for its realm. Answers ProfileClaimResult: the
    * addresses the page loads in hidden credentialless frames to put the account's cookies in
    * place. One profile per realm per page load; another one needs the page reloaded.
    */
-  | { type: 'PROFILE_CLAIM'; realm: string; accountId: string }
+  | { type: 'PROFILE_CLAIM'; realm: string; accountId: string; move?: boolean }
   /** The seeding addresses have loaded: the slot is ready and its header rules are removed. */
   | { type: 'PROFILE_READY'; realm: string }
   | { type: 'ACCOUNTS_UPDATE'; accountId: string; label?: string; color?: AccountColor }
@@ -331,6 +341,7 @@ export const WORKSPACE_COMMAND_TYPES: ReadonlySet<string> = new Set<WorkspaceCom
   'ACCOUNTS_ADD',
   'ACCOUNTS_ACTIVATE',
   'ACCOUNTS_SIGNIN_BEGIN',
+  'ACCOUNTS_SIGNIN_RESUME',
   'ACCOUNTS_SIGNIN_FINISH',
   'ACCOUNTS_SIGNIN_CANCEL',
   'PROFILE_CLAIM',
@@ -365,6 +376,8 @@ export type WorkspaceErrorCode =
   | 'browser_account'
   /** Another account is signing in through the browser right now. */
   | 'signin_pending'
+  | 'signin_incomplete'
+  | 'signin_wrong_account'
   /** The account is shown in another workspace tab; two pages must not keep one sign-in apart. */
   | 'profile_in_use';
 
@@ -388,6 +401,8 @@ export interface ProfileClaimResult {
   accountId: string;
   /** Addresses to load, in order, each in a hidden credentialless frame, before PROFILE_READY. */
   steps: string[];
+  /** Previous workspace tabs whose partitions were retired by an explicit move. */
+  movedFrom?: number[];
   /** Whether the account has a saved sign-in (false: its pages will show the site's sign-in page). */
   signedIn: boolean;
   /**
@@ -424,7 +439,7 @@ export type WorkspaceBroadcast =
    * removed): a page whose profile slot shows it holds old cookies and must reload to show it.
    * Sent before the ACCOUNTS_CHANGED of the same change.
    */
-  | { type: 'PROFILE_RETIRED'; accountId: string }
+  | { type: 'PROFILE_RETIRED'; accountId: string; movedFrom?: number[] }
   /** An embedded page tried to open a new window; open the address as a session tab instead. */
   | { type: 'EMBED_OPEN_REQUEST'; tabId: number; url: string };
 

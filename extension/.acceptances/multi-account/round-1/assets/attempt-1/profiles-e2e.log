@@ -1,0 +1,34 @@
+[profiles-e2e] ok — the build asks for webRequest, so the cookies of an added account can be followed
+[profiles-e2e] fixture build: {
+  "version": "0.5.0",
+  "versionName": "0.5.0 (build 20261123.201248-5adc60f8a)",
+  "buildId": "20261123.201248-5adc60f8a",
+  "builtAt": "2026-11-23T20:12:48.114Z"
+}
+[profiles-e2e] extension: chrome-extension://dhncjnkkeiegnepkgejcjonidifpoicb/manager.html?surface=page
+[profiles-e2e] browser: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36
+[profiles-e2e] ok — an ordinary tab is signed in as A
+[profiles-e2e] ok — as a top-level page the stand-in shows its navigation
+[profiles-e2e] ok — the workspace lands on Claude Code
+[profiles-e2e] ok — in an ordinary frame with the browser account, A
+[profiles-e2e] ok — the framed page's own check reads top-level
+[profiles-e2e] ok — so it shows its own navigation inside the workspace
+[profiles-e2e] ok — the add dialog promises no sign-out
+[profiles-e2e] ok — Work is an added account without a sign-in yet
+[profiles-e2e] ok — adding it leaves the browser's sign-in exactly as it was
+[profiles-e2e] ok — Work's page loads in a credentialless frame (the workspace's own cookie partition)
+[profiles-e2e] ok — Work is signed in as B inside the workspace
+[profiles-e2e] ok — with its navigation shown too
+[profiles-e2e] ok — the browser account's page did not turn into B
+[profiles-e2e] ok — the browser is still signed in as A after B signed in
+[profiles-e2e] ok — and so is the ordinary tab
+[profiles-e2e] ok — Work keeps its name and records who signed in there
+[profiles-e2e] ok — Work's sign-in is kept, encrypted, not as readable text
+[profiles-e2e] ok — the browser account's identity is untouched
+[profiles-e2e] ok — a session opened as Work is filed under Work
+[profiles-e2e] ok — the browser account's sessions stay under it
+page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('.tk-rail-seg [role="radio"]:has-text("Dashboard")')[22m
+
+[profiles-e2e] 21 checks passed before the failure

@@ -34,6 +34,8 @@ export interface RealmInfo {
   fixedReason?: string;
   /** Where a new account signs in. */
   signInUrl: string;
+  /** The sign-in commonly redirects through a separate identity provider. */
+  preferBrowserSignIn?: boolean;
   /** Where "new tab" lands for this realm when no provider is chosen. */
   homeUrl: string;
 }
@@ -91,6 +93,7 @@ const NAMED_REALMS: RealmInfo[] = [
     cookieDomains: ['cursor.com', 'authenticator.cursor.sh'],
     extraHostPatterns: ['https://authenticator.cursor.sh/*'],
     signInUrl: 'https://cursor.com/agents',
+    preferBrowserSignIn: true,
     homeUrl: 'https://cursor.com/agents',
   }),
   realm({

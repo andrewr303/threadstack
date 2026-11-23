@@ -26,6 +26,7 @@ import { primaryAccountId, realmById, realmForProvider, switchableRealms, type R
 import {
   ACCOUNT_COLORS,
   KV_KEYS,
+  signInAttemptId,
   threadAccountId,
   type AccountColor,
   type AccountIdentity,
@@ -42,7 +43,7 @@ import {
 import type { AccountService, AccountsEnv, AddAccountInput, CaptureAccount, IdentityOutcome } from './contract.js';
 import { cookieSlot, isDeviceCookie } from './cookies.js';
 import { decryptJar, encryptJar } from './crypto.js';
-import { looksSignedIn } from './set-cookie.js';
+import { bareDomain, looksSignedIn } from './set-cookie.js';
 
 const MAIN_LABEL = 'Main account';
 const MAX_LABEL = 80;
@@ -151,11 +152,17 @@ function readJournalValue(value: unknown): SwitchJournal | null {
 function readPendingValue(value: unknown): PendingSignIn | null {
   if (!isRecord(value)) return null;
   if (typeof value.realm !== 'string' || typeof value.accountId !== 'string' || typeof value.returnToAccountId !== 'string') return null;
+  const identity = isRecord(value.identity) && typeof value.identity.observedAt === 'string'
+    ? cleanIdentity(value.identity, value.identity.observedAt)
+    : null;
   return {
     realm: value.realm,
     accountId: value.accountId,
     returnToAccountId: value.returnToAccountId,
     startedAt: typeof value.startedAt === 'string' ? value.startedAt : '',
+    ...(typeof value.attemptId === 'string' ? { attemptId: value.attemptId } : {}),
+    ...(identity ? { identity } : {}),
+    ...(value.wrongAccount === true ? { wrongAccount: true as const } : {}),
   };
 }
 
@@ -360,8 +367,13 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
   // -------------------------------------------------------------------------------------------
 
   /** Only the cookie domains host access covers count; with none, nothing can be switched. */
+  function appCookieDomains(realm: RealmInfo): string[] {
+    return realm.cookieDomains.filter((domain) => !realm.extraHostPatterns.includes(`https://${domain}/*`));
+  }
+
   async function hasRealmAccess(realm: RealmInfo): Promise<boolean> {
-    for (const domain of realm.cookieDomains) {
+    // An auth redirect alone does not give access to the application's session.
+    for (const domain of appCookieDomains(realm)) {
       if (await env.hasHostAccess([`https://${domain}/*`])) return true;
     }
     return false;
@@ -432,9 +444,9 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
     realm: RealmInfo,
     fromId: string | null,
     to: AccountRecord,
-    options: { create: boolean; saveFrom: boolean; keepTargetJar?: boolean }
+    options: { create: boolean; saveFrom: boolean; keepTargetJar?: boolean; signedIn?: { cookies: StoredCookie[]; identity?: AccountIdentity } }
   ): Promise<number> {
-    const outgoing = await readRealmCookies(realm);
+    const outgoing = options.signedIn?.cookies ?? await readRealmCookies(realm);
     const sealed = fromId && options.saveFrom && outgoing.length > 0 ? await encryptJar(db, outgoing) : null;
     const at = nowIso();
     const journal: SwitchJournal = {
@@ -451,7 +463,21 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
         if (sealed) {
           await db.accountJars.put({ accountId: fromId, iv: sealed.iv, data: sealed.data, cookieCount: sealed.cookieCount, savedAt: at });
           // Cookies without a sign-in among them (a visitor's) are kept, and say so.
-          await db.accounts.update(fromId, looksSignedIn(outgoing, env.now().getTime(), isDeviceCookie) ? { hasJar: true } : { hasJar: true, signedIn: 'no' });
+          const confirmed = options.signedIn;
+          if (confirmed) {
+            const previous = await db.accounts.get(fromId);
+            const identity = confirmed.identity;
+            await db.accounts.update(fromId, {
+              hasJar: true,
+              signedIn: identity ? 'yes' : 'unknown',
+              ...(identity ? { identity } : {}),
+              ...(identity?.display && previous && isDefaultLabel(previous.label)
+                ? { label: identity.display.slice(0, MAX_LABEL) }
+                : {}),
+            });
+          } else {
+            await db.accounts.update(fromId, looksSignedIn(outgoing, env.now().getTime(), isDeviceCookie) ? { hasJar: true } : { hasJar: true, signedIn: 'no' });
+          }
         } else {
           await db.accountJars.delete(fromId);
           await db.accounts.update(fromId, { hasJar: false, signedIn: 'no' });
@@ -557,9 +583,9 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
    * End a pending browser sign-in: make `returnTo` the browser account again. With `keep`, what
    * the browser holds is saved as the outgoing account's jar; without, it is dropped.
    */
-  async function endPendingSignIn(keep: boolean): Promise<AccountsChangeResult | WorkspaceFailure> {
+  async function endPendingSignIn(keep: boolean, attemptId?: string, requireIdentity = false): Promise<AccountsChangeResult | WorkspaceFailure> {
     const pending = await readPending();
-    if (!pending) return fail('No sign-in is open.', 'not_allowed');
+    if (!pending || (attemptId !== undefined && signInAttemptId(pending) !== attemptId)) return fail('No sign-in is open.', 'not_allowed');
     const realm = realmById(pending.realm);
     if (!realm || !realm.switchable) {
       await db.kv.delete(KV_KEYS.pendingSignIn);
@@ -568,7 +594,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
     return withSwitchLock(realm.id, () =>
       guardedSwitch(realm, async () => {
         const again = await readPending();
-        if (!again || again.accountId !== pending.accountId) return fail('No sign-in is open.', 'not_allowed');
+        if (!again || signInAttemptId(again) !== signInAttemptId(pending)) return fail('No sign-in is open.', 'not_allowed');
         const primary = await ensurePrimary(realm);
         const accounts = await realmAccounts(realm.id);
         const activeId = activeIdFor(realm, accounts, await activeMap());
@@ -576,7 +602,23 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
         let switched = false;
         if (activeId !== returnTo.id) {
           if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
-          await performSwitch(realm, activeId, returnTo, { create: false, saveFrom: keep });
+          let signedIn: { cookies: StoredCookie[]; identity?: AccountIdentity } | undefined;
+          if (keep) {
+            if (again.wrongAccount) {
+              return fail('The site signed in to a different saved account. Choose the account you want in the browser tab, or cancel.', 'signin_wrong_account');
+            }
+            const cookies = await readRealmCookies(realm);
+            const domains = appCookieDomains(realm);
+            const siteCookies = cookies.filter((cookie) => {
+              const host = bareDomain(cookie);
+              return domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+            });
+            if (activeId !== pending.accountId || (requireIdentity && !again.identity) || !looksSignedIn(siteCookies, env.now().getTime(), isDeviceCookie)) {
+              return fail(`Finish signing in to ${realm.label} in the browser tab, then try again.`, 'signin_incomplete');
+            }
+            signedIn = { cookies, identity: again.identity };
+          }
+          await performSwitch(realm, activeId, returnTo, { create: false, saveFrom: keep, signedIn });
           // Cancelled: what the browser held is dropped, and a jar the account kept through the
           // sign-in (see beginBrowserSignIn) is its sign-in again.
           if (!keep) await db.accounts.update(activeId, { hasJar: Boolean(await db.accountJars.get(activeId)) });
@@ -893,7 +935,13 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
           const activeId = activeIdFor(realm, accounts, await activeMap());
           if (activeId === target.id) return fail('This account is the one your browser is signed in to. Sign in on the site in any tab.', 'browser_account');
           if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
-          const pending: PendingSignIn = { realm: realm.id, accountId: target.id, returnToAccountId: activeId, startedAt: nowIso() };
+          const pending: PendingSignIn = {
+            realm: realm.id,
+            accountId: target.id,
+            returnToAccountId: activeId,
+            startedAt: nowIso(),
+            attemptId: env.randomHex(24),
+          };
           // Written first: if the worker stops after the switch, the page still offers to finish.
           await db.kv.put({ key: KV_KEYS.pendingSignIn, value: pending, updatedAt: pending.startedAt });
           try {
@@ -910,12 +958,12 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
       );
     },
 
-    async finishBrowserSignIn(): Promise<AccountsChangeResult | WorkspaceFailure> {
-      return endPendingSignIn(true);
+    async finishBrowserSignIn(attemptId?: string, requireIdentity?: boolean): Promise<AccountsChangeResult | WorkspaceFailure> {
+      return endPendingSignIn(true, attemptId, requireIdentity);
     },
 
-    async cancelBrowserSignIn(): Promise<AccountsChangeResult | WorkspaceFailure> {
-      return endPendingSignIn(false);
+    async cancelBrowserSignIn(attemptId?: string): Promise<AccountsChangeResult | WorkspaceFailure> {
+      return endPendingSignIn(false, attemptId);
     },
 
     async pendingSignIn(): Promise<PendingSignIn | null> {
@@ -926,7 +974,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
       }
     },
 
-    async noteIdentity(provider: ProviderId, raw: Omit<AccountIdentity, 'observedAt'> | null): Promise<IdentityOutcome | null> {
+    async noteIdentity(provider: ProviderId, raw: Omit<AccountIdentity, 'observedAt'> | null, attempt?: PendingSignIn): Promise<IdentityOutcome | null> {
       try {
         const realm = realmForProvider(provider);
         if (!realm || !realm.switchable) return null;
@@ -939,6 +987,22 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
             const base: IdentityOutcome = { realm: realm.id, activeAccountId: active.id, reassigned: false, updated: false };
             // A switch of this realm was interrupted; what the page saw may predate it.
             if ((await readJournal())?.realm === realm.id) return base;
+            const pending = await pendingFor(realm.id);
+            if (pending) {
+              if (!attempt || signInAttemptId(attempt) !== signInAttemptId(pending) || active.id !== pending.accountId) return base;
+              const wrongAccount = identity && (
+                (active.identity && active.identity.key !== identity.key) ||
+                (await realmAccounts(realm.id)).some((a) => a.mode === 'embedded' && a.id !== active.id && a.identity?.key === identity.key)
+              );
+              const { identity: previous, wrongAccount: wasWrong, ...current } = pending;
+              const next: PendingSignIn = wrongAccount
+                ? { ...current, wrongAccount: true }
+                : identity ? { ...current, identity } : wasWrong ? { ...current, wrongAccount: true } : current;
+              const updated = next.identity?.key !== previous?.key || next.wrongAccount !== wasWrong;
+              if (updated) await db.kv.put({ key: KV_KEYS.pendingSignIn, value: next, updatedAt: nowIso() });
+              return { ...base, updated, named: next.identity ? active.id : null };
+            }
+            if (attempt) return base;
             const settling = env.now().getTime() - (lastSwitchAt.get(realm.id) ?? -Infinity) < SWITCH_SETTLE_MS;
 
             if (!identity) {

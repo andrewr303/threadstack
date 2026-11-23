@@ -381,6 +381,18 @@ describe('accountReplaced', () => {
 });
 
 describe('one account in two workspace tabs', () => {
+  it('moves the account on request and stops filing responses from the previous tab', async () => {
+    await readyTab(5, 'acct_a');
+    await profiles.frameSeen(5, 3, true);
+    await profiles.onResponse({ tabId: 5, frameId: 3, url: 'https://claude.ai/x', setCookies: ['latest=1; Path=/; Secure'] });
+    expect(await profiles.claim(6, 'anthropic', 'acct_a', true)).toMatchObject({ ok: true, movedFrom: [5] });
+    expect(slots.slot(5, 'anthropic')?.status).toBe('stale');
+    expect(await profiles.accountOfFrame(5, 3, 'https://claude.ai/x')).toEqual({ kind: 'profile', account: null });
+    await profiles.onResponse({ tabId: 5, frameId: 3, url: 'https://claude.ai/x', setCookies: ['latest=old; Path=/; Secure'] });
+    expect((await jars.cookies('acct_a')).find((c) => c.name === 'latest')?.value).toBe('1');
+    expect(slots.slot(6, 'anthropic')?.accountId).toBe('acct_a');
+  });
+
   it('is refused: two partitions would each change the one saved sign-in', async () => {
     await readyTab(5, 'acct_a');
     expect(await profiles.claim(6, 'anthropic', 'acct_a')).toMatchObject({ ok: false, code: 'profile_in_use' });

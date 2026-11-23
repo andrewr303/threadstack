@@ -21,7 +21,7 @@
 // Build first, into a folder no browser has loaded:
 //   TK_OUT_DIR=/tmp/tk-build node scripts/build-extension.mjs
 //   TK_E2E_DIST=/tmp/tk-build node scripts/run-profiles-e2e.mjs
-// Screenshots go to evidence/profiles/.
+// TK_E2E_OUT redirects screenshots from the default evidence/profiles/.
 import fs from 'node:fs';
 import https from 'node:https';
 import os from 'node:os';
@@ -33,7 +33,7 @@ import { chromium } from 'playwright';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = process.env.TK_E2E_DIST ? path.resolve(process.env.TK_E2E_DIST) : path.join(root, '.output', 'chrome-mv3');
-const out = path.join(root, 'evidence', 'profiles');
+const out = process.env.TK_E2E_OUT ? path.resolve(process.env.TK_E2E_OUT) : path.join(root, 'evidence', 'profiles');
 fs.mkdirSync(out, { recursive: true });
 
 function resolveChromium() {
@@ -143,6 +143,23 @@ function handler(req, res) {
   if (host === 'other-site.test') {
     return send(200, { 'content-type': 'text/html' }, '<!doctype html><title>Other site</title><iframe name="elsewhere" src="https://claude.ai/code/session_elsewhere?plain=1" width="800" height="400"></iframe>');
   }
+  if (host === 'cursor.com') {
+    if (url.pathname === '/api/auth/me') {
+      return acct ? json({ sub: ACCOUNTS[acct].uuid, email: ACCOUNTS[acct].email }) : json({}, 401);
+    }
+    if (url.pathname === '/agents') {
+      return html(acct
+        ? `<title>Cursor Agents</title><p id="who">Signed in as ${acct}</p><script>fetch('/api/auth/me')</script>`
+        : '<title>Cursor Sign-in</title><a href="/login?as=A">Use current Cursor account</a> <a href="/login?as=B">Use another Cursor account</a>');
+    }
+    if (url.pathname === '/login' && ACCOUNTS[url.searchParams.get('as')]) {
+      const who = url.searchParams.get('as');
+      return send(302, {
+        location: '/agents',
+        'set-cookie': `sessionKey=${who}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400`,
+      }, '');
+    }
+  }
   if (host !== 'claude.ai') return send(404, { 'content-type': 'text/plain' }, 'not a stand-in host');
 
   if (url.pathname === '/login') {
@@ -229,8 +246,15 @@ async function main() {
   if (!fs.existsSync(path.join(dist, 'manifest.json'))) throw new Error(`No build at ${dist}. Build first: TK_OUT_DIR=/tmp/tk-build node scripts/build-extension.mjs`);
   const manifest = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.json'), 'utf8'));
   check(manifest.permissions.includes('webRequest'), 'the build asks for webRequest, so the cookies of an added account can be followed');
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tk-profile-fixture-'));
+  const fixtureDist = path.join(fixtureDir, 'extension');
+  fs.cpSync(dist, fixtureDist, { recursive: true });
+  // Fixture only: pre-grant the Cursor hosts so the run does not depend on a native permission prompt.
+  manifest.host_permissions.push('https://cursor.com/*', 'https://www.cursor.com/*', 'https://authenticator.cursor.sh/*');
+  fs.writeFileSync(path.join(fixtureDist, 'manifest.json'), JSON.stringify(manifest));
+  log('fixture build:', fs.readFileSync(path.join(fixtureDist, 'build-info.json'), 'utf8'));
   const { server, port } = await startServer();
-  const context = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'tk-profiles-e2e-')), {
+  const context = await chromium.launchPersistentContext(path.join(fixtureDir, 'profile'), {
     executablePath: resolveChromium(),
     headless: true,
     ignoreHTTPSErrors: true,
@@ -239,9 +263,9 @@ async function main() {
       '--headless=new',
       '--no-first-run',
       '--no-default-browser-check',
-      `--disable-extensions-except=${dist}`,
-      `--load-extension=${dist}`,
-      `--host-resolver-rules=MAP claude.ai 127.0.0.1:${port}, MAP other-site.test 127.0.0.1:${port}`,
+      `--disable-extensions-except=${fixtureDist}`,
+      `--load-extension=${fixtureDist}`,
+      `--host-resolver-rules=MAP claude.ai 127.0.0.1:${port}, MAP cursor.com 127.0.0.1:${port}, MAP other-site.test 127.0.0.1:${port}`,
       '--ignore-certificate-errors',
     ],
   });
@@ -249,6 +273,7 @@ async function main() {
     let [sw] = context.serviceWorkers();
     if (!sw) sw = await context.waitForEvent('serviceworker');
     const extId = new URL(sw.url()).host;
+    log(`extension: chrome-extension://${extId}/manager.html?surface=page`);
     log(`browser: ${await sw.evaluate(() => navigator.userAgent)}`);
 
     // 1. The browser's own sign-in, then the workspace lands on Claude Code as that account.
@@ -330,7 +355,7 @@ async function main() {
       for (const key of keys) await globalThis.__threadkeeperDb.conversations.update(key, { pinned: true });
       chrome.runtime.sendMessage({ type: 'LIBRARY_CHANGED' }).catch(() => undefined);
     }, [a1.key, filed.key]);
-    await page.click('.tk-rail-seg [role="radio"]:has-text("Dashboard")');
+    await page.getByRole('radio', { name: 'Dashboard', exact: true }).click();
     await page.waitForSelector('.tk-workbench[data-view="dashboard"]');
     for (let pane = 0; pane < 2; pane++) {
       await until(() => page.$$eval('.tk-dash-empty button', (b) => b.length), (n) => n > 0, { label: `a pinned session to place in pane ${pane + 1}` });
@@ -375,6 +400,24 @@ async function main() {
     await until(() => textOf(paneFrame(page, aThreadTab), '#who'), (t) => t === 'Signed in as A', { label: "A's pane after that reload" });
     check(true, 'after that reload Work is signed in from its new saved sign-in, beside A');
 
+    // A second Chrome tab can take over a saved account without closing the original workspace.
+    const secondWorkspace = await context.newPage();
+    await secondWorkspace.goto(page.url());
+    const dashboard = (workspace) => workspace.getByRole('region', { name: 'Dashboard', exact: true });
+    await dashboard(secondWorkspace).getByRole('heading', { name: 'Work is open in another Threadkeeper tab', exact: true }).waitFor();
+    await secondWorkspace.screenshot({ path: path.join(out, '04-move-account.png') });
+    await dashboard(secondWorkspace).getByRole('button', { name: 'Move account here', exact: true }).click();
+    await until(() => textOf(paneFrame(secondWorkspace, bThreadTab), '#who'), (t) => t === 'Signed in as B', { label: 'Work in the second workspace' });
+    await dashboard(page).getByRole('heading', { name: 'Work moved to another Threadkeeper tab', exact: true }).waitFor();
+    await until(() => Promise.resolve(paneFrame(page, bThreadTab)), (frame) => frame === null, { label: 'the previous Work frame to unmount' });
+    check((await textOf(paneFrame(page, aThreadTab), '#who')) === 'Signed in as A', 'moving Work leaves A visible in the original workspace');
+    await secondWorkspace.screenshot({ path: path.join(out, '05-account-after-move.png') });
+    check(true, 'the second workspace shows Work signed in after the move and the original pauses Work');
+    await secondWorkspace.close();
+    await clickButton(page, 'Reload to show Work');
+    await until(() => textOf(paneFrame(page, bThreadTab), '#who'), (t) => t === 'Signed in as B', { label: 'Work back in the first workspace' });
+    check(true, 'closing the second workspace releases Work for the first workspace');
+
     // 5. Account C signs in through an ordinary browser tab.
     const added = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'ACCOUNTS_ADD', realm: 'anthropic', mode: 'embedded', label: 'Client' }));
     check(added?.ok === true && added.switched === false, 'adding Client signs nothing out', added?.error);
@@ -383,11 +426,9 @@ async function main() {
     const begun = await page.evaluate((id) => chrome.runtime.sendMessage({ type: 'ACCOUNTS_SIGNIN_BEGIN', accountId: id }), clientId);
     check(begun?.ok === true && begun.switched === true, "starting Client's browser sign-in sets the browser's sign-in aside", begun?.error);
     const signInTab = await opened;
-    await signInTab.waitForLoadState('domcontentloaded');
+    await signInTab.waitForURL('https://claude.ai/login');
     check(new URL(signInTab.url()).pathname === '/login', "the realm's sign-in page opens in an ordinary tab", signInTab.url());
     check((await browserJar(sw)).sessionKey === undefined, 'while it is open the browser holds no Claude sign-in');
-    // A person takes a few seconds; identity reports right after a switch are ignored on purpose.
-    await sleep(4_500);
     await signInTab.click('#login-C');
     await until(() => claudeAccounts(sw), (list) => list.find((a) => a.id === clientId)?.hasJar === true, { label: "Client's saved sign-in", timeout: 30_000 });
     const afterClient = await until(() => browserJar(sw), (j) => j.sessionKey === 'A', { label: "the browser's own sign-in coming back" });
@@ -398,6 +439,47 @@ async function main() {
     check(client.identity === ACCOUNTS.C.email, 'Client records who signed in', client);
     await until(() => Promise.resolve(signInTab.isClosed()), (closed) => closed === true, { label: 'the sign-in tab to close' });
     check(true, 'and the sign-in tab is closed');
+
+    // With capture off and host access granted, Cursor's own response still identifies the account.
+    await until(() => sw.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((s) => s.id)),
+      (ids) => ids.includes('tk-provider-cursor_agents~site-data'), { label: 'the Cursor identity observer' });
+    const cursor = await context.newPage();
+    await cursor.goto('https://cursor.com/login?as=A');
+    const cursorAccounts = () => sw.evaluate(() => globalThis.__threadkeeperDb.accounts.where('realm').equals('cursor').toArray());
+    await until(cursorAccounts, (rows) => rows.some((row) => row.primary && row.identity?.display === ACCOUNTS.A.email), { label: 'Cursor’s primary identity' });
+    check(true, 'Cursor account identity is observed with conversation capture disabled');
+    await clickButton(page, 'Add account');
+    const dialog = page.locator('#tk-add-account-dialog');
+    await dialog.locator('select').selectOption('cursor');
+    await dialog.locator('input[type="text"]').fill('Cursor Work');
+    await dialog.getByRole('button', { name: 'Add account', exact: true }).click();
+    const browserButton = page.getByRole('button', { name: 'Sign in with a browser tab', exact: true });
+    await browserButton.waitFor();
+    check(await browserButton.evaluate((button) => button.classList.contains('tk-btn-primary')), 'Cursor offers browser-tab sign-in first');
+    const cursorOpened = context.waitForEvent('page');
+    await browserButton.click();
+    const firstCursorLogin = await cursorOpened;
+    await firstCursorLogin.waitForURL('https://cursor.com/agents');
+    const banner = page.getByTestId('pending-signin-banner');
+    await banner.getByRole('button', { name: 'I’ve signed in' }).click();
+    await banner.getByRole('alert').getByText('Finish signing in to Cursor in the browser tab, then try again.').waitFor();
+    check(true, 'finishing before Cursor login keeps it open and shows a recovery message');
+    await firstCursorLogin.close();
+    const cursorReopened = context.waitForEvent('page');
+    await banner.getByRole('button', { name: 'Open sign-in tab' }).click();
+    const cursorLogin = await cursorReopened;
+    await cursorLogin.getByRole('link', { name: 'Use current Cursor account' }).click();
+    await banner.getByText(/The site picked a different saved account/).waitFor();
+    check(await banner.getByRole('button', { name: 'I’ve signed in' }).isDisabled(), 'a duplicate Cursor account is rejected');
+    await page.screenshot({ path: path.join(out, '06-cursor-duplicate.png') });
+    await cursorLogin.goto('https://cursor.com/login?as=B');
+    await banner.waitFor({ state: 'hidden' });
+    await until(cursorAccounts, (rows) => rows.some((row) => row.label === 'Cursor Work' && row.hasJar && row.identity?.display === ACCOUNTS.B.email),
+      { label: 'the saved second Cursor account' });
+    await page.locator('iframe.tk-frame[src^="https://cursor.com/agents"]').contentFrame().getByText('Signed in as B').waitFor();
+    await cursor.reload();
+    check((await cursor.textContent('#who')) === 'Signed in as A', 'the second Cursor login is visible in Threadkeeper and the original is restored in Chrome');
+    await page.screenshot({ path: path.join(out, '07-cursor-second-account.png') });
 
     // 6. Controls.
     const other = await context.newPage();
@@ -410,6 +492,7 @@ async function main() {
     await sw.evaluate(async () => {
       await globalThis.__threadkeeperDb.settings.update('default', { embedFullNavigation: false });
     });
+    await page.getByRole('radio', { name: 'Dashboard', exact: true }).click();
     await page.reload();
     await page.waitForSelector('.tk-workbench[data-view="dashboard"]', { timeout: 20_000 });
     const plainA = await until(() => paneFrame(page, aThreadTab), (f) => f !== null && f.name().includes('!n!'), { label: "A's pane without the navigation option" });
@@ -425,6 +508,7 @@ async function main() {
   } finally {
     await context.close();
     server.close();
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
   }
   log(`${results.length} checks passed`);
 }

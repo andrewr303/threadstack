@@ -137,7 +137,7 @@ describe('workspace commands', () => {
     expect(await handleWorkspaceCommand({ type: 'PROFILE_READY', realm: 'openai' }, 11, d)).toEqual({ ok: true });
     // The tab is always the sender's own, never one the message names.
     expect(profiles.calls).toEqual([
-      ['claim', [11, 'openai', PRIMARY.id]],
+      ['claim', [11, 'openai', PRIMARY.id, false]],
       ['ready', [11, 'openai']],
     ]);
     for (const bad of [
@@ -156,7 +156,14 @@ describe('workspace commands', () => {
   });
 
   it('starts a browser sign-in: opens the sign-in page, drops the stale copy and tells the pages', async () => {
-    const svc = fakeAccounts();
+    const pending = { realm: 'openai', accountId: PRIMARY.id, returnToAccountId: SECOND.id, startedAt: '', attemptId: 'attempt' };
+    const svc = fakeAccounts({
+      beginBrowserSignIn: async (...args) => {
+        svc.calls.push(['beginBrowserSignIn', args]);
+        return { ok: true, account: PRIMARY, switched: true, realms: REALMS.map((r) => ({ ...r, pendingSignIn: pending })) };
+      },
+      pendingSignIn: async () => pending,
+    });
     const { d, broadcasts } = deps(svc);
     const profiles = fakeProfiles();
     const opened: string[] = [];
@@ -166,6 +173,9 @@ describe('workspace commands', () => {
     expect(res).toMatchObject({ ok: true, switched: true });
     expect(svc.calls.find(([n]) => n === 'beginBrowserSignIn')?.[1]).toEqual([PRIMARY.id]);
     expect(opened).toEqual([realmById('openai')!.signInUrl]);
+    expect(await handleWorkspaceCommand({ type: 'ACCOUNTS_SIGNIN_RESUME', attemptId: 'old' }, 11, d)).toMatchObject({ ok: false });
+    expect(await handleWorkspaceCommand({ type: 'ACCOUNTS_SIGNIN_RESUME', attemptId: 'attempt' }, 11, d)).toMatchObject({ ok: true });
+    expect(opened).toHaveLength(2);
     expect(profiles.calls).toContainEqual(['accountReplaced', [PRIMARY.id]]);
     expect(broadcasts).toEqual([{ type: 'ACCOUNTS_CHANGED', realm: 'openai', activeAccountId: SECOND.id, switched: true }]);
     expect(await handleWorkspaceCommand({ type: 'ACCOUNTS_SIGNIN_BEGIN', accountId: 7 }, 11, d)).toMatchObject({ ok: false, code: 'unknown_account' });
@@ -575,7 +585,7 @@ describe('service worker wiring', () => {
       providerTab('https://chatgpt.com/')
     );
     expect(id).toEqual({ ok: true });
-    expect(fake.noteIdentity).toHaveBeenCalledWith('chatgpt', { key: 'h1', display: 'me@example.com', detail: null, source: 'network' });
+    expect(fake.noteIdentity).toHaveBeenCalledWith('chatgpt', { key: 'h1', display: 'me@example.com', detail: null, source: 'network' }, undefined);
     expect(sent).toContainEqual({ type: 'ACCOUNTS_CHANGED', realm: 'openai', activeAccountId: SECOND.id, switched: false });
     expect(await call({ type: 'ACCOUNT_IDENTITY', provider: 'claude', identity: null }, providerTab('https://chatgpt.com/'))).toMatchObject({ ok: false });
   });

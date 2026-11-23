@@ -31,9 +31,10 @@ TK_LIVE_DIR=/absolute/folder/the/browser/already/loads pnpm run deploy:extension
 
 Keep the existing loaded folder to preserve its extension ID and library. The
 command refuses an unset or relative destination, symlinks resolved first: the
-home folder and its parents, the fork and anything inside it, and `/tmp/tk-build`
-and anything inside it are rejected. Other folders inside the home folder, such as
-`~/dev/threadkeeper/.output/chrome-mv3`, are allowed. It forces a path-based ID. Do not run it
+home folder and its parents, source directories, and `/tmp/tk-build`
+and anything inside it are rejected. The fork's own `.output/chrome-mv3` is supported
+when it already contains a path-based Threadkeeper build, has no symlinks, and its
+sibling staging directory is absent. It forces a path-based ID. Do not run it
 without authorization for that deployment. Never regenerate the extension key.
 
 ## Registering the source checkout with the Mac helper

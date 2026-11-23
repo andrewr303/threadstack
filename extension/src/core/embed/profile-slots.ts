@@ -237,7 +237,13 @@ export class ProfileSlots {
    * Answers the addresses the page must load. A slot already showing another account refuses:
    * the page has to be reloaded for that.
    */
-  claim(tabId: number, realmId: string, accountId: string, plan: SeedPlan): Promise<{ ok: true; steps: string[] } | WorkspaceFailure> {
+  claim(
+    tabId: number,
+    realmId: string,
+    accountId: string,
+    prepare: SeedPlan | (() => Promise<SeedPlan>),
+    move = false
+  ): Promise<{ ok: true; steps: string[]; movedFrom?: number[] } | WorkspaceFailure> {
     return this.serial(async () => {
       await this.ready();
       const state = this.tab(tabId);
@@ -251,63 +257,62 @@ export class ProfileSlots {
       // Two partitions would each change the one saved sign-in behind the other's back.
       const others = this.tabsShowing(accountId).filter((other) => other !== tabId);
       const live = this.env.isWorkspaceTab ?? (() => true);
-      if (others.some((other) => live(other))) {
+      const movedFrom = others.filter(live);
+      if (!move && movedFrom.length) {
         return {
           ok: false,
-          error: 'This account is open in another Threadkeeper tab. Use that tab, or close it and try again here.',
+          error: 'This account is open in another Threadkeeper tab.',
           code: 'profile_in_use',
         };
       }
-      // Left behind by pages that went away: retired, so if such a page comes back it files nothing.
+      // Freeze the old partition before reading the live jar. Previous writes have entered the
+      // jar queue, and responses arriving during the move cannot change the transferred sign-in.
+      const retired: Array<{ slot: SlotRecord; status: SlotRecord['status'] }> = [];
       for (const other of others) {
         for (const slot of this.tabs.get(other)?.slots.values() ?? []) {
           if (slot.accountId !== accountId || slot.status === 'stale') continue;
-          await this.removeRules(slot.ruleIds);
+          retired.push({ slot, status: slot.status });
           slot.status = 'stale';
-          slot.ruleIds = [];
-          slot.pending = [];
         }
       }
-      // Already in place: nothing to load again.
-      if (existing && existing.status === 'ready') return { ok: true, steps: [] };
-      if (existing) {
-        await this.removeRules(existing.ruleIds);
-        state.slots.delete(realmId);
-      }
-      const nonce = plan.steps[0] ? seedNonceOf(plan.steps[0].url) : null;
-      if (plan.steps.length === 0 || !nonce) {
-        // Nothing saved and no bot-check to carry over: the slot is ready as it is, empty.
-        state.slots.set(realmId, { accountId, status: 'ready', nonce: '', ruleIds: [], pending: [], readyAt: this.env.now() });
-        await this.persist();
-        return { ok: true, steps: [] };
-      }
-      if (!this.env.rules) return BUSY;
-      let ruleIds: number[] | null;
+      let steps: string[] = [];
       try {
-        const taken = [
-          ...(await this.env.rules.getSessionRules()).map((r) => r.id),
-          ...[...this.tabs.values()].flatMap((t) => [...t.slots.values()].flatMap((s) => s.ruleIds)),
-        ];
-        ruleIds = allocateSeedRuleIds(taken, plan.steps.length);
-        if (!ruleIds) return BUSY;
-        await this.env.rules.updateSessionRules({
-          removeRuleIds: ruleIds,
-          addRules: plan.steps.map((step, i) => seedRule(ruleIds![i], tabId, step)),
-        });
+        const plan = typeof prepare === 'function' ? await prepare() : prepare;
+        if (existing?.status !== 'ready') {
+          const nonce = plan.steps[0] ? seedNonceOf(plan.steps[0].url) : null;
+          const ruleIds = nonce ? await this.installSeedRules(tabId, plan) : [];
+          steps = nonce ? plan.steps.map((s) => s.url) : [];
+          state.slots.set(realmId, {
+            accountId, status: nonce ? 'seeding' : 'ready', nonce: nonce ?? '', ruleIds,
+            pending: steps.slice(), readyAt: nonce ? null : this.env.now(),
+          });
+          if (existing) await this.removeRules(existing.ruleIds);
+        }
       } catch {
+        for (const { slot, status } of retired) slot.status = status;
         return BUSY;
       }
-      state.slots.set(realmId, {
-        accountId,
-        status: 'seeding',
-        nonce,
-        ruleIds,
-        pending: plan.steps.map((s) => s.url),
-        readyAt: null,
-      });
+      for (const { slot } of retired) {
+        await this.removeRules(slot.ruleIds);
+        slot.ruleIds = [];
+        slot.pending = [];
+      }
       await this.persist();
-      return { ok: true, steps: plan.steps.map((s) => s.url) };
+      return { ok: true, steps, ...(movedFrom.length ? { movedFrom } : {}) };
     });
+  }
+
+  private async installSeedRules(tabId: number, plan: SeedPlan): Promise<number[]> {
+    const rules = this.env.rules;
+    if (!rules) throw new Error('Session rules unavailable');
+    const taken = [
+      ...(await rules.getSessionRules()).map((r) => r.id),
+      ...[...this.tabs.values()].flatMap((t) => [...t.slots.values()].flatMap((s) => s.ruleIds)),
+    ];
+    const ids = allocateSeedRuleIds(taken, plan.steps.length);
+    if (!ids) throw new Error('No seed rule IDs available');
+    await rules.updateSessionRules({ addRules: plan.steps.map((step, i) => seedRule(ids[i], tabId, step)) });
+    return ids;
   }
 
   /** A response arrived for a seeding address of this tab. True when it was one. */

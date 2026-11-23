@@ -429,6 +429,8 @@ export interface ProfileSlotState {
   status: 'seeding' | 'ready' | 'failed' | 'stale';
   /** Why seeding failed, in plain words. */
   error?: string;
+  inUse?: boolean;
+  moved?: boolean;
   /** The saved sign-in was too large to load whole (see ProfileClaimResult.truncated). */
   truncated?: boolean;
 }
