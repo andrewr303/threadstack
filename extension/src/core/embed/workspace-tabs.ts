@@ -9,11 +9,13 @@ import type { AccountService } from '../accounts/contract.js';
 import { PROVIDERS, detectProviderFromUrl, isProviderAllowedOnUrl } from '../providers.js';
 import {
   ACCOUNT_COLORS,
+  signInAttemptId,
   type AccountColor,
   type AccountIdentity,
   type AccountRecord,
   type AccountsChangeResult,
   type HelperPingResult,
+  type PendingSignIn,
   type ProfileClaimResult,
   type WorkspaceBroadcast,
   type WorkspaceFailure,
@@ -236,7 +238,7 @@ export function sanitizeIdentity(value: unknown): Omit<AccountIdentity, 'observe
 export interface ProfileCommands {
   /** Whether the worker can see the cookies profile pages are given, so sign-ins are saved. */
   available: boolean;
-  claim(tabId: number, realmId: string, accountId: string): Promise<ProfileClaimResult | WorkspaceFailure>;
+  claim(tabId: number, realmId: string, accountId: string, move?: boolean): Promise<ProfileClaimResult | WorkspaceFailure>;
   ready(tabId: number, realmId: string): Promise<{ ok: true } | WorkspaceFailure>;
   /** The tab loaded a new workspace page: its slots start empty. */
   reset(tabId: number): Promise<void>;
@@ -260,9 +262,9 @@ export interface WorkspaceCommandDeps {
   /** Null in a browser without the pieces profiles need. */
   profiles?: ProfileCommands | null;
   /** Open a realm's sign-in page in an ordinary tab, for a sign-in borrowed from the browser. */
-  openSignInTab?(url: string): Promise<void>;
+  openSignInTab?(url: string, pending: PendingSignIn): Promise<void>;
   /** Close the tab `openSignInTab` opened, when it is still there. */
-  closeSignInTab?(): Promise<void>;
+  closeSignInTab?(pending: PendingSignIn): Promise<void>;
 }
 
 const UNAVAILABLE: WorkspaceFailure = { ok: false, error: 'Accounts are not available right now. Reload Threadkeeper and try again.' };
@@ -323,7 +325,11 @@ export async function handleWorkspaceCommand(
         const realm = idString(message.realm);
         const accountId = idString(message.accountId);
         if (!realm || !accountId) return { ok: false, error: 'That account request is not valid.', code: 'not_allowed' };
-        return await deps.profiles.claim(tabId, realm, accountId);
+        const result = await deps.profiles.claim(tabId, realm, accountId, message.move === true);
+        if (result.ok && result.movedFrom?.length) {
+          deps.broadcast({ type: 'PROFILE_RETIRED', accountId, movedFrom: result.movedFrom });
+        }
+        return result;
       }
       case 'PROFILE_READY': {
         if (!deps.profiles) return UNAVAILABLE;
@@ -344,21 +350,46 @@ export async function handleWorkspaceCommand(
           if (realm) {
             announce(deps, result, realm);
             const url = realmById(realm)?.signInUrl;
-            if (url) await deps.openSignInTab?.(url).catch(() => undefined);
+            const pending = result.realms.find((r) => r.realm.id === realm)?.pendingSignIn;
+            if (url && pending) {
+              try {
+                await deps.openSignInTab?.(url, pending);
+              } catch {
+                return { ok: false, error: 'The sign-in tab could not open. Use Open sign-in tab to retry, or cancel the sign-in.' };
+              }
+            }
           }
         }
         return result;
+      }
+      case 'ACCOUNTS_SIGNIN_RESUME': {
+        if (!accounts || !deps.openSignInTab) return UNAVAILABLE;
+        const pending = await accounts.pendingSignIn();
+        const url = pending && realmById(pending.realm)?.signInUrl;
+        if (!pending || !url || message.attemptId !== signInAttemptId(pending)) {
+          return { ok: false, error: 'This sign-in has ended.', code: 'not_allowed' };
+        }
+        try {
+          await deps.openSignInTab(url, pending);
+          return { ok: true };
+        } catch {
+          return { ok: false, error: 'The sign-in tab could not open. Try again or cancel the sign-in.' };
+        }
       }
       case 'ACCOUNTS_SIGNIN_FINISH':
       case 'ACCOUNTS_SIGNIN_CANCEL': {
         if (!accounts) return UNAVAILABLE;
         const pending = await accounts.pendingSignIn();
-        const result = message.type === 'ACCOUNTS_SIGNIN_FINISH' ? await accounts.finishBrowserSignIn() : await accounts.cancelBrowserSignIn();
+        const attemptId = pending ? signInAttemptId(pending) : undefined;
+        if (message.attemptId !== undefined && message.attemptId !== attemptId) {
+          return { ok: false, error: 'This sign-in has ended.', code: 'not_allowed' };
+        }
+        const result = message.type === 'ACCOUNTS_SIGNIN_FINISH' ? await accounts.finishBrowserSignIn(attemptId) : await accounts.cancelBrowserSignIn(attemptId);
         if (isChange(result) && pending) {
           await deps.profiles?.accountReplaced(pending.accountId).catch(() => undefined);
           await deps.profiles?.accountReplaced(pending.returnToAccountId).catch(() => undefined);
           announce(deps, result, pending.realm);
-          await deps.closeSignInTab?.().catch(() => undefined);
+          await deps.closeSignInTab?.(pending).catch(() => undefined);
         }
         return result;
       }

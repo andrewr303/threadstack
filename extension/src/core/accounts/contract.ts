@@ -118,9 +118,9 @@ export interface AccountService {
    */
   beginBrowserSignIn(accountId: string): Promise<AccountsChangeResult | WorkspaceFailure>;
   /** Keep what the browser is signed in to as the pending account's jar; restore the browser's own. */
-  finishBrowserSignIn(): Promise<AccountsChangeResult | WorkspaceFailure>;
+  finishBrowserSignIn(attemptId?: string, requireIdentity?: boolean): Promise<AccountsChangeResult | WorkspaceFailure>;
   /** Give the pending sign-in up: restore the browser's own sign-in and keep nothing. */
-  cancelBrowserSignIn(): Promise<AccountsChangeResult | WorkspaceFailure>;
+  cancelBrowserSignIn(attemptId?: string): Promise<AccountsChangeResult | WorkspaceFailure>;
   pendingSignIn(): Promise<PendingSignIn | null>;
   update(accountId: string, patch: { label?: string; color?: AccountColor }): Promise<AccountsChangeResult | WorkspaceFailure>;
   /** Forget an account and its saved cookies. Threads keep their keys. A primary account cannot be removed. */
@@ -131,7 +131,7 @@ export interface AccountService {
    * one, and an identity no account has yet gets a new account, so a capture is never filed
    * under the wrong person.
    */
-  noteIdentity(provider: ProviderId, identity: Omit<AccountIdentity, 'observedAt'> | null): Promise<IdentityOutcome | null>;
+  noteIdentity(provider: ProviderId, identity: Omit<AccountIdentity, 'observedAt'> | null, attempt?: PendingSignIn): Promise<IdentityOutcome | null>;
   /** Finish a switch that was interrupted (service worker stopped mid-way). Safe to call on every start. */
   recover(): Promise<void>;
 }

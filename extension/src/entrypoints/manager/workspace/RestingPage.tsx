@@ -114,29 +114,10 @@ export function RestingPage({
     const who = signingIn?.label ?? 'an account';
     const mine = pending?.accountId === tab.accountId;
     return (
-      <Notice icon="userPlus" title={mine ? `Sign in to ${who} in the browser tab that opened` : `${realmName} is waiting for a sign-in`} actions={
-        <>
-          <button
-            type="button"
-            className="tk-btn tk-btn-primary"
-            disabled={busy || realmBusy}
-            onClick={() => void run(() => workspace.finishBrowserSignIn(), `${who} is signed in. Your browser's own ${realmName} sign-in is back.`)}
-          >
-            I’ve signed in
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            disabled={busy || realmBusy}
-            onClick={() => void run(() => workspace.cancelBrowserSignIn(), `Sign-in cancelled. Your browser's own ${realmName} sign-in is back.`)}
-          >
-            Cancel sign-in
-          </button>
-        </>
-      }>
+      <Notice icon="userPlus" title={mine ? `Sign in to ${who} in the browser tab` : `${realmName} is waiting for a sign-in`}>
         <p>
           {mine
-            ? `Finish signing in to ${realmName} as ${who} there. Threadkeeper notices when you are in and brings you back; if it does not, choose “I’ve signed in”.`
+            ? 'Use the sign-in controls at the top of Threadkeeper to reopen the browser tab, finish, or cancel.'
             : `${who} is signing in to ${realmName} in a browser tab. Until that ends, ${realmName} pages wait here.`}
         </p>
         <p className="tk-notice-note">
@@ -148,33 +129,39 @@ export function RestingPage({
   }
 
   if (rest === 'signin') {
+    const preferBrowser = entry?.realm.preferBrowserSignIn === true;
+    const embeddedSignIn = (
+      <button
+        type="button"
+        className={preferBrowser ? 'tk-btn' : 'tk-btn tk-btn-primary'}
+        disabled={busy || !account}
+        onClick={async () => {
+          setBusy(true);
+          await workspace.showProfile(tab.accountId);
+          setBusy(false);
+        }}
+      >
+        Sign in here
+      </button>
+    );
+    const browserSignIn = (
+      <button
+        type="button"
+        className={preferBrowser ? 'tk-btn tk-btn-primary' : 'tk-btn'}
+        disabled={busy || realmBusy || !account}
+        onClick={() => void run(() => workspace.beginBrowserSignIn(tab.accountId))}
+      >
+        Sign in with a browser tab
+      </button>
+    );
     return (
       <Notice icon="userPlus" title={`${name} is not signed in to ${realmName} yet`} actions={
-        <>
-          <button
-            type="button"
-            className="tk-btn tk-btn-primary"
-            disabled={busy || !account}
-            onClick={async () => {
-              setBusy(true);
-              await workspace.showProfile(tab.accountId);
-              setBusy(false);
-            }}
-          >
-            Sign in here
-          </button>
-          <button
-            type="button"
-            className="tk-btn"
-            disabled={busy || realmBusy || !account}
-            onClick={() => void run(() => workspace.beginBrowserSignIn(tab.accountId))}
-          >
-            Sign in with a browser tab
-          </button>
-        </>
+        preferBrowser ? <>{browserSignIn}{embeddedSignIn}</> : <>{embeddedSignIn}{browserSignIn}</>
       }>
         <p>
-          “Sign in here” opens {realmName}’s sign-in page in this {noun}; your other {realmName} account stays signed in beside it.
+          {preferBrowser
+            ? `Use a browser tab for ${realmName}’s sign-in and choose the account you want to add when prompted.`
+            : `“Sign in here” opens ${realmName}’s sign-in page in this ${noun}. Your other ${realmName} account stays signed in beside it.`}
         </p>
         <p className="tk-notice-note">
           Use a browser tab if your sign-in goes through Google, Apple, a passkey or a pop-up window. Threadkeeper sets your
@@ -211,14 +198,15 @@ export function RestingPage({
 
   if (rest === 'stale') {
     return (
-      <Notice icon="swap" title={`${name}’s sign-in changed`} actions={
+      <Notice icon="swap" title={workspace.slots[tab.realm]?.moved ? `${name} moved to another Threadkeeper tab` : `${name}’s sign-in changed`} actions={
         <button type="button" className="tk-btn tk-btn-primary" disabled={!account} onClick={() => void workspace.switchProfile(tab.id)}>
           Reload to show {name}
         </button>
       }>
         <p>
-          Threadkeeper saved a newer sign-in for {name} than the one this window loaded. Reloading Threadkeeper’s pages shows
-          it; nothing is signed out.
+          {workspace.slots[tab.realm]?.moved
+            ? 'Reload this tab if you want to move the account back.'
+            : `Reload Threadkeeper to use the latest saved sign-in for ${name}.`}
         </p>
       </Notice>
     );
@@ -226,6 +214,21 @@ export function RestingPage({
 
   if (rest === 'failed') {
     const slot = workspace.slots[tab.realm];
+    if (slot?.inUse) {
+      return (
+        <Notice icon="swap" title={`${name} is open in another Threadkeeper tab`} actions={
+          <button type="button" className="tk-btn tk-btn-primary" disabled={busy} onClick={async () => {
+            setBusy(true);
+            await workspace.showProfile(tab.accountId, true);
+            setBusy(false);
+          }}>
+            Move account here
+          </button>
+        }>
+          <p>This tab takes over the saved sign-in and the account’s pages pause in the other tab.</p>
+        </Notice>
+      );
+    }
     return (
       <Notice icon="alert" tone="warn" title={`${name} could not be loaded`} actions={
         <>

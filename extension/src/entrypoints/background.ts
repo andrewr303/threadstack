@@ -50,8 +50,10 @@ import {
   WORKSPACE_COMMAND_TYPES,
   WORKSPACE_PORT_NAME,
   isAgentState,
+  signInAttemptId,
   threadAccountId,
   type AgentState,
+  type PendingSignIn,
   type WorkspaceBroadcast,
 } from '../core/workspace/types.js';
 import {
@@ -170,6 +172,8 @@ async function resolveSenderAccount(
       return { accountId: threadAccountId(owner.account, bound.accountId), workspaceId: bound.workspaceId, account: owner.account };
     }
   }
+  const pending = await accounts()?.pendingSignIn();
+  if (pending && pending.realm === realmForProvider(provider)?.id) return null;
   return resolveCaptureAccount(provider, bound);
 }
 
@@ -331,18 +335,60 @@ function unwatchWorkspaceTab(tabId: number): void {
 
 // A sign-in borrowed from the browser opens the realm's sign-in page in a tab of its own.
 const SIGNIN_TAB_KEY = 'tk_signin_tab';
+const openingSignInTabs = new Map<string, Promise<void>>();
 
-async function openSignInTab(url: string): Promise<void> {
-  const tab = await chrome.tabs.create({ url, active: true });
-  if (typeof tab.id === 'number') await chrome.storage.session?.set({ [SIGNIN_TAB_KEY]: tab.id }).catch(() => undefined);
+function signInTabKey(pending: PendingSignIn): string {
+  return pending.attemptId ? `${SIGNIN_TAB_KEY}.${pending.attemptId}` : SIGNIN_TAB_KEY;
 }
 
-async function closeSignInTab(): Promise<void> {
-  const stored = (await chrome.storage.session?.get(SIGNIN_TAB_KEY).catch(() => undefined))?.[SIGNIN_TAB_KEY];
-  await chrome.storage.session?.remove(SIGNIN_TAB_KEY).catch(() => undefined);
+async function signInTabId(pending: PendingSignIn): Promise<number | undefined> {
+  const key = signInTabKey(pending);
+  const tabId = (await chrome.storage.session.get(key))[key];
+  return typeof tabId === 'number' ? tabId : undefined;
+}
+
+async function openSignInTab(url: string, pending: PendingSignIn): Promise<void> {
+  const key = signInTabKey(pending);
+  const opening = openingSignInTabs.get(key);
+  if (opening) return opening;
+  const isCurrent = async () => {
+    const current = await accounts()?.pendingSignIn();
+    return current && signInAttemptId(current) === signInAttemptId(pending);
+  };
+  const run = (async () => {
+    if (!(await isCurrent())) return;
+    const saved = await signInTabId(pending);
+    const existing = saved === undefined ? null : await chrome.tabs.get(saved).catch(() => null);
+    if (existing?.id !== undefined) {
+      await chrome.tabs.update(existing.id, { active: true });
+      await focusWindow(existing.windowId);
+      return;
+    }
+    await reconcileCaptureSites();
+    const tab = await chrome.tabs.create({ url: 'about:blank', active: true });
+    if (tab.id === undefined) throw new Error('Browser did not return a sign-in tab ID');
+    try {
+      await chrome.storage.session.set({ [key]: tab.id });
+      if (await isCurrent()) await chrome.tabs.update(tab.id, { url });
+      else await closeSignInTab(pending);
+    } catch (error) {
+      await chrome.tabs.remove(tab.id).catch(() => undefined);
+      await chrome.storage.session.remove(key).catch(() => undefined);
+      throw error;
+    }
+  })();
+  openingSignInTabs.set(key, run);
+  try {
+    await run;
+  } finally {
+    openingSignInTabs.delete(key);
+  }
+}
+
+async function closeSignInTab(pending: PendingSignIn): Promise<void> {
+  const stored = await signInTabId(pending);
+  await chrome.storage.session.remove(signInTabKey(pending)).catch(() => undefined);
   if (typeof stored !== 'number') return;
-  // Only while it still shows a site of a sign-in Threadkeeper keeps accounts for: a tab the person
-  // has since used for something else stays open. (Its address is visible only on those sites.)
   const tab = await chrome.tabs.get(stored).catch(() => null);
   let host: string | null = null;
   try {
@@ -350,40 +396,40 @@ async function closeSignInTab(): Promise<void> {
   } catch {
     host = null;
   }
-  if (!host || !realmOfHost(host)) return;
+  if ((!host || realmOfHost(host)?.id !== pending.realm) && tab?.url !== 'about:blank') return;
   await chrome.tabs.remove(stored).catch(() => undefined);
 }
 
 /** How long after the site names the person the sign-in is taken over (its last cookies are still arriving). */
 const SIGNIN_SETTLE_MS = 2_000;
-let signInFinishTimer: ReturnType<typeof setTimeout> | null = null;
+let finishingSignIn: string | null = null;
 
 /**
  * A sign-in borrowed from the browser ends by itself once the site has named who signed in: the
  * cookies become that account's saved sign-in and the browser's own sign-in is put back. Sites
  * that do not name the person are finished from the workspace ("I've signed in").
  */
-async function maybeFinishBrowserSignIn(outcome: IdentityOutcome): Promise<void> {
+function maybeFinishBrowserSignIn(outcome: IdentityOutcome, pending: PendingSignIn): void {
   const svc = accounts();
-  if (!svc || signInFinishTimer) return;
+  const attemptId = signInAttemptId(pending);
+  if (!svc || finishingSignIn === attemptId) return;
   const realmId = outcome.realm;
-  const pending = await svc.pendingSignIn();
-  if (!pending || pending.realm !== realmId) return;
   // Only a report that named the browser's account now counts: not "nobody signed in", not one
   // set aside right after the switch, and not the account that was set aside. A stored
   // "signed in" is no evidence, since the account may have been signed in before it began.
   const named = outcome.named ?? null;
-  if (!named || named !== outcome.activeAccountId || named === pending.returnToAccountId) return;
-  signInFinishTimer = setTimeout(() => {
-    signInFinishTimer = null;
+  if (!named || named !== pending.accountId || pending.realm !== realmId) return;
+  finishingSignIn = attemptId;
+  setTimeout(() => {
+    if (finishingSignIn === attemptId) finishingSignIn = null;
     void (async () => {
-      const result = await svc.finishBrowserSignIn();
+      const result = await svc.finishBrowserSignIn(attemptId, true);
       if (!result.ok) return;
       await retireProfileAccount(pending.accountId);
       await retireProfileAccount(pending.returnToAccountId);
       const now = result.realms.find((r) => r.realm.id === realmId);
       broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: realmId, activeAccountId: now?.activeAccountId ?? null, switched: true });
-      await closeSignInTab();
+      await closeSignInTab(pending);
     })().catch(() => undefined);
   }, SIGNIN_SETTLE_MS);
 }
@@ -1227,7 +1273,11 @@ async function handleEmbedEvent(
           return { ok: true };
         }
       }
-      const outcome = await svc.noteIdentity(message.provider, identity);
+      const pending = await svc.pendingSignIn();
+      const attempt = pending && sender.frameId === 0 && typeof tabId === 'number' && tabId === await signInTabId(pending)
+        ? pending
+        : undefined;
+      const outcome = await svc.noteIdentity(message.provider, identity, attempt);
       if (outcome && (outcome.reassigned || outcome.updated)) {
         // The browser is now signed in as another known account. Its saved jar went into the
         // browser, so the worker's copy of it is stale. Workspace pages re-place their frames by
@@ -1235,7 +1285,7 @@ async function handleEmbedEvent(
         if (outcome.reassigned && outcome.activeAccountId) await retireProfileAccount(outcome.activeAccountId);
         broadcastWorkspace({ type: 'ACCOUNTS_CHANGED', realm: outcome.realm, activeAccountId: outcome.activeAccountId, switched: false });
       }
-      if (outcome) await maybeFinishBrowserSignIn(outcome);
+      if (outcome && attempt) maybeFinishBrowserSignIn(outcome, attempt);
     } catch {
       // the next report tries again
     }
@@ -1593,9 +1643,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             broadcast: broadcastWorkspace,
             profiles: {
               available: canObserveResponses(),
-              claim: (tabId, realmId, accountId) => {
+              claim: (tabId, realmId, accountId, move) => {
                 watchWorkspaceTab(tabId);
-                return profiles.claim(tabId, realmId, accountId);
+                return profiles.claim(tabId, realmId, accountId, move);
               },
               ready: (tabId, realmId) => profiles.markReady(tabId, realmId),
               reset: async (tabId) => {

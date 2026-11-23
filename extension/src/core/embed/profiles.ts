@@ -119,7 +119,7 @@ export class Profiles {
   constructor(private readonly deps: ProfilesDeps) {}
 
   /** PROFILE_CLAIM: show `accountId` in the tab's slot of `realmId`. */
-  async claim(tabId: number, realmId: string, accountId: string): Promise<ProfileClaimResult | WorkspaceFailure> {
+  async claim(tabId: number, realmId: string, accountId: string, move = false): Promise<ProfileClaimResult | WorkspaceFailure> {
     const accounts = this.deps.accounts();
     if (!accounts) return UNAVAILABLE;
     const realm = realmById(realmId);
@@ -138,24 +138,29 @@ export class Profiles {
     // kept now, the browser account's sign-in survives being replaced that way.
     void accounts.snapshotBrowserAccount(realm.id).catch(() => undefined);
 
-    const cookies = await this.deps.jars.cookies(account.id);
-    const deviceCookies = (await accounts.deviceCookies(realm.id)).filter(isDeviceCookie);
-    const hosts = new Set([...cookies, ...deviceCookies].map((c) => bareDomain(c)));
-    const allowed = new Set<string>();
-    for (const host of hosts) {
-      if (realmOwnsHost(realm, host) && (await this.deps.hasHostAccess([`https://${host}/*`]))) allowed.add(host);
-    }
-    const now = this.deps.now();
-    const plan = buildSeedPlan({ cookies, deviceCookies, hostAllowed: (host) => allowed.has(host), nonce: this.deps.randomHex(24), nowMs: now });
-    const claimed = await this.deps.slots.claim(tabId, realm.id, account.id, plan);
+    let signedIn = false;
+    let truncated = false;
+    const claimed = await this.deps.slots.claim(tabId, realm.id, account.id, async () => {
+      const cookies = await this.deps.jars.cookies(account.id);
+      const deviceCookies = (await accounts.deviceCookies(realm.id)).filter(isDeviceCookie);
+      const hosts = new Set([...cookies, ...deviceCookies].map((c) => bareDomain(c)));
+      const allowed = new Set<string>();
+      for (const host of hosts) {
+        if (realmOwnsHost(realm, host) && (await this.deps.hasHostAccess([`https://${host}/*`]))) allowed.add(host);
+      }
+      const now = this.deps.now();
+      const plan = buildSeedPlan({ cookies, deviceCookies, hostAllowed: (host) => allowed.has(host), nonce: this.deps.randomHex(24), nowMs: now });
+      signedIn = looksSignedIn(cookies, now, isDeviceCookie);
+      truncated = plan.truncated;
+      return plan;
+    }, move);
     if (!claimed.ok) return claimed;
     return {
-      ok: true,
+      ...claimed,
       realm: realm.id,
       accountId: account.id,
-      steps: claimed.steps,
-      signedIn: looksSignedIn(cookies, now, isDeviceCookie),
-      truncated: plan.truncated,
+      signedIn,
+      truncated,
     };
   }
 

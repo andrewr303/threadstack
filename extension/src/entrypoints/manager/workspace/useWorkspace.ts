@@ -128,15 +128,15 @@ export interface WorkspaceController {
    * Load a profile account into this page's slot of its realm now. For an account without a
    * saved sign-in this is "sign in here": its pages open on the site's own sign-in page.
    */
-  showProfile: (accountId: string) => Promise<void>;
+  showProfile: (accountId: string, move?: boolean) => Promise<void>;
   /** Reload the page so that `tabId`'s account takes its realm's slot from the account holding it. */
   switchProfile: (tabId: string) => Promise<void>;
   /** Make an account the browser's own sign-in for its realm. Changes every tab of the realm. */
   useAsBrowserAccount: (accountId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
   /** Sign a profile account in through an ordinary browser tab (for sign-ins a frame cannot finish). */
   beginBrowserSignIn: (accountId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
-  finishBrowserSignIn: () => Promise<AccountsChangeResult | WorkspaceFailure>;
-  cancelBrowserSignIn: () => Promise<AccountsChangeResult | WorkspaceFailure>;
+  finishBrowserSignIn: (attemptId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
+  cancelBrowserSignIn: (attemptId: string) => Promise<AccountsChangeResult | WorkspaceFailure>;
   addAccount: (input: {
     realm: string;
     mode: AccountMode;
@@ -327,12 +327,14 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
         // slot of this page that shows it holds old cookies. Its tabs rest until a reload.
         if (sender.tab || typeof msg.accountId !== 'string') return;
         const retired = msg.accountId;
+        const movedFrom = Array.isArray(msg.movedFrom) ? msg.movedFrom : null;
+        if (movedFrom && !movedFrom.includes(tabIdRef.current)) return;
         setSlots((prev) => {
           let changed = false;
           const next: Record<string, ProfileSlotMap[string]> = { ...prev };
           for (const [realm, slot] of Object.entries(prev)) {
             if (slot.accountId !== retired || slot.status === 'stale') continue;
-            next[realm] = { accountId: retired, status: 'stale' };
+            next[realm] = { accountId: retired, status: 'stale', moved: movedFrom !== null };
             changed = true;
           }
           return changed ? next : prev;
@@ -467,7 +469,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
    * the addresses, the page loads them in hidden credentialless frames, and the worker confirms.
    * A slot is filled once per page load; only a failed attempt may be tried again.
    */
-  const claimProfile = useCallback(async (realm: string, accountId: string): Promise<void> => {
+  const claimProfile = useCallback(async (realm: string, accountId: string, move = false): Promise<void> => {
     if (claiming.current.has(realm)) return;
     const held = slotsRef.current[realm];
     if (held && !(held.accountId === accountId && held.status === 'failed')) return;
@@ -485,7 +487,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
     };
     put({ accountId, status: 'seeding' });
     try {
-      const claim = await workspaceApi.claimProfile(realm, accountId);
+      const claim = await workspaceApi.claimProfile(realm, accountId, move);
       if (!claim.ok) {
         if (claim.code === 'browser_account') {
           // It became the browser's own sign-in meanwhile: its tabs load in ordinary frames.
@@ -496,7 +498,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
           // replaced since): only a reload gives the page a new partition.
           put({ accountId, status: 'stale' });
         } else {
-          put({ accountId, status: 'failed', error: claim.error });
+          put({ accountId, status: 'failed', error: claim.error, inUse: claim.code === 'profile_in_use' });
         }
         return;
       }
@@ -633,12 +635,12 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   const pendingRealm = () => realmsRef.current.find((r) => r.pendingSignIn)?.realm.id ?? null;
 
   const finishBrowserSignIn = useCallback<WorkspaceController['finishBrowserSignIn']>(
-    () => changeAccounts(pendingRealm(), () => workspaceApi.finishBrowserSignIn()),
+    (attemptId) => changeAccounts(pendingRealm(), () => workspaceApi.finishBrowserSignIn(attemptId)),
     [changeAccounts]
   );
 
   const cancelBrowserSignIn = useCallback<WorkspaceController['cancelBrowserSignIn']>(
-    () => changeAccounts(pendingRealm(), () => workspaceApi.cancelBrowserSignIn()),
+    (attemptId) => changeAccounts(pendingRealm(), () => workspaceApi.cancelBrowserSignIn(attemptId)),
     [changeAccounts]
   );
 
@@ -668,9 +670,9 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   );
 
   const showProfile = useCallback<WorkspaceController['showProfile']>(
-    async (accountId) => {
+    async (accountId, move) => {
       const account = findAccount(realmsRef.current, accountId);
-      if (account) await claimProfile(account.realm, accountId);
+      if (account) await claimProfile(account.realm, accountId, move);
     },
     [claimProfile]
   );
