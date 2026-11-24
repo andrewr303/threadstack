@@ -257,7 +257,7 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
 
           <p id={noteId} className="tk-acct-explain">
             Nothing is signed out. {info?.label ?? 'This sign-in'} opens a tab for the new account, where you sign in to it once:
-            inside Threadkeeper, or in a browser tab when your sign-in uses Google, Apple or a passkey. Its sign-in is then
+            inside ThreadStack, or in a browser tab when your sign-in uses Google, Apple or a passkey. Its sign-in is then
             kept on this device, encrypted, and never exported or sent anywhere.
           </p>
 
@@ -295,12 +295,12 @@ function failureHelp(
   switch (failure.code) {
     case 'needs_host_access':
       return {
-        text: `Threadkeeper needs your permission for ${name} before it can show the account's pages and keep its sign-in on this device. Nothing was changed.`,
+        text: `ThreadStack needs your permission for ${name} before it can show the account's pages and keep its sign-in on this device. Nothing was changed.`,
         action: 'allow',
       };
     case 'not_switchable':
       return {
-        text: `Threadkeeper does not keep separate accounts for ${name}. Use the site's own account switcher instead.`,
+        text: `ThreadStack does not keep separate accounts for ${name}. Use the site's own account switcher instead.`,
         action: null,
       };
     default:

@@ -114,7 +114,7 @@ async function runCase(id, name, action) {
 async function paperclipFrame(expectedOrigin = origin) {
   await page.locator('iframe[title="Paperclip"]').waitFor({ state: 'visible', timeout: 45_000 });
   const frame = await until(() => Promise.resolve(page.frames().find(frame => frame.url().startsWith(expectedOrigin) && frame.parentFrame() === page.mainFrame())), Boolean);
-  await frame.waitForFunction(() => document.documentElement.hasAttribute('data-threadkeeper-host'), { timeout: 15_000 });
+  await frame.waitForFunction(() => document.documentElement.hasAttribute('data-threadstack-host'), { timeout: 15_000 });
   await page.locator('.tk-paperclip-loading').waitFor({ state: 'hidden', timeout: 15_000 });
   return frame;
 }
@@ -229,10 +229,10 @@ try {
     return 'Threads and Browse remain usable; returning to Paperclip retains the same document time origin and route with no reload.';
   });
 
-  await runCase('pc-plugin-navigation', 'Paperclip sidebar entries switch the actual mounted Threadkeeper views', async () => {
+  await runCase('pc-plugin-navigation', 'Paperclip sidebar entries switch the actual mounted ThreadStack views', async () => {
     const frame = await paperclipFrame(); const documentId = await frame.evaluate(() => performance.timeOrigin);
     for (const [label, route, view] of [['Threads', 'threads', 'threads'], ['Browse', 'browse', 'browse'], ['Session board', 'session-board', 'dashboard']]) {
-      const entry = frame.locator(`nav[aria-label="Threadkeeper"] a[href="${companyPath}/${route}"]`);
+      const entry = frame.locator(`nav[aria-label="ThreadStack"] a[href="${companyPath}/${route}"]`);
       await entry.waitFor({ state: 'visible', timeout: 20_000 });
       assert(await entry.innerText() === label, `Actual plugin sidebar entry ${label} is present`);
       await entry.click(); await page.locator(`.tk-shell[data-view="${view}"]`).waitFor({ state: 'visible', timeout: 20_000 });
@@ -241,11 +241,11 @@ try {
     }
     const ordinary = await context.newPage(); evidencePage = ordinary;
     await ordinary.goto(`${origin}${companyPath}/threads`);
-    await ordinary.getByRole('heading', { name: 'Open this in Threadkeeper', exact: true }).waitFor({ timeout: 30_000 });
-    await ordinary.getByText('Browse, Threads and the session board run inside the Threadkeeper window.', { exact: true }).waitFor();
+    await ordinary.getByRole('heading', { name: 'Open this in ThreadStack', exact: true }).waitFor({ timeout: 30_000 });
+    await ordinary.getByText('Browse, Threads and the session board run inside the ThreadStack window.', { exact: true }).waitFor();
     const evidence = await capture('pc-plugin-navigation-ordinary', ordinary);
     await ordinary.close(); evidencePage = page; await page.bringToFront();
-    return { observation: 'The real Paperclip coordinator sidebar exposes Threads, Browse and Session board; each selects the corresponding mounted extension view without reloading Paperclip. Its ordinary-tab page presents the documented Open this in Threadkeeper fallback.', evidence };
+    return { observation: 'The real Paperclip coordinator sidebar exposes Threads, Browse and Session board; each selects the corresponding mounted extension view without reloading Paperclip. Its ordinary-tab page presents the documented Open this in ThreadStack fallback.', evidence };
   });
 
   await runCase('pc-deep-link', 'Native navigation synchronizes a route that survives manager reload', async () => {
@@ -297,12 +297,12 @@ try {
       }
       const now = new Date().toISOString();
       const suffix = (process.env.TK_PAPERCLIP_SESSION_SUFFIX || 'chromium').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
-      const fixtureKey = `claude_code:acct_claude_primary:default:threadkeeper_acceptance_${suffix}:main`;
+      const fixtureKey = `claude_code:acct_claude_primary:default:threadstack_acceptance_${suffix}:main`;
       const title = `Acceptance webhook retry session (${suffix})`;
       await sw.evaluate(async ({ now, fixtureKey, title }) => {
-        const base = { provider: 'claude_code', accountId: 'acct_claude_primary', workspaceId: 'default', sourceConversationId: 'threadkeeper_acceptance', branchId: 'main', parentBranchId: null, siblingBranchIds: [], canonicalUrl: 'https://claude.ai/code/session_threadkeeper_acceptance', title, manualTitleOverride: null, createdAt: now, updatedAt: now, lastCapturedAt: now, sourceRevision: 1, contentHash: 'isolated-acceptance-fixture', coverage: 'full', captureSource: 'manual', messageCount: 1, project: 'General research', categoryLocked: true, tags: [], manualTags: [], workflowState: 'active', manualNotes: '', pinned: false, snoozedUntil: null, dismissedQueues: [], cloudExcluded: false, cloudTaskStatus: 'unsupported', isSyntheticBenchmark: false, latestDecisionText: null, latestDecisionMsgIndex: null, latestDecisionSpeaker: null, nextStepText: 'Check webhook retries', nextStepMsgIndex: 0, nextStepSpeaker: 'user_committed', agentState: null };
-        await globalThis.__threadkeeperDb.conversations.bulkPut([{ ...base, threadKey: fixtureKey }, { ...base, threadKey: fixtureKey + '_private', sourceConversationId: 'threadkeeper_acceptance_private', title: 'Acceptance webhook private control', cloudExcluded: true }]);
-        await globalThis.__threadkeeperDb.messages.put({ messageKey: fixtureKey + ':m0', threadKey: fixtureKey, ordinal: 0, sourceMessageId: 'fixture-m0', role: 'user', content: 'Make acceptance webhook retries safe for Stripe delivery.', createdAt: now, contentHash: 'isolated-acceptance-message', hasCode: false, hasArtifact: false, branchPath: 'main' });
+        const base = { provider: 'claude_code', accountId: 'acct_claude_primary', workspaceId: 'default', sourceConversationId: 'threadstack_acceptance', branchId: 'main', parentBranchId: null, siblingBranchIds: [], canonicalUrl: 'https://claude.ai/code/session_threadstack_acceptance', title, manualTitleOverride: null, createdAt: now, updatedAt: now, lastCapturedAt: now, sourceRevision: 1, contentHash: 'isolated-acceptance-fixture', coverage: 'full', captureSource: 'manual', messageCount: 1, project: 'General research', categoryLocked: true, tags: [], manualTags: [], workflowState: 'active', manualNotes: '', pinned: false, snoozedUntil: null, dismissedQueues: [], cloudExcluded: false, cloudTaskStatus: 'unsupported', isSyntheticBenchmark: false, latestDecisionText: null, latestDecisionMsgIndex: null, latestDecisionSpeaker: null, nextStepText: 'Check webhook retries', nextStepMsgIndex: 0, nextStepSpeaker: 'user_committed', agentState: null };
+        await globalThis.__threadStackDb.conversations.bulkPut([{ ...base, threadKey: fixtureKey }, { ...base, threadKey: fixtureKey + '_private', sourceConversationId: 'threadstack_acceptance_private', title: 'Acceptance webhook private control', cloudExcluded: true }]);
+        await globalThis.__threadStackDb.messages.put({ messageKey: fixtureKey + ':m0', threadKey: fixtureKey, ordinal: 0, sourceMessageId: 'fixture-m0', role: 'user', content: 'Make acceptance webhook retries safe for Stripe delivery.', createdAt: now, contentHash: 'isolated-acceptance-message', hasCode: false, hasArtifact: false, branchPath: 'main' });
       }, { now, fixtureKey, title });
       record('fixture-seed', { database: 'owned empty extension profile', shared: 1, private: 1, title, noProviderNetwork: true });
       // A company permits one paired browser. Explicitly retire the prior disposable
@@ -411,9 +411,9 @@ try {
       // Documented authenticated fixture setup, matching multi-user-authenticated.spec.ts.
       const company = await authPage.evaluate(async () => {
         const existing = await (await fetch('/api/companies', { credentials: 'include' })).json();
-        const found = existing.find(item => item.name === 'Threadkeeper authenticated acceptance');
+        const found = existing.find(item => item.name === 'ThreadStack authenticated acceptance');
         if (found) return { id: found.id, prefix: found.issuePrefix };
-        const response = await fetch('/api/companies', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Threadkeeper authenticated acceptance' }) });
+        const response = await fetch('/api/companies', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'ThreadStack authenticated acceptance' }) });
         if (!response.ok) throw new Error(`Company fixture setup failed (${response.status})`);
         const value = await response.json(); return { id: value.id, prefix: value.issuePrefix };
       });
@@ -471,7 +471,7 @@ try {
       record('authenticated-frame-state', await frame.evaluate(async () => {
         const response = await fetch('/api/auth/get-session', { credentials: 'include', cache: 'no-store' });
         const session = await response.json();
-        return { hostVerified: document.documentElement.hasAttribute('data-threadkeeper-host'), transport: document.documentElement.getAttribute('data-paperclip-live-transport'), visibility: document.visibilityState, sessionStatus: response.status, userPresent: Boolean(session?.user) };
+        return { hostVerified: document.documentElement.hasAttribute('data-threadstack-host'), transport: document.documentElement.getAttribute('data-paperclip-live-transport'), visibility: document.visibilityState, sessionStatus: response.status, userPresent: Boolean(session?.user) };
       }));
       await until(() => frame.evaluate(() => document.documentElement.getAttribute('data-paperclip-live-transport')), mode => mode === 'eventsource', 20_000);
       const documentId = await frame.evaluate(() => performance.timeOrigin);
@@ -490,7 +490,7 @@ try {
       const authEvidence = [];
       for (const target of [authPage, approval]) { const video = await target.video()?.path(); if (video) authEvidence.push({ path: relative(video), type: 'video', capturedAt: new Date().toISOString(), inspected: false }); }
       await authPage.close(); await approval.close(); await page.bringToFront();
-      return { observation: 'A disposable user signed in through the real UI, approved Threadkeeper board access, then signed out and signed back in inside the real Paperclip iframe. Its same-auth HTTP event stream delivered the matching created-task event and updated the actual UI without reload; the real app service worker was active. No authentication cookies or tokens were injected.', evidence: authEvidence };
+      return { observation: 'A disposable user signed in through the real UI, approved ThreadStack board access, then signed out and signed back in inside the real Paperclip iframe. Its same-auth HTTP event stream delivered the matching created-task event and updated the actual UI without reload; the real app service worker was active. No authentication cookies or tokens were injected.', evidence: authEvidence };
     });
   }
   if (process.env.TK_PAPERCLIP_READ_HOLD) {

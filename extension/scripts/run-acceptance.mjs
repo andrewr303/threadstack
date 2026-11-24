@@ -145,10 +145,10 @@ function startFixtureServer() {
 async function inspectHostDom(page) {
   return page.evaluate(() => {
     const injected = document.querySelectorAll(
-      '#threadkeeper-overlay-root, [id^="threadkeeper"], [class^="tk-"]'
+      '#threadkeeper-overlay-root, [id^="threadstack"], [class^="tk-"]'
     );
     const pollutedWindowKeys = Object.getOwnPropertyNames(window).filter((k) =>
-      /threadkeeper|^__tk|^tk_/i.test(k)
+      /threadstack|^__tk|^tk_/i.test(k)
     );
     const favicon =
       document.querySelector('link[rel="icon"]')?.getAttribute('href') ?? '';
@@ -429,7 +429,7 @@ async function runAcceptance() {
       if (!target || typeof target.id !== 'number') {
         throw new Error('Could not find ChatGPT host tab in chrome.tabs.query');
       }
-      return await globalThis.__threadkeeperInvokeAction(
+      return await globalThis.__threadStackInvokeAction(
         target.id,
         target.url,
         'test_harness'
@@ -511,7 +511,7 @@ async function runAcceptance() {
       const target = tabs.find(
         (t) => t.url && t.url.includes('conv_daydock_live_host')
       );
-      return await globalThis.__threadkeeperInvokeAction(
+      return await globalThis.__threadStackInvokeAction(
         target.id,
         target.url,
         'test_harness'
@@ -659,7 +659,7 @@ async function runAcceptance() {
     // can still execute privileged actions (OPEN_ORIGINAL_THREAD / CLOSE_THREADKEEPER_OVERLAY)
     // backed by chrome.storage.session.
     const clearedMapSize = await serviceWorker.evaluate(() => {
-      return globalThis.__threadkeeperClearInMemoryHandshakes();
+      return globalThis.__threadStackClearInMemoryHandshakes();
     });
     if (clearedMapSize !== 0) {
       throw new Error(`Expected in-memory handshake Map to be cleared, got ${clearedMapSize}`);
@@ -697,7 +697,7 @@ async function runAcceptance() {
 
     // Click Close button inside iframe (verifies authenticated CLOSE_THREADKEEPER_OVERLAY handshakeToken path)
     await overlayFrame
-      .locator('button[aria-label="Close Threadkeeper overlay"]')
+      .locator('button[aria-label="Close ThreadStack overlay"]')
       .click();
     await chatgptPage
       .locator('#threadkeeper-overlay-root')
@@ -1134,7 +1134,7 @@ async function runAcceptance() {
 
       // Verify 652-conversation branching ChatGPT export (653 threads: conv #0 has 2 branches + 651 single-branch convs)
       // in Chromium IndexedDB and compute the full reconciliation tuple
-      const import652DbName = 'ThreadkeeperImport652BrowserVerifyDB';
+      const import652DbName = 'ThreadStackImport652BrowserVerifyDB';
       await new Promise((resolve) => {
         const del = indexedDB.deleteDatabase(import652DbName);
         del.onsuccess = () => resolve(true);
@@ -1265,7 +1265,7 @@ async function runAcceptance() {
 
     // PERF-10: Packaged-extension Chromium IndexedDB 10,000-record (200,000-message) warm-open & local search benchmark
     const browserPerf10k = await managerPage.evaluate(async () => {
-      const dbName = 'ThreadkeeperPerf10kBrowserDB';
+      const dbName = 'ThreadStackPerf10kBrowserDB';
       await new Promise((resolve) => {
         const del = indexedDB.deleteDatabase(dbName);
         del.onsuccess = () => resolve(true);
@@ -1730,14 +1730,14 @@ async function runAcceptance() {
       },
       disclosures: [
         'Per build prompt §14 line 248 ("Use gated live API smoke tests only with configured, authorized credentials and a small explicit budget. Missing live access is not verified, not a passed integration. Record real-browser checks separately from fixture tests."), live external third-party API smoke tests (live Cloudflare Workers AI, live MongoDB Atlas Voyage APIs, and live authenticated chatgpt.com/claude.ai accounts) are recorded separately as NOT_VERIFIED, while real-browser packaged-extension Chromium checks and local fixture/contract checks are recorded as PASS.',
-        'In Chromium headless extension testing, chrome.action.onClicked cannot be triggered by an OS-level physical toolbar click; invocation was triggered via globalThis.__threadkeeperInvokeAction on the MV3 background ServiceWorker, which calls the exact same invokeOverlayOnTab production handler.',
+        'In Chromium headless extension testing, chrome.action.onClicked cannot be triggered by an OS-level physical toolbar click; invocation was triggered via globalThis.__threadStackInvokeAction on the MV3 background ServiceWorker, which calls the exact same invokeOverlayOnTab production handler.',
       ],
     };
 
     const ledgerPath = path.join(evidenceDir, 'acceptance-ledger.json');
     await fs.writeFile(ledgerPath, JSON.stringify(ledger, null, 2), 'utf8');
 
-    const reportMd = `# Threadkeeper Acceptance & Verification Report
+    const reportMd = `# ThreadStack Acceptance & Verification Report
 
 Generated: \`${ledger.generatedAt}\`
 Extension Build: \`${distDir}\`

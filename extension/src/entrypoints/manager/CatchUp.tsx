@@ -207,7 +207,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
         Import from online accounts
       </h3>
       <p className="tk-settings-note">
-        Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. Threadkeeper reads
+        Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. ThreadStack reads
         through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then
         summarized and filed like any other thread.
       </p>
@@ -256,7 +256,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
         <details className="tk-catchup-more">
           <summary className="tk-muted">Coding sessions: Claude Code and Codex (slower)</summary>
           <p className="tk-settings-note">
-            Threadkeeper reads your session list on the web and opens each session in a background tab for a few seconds,
+            ThreadStack reads your session list on the web and opens each session in a background tab for a few seconds,
             where it is read like any session you open, including its repository and pull request when the page shows them.
             Sessions are filed under the account signed in right now; to import a second account, switch to it and run the
             import again.
@@ -278,7 +278,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
         <details className="tk-catchup-more">
           <summary className="tk-muted">Other sites (slower)</summary>
           <p className="tk-settings-note">
-            These sites do not offer a history Threadkeeper can read directly, so it opens each recent conversation in a
+            These sites do not offer a history ThreadStack can read directly, so it opens each recent conversation in a
             background tab for a few seconds and closes it. They need to be signed in too.
           </p>
           <div className="tk-catchup-providers">
@@ -330,7 +330,7 @@ export function CatchUpSection({ settings, onImported, onOpenThread }: Props) {
           <p className="tk-settings-note">
             {claude
               ? 'Claude writes the brief from titles and summaries only, never message text. Local-only threads stay on this device.'
-              : 'The brief is built on this device from the summaries Threadkeeper wrote. Add a Claude key in Settings for a written one.'}
+              : 'The brief is built on this device from the summaries ThreadStack wrote. Add a Claude key in Settings for a written one.'}
           </p>
           <div className="tk-field-row">
             <button type="button" className="tk-btn" disabled={briefBusy} onClick={() => void writeBrief()}>

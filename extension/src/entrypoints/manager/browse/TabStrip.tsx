@@ -1,12 +1,13 @@
 // The row of open sessions at the top of Browse: a tablist with a sliding underline under the
-// selected tab, and the new-tab button fixed at its end.
+// selected tab, then the new-tab, status board and split view buttons fixed at its end. In split
+// view each pane has its own strip over its own tabs.
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { providerCategory } from '../../../core/providers.js';
 import type { SessionTab } from '../../../core/workspace/types.js';
 import { Icon } from '../shell/icons.js';
 import { AccountChip, ProviderMark, RunState, providerName } from '../shell/primitives.js';
 import { useWorkspaceContext } from '../workspace/context.js';
-import { needsSignIn, type TabRest } from '../workspace/state.js';
+import { browseOf, needsSignIn, type TabRest } from '../workspace/state.js';
 
 /** What a tab that is waiting on its account says about itself, for its label and its tooltip. */
 const WAITING: Partial<Record<TabRest, { label: string; tip: (account: string) => string }>> = {
@@ -24,14 +25,21 @@ export function tabDomId(prefix: string, tabId: string): string {
 
 export function TabStrip({
   idPrefix,
+  tabs: paneTabs,
+  activeId,
   selectedId,
   panelId,
   onActivate,
   onNewTab,
   newTabRef,
   newTabOpen,
+  showBoard = true,
 }: {
   idPrefix: string;
+  /** The tabs this strip lists (one pane's in split view). Default: every open tab. */
+  tabs?: readonly SessionTab[];
+  /** The tab this strip's pane shows (its pane's tab in split view). Default: the active tab. */
+  activeId?: string | null;
   /** The tab shown in the stage; null while the new tab page is shown. */
   selectedId: string | null;
   panelId: string;
@@ -39,10 +47,15 @@ export function TabStrip({
   onNewTab: () => void;
   newTabRef: React.RefObject<HTMLButtonElement>;
   newTabOpen: boolean;
+  /** Show the status board button (once per window: the single strip or the left pane's). */
+  showBoard?: boolean;
 }) {
   const { workspace, conversationByKey, announce } = useWorkspaceContext();
-  const tabs = workspace.state.tabs;
-  const activeTabId = workspace.state.activeTabId;
+  const tabs = paneTabs ?? workspace.state.tabs;
+  const activeTabId = activeId === undefined ? workspace.state.activeTabId : activeId;
+  const layout = browseOf(workspace.state);
+  const split = layout.split;
+  const splitLabel = split ? 'Close split view' : 'Split view';
   const stripRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -252,6 +265,32 @@ export function TabStrip({
         onClick={onNewTab}
       >
         <Icon name="plus" />
+      </button>
+      {showBoard && (
+        <button
+          type="button"
+          className="tk-icon-btn tk-browse-toggle"
+          aria-label="Status board"
+          aria-pressed={false}
+          title="Status board: sessions by what they need"
+          onClick={() => workspace.dispatch({ type: 'browse_mode', mode: 'board' })}
+        >
+          <Icon name="board" />
+        </button>
+      )}
+      <button
+        type="button"
+        className="tk-icon-btn tk-browse-toggle"
+        aria-label={splitLabel}
+        aria-pressed={split}
+        title={splitLabel}
+        onClick={(event) => {
+          event.stopPropagation();
+          workspace.dispatch({ type: 'browse_split', on: !split });
+          announce(split ? 'Split view closed' : 'Split view: two panes side by side');
+        }}
+      >
+        <Icon name="split" />
       </button>
     </div>
   );

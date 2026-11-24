@@ -440,7 +440,7 @@ function UpgradeOlderSummaries({ settings, active }: { settings: SettingsRecord;
         message:
           r.queued === 0
             ? 'Nothing to upgrade.'
-            : `Queued ${r.queued} thread${r.queued === 1 ? '' : 's'}. Threadkeeper rewrites them in the background${
+            : `Queued ${r.queued} thread${r.queued === 1 ? '' : 's'}. ThreadStack rewrites them in the background${
                 limit > 0 && r.queued > limit ? `, up to ${limit} a day (your daily limit)` : ''
               }.`,
       });
@@ -556,7 +556,7 @@ export function SettingsDialog({
   const testAi = async () => {
     setAiTest({ busy: true, message: 'Testing…' });
     if (aiHostOrigins(settings).length && !(await requestHostAccess(aiHostOrigins(settings)))) {
-      setAiTest({ busy: false, ok: false, message: `Access to ${backendHost(settings)} was not granted, so Threadkeeper cannot reach it.` });
+      setAiTest({ busy: false, ok: false, message: `Access to ${backendHost(settings)} was not granted, so ThreadStack cannot reach it.` });
       return;
     }
     const r = await testClaudeConnection(settings);
@@ -674,14 +674,20 @@ export function SettingsDialog({
             </label>
           </div>
           <p id="tk-start-page-hint" className="tk-settings-note">
-            The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat
+            The page ThreadStack opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat
             and code.
           </p>
           <Toggle
             checked={settings.embedFullNavigation}
             onChange={(v) => void onPatch({ embedFullNavigation: v })}
             label="Show each site’s full navigation"
-            hint="Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
+            hint="Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in ThreadStack."
+          />
+          <Toggle
+            checked={settings.commandBar !== false}
+            onChange={(v) => void onPatch({ commandBar: v })}
+            label="Session palette (⌘K)"
+            hint="Search every session and open it in Browse with ⌘K or Ctrl+K, the rail’s search button or the ⌘K chip in the address field. Turn it off to free the shortcut."
           />
           <Toggle
             checked={settings.surfaces === 'solid'}
@@ -1004,7 +1010,7 @@ export function SettingsDialog({
 
         <Section
           title="Browser access to AWS"
-          note="Threadkeeper holds no AWS host permission until you allow the endpoints for this region. The browser asks once."
+          note="ThreadStack holds no AWS host permission until you allow the endpoints for this region. The browser asks once."
         >
           {origins.length === 0 ? (
             <p className="tk-settings-note">Nothing to allow yet: no AWS feature is turned on.</p>
@@ -1134,7 +1140,7 @@ export function SettingsDialog({
               </div>
               <p className="tk-settings-note">
                 The same Voyage models as voyageai.com, billed through your Atlas account. A key only works on the
-                geography it was created for. Threadkeeper asks for access to that one host when you press Test.
+                geography it was created for. ThreadStack asks for access to that one host when you press Test.
               </p>
             </>
           )}

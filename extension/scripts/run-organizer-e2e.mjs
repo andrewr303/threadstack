@@ -181,7 +181,7 @@ function edgeVariant(blockFrame) {
 async function invokeOverlay(sw, urlPart) {
   await sw.evaluate(async (part) => {
     const tab = (await chrome.tabs.query({})).find((t) => t.url?.includes(part));
-    return globalThis.__threadkeeperInvokeAction(tab.id, tab.url, 'toolbar_action');
+    return globalThis.__threadStackInvokeAction(tab.id, tab.url, 'toolbar_action');
   }, urlPart);
 }
 
@@ -211,7 +211,7 @@ async function edgeChecks() {
     await page.waitForTimeout(500);
     // The fallback must be the background's OPEN_MANAGER_FALLBACK handler opening one new tab.
     const fallback = await sw.evaluate(async () => ({
-      log: globalThis.__threadkeeperGetSecurityRejections().map((r) => r.reason),
+      log: globalThis.__threadStackGetSecurityRejections().map((r) => r.reason),
       tabs: (await chrome.tabs.query({})).length,
     }));
     const fallbackLogged = fallback.log.some((r) => /Overlay frame did not load .* opened full-page manager/.test(r));
@@ -237,7 +237,7 @@ async function organizerChecks() {
     await p.close();
   }
   const captured = await sw.evaluate(async () =>
-    (await globalThis.__threadkeeperDb.conversations.toArray()).map((c) => ({
+    (await globalThis.__threadStackDb.conversations.toArray()).map((c) => ({
       provider: c.provider,
       project: c.project,
       source: c.projectSource,
@@ -300,7 +300,7 @@ async function organizerChecks() {
 
   // A thread marked local-only must not reach Claude through Ask, even when it is the best match.
   await sw.evaluate(async () => {
-    const db = globalThis.__threadkeeperDb;
+    const db = globalThis.__threadStackDb;
     const all = await db.conversations.toArray();
     const stripe = all.find((c) => /stripe/i.test(`${c.title} ${c.manualTitleOverride ?? ''}`));
     await db.conversations.update(stripe.threadKey, { cloudExcluded: true });

@@ -1,4 +1,4 @@
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import { ensureStarterCollectionsAndSettings } from '../db.js';
 import { computeDeterministicHash, type SettingsRecord } from '../schema.js';
 import { jsonByteLength, MAX_MESSAGE_BYTES, isObject } from '../dock/protocol.js';
@@ -86,7 +86,7 @@ export function chromeBridgeStorage(): BridgeStorage {
 }
 
 export interface PaperclipBridgeDeps {
-  db: ThreadkeeperDB; storage?: BridgeStorage; actionJournal?: ActionJournal;
+  db: ThreadStackDB; storage?: BridgeStorage; actionJournal?: ActionJournal;
   settings?: () => Promise<SettingsRecord>; fetch?: typeof fetch; now?: () => number;
   extensionVersion: string; extensionCommit: string; browser?: string;
   executeAction?: (action: AgentAction, signal: AbortSignal) => Promise<ActionOutcome>;
@@ -122,7 +122,7 @@ export class PaperclipBridge {
     this.actions = new BrowserActionGuard({ db: deps.db, journal: deps.actionJournal ?? chromeActionJournal(), now: deps.now,
       policy: async () => (await this.load()).policy,
       links: async id => (await this.load()).companies[id]?.links ?? [],
-      execute: deps.executeAction ?? (async () => { throw new BridgeActionError('browser_offline', 'Open the Threadkeeper window to act in browser sessions.'); }),
+      execute: deps.executeAction ?? (async () => { throw new BridgeActionError('browser_offline', 'Open the ThreadStack window to act in browser sessions.'); }),
       // Provider pages change; an adapter or page failure is recorded in Diagnostics (REQ-11 FR-6, F-5).
       onFailure: (action, error) => deps.log?.(`Paperclip agent ${action.type === 'session.send' ? 'send' : 'start'} on ${action.provider} failed: ${error.code}: ${error.message.slice(0, 200)}`),
     });
@@ -251,7 +251,7 @@ export class PaperclipBridge {
   }
 
   private async adopt(companyId: string, data: Record<string, unknown>, handshake = false): Promise<void> {
-    if (handshake && data.protocol !== BRIDGE_PROTOCOL) throw new BridgeActionError('version_mismatch', 'Paperclip and Threadkeeper use different bridge protocols.');
+    if (handshake && data.protocol !== BRIDGE_PROTOCOL) throw new BridgeActionError('version_mismatch', 'Paperclip and ThreadStack use different bridge protocols.');
     await this.mutate(s => {
       const c = s.companies[companyId]; if (!c) return;
       c.lastSeenAt = this.now(); c.lastError = '';

@@ -1,4 +1,4 @@
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import { UNFILED_PROJECT } from './db.js';
 import { getDisplayTitle, type ConversationRecord, type SettingsRecord, type ThreadInsight } from './schema.js';
 import { remoteAllowedKeys } from './privacy.js';
@@ -78,7 +78,7 @@ function dedupe(items: string[], cap = Infinity): string[] {
 
 /** Recent threads, newest first, with the notes the analyzers derived for each. */
 export async function collectCatchUpThreads(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   opts: { sinceMs: number; limit?: number }
 ): Promise<CatchUpThread[]> {
@@ -246,7 +246,7 @@ function mergeWorkstreams(a: CatchUpBrief['workstreams'], b: CatchUpBrief['works
 }
 
 export async function generateCatchUpBrief(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   opts: { days: number; now?: number; fetchImpl?: typeof fetch }
 ): Promise<CatchUpBrief> {

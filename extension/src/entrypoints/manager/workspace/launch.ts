@@ -5,7 +5,7 @@ import { SESSION_GROUP_LABELS, sessionGroupOf } from './state.js';
 
 export interface LaunchProvider {
   provider: ProviderId;
-  /** An https page of the provider that Threadkeeper can embed (see embedTargetFor). */
+  /** An https page of the provider that ThreadStack can embed (see embedTargetFor). */
   url: string;
 }
 

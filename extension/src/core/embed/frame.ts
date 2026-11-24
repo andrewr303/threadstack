@@ -1,7 +1,7 @@
 // Where a content script is running. Every content script now runs in all frames of the hosts it
 // matches, so each one decides at its very top whether it has anything to do there:
 // - `top`: the page is a tab of its own, as before.
-// - `workspace`: the page is embedded directly in Threadkeeper's own workspace page.
+// - `workspace`: the page is embedded directly in ThreadStack's own workspace page.
 // - `other`: any other frame (an ad, a sign-in widget, a site embedding a provider, a frame
 //   nested inside an embedded page). Scripts return at once and register nothing.
 import { EMBED_FRAME_NAME_PREFIX } from '../workspace/types.js';
@@ -15,7 +15,7 @@ export interface FrameWindow {
   location: { ancestorOrigins?: ArrayLike<string> | null };
 }
 
-/** Threadkeeper's own origin, or null when the extension context is gone (reloaded). */
+/** ThreadStack's own origin, or null when the extension context is gone (reloaded). */
 function extensionOrigin(): string | null {
   try {
     if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) return null;
@@ -157,7 +157,7 @@ export function wantsTopLevelView(hostname: string): boolean {
 
 /**
  * Attribute the isolated-world script leaves on the document element, at document_start, for
- * the page-world script that runs right after it: "this frame is directly inside Threadkeeper's
+ * the page-world script that runs right after it: "this frame is directly inside ThreadStack's
  * own page and should answer framing checks like a top-level page". Only the isolated world can
  * tell whose page frames it; the page world consumes the mark at once.
  */

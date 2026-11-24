@@ -1,4 +1,4 @@
-import type { ThreadkeeperDB, UpsertThreadInput } from './db.js';
+import type { ThreadStackDB, UpsertThreadInput } from './db.js';
 import { isAuthoritativeSource, upsertThread } from './db.js';
 import { buildThreadKey, type SettingsRecord } from './schema.js';
 import type { SyncState, SyncProviderId } from './history-sync.js';
@@ -57,7 +57,7 @@ const RECENT_CAPTURE_MS = 6 * 3_600_000;
  * a run account (not an import run) is the realm's active account asked.
  */
 export function createSyncedConversationStore(deps: {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   loadSettings: () => Promise<SettingsRecord>;
   resolveAccount: CaptureAccountResolver;
   /** Organize a stored thread like any captured one (on-device pass, analysis queue). */
@@ -78,7 +78,7 @@ export function createSyncedConversationStore(deps: {
 
 /** The orchestrator's view of the browser and the database, for the service worker. */
 export function createChromeSyncEnv(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   deps: {
     loadSettings: () => Promise<SettingsRecord>;
     /** Store a conversation under the run's account and organize it like any captured thread. */

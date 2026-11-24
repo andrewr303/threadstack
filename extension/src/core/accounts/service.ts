@@ -20,7 +20,7 @@
 //
 // Cookie values never leave this file except through AccountsEnv and the encrypted jar. Error
 // results carry fixed messages, never an exception's text.
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import type { ProviderId } from '../providers.js';
 import { primaryAccountId, realmById, realmForProvider, switchableRealms, type RealmInfo } from '../workspace/realms.js';
 import {
@@ -174,7 +174,7 @@ function asEmbedded(record: AccountRecord): AccountRecord {
   return record.mode === 'isolated' ? { ...record, mode: 'embedded', hasJar: false, signedIn: record.signedIn === 'yes' ? 'unknown' : record.signedIn } : record;
 }
 
-export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): AccountService {
+export function createAccountService(db: ThreadStackDB, env: AccountsEnv): AccountService {
   const locks = new Map<string, Promise<unknown>>();
   const lastSwitchAt = new Map<string, number>();
 
@@ -588,7 +588,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
     const realm = realmById(pending.realm);
     if (!realm || !realm.switchable) {
       await db.kv.delete(KV_KEYS.pendingSignIn);
-      return fail('This sign-in is not one Threadkeeper knows.', 'not_allowed');
+      return fail('This sign-in is not one ThreadStack knows.', 'not_allowed');
     }
     return withSwitchLock(realm.id, () =>
       guardedSwitch(realm, async () => {
@@ -600,7 +600,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
         const returnTo = accounts.find((a) => a.id === pending.returnToAccountId) ?? primary;
         let switched = false;
         if (activeId !== returnTo.id) {
-          if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
+          if (!(await hasRealmAccess(realm))) return fail(`Allow ThreadStack to access ${realm.label} first.`, 'needs_host_access');
           let signedIn: { cookies: StoredCookie[]; identity?: AccountIdentity } | undefined;
           if (keep) {
             if (again.wrongAccount) {
@@ -661,7 +661,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
 
     async add(input: AddAccountInput): Promise<AccountsChangeResult | WorkspaceFailure> {
       const realm = isRecord(input) && typeof input.realm === 'string' ? realmById(input.realm) : null;
-      if (!realm) return fail('This sign-in is not one Threadkeeper knows.', 'not_allowed');
+      if (!realm) return fail('This sign-in is not one ThreadStack knows.', 'not_allowed');
       const label = cleanLabel(input.label);
       const color = isColor(input.color) ? input.color : null;
       if (input.mode !== 'embedded' && input.mode !== 'isolated') return fail('Choose how this account is opened.', 'not_allowed');
@@ -673,9 +673,9 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
         if (typeof input.profileId !== 'string' || !UUID_RE.test(input.profileId.toLowerCase())) return fail('The profile id is not valid.', 'not_allowed');
         profileId = input.profileId.toLowerCase();
       }
-      if (!realm.switchable) return fail(realm.fixedReason ?? 'Threadkeeper does not switch this sign-in.', 'not_switchable');
+      if (!realm.switchable) return fail(realm.fixedReason ?? 'ThreadStack does not switch this sign-in.', 'not_switchable');
       // Showing the account later needs the realm's hosts; ask now, inside the click.
-      if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
+      if (!(await hasRealmAccess(realm))) return fail(`Allow ThreadStack to access ${realm.label} first.`, 'needs_host_access');
 
       return withLock(realm.id, async () => {
         try {
@@ -708,7 +708,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
       const account = await getAccount(accountId);
       if (!account) return fail('That account no longer exists.', 'unknown_account');
       const realm = realmById(account.realm);
-      if (!realm || !realm.switchable) return fail(realm?.fixedReason ?? 'Threadkeeper does not switch this sign-in.', 'not_switchable');
+      if (!realm || !realm.switchable) return fail(realm?.fixedReason ?? 'ThreadStack does not switch this sign-in.', 'not_switchable');
 
       return withSwitchLock(realm.id, () =>
         guardedSwitch<AccountsSwitchResult | AccountsChangeResult>(realm, async () => {
@@ -720,7 +720,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
           const accounts = await realmAccounts(realm.id);
           const activeId = activeIdFor(realm, accounts, await activeMap());
           if (activeId === target.id) return changed(target, false);
-          if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
+          if (!(await hasRealmAccess(realm))) return fail(`Allow ThreadStack to access ${realm.label} first.`, 'needs_host_access');
           const refusedCookies = await performSwitch(realm, activeId, target, { create: false, saveFrom: true });
           const result = await changed((await db.accounts.get(target.id)) ?? null, true);
           return { ...result, refusedCookies };
@@ -790,7 +790,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
           const accounts = await realmAccounts(realm.id);
           let switched = false;
           if (activeIdFor(realm, accounts, await activeMap()) === account.id) {
-            if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
+            if (!(await hasRealmAccess(realm))) return fail(`Allow ThreadStack to access ${realm.label} first.`, 'needs_host_access');
             // The removed account's cookies are dropped, not saved.
             await performSwitch(realm, account.id, primary, { create: false, saveFrom: false });
             switched = true;
@@ -921,7 +921,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
       const account = await getAccount(accountId);
       if (!account) return fail('That account no longer exists.', 'unknown_account');
       const realm = realmById(account.realm);
-      if (!realm || !realm.switchable) return fail(realm?.fixedReason ?? 'Threadkeeper does not switch this sign-in.', 'not_switchable');
+      if (!realm || !realm.switchable) return fail(realm?.fixedReason ?? 'ThreadStack does not switch this sign-in.', 'not_switchable');
 
       return withSwitchLock(realm.id, () =>
         guardedSwitch(realm, async () => {
@@ -933,7 +933,7 @@ export function createAccountService(db: ThreadkeeperDB, env: AccountsEnv): Acco
           const accounts = await realmAccounts(realm.id);
           const activeId = activeIdFor(realm, accounts, await activeMap());
           if (activeId === target.id) return fail('This account is the one your browser is signed in to. Sign in on the site in any tab.', 'browser_account');
-          if (!(await hasRealmAccess(realm))) return fail(`Allow Threadkeeper to access ${realm.label} first.`, 'needs_host_access');
+          if (!(await hasRealmAccess(realm))) return fail(`Allow ThreadStack to access ${realm.label} first.`, 'needs_host_access');
           const pending: PendingSignIn = {
             realm: realm.id,
             accountId: target.id,

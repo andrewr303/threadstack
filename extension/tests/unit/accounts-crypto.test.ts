@@ -1,11 +1,11 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import { JAR_KEY_KV, decryptJar, encryptJar } from '../../src/core/accounts/crypto.js';
 import type { StoredCookie } from '../../src/core/workspace/types.js';
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`ThreadkeeperAccountsCrypto_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`ThreadStackAccountsCrypto_${Date.now()}_${++n}`);
 
 const cookies: StoredCookie[] = [
   { name: '__Host-sess', value: 'SECRET-SESSION-VALUE', domain: 'claude.ai', hostOnly: true, path: '/', secure: true, httpOnly: true, sameSite: 'strict', session: true },

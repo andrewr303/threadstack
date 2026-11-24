@@ -114,7 +114,7 @@ export function ImportDialog({ dialogRef, settings, onImported, onOpenThread, on
       await sharedDb.handles.put({ id: kind, kind, handle: dir, label: dir.name, lastSyncedAt: new Date().toISOString() });
       refreshFolders();
       const report = await importFiles(sharedDb, settings, files, setBusy);
-      return `${describeReport(report)} Folder saved; new sessions sync automatically when Threadkeeper opens.`;
+      return `${describeReport(report)} Folder saved; new sessions sync automatically when ThreadStack opens.`;
     });
   };
 
@@ -135,7 +135,7 @@ export function ImportDialog({ dialogRef, settings, onImported, onOpenThread, on
       <section className="tk-settings-section">
         <h3 className="tk-settings-h3">Import exports and sessions</h3>
         <p className="tk-settings-note">
-          Drop in a ChatGPT or Claude data export (the .zip or its conversations.json), a Threadkeeper Portable bundle,
+          Drop in a ChatGPT or Claude data export (the .zip or its conversations.json), a ThreadStack Portable bundle,
           or Claude Code / Codex .jsonl session files. The format is detected automatically and everything is organized
           as it lands.
         </p>
@@ -171,7 +171,7 @@ export function ImportDialog({ dialogRef, settings, onImported, onOpenThread, on
       <section className="tk-settings-section">
         <h3 className="tk-settings-h3">Coding agents on this computer</h3>
         <p className="tk-settings-note">
-          Pick the folder once; Threadkeeper remembers it and imports new sessions each time it opens. In the macOS
+          Pick the folder once; ThreadStack remembers it and imports new sessions each time it opens. In the macOS
           picker press ⌘⇧. to show hidden folders.
         </p>
         <div className="tk-field-row">
@@ -268,7 +268,7 @@ export function ImportDialog({ dialogRef, settings, onImported, onOpenThread, on
                 const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `threadkeeper-${new Date().toISOString().slice(0, 10)}.json`;
+                a.download = `threadstack-${new Date().toISOString().slice(0, 10)}.json`;
                 a.click();
                 setTimeout(() => URL.revokeObjectURL(url), 2000);
               })

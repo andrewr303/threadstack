@@ -1,0 +1,365 @@
+/* The session palette (⌘K). A modal dialog in the top layer: the dialog element covers the window
+   and is the click-away area; the panel inside is the floating surface. Tokens only. */
+.tk-palette {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.tk-palette::backdrop {
+  background: var(--scrim);
+  animation: tk-fade-in var(--t-mid) var(--ease-out);
+}
+
+.tk-palette-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100% - 48px));
+  max-height: calc(100% - 120px);
+  margin: 72px auto 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-chrome);
+  background: var(--dialog-fill);
+  -webkit-backdrop-filter: var(--dialog-filter);
+  backdrop-filter: var(--dialog-filter);
+  box-shadow: var(--dialog-shadow);
+  overflow: hidden;
+}
+
+.tk-palette[open] .tk-palette-panel {
+  animation: tk-dialog-in var(--t-mid) var(--ease-out);
+}
+
+/* --- The query ------------------------------------------------------------------------------ */
+.tk-palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tk-palette-input-icon {
+  color: var(--text-3);
+}
+
+.tk-palette-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 var(--fs-16) / 1.3 var(--font-sans);
+}
+
+.tk-palette-input::placeholder {
+  color: var(--text-3);
+}
+
+.tk-palette-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.tk-palette-esc {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text-2);
+}
+
+.tk-palette-esc:hover {
+  background: var(--ctl-hover);
+}
+
+.tk-palette-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  background: var(--ctl-fill);
+  color: var(--text-2);
+  font: 500 var(--fs-11) / 1 var(--font-mono);
+}
+
+/* --- Filters -------------------------------------------------------------------------------- */
+.tk-palette-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: flex-start;
+  gap: 2px;
+  margin: 12px 18px 6px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--seg-track);
+}
+
+.tk-palette-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--text-2);
+  font: 500 var(--fs-13) / 1 var(--font-sans);
+  transition: background var(--t-small) var(--ease-out), color var(--t-small) var(--ease-out);
+}
+
+.tk-palette-chip:hover {
+  background: var(--ctl-hover);
+  color: var(--text);
+}
+
+.tk-palette-chip[aria-pressed="true"] {
+  background: var(--seg-thumb);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--text);
+}
+
+.tk-palette-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st-running);
+}
+
+.tk-palette-chip-dot[data-run="needs"] {
+  background: var(--warn);
+}
+
+.tk-palette-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-cap);
+  background: var(--ctl-hover);
+  color: var(--text-3);
+  font: 600 var(--fs-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-palette-chip[aria-pressed="true"] .tk-palette-count {
+  background: var(--accent-count);
+  color: var(--accent-count-text);
+}
+
+.tk-palette-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line-2);
+}
+
+/* --- Results -------------------------------------------------------------------------------- */
+.tk-palette-problem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 18px 0;
+  padding: 8px 10px;
+  border-radius: var(--r-row);
+  background: var(--warn-wash);
+  color: var(--warn-text);
+  font-size: var(--fs-13);
+}
+
+.tk-palette-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(460px, 60vh);
+  margin: 0;
+  padding: 6px 8px 8px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tk-palette-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding: 6px 10px 6px 14px;
+  border-radius: var(--r-row);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tk-palette-option[aria-selected="true"] {
+  background: var(--accent-wash);
+}
+
+.tk-palette-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-2);
+}
+
+.tk-palette-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tk-palette-title {
+  overflow: hidden;
+  color: var(--text);
+  font: 500 var(--fs-14) / 1.3 var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-palette-path {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.tk-palette-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+}
+
+.tk-palette-meta .tk-acct-name {
+  color: var(--text-2);
+}
+
+.tk-palette-run {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.tk-palette-idle .tk-run-dot {
+  background: var(--st-idle);
+}
+
+.tk-palette-empty {
+  margin: 0;
+  padding: 28px 18px 32px;
+  color: var(--text-3);
+  font-size: var(--fs-13);
+  text-align: center;
+}
+
+/* --- Footer --------------------------------------------------------------------------------- */
+.tk-palette-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 6px 18px;
+  border-top: 1px solid var(--line);
+  color: var(--text-3);
+  font-size: var(--fs-12);
+}
+
+.tk-palette-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tk-palette-keys > span {
+  margin: 0 10px 0 4px;
+}
+
+.tk-palette-total {
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-palette-total b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Focus: the ring every control uses; rows are chosen through the input (aria-activedescendant). */
+.tk-palette-chip:focus-visible,
+.tk-palette-esc:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.tk-palette-input-row:focus-within {
+  box-shadow: inset 0 -2px 0 var(--accent-line);
+}
+
+@media (max-width: 560px) {
+  .tk-palette-panel {
+    margin-top: 24px;
+    max-height: calc(100% - 48px);
+  }
+  .tk-palette-keys {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-palette::backdrop,
+  .tk-palette[open] .tk-palette-panel {
+    animation: none;
+  }
+  .tk-palette-chip {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .tk-palette-panel {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .tk-palette-option[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .tk-palette-chip[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+  }
+  .tk-palette-chip-dot,
+  .tk-palette-idle .tk-run-dot {
+    background: CanvasText;
+  }
+}

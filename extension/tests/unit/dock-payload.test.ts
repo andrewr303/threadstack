@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, updateManualThreadFields, deleteConversationCascade } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings, updateManualThreadFields, deleteConversationCascade } from '../../src/core/db.js';
 import { insightKeyFor, type MessageRecord } from '../../src/core/schema.js';
 import { PROVIDERS } from '../../src/core/providers.js';
 import {
@@ -115,7 +115,7 @@ describe('transcript budget', () => {
 });
 
 describe('buildThreadPayload', () => {
-  let db: ThreadkeeperDB;
+  let db: ThreadStackDB;
   beforeEach(async () => {
     db = freshDb();
     await ensureStarterCollectionsAndSettings(db);
@@ -190,7 +190,7 @@ describe('buildThreadPayload', () => {
     }
   });
 
-  it('omits transcripts when sharing is off in Threadkeeper', async () => {
+  it('omits transcripts when sharing is off in ThreadStack', async () => {
     const key = await seed(db, thread('t1', 'T', [['user', 'hello there']]));
     const base = await ensureStarterCollectionsAndSettings(db);
     const settings = { ...base, sidebarDock: { ...base.sidebarDock, shareTranscripts: false } };
@@ -237,7 +237,7 @@ describe('buildThreadPayload', () => {
 });
 
 describe('payload fields from the other v0.5 workstreams', () => {
-  let db: ThreadkeeperDB;
+  let db: ThreadStackDB;
   beforeEach(async () => {
     db = freshDb();
     await ensureStarterCollectionsAndSettings(db);
@@ -306,7 +306,7 @@ describe('Dexie v3 migration', () => {
     await v2.table('insights').put({ insightKey: insightKeyFor('ai', 'k1'), threadKey: 'k1', source: 'ai', kind: 'coding' });
     v2.close();
 
-    const db = new ThreadkeeperDB(name);
+    const db = new ThreadStackDB(name);
     const settings = await ensureStarterCollectionsAndSettings(db);
     // v3 added the dock tables; v4 adds accounts, their cookie jars and the workspace values;
     // v5 adds the Table view's columns and values.

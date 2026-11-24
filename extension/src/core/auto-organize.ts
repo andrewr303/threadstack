@@ -7,7 +7,7 @@ import {
   type ThreadInsight,
   type ThreadVectorRecord,
 } from './schema.js';
-import { UNFILED_PROJECT, type ThreadkeeperDB } from './db.js';
+import { UNFILED_PROJECT, type ThreadStackDB } from './db.js';
 import { LOCAL_SPACE, cosine, nearestNeighbors, primarySpace } from './embeddings.js';
 import { normalizeTags } from './organization.js';
 import { providerCategory } from './providers.js';
@@ -40,7 +40,7 @@ export interface OrganizeContext {
 }
 
 export async function loadOrganizeContext(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord
 ): Promise<OrganizeContext> {
   const [collections, conversations] = await Promise.all([
@@ -260,7 +260,7 @@ export interface AutoOrganizeResult {
  * manual assignments and manual workflow states.
  */
 export async function applyAutoOrganization(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKey: string,
   settings: SettingsRecord,
   ctx: OrganizeContext,

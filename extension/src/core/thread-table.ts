@@ -1,7 +1,7 @@
 // The Table view's data: built-in columns read from each thread, columns the person adds, and the
 // value every thread has in them. One rule runs through all of it: a value the person set by hand
 // is theirs. Claude may fill empty cells and replace its own earlier values, never a manual one.
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import { providerCategory, providerLabel, type ProviderCategory } from './providers.js';
 import { threadRepository } from './repository.js';
 import {
@@ -50,7 +50,7 @@ export const BUILTIN_COLUMNS: Record<BuiltinColumnId, { label: string; descripti
   type: { label: 'Type', description: 'What kind of product the thread is from: coding agent, chat, agent and so on.' },
   provider: { label: 'Provider', description: 'Where the thread lives: Claude, ChatGPT, Claude Code, Codex…' },
   created: { label: 'Created', description: 'When the conversation started.' },
-  updated: { label: 'Last active', description: 'The newest activity Threadkeeper has seen.' },
+  updated: { label: 'Last active', description: 'The newest activity ThreadStack has seen.' },
   status: { label: 'Status', description: 'Active, needs review, waiting, paused, done or archived. Editable.' },
   project: { label: 'Project', description: 'The project the thread is filed in. Editable.' },
   topics: { label: 'Topics', description: 'Topics from the thread’s analysis.' },
@@ -364,9 +364,32 @@ export function sortTableRows<T extends TableRow>(
     else if (typeof a.key === 'number') c = -1;
     else if (typeof b.key === 'number') c = 1;
     else c = a.key.localeCompare(b.key);
-    return c !== 0 ? c * dir : b.recent - a.recent;
+    if (c !== 0) return c * dir;
+    // Ties: most recently active first, then by thread key, so equal rows never trade places.
+    return b.recent - a.recent || (a.row.conv.threadKey < b.row.conv.threadKey ? -1 : a.row.conv.threadKey > b.row.conv.threadKey ? 1 : 0);
   });
   return keyed.map((k) => k.row);
+}
+
+/**
+ * The providers the Table's provider switch offers: the ones the library holds, most threads
+ * first (ties by name), at most `max`. The switch adds "All" in front; a provider past the cut is
+ * still found by typing its name in the table search.
+ */
+export function tableProviderOptions(
+  conversations: ReadonlyArray<Pick<ConversationRecord, 'provider' | 'isSyntheticBenchmark'>>,
+  labelOf: (provider: string) => string,
+  max = 4
+): Array<{ provider: string; label: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const c of conversations) {
+    if (c.isSyntheticBenchmark) continue;
+    counts.set(c.provider, (counts.get(c.provider) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([provider, count]) => ({ provider, label: labelOf(provider), count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, Math.max(0, max));
 }
 
 /** Every word of the query appears somewhere in the row: its built-in cells, gist or stored values. */
@@ -390,13 +413,13 @@ function newColumnId(): string {
   return `col_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export async function listTableColumns(db: ThreadkeeperDB): Promise<TableColumnRecord[]> {
+export async function listTableColumns(db: ThreadStackDB): Promise<TableColumnRecord[]> {
   const columns = await db.tableColumns.toArray();
   return columns.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
 export async function createTableColumn(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   draft: TableColumnDraft,
   createdBy: TableColumnRecord['createdBy'] = 'user'
 ): Promise<TableColumnRecord> {
@@ -419,7 +442,7 @@ export async function createTableColumn(
  * use a removed choice lose it; a cell left with nothing is emptied. Returns how many cells changed.
  */
 export async function updateTableColumn(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   id: string,
   patch: { name?: string; options?: string[]; instructions?: string }
 ): Promise<{ column: TableColumnRecord; changedCells: number }> {
@@ -458,14 +481,14 @@ export async function updateTableColumn(
   });
 }
 
-export async function deleteTableColumn(db: ThreadkeeperDB, id: string): Promise<void> {
+export async function deleteTableColumn(db: ThreadStackDB, id: string): Promise<void> {
   await db.transaction('rw', db.tableColumns, db.tableCells, async () => {
     await db.tableCells.where('columnId').equals(id).delete();
     await db.tableColumns.delete(id);
   });
 }
 
-export async function listTableCells(db: ThreadkeeperDB): Promise<TableCellRecord[]> {
+export async function listTableCells(db: ThreadStackDB): Promise<TableCellRecord[]> {
   return db.tableCells.toArray();
 }
 
@@ -486,7 +509,7 @@ export function indexCells(cells: readonly TableCellRecord[]): Map<string, Map<s
  * or null when the cell is now empty.
  */
 export async function setManualCell(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   columnId: string,
   threadKey: string,
   raw: unknown
@@ -520,7 +543,7 @@ export async function setManualCell(
 }
 
 /** Remove every value Claude wrote in a column; the person's own values stay. Returns the count. */
-export async function clearAiCells(db: ThreadkeeperDB, columnId: string): Promise<number> {
+export async function clearAiCells(db: ThreadStackDB, columnId: string): Promise<number> {
   return db.transaction('rw', db.tableCells, async () => {
     const ai = (await db.tableCells.where('columnId').equals(columnId).toArray()).filter((c) => c.source === 'ai');
     await db.tableCells.bulkDelete(ai.map((c) => c.cellKey));
@@ -540,7 +563,7 @@ export interface AiCellWrite {
  * the cell as it is (Claude found nothing to go on). Choices new to the column are added to it.
  */
 export async function applyAiCells(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   columnId: string,
   writes: readonly AiCellWrite[],
   { model, newOptions = [] }: { model: string; newOptions?: readonly string[] }

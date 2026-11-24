@@ -5,7 +5,7 @@
       <button type="button" class="tk-btn" aria-label="Toggle navigation rail">
         "☰"
       <h1 class="tk-h1">
-        "Threadkeeper"
+        "ThreadStack"
       <details class="tk-counts-details"> {open=false}
         <summary class="tk-counts-summary">
           "7"
@@ -823,7 +823,7 @@
       <h3 class="tk-settings-h3" id="tk-catchup-h">
         "Import from online accounts"
       <p class="tk-settings-note">
-        "Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. Threadkeeper reads through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then summarized and filed like any other thread."
+        "Import old and recent Claude and ChatGPT conversations straight from the websites, with no export. ThreadStack reads through your own signed-in session in this browser, one conversation at a time, and only reads. Each one is then summarized and filed like any other thread."
       <p class="tk-settings-note">
         "All history reads every available page in the active account or workspace, including archived ChatGPT chats. Keep the browser and site tabs open while it runs. Cancel at any time; run it again to skip complete, unchanged conversations and continue importing. Deleted or unavailable chats cannot be recovered."
       <div class="tk-field-row">
@@ -861,7 +861,7 @@
         <summary class="tk-muted">
           "Coding sessions: Claude Code and Codex (slower)"
         <p class="tk-settings-note">
-          "Threadkeeper reads your session list on the web and opens each session in a background tab for a few seconds, where it is read like any session you open, including its repository and pull request when the page shows them. Sessions are filed under the account signed in right now; to import a second account, switch to it and run the import again."
+          "ThreadStack reads your session list on the web and opens each session in a background tab for a few seconds, where it is read like any session you open, including its repository and pull request when the page shows them. Sessions are filed under the account signed in right now; to import a second account, switch to it and run the import again."
         <div class="tk-catchup-providers">
           <label class="tk-toggle">
             <input type="checkbox"> {checked=false}
@@ -882,7 +882,7 @@
       <h3 class="tk-settings-h3">
         "Import exports and sessions"
       <p class="tk-settings-note">
-        "Drop in a ChatGPT or Claude data export (the .zip or its conversations.json), a Threadkeeper Portable bundle, or Claude Code / Codex .jsonl session files. The format is detected automatically and everything is organized as it lands."
+        "Drop in a ChatGPT or Claude data export (the .zip or its conversations.json), a ThreadStack Portable bundle, or Claude Code / Codex .jsonl session files. The format is detected automatically and everything is organized as it lands."
       <div class="tk-field-row">
         <button type="button" class="tk-btn tk-btn-primary">
           "Choose files…"
@@ -892,7 +892,7 @@
       <h3 class="tk-settings-h3">
         "Coding agents on this computer"
       <p class="tk-settings-note">
-        "Pick the folder once; Threadkeeper remembers it and imports new sessions each time it opens. In the macOS picker press ⌘⇧. to show hidden folders."
+        "Pick the folder once; ThreadStack remembers it and imports new sessions each time it opens. In the macOS picker press ⌘⇧. to show hidden folders."
       <div class="tk-field-row">
         <button type="button" class="tk-btn">
           "Import"
@@ -1072,13 +1072,19 @@
                 <option value="https://claude.ai/duet">
                   "Claude Duet"
           <p id="tk-start-page-hint" class="tk-settings-note">
-            "The page Threadkeeper opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat and code."
+            "The page ThreadStack opens on. Claude Code is also the way in to the rest of Claude: its own menu moves between chat and code."
           <label class="tk-toggle">
             <input type="checkbox" checked=""> {checked=true}
             <span>
               "Show each site’s full navigation"
               <span class="tk-toggle-hint">
-                "Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in Threadkeeper."
+                "Some sites, Claude among them, hide their sidebar and menus when they are shown inside another page. Leave this on to see them here; turn it off if a site stops loading in ThreadStack."
+          <label class="tk-toggle">
+            <input type="checkbox" checked=""> {checked=true}
+            <span>
+              "Session palette (⌘K)"
+              <span class="tk-toggle-hint">
+                "Search every session and open it in Browse with ⌘K or Ctrl+K, the rail’s search button or the ⌘K chip in the address field. Turn it off to free the shortcut."
           <label class="tk-toggle">
             <input type="checkbox"> {checked=false}
             <span>

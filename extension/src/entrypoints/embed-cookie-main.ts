@@ -1,9 +1,9 @@
 // Runs in the MAIN world of every frame of the provider hosts at document_start: the page-world
-// half of the cookie bridge for pages embedded in Threadkeeper's workspace (core/embed/
+// half of the cookie bridge for pages embedded in ThreadStack's workspace (core/embed/
 // cookie-shim.ts explains why it exists).
 //
 // It acts only in a frame directly inside an extension page. This world cannot call
-// chrome.runtime to learn Threadkeeper's own origin, so it checks for any extension origin and
+// chrome.runtime to learn ThreadStack's own origin, so it checks for any extension origin and
 // then stays inert: document.cookie keeps its native behaviour until the isolated half (which
 // does check the exact origin) delivers a cookie string. Inside another extension's page that
 // never happens. In a top-level tab or any other frame nothing is installed.
@@ -14,7 +14,7 @@
 // Nothing here may throw into the page.
 //
 // Two more things happen here, each only when the isolated half left its mark on the document
-// (it runs first and is the one that knows the frame is inside Threadkeeper's own page):
+// (it runs first and is the one that knows the frame is inside ThreadStack's own page):
 // - a site that hides its navigation when framed is made to answer that check like a top-level
 //   page (core/embed/profile-page.ts presentAsTopLevel);
 // - in a profile frame (the workspace's separate cookie partition), service workers are refused

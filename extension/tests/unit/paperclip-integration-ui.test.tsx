@@ -70,8 +70,8 @@ describe('browser-session status copy (REQ-7 FR-2, FR-7, UI Layout)', () => {
     expect(host.textContent).toContain('Last seen 5 minutes ago');
   });
   it('warns when commits differ, shows Version mismatch and surfaces a plugin error', async () => {
-    await render({ 'company-a': company({ pluginCommit: 'def5678', connected: false, lastError: 'version_mismatch: Paperclip and Threadkeeper use different bridge protocols.' }) });
-    expect(host.textContent).toContain('Threadkeeper and Paperclip were built from different commits (abc1234 and def5678).');
+    await render({ 'company-a': company({ pluginCommit: 'def5678', connected: false, lastError: 'version_mismatch: Paperclip and ThreadStack use different bridge protocols.' }) });
+    expect(host.textContent).toContain('ThreadStack and Paperclip were built from different commits (abc1234 and def5678).');
     expect(host.textContent).toContain('Version mismatch');
     await render({ 'company-a': company({ connected: false, lastError: 'unsupported: Paperclip plugin "browser-sessions": Plugin not found' }) });
     expect(host.textContent).toContain('Plugin not found');

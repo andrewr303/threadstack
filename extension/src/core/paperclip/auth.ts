@@ -1,5 +1,5 @@
 /**
- * Signing Threadkeeper in to an authenticated Paperclip server.
+ * Signing ThreadStack in to an authenticated Paperclip server.
  *
  * A local_trusted instance (the `npx paperclipai onboard` default) treats every request on the
  * loopback interface as its board, so nothing is needed. An authenticated instance gets a board
@@ -133,7 +133,7 @@ export async function signInWithApproval(options: ApprovalFlowOptions): Promise<
   }
 }
 
-/** Best effort: tell Paperclip to revoke the key Threadkeeper holds. */
+/** Best effort: tell Paperclip to revoke the key ThreadStack holds. */
 export async function revokeBoardKey(serverUrl: string, apiKey: string, fetchImpl?: FetchLike): Promise<boolean> {
   if (!apiKey.trim()) return false;
   try {

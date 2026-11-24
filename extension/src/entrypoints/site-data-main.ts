@@ -140,7 +140,7 @@ function hookFetch(): void {
 
 try {
   // Content scripts run in every frame. Only a top-level page and a page embedded in an extension
-  // page have an isolated content script listening (it checks for Threadkeeper's exact origin;
+  // page have an isolated content script listening (it checks for ThreadStack's exact origin;
   // this world cannot), so any other frame is left alone.
   const wanted = window === window.top || embeddedInExtensionPage();
   if (wanted && !Reflect.get(window, HOOK_FLAG)) {

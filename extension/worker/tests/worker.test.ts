@@ -163,7 +163,7 @@ const VALID_SUMMARY_OUTPUT: StructuredSummaryOutput = {
   confidence: 0.95,
 };
 
-describe('Threadkeeper Cloudflare Worker', () => {
+describe('ThreadStack Cloudflare Worker', () => {
   beforeEach(() => {
     resetLocalFallbackQuotasForTest();
   });

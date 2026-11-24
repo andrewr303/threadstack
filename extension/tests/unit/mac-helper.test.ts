@@ -232,11 +232,15 @@ describe('installer: browsers and extension IDs', () => {
       expect(fallback.stdout.length).toBeGreaterThan(4);
     }));
 
-  it('finds Threadkeeper in browser profiles and adds the fixed ID', () =>
+  it('finds ThreadStack in browser profiles and adds the fixed ID', () =>
     withHome((home) => {
       const unpacked = path.join(home, 'ext');
       fs.mkdirSync(unpacked, { recursive: true });
-      fs.writeFileSync(path.join(unpacked, 'manifest.json'), JSON.stringify({ name: 'Threadkeeper' }));
+      fs.writeFileSync(path.join(unpacked, 'manifest.json'), JSON.stringify({ name: 'ThreadStack' }));
+      // A build from before the rename is still named Threadkeeper; it is the same extension.
+      const older = path.join(home, 'ext-older');
+      fs.mkdirSync(older, { recursive: true });
+      fs.writeFileSync(path.join(older, 'manifest.json'), JSON.stringify({ name: 'Threadkeeper' }));
       const profile = path.join(home, support, 'Microsoft Edge/Default');
       fs.mkdirSync(profile, { recursive: true });
       fs.writeFileSync(
@@ -245,10 +249,11 @@ describe('installer: browsers and extension IDs', () => {
           extensions: {
             settings: {
               ['b'.repeat(32)]: { path: unpacked, location: 4 },
+              ['c'.repeat(32)]: { path: older, location: 4 },
               ['d'.repeat(32)]: { manifest: { name: 'Something else' } },
-              // An installed extension that only calls itself Threadkeeper is not trusted.
-              ['e'.repeat(32)]: { manifest: { name: 'Threadkeeper' }, path: unpacked },
-              'not-an-id': { manifest: { name: 'Threadkeeper' } },
+              // An installed extension that only calls itself ThreadStack is not trusted.
+              ['e'.repeat(32)]: { manifest: { name: 'ThreadStack' }, path: unpacked },
+              'not-an-id': { manifest: { name: 'ThreadStack' } },
             },
           },
         })
@@ -262,6 +267,7 @@ describe('installer: browsers and extension IDs', () => {
       expect(found).toEqual([
         { id: core.extensionIdFromKey(key), where: 'fixed ID' },
         { id: 'b'.repeat(32), where: 'Microsoft Edge' },
+        { id: 'c'.repeat(32), where: 'Microsoft Edge' },
       ]);
       expect(core.extensionIdFromKey(key)).toMatch(/^[a-p]{32}$/);
     }));

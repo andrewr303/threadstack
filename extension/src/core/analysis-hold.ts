@@ -1,4 +1,4 @@
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 
 /** pipeline.ts's job type for thread analysis (not imported: pipeline imports this module). */
 const ANALYZE_JOB = 'analyze_thread';
@@ -35,13 +35,13 @@ function readHold(value: unknown): AnalysisHold | null {
   return { runId: v.runId, since: v.since, heartbeatAt: v.heartbeatAt };
 }
 
-export async function holdAnalysis(db: ThreadkeeperDB, runId: string, nowMs: number): Promise<void> {
+export async function holdAnalysis(db: ThreadStackDB, runId: string, nowMs: number): Promise<void> {
   const at = new Date(nowMs).toISOString();
   await db.kv.put({ key: ANALYSIS_HOLD_KEY, value: { runId, since: at, heartbeatAt: at } satisfies AnalysisHold, updatedAt: at });
 }
 
 /** Renew the run's hold; a hold that belongs to another run is left alone. */
-export async function touchAnalysisHold(db: ThreadkeeperDB, runId: string, nowMs: number): Promise<void> {
+export async function touchAnalysisHold(db: ThreadStackDB, runId: string, nowMs: number): Promise<void> {
   await db.transaction('rw', db.kv, async () => {
     const hold = readHold((await db.kv.get(ANALYSIS_HOLD_KEY))?.value);
     if (!hold || hold.runId !== runId) return;
@@ -51,7 +51,7 @@ export async function touchAnalysisHold(db: ThreadkeeperDB, runId: string, nowMs
 }
 
 /** The hold in force now, or null when there is none or it went stale. */
-export async function activeAnalysisHold(db: ThreadkeeperDB, nowMs: number): Promise<AnalysisHold | null> {
+export async function activeAnalysisHold(db: ThreadStackDB, nowMs: number): Promise<AnalysisHold | null> {
   const hold = readHold((await db.kv.get(ANALYSIS_HOLD_KEY))?.value);
   if (!hold) return null;
   const beat = Date.parse(hold.heartbeatAt);
@@ -63,7 +63,7 @@ export async function activeAnalysisHold(db: ThreadkeeperDB, nowMs: number): Pro
  * waited for it due now, so the threads the run imported or changed are analysed first thing.
  * Returns how many threads that is. Jobs queued before the run keep their own time.
  */
-export async function releaseAnalysisHold(db: ThreadkeeperDB, runId: string | null, nowMs: number): Promise<number> {
+export async function releaseAnalysisHold(db: ThreadStackDB, runId: string | null, nowMs: number): Promise<number> {
   return db.transaction('rw', db.kv, db.jobs, async () => {
     const hold = readHold((await db.kv.get(ANALYSIS_HOLD_KEY))?.value);
     if (hold && runId !== null && hold.runId !== runId) return 0;

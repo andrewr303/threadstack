@@ -557,7 +557,7 @@ export async function handleWorkerRequest(
       default:
         return jsonResponse(
           {
-            error: `Endpoint "${url.pathname}" is not in the Threadkeeper Worker allowlist. Generic AI proxy routes are forbidden.`,
+            error: `Endpoint "${url.pathname}" is not in the ThreadStack Worker allowlist. Generic AI proxy routes are forbidden.`,
           },
           404,
           originCheck.allowOrigin

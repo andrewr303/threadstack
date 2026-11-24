@@ -122,7 +122,7 @@ function chromeStub() {
       return result;
     },
     ACCOUNTS_ADD: (m) => {
-      if (!REALMS[m.realm]) return fail('That sign-in is not one Threadkeeper switches.', 'not_switchable');
+      if (!REALMS[m.realm]) return fail('That sign-in is not one ThreadStack switches.', 'not_switchable');
       const inRealm = accounts.filter((a) => a.realm === m.realm);
       const used = new Set(inRealm.map((a) => a.color));
       const account = {
@@ -241,5 +241,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Threadkeeper preview: http://127.0.0.1:${port}/manager.html?surface=page&seed=1`);
+  console.log(`ThreadStack preview: http://127.0.0.1:${port}/manager.html?surface=page&seed=1`);
 });

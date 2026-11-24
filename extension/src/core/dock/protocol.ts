@@ -1,4 +1,4 @@
-// Still ⇄ Threadkeeper protocol v1 (docs/sidebar-dock-integration.md): constants, ids, shapes and
+// Still ⇄ ThreadStack protocol v1 (docs/sidebar-dock-integration.md): constants, ids, shapes and
 // hand-written validators for everything Still sends (messages and responses). Pure: no chrome, no Dexie.
 
 import type { DockSyncPrefs } from '../schema.js';
@@ -35,7 +35,7 @@ export type DockErrorCode =
 export const CAPABILITIES = ['sync', 'search', 'context', 'transcripts', 'open', 'remote_models', 'analyze'] as const;
 export type DockCapability = (typeof CAPABILITIES)[number];
 
-/** Message types Still may send to Threadkeeper. */
+/** Message types Still may send to ThreadStack. */
 export const INBOUND_TYPES = [
   'hello',
   'pair.request',
@@ -67,7 +67,7 @@ export const READ_TYPES: ReadonlySet<string> = new Set([
   'facets',
 ]);
 
-/** Message types Threadkeeper sends to Still. */
+/** Message types ThreadStack sends to Still. */
 export type OutboundType =
   | 'hello'
   | 'pair.granted'

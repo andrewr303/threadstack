@@ -5,7 +5,7 @@ import {
   type SettingsRecord,
   type ThreadInsight,
 } from './schema.js';
-import { UNFILED_PROJECT, ensureStarterCollectionsAndSettings, type ThreadkeeperDB } from './db.js';
+import { UNFILED_PROJECT, ensureStarterCollectionsAndSettings, type ThreadStackDB } from './db.js';
 import { previewNaturalLanguageOrganize, type OrganizeProposalItem } from './organization.js';
 import {
   clusterThreads,
@@ -30,7 +30,7 @@ const AUTO_INSTRUCTION =
 
 const MAX_AI_ROWS = 250;
 
-async function loadInsights(db: ThreadkeeperDB, conversations: ConversationRecord[]) {
+async function loadInsights(db: ThreadStackDB, conversations: ConversationRecord[]) {
   const all = await db.insights.toArray();
   const local = new Map<string, ThreadInsight>();
   const ai = new Map<string, ThreadInsight>();
@@ -45,7 +45,7 @@ async function loadInsights(db: ThreadkeeperDB, conversations: ConversationRecor
 
 /** Proposals without AI: re-run the filer over every revisable thread, then cluster what is left unfiled. */
 async function planLocally(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   conversations: ConversationRecord[],
   insights: Map<string, ThreadInsight>,
@@ -154,7 +154,7 @@ async function planLocally(
  * the caller previews proposals and applies them with an undo log.
  */
 export async function planLibraryOrganization(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options: { instruction?: string; preferAi?: boolean; fetchImpl?: typeof fetch } = {}
 ): Promise<LibraryPlan> {
   const settings = await ensureStarterCollectionsAndSettings(db);

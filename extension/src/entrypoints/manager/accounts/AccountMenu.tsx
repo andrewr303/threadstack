@@ -84,7 +84,7 @@ export function AccountMenuButton({ realmId, variant, accountId }: AccountMenuBu
   if (!entry) return null;
 
   const { realm } = entry;
-  // Every account opens inside Threadkeeper now, including ones that used to open in their own window.
+  // Every account opens inside ThreadStack now, including ones that used to open in their own window.
   const accounts = entry.accounts;
   const browseTab = workspace.state.tabs.find((t) => t.id === workspace.state.activeTabId) ?? null;
   const inFrontId = accountId ?? (browseTab?.realm === realmId ? browseTab.accountId : null) ?? entry.activeAccountId;

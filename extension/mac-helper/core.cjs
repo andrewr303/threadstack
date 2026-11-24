@@ -135,7 +135,7 @@ function createBackupSession({ home = os.homedir(), now = () => new Date() } = {
         case 'backup-begin': {
           abort();
           fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-          // Pieces left by a backup that never finished. Recent ones may belong to Threadkeeper in
+          // Pieces left by a backup that never finished. Recent ones may belong to ThreadStack in
           // another browser backing up right now, so only old ones are cleared.
           for (const n of fs.readdirSync(dir)) {
             if (!n.startsWith('.partial-')) continue;

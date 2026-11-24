@@ -143,6 +143,17 @@ describe('DashboardView', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'dashboard_pane', index: 1, threadKey: 'b' });
   });
 
+  it('pressing a pinned session already in another pane swaps the two panes', () => {
+    mount([a, b], { layout: 2, panes: ['a', 'b'], focusedPane: 0 }, [tabFor('a'), tabFor('b')]);
+    const beta = pins().find((p) => p.querySelector('.tk-dash-pin-label')?.textContent === 'Beta')!;
+    // The chip carries the slot number of the pane it shows in.
+    expect(beta.querySelector('.tk-dash-slot')?.textContent).toBe('2');
+    act(() => beta.click());
+    expect(dispatch).toHaveBeenCalledWith({ type: 'dashboard_pane', index: 0, threadKey: 'b' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'dashboard_pane', index: 1, threadKey: 'a' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'dashboard_focus', index: 0 });
+  });
+
   it('changes the number of panes through the layout control', () => {
     mount([a]);
     const group = container.querySelector('[role="radiogroup"]')!;

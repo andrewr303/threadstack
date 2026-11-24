@@ -19,7 +19,7 @@ import {
   type SyncIdentityReply,
 } from '../../src/core/sync-orchestrator.js';
 import type { SiteConversation } from '../../src/core/site-api.js';
-import { ThreadkeeperDB, upsertThread } from '../../src/core/db.js';
+import { ThreadStackDB, upsertThread } from '../../src/core/db.js';
 import { DEFAULT_SETTINGS } from '../../src/core/schema.js';
 import { HISTORY_SYNC_STATE_KEY, createChromeSyncEnv, createSyncedConversationStore, syncedThreadInput } from '../../src/core/sync-env.js';
 import {
@@ -433,7 +433,7 @@ describe('import progress', () => {
 
   it('never calls an unreadable conversation up to date, and says when a site has more to import', () => {
     const done = describeProviderProgress(p({ status: 'done', listed: 300, stored: 290, skipped: 5, empty: 5, truncated: true }));
-    expect(done.detail).toBe(`290 imported, 5 already up to date, 5 had no messages Threadkeeper could read. ${TRUNCATED_NOTE}`);
+    expect(done.detail).toBe(`290 imported, 5 already up to date, 5 had no messages ThreadStack could read. ${TRUNCATED_NOTE}`);
     expect(TRUNCATED_NOTE).toBe('This site has more than were imported. Run the import again to continue.');
     // The heading never says more were read than found.
     const over: SyncState = { runId: 'r', running: true, days: 30, startedAt: null, finishedAt: null, providers: [p({ status: 'fetching', listed: 4, stored: 6 })] };
@@ -565,13 +565,13 @@ describe('import attribution with several accounts of one site', () => {
     expect(f.sent.some((s) => s.message.type === 'TK_HISTORY_SYNC_CANCEL')).toBe(true);
   });
 
-  it('stops when the account Threadkeeper files under changes mid-run, and fails closed when that cannot be read', async () => {
+  it('stops when the account ThreadStack files under changes mid-run, and fails closed when that cannot be read', async () => {
     const f = fake({ enabled: ['chatgpt'], tabs: { chatgpt: 7 }, identity: signedIn, accounts: [work, home] });
     const orch = new HistorySyncOrchestrator(f.env);
     answerRuns(f, orch, 'chatgpt', 2);
     const original = f.hooks.onSend!;
     f.hooks.onSend = (tabId, m) => {
-      if (m.type === 'TK_HISTORY_SYNC_RUN') f.switchAccount(); // a switch in Threadkeeper itself
+      if (m.type === 'TK_HISTORY_SYNC_RUN') f.switchAccount(); // a switch in ThreadStack itself
       return original(tabId, m);
     };
     await orch.start({ providers: ['chatgpt'], days: 30 });
@@ -708,7 +708,7 @@ describe('import attribution with several accounts of one site', () => {
   });
 
   it('a second account\'s run adds its own threads and leaves the first account\'s untouched', async () => {
-    const db = new ThreadkeeperDB('online-import-two-accounts');
+    const db = new ThreadStackDB('online-import-two-accounts');
     try {
       const first = await upsertThread(db, syncedThreadInput(conv(1), work, new Date(NOW).toISOString()));
       const second = await upsertThread(db, syncedThreadInput({ ...conv(1), title: 'Same id, other person', messages: [{ sourceMessageId: 'x', role: 'user', content: 'Other', createdAt: null, branchPath: 'main' }] }, home, new Date(NOW).toISOString()));
@@ -757,8 +757,8 @@ describe('import attribution with several accounts of one site', () => {
 // ---------------------------------------------------------------------------
 
 describe('hosted analysis waits for the online import', () => {
-  async function withJob(name: string, fn: (db: ThreadkeeperDB) => Promise<void>) {
-    const db = new ThreadkeeperDB(name);
+  async function withJob(name: string, fn: (db: ThreadStackDB) => Promise<void>) {
+    const db = new ThreadStackDB(name);
     try {
       await fn(db);
     } finally {
@@ -1144,7 +1144,7 @@ describe('loading a sidebar list says whether it reached the end', () => {
 
 describe('storing an imported conversation under the run\'s account', () => {
   it('files each account\'s copy separately and only asks for the active account without a run account', async () => {
-    const db = new ThreadkeeperDB('online-import-store-two-accounts');
+    const db = new ThreadStackDB('online-import-store-two-accounts');
     try {
       const organized: string[] = [];
       const resolved: string[] = [];

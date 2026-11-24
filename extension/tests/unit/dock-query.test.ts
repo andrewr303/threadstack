@@ -167,7 +167,7 @@ describe('read requests', () => {
     expect(await h.db.dockSent.count()).toBe(0);
   });
 
-  it('answers disabled when Threadkeeper turned off search (tracked gets still work)', async () => {
+  it('answers disabled when ThreadStack turned off search (tracked gets still work)', async () => {
     await patchDockSettings(h.db, { allowSearch: false });
     expect(await ask(h, 'threads.search', { query: 'x' })).toMatchObject({ ok: false, error: { code: 'disabled' } });
     expect(await ask(h, 'facets')).toMatchObject({ ok: false, error: { code: 'disabled' } });

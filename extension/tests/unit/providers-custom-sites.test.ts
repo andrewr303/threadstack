@@ -33,7 +33,7 @@ describe('added sites: origins', () => {
     expect(normalizeSiteOrigin('http://nas.local')).toMatchObject({ ok: true });
   });
 
-  it('refuses public plain-http, non-web schemes, credentials and providers Threadkeeper already lists', () => {
+  it('refuses public plain-http, non-web schemes, credentials and providers ThreadStack already lists', () => {
     expect(normalizeSiteOrigin('http://chat.example.com')).toMatchObject({ ok: false });
     expect(normalizeSiteOrigin('file:///etc/passwd')).toMatchObject({ ok: false });
     expect(normalizeSiteOrigin('chrome://extensions')).toMatchObject({ ok: false });

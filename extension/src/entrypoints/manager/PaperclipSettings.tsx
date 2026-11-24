@@ -20,7 +20,7 @@ import {
 } from '../../core/paperclip/sync.js';
 import { relativeTime } from './shared.js';
 import { paperclipPermissionOrigins } from '../../core/host-access.js';
-import { PaperclipStatus } from './PaperclipConnection.js';
+import { PaperclipConnectionRow } from './PaperclipConnection.js';
 import { PaperclipBridgeSettings } from './PaperclipBridgeSettings.js';
 import { PaperclipCredentials } from './PaperclipCredentials.js';
 
@@ -174,7 +174,7 @@ export function PaperclipSettings({
       if (!(await access)) {
         setConnect({
           ok: false,
-          message: `Access to ${new URL(typed).host} was not granted, so Threadkeeper cannot reach Paperclip there.`,
+          message: `Access to ${new URL(typed).host} was not granted, so ThreadStack cannot reach Paperclip there.`,
         });
         return;
       }
@@ -225,7 +225,7 @@ export function PaperclipSettings({
               setAuth({
                 busy: true,
                 approvalUrl: s.approvalUrl,
-                message: 'Approve Threadkeeper in the Paperclip tab that just opened. This waits up to 10 minutes.',
+                message: 'Approve ThreadStack in the Paperclip tab that just opened. This waits up to 10 minutes.',
               });
             }
           },
@@ -268,7 +268,7 @@ export function PaperclipSettings({
 
   const onSyncNow = () => {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
-      setSyncNote({ ok: false, message: 'Sync runs in the Threadkeeper extension.' });
+      setSyncNote({ ok: false, message: 'Sync runs in the ThreadStack extension.' });
       return;
     }
     setSyncNote({ busy: true, message: 'Syncing…' });
@@ -276,12 +276,12 @@ export function PaperclipSettings({
       .sendMessage({ type: 'PAPERCLIP_SYNC_NOW' })
       .then((res: { ok?: boolean; outcome?: { status: string; error?: string } } | undefined) => {
         const outcome = res?.outcome;
-        if (!outcome) setSyncNote({ ok: false, message: 'Threadkeeper did not answer. Reload the extension and try again.' });
+        if (!outcome) setSyncNote({ ok: false, message: 'ThreadStack did not answer. Reload the extension and try again.' });
         else if (outcome.status === 'off') setSyncNote({ ok: false, message: 'Turn on Paperclip sync first.' });
         else if (outcome.status === 'error') setSyncNote({ ok: false, message: outcome.error ?? 'Sync failed.' });
         else setSyncNote({ message: null });
       })
-      .catch(() => setSyncNote({ ok: false, message: 'Threadkeeper did not answer. Reload the extension and try again.' }));
+      .catch(() => setSyncNote({ ok: false, message: 'ThreadStack did not answer. Reload the extension and try again.' }));
   };
 
   const toggleCompany = (id: string, on: boolean) => {
@@ -293,13 +293,13 @@ export function PaperclipSettings({
 
   return (
     <>
-      <PaperclipStatus onConfigure={() => { if (needsKey && !signedIn) onSignIn(); else openTab(pc.serverUrl); }} />
+      <PaperclipConnectionRow onConfigure={() => { if (needsKey && !signedIn) onSignIn(); else openTab(pc.serverUrl); }} />
       <PaperclipBridgeSettings companies={companies} />
       <PaperclipCredentials settings={settings} onPatch={onPatch} companies={companies ?? []} />
       <section className="tk-settings-section" data-testid="paperclip-settings">
         <h3 className="tk-settings-h3">Paperclip server</h3>
         <p className="tk-settings-note">
-          Paperclip runs companies of AI agents on your own server. Threadkeeper reads each issue with its comments and the
+          Paperclip runs companies of AI agents on your own server. ThreadStack reads each issue with its comments and the
           transcripts of the agent runs that worked on it, as one thread per issue. It never changes anything in Paperclip.
         </p>
         <div className="tk-field">
@@ -345,7 +345,7 @@ export function PaperclipSettings({
           ) : (
             <>
               <p className="tk-settings-note">
-                Threadkeeper asks Paperclip for a read key the same way the Paperclip CLI does: you approve it in Paperclip, and the
+                ThreadStack asks Paperclip for a read key the same way the Paperclip CLI does: you approve it in Paperclip, and the
                 key stays in this browser profile (extension storage that websites cannot read).
               </p>
               <div className="tk-field-row">
@@ -440,7 +440,7 @@ export function PaperclipSettings({
           <label className="tk-toggle">
             <input type="checkbox" checked={pc.enabled} onChange={(e) => void patch({ enabled: e.target.checked })} />
             <span>
-              Sync Paperclip issues into Threadkeeper
+              Sync Paperclip issues into ThreadStack
               <span className="tk-toggle-hint">
                 Checks for changes every 5 minutes while this browser runs. Threads are analyzed and filed by Paperclip project like
                 any other thread.
@@ -452,7 +452,7 @@ export function PaperclipSettings({
               <input type="checkbox" checked={pc.liveUpdates} onChange={(e) => void patch({ liveUpdates: e.target.checked })} />
               <span>
                 Sync sooner when Paperclip reports a change
-                <span className="tk-toggle-hint">Listens to the local server's live events while Threadkeeper is awake.</span>
+                <span className="tk-toggle-hint">Listens to the local server's live events while ThreadStack is awake.</span>
               </span>
             </label>
           )}

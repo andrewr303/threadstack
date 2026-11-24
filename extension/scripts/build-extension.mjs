@@ -1,7 +1,6 @@
 import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -10,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 // TK_OUT_DIR builds somewhere else, so a test build never replaces the folder a browser has loaded
-// (a loaded Threadkeeper reloads itself when the build in its folder changes).
+// (a loaded ThreadStack reloads itself when the build in its folder changes).
 const finalDir = process.env.TK_OUT_DIR ? path.resolve(process.env.TK_OUT_DIR) : path.join(rootDir, '.output', 'chrome-mv3');
 // Everything is built here first and then moved into finalDir file by file (publish()), so the
 // folder a browser has loaded is never empty or missing its manifest, not even for a moment.
@@ -47,7 +46,7 @@ function publish(stagedDir, targetDir) {
       const rel = path.join(base, entry.name);
       return entry.isDirectory() ? list(path.join(dir, entry.name), rel) : [rel];
     });
-  // Only ever replace a folder that is empty or already holds a Threadkeeper build: everything in
+  // Only ever replace a folder that is empty or already holds a ThreadStack build: everything in
   // the target that is not part of the new build is deleted below.
   if (fs.existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
     let name = null;
@@ -56,9 +55,10 @@ function publish(stagedDir, targetDir) {
     } catch {
       // no manifest: not a build folder
     }
-    if (name !== 'Threadkeeper') {
+    // Builds made before the rename are named Threadkeeper; they are the same extension.
+    if (name !== 'ThreadStack' && name !== 'Threadkeeper') {
       fs.rmSync(stagedDir, { recursive: true, force: true });
-      throw new Error(`${targetDir} is not empty and is not a Threadkeeper build. Choose an empty folder.`);
+      throw new Error(`${targetDir} is not empty and is not a ThreadStack build. Choose an empty folder.`);
     }
   }
   const staged = list(stagedDir);
@@ -95,7 +95,7 @@ function pathExtensionId(dir) {
 /**
  * Whether this build carries the fixed manifest key (shared/extension-key.json).
  *
- * With the key, Threadkeeper has the same extension ID wherever its folder is, so loading it
+ * With the key, ThreadStack has the same extension ID wherever its folder is, so loading it
  * from another checkout or moving the folder keeps the library. Without it the ID is a hash of
  * the folder path. A browser keeps an extension's data under its ID, and changing the ID starts
  * an empty library, so a folder that a browser on this computer already has loaded under its
@@ -158,82 +158,6 @@ function decideManifestKey(targetDir) {
   return { key: fixed.key, id: fixed.extensionId, legacyId: null };
 }
 
-function createPngBuffer(size) {
-  const width = size;
-  const height = size;
-  const rawData = Buffer.alloc(height * (1 + width * 4));
-
-  for (let y = 0; y < height; y++) {
-    const rowStart = y * (1 + width * 4);
-    rawData[rowStart] = 0; // filter type 0
-    for (let x = 0; x < width; x++) {
-      const px = rowStart + 1 + x * 4;
-      const border = Math.max(1, Math.floor(size * 0.12));
-      const isOuter = x < border || x >= width - border || y < border || y >= height - border;
-      const isSpine = x >= Math.floor(size * 0.28) && x < Math.floor(size * 0.38) && y >= border * 2 && y < height - border * 2;
-      if (isOuter) {
-        // Warm paper border #F6F4EF
-        rawData[px] = 0xf6;
-        rawData[px + 1] = 0xf4;
-        rawData[px + 2] = 0xef;
-        rawData[px + 3] = 0xff;
-      } else if (isSpine) {
-        // Warm amber spine #9A5B13
-        rawData[px] = 0x9a;
-        rawData[px + 1] = 0x5b;
-        rawData[px + 2] = 0x13;
-        rawData[px + 3] = 0xff;
-      } else {
-        // Warm ink background #161513
-        rawData[px] = 0x16;
-        rawData[px + 1] = 0x15;
-        rawData[px + 2] = 0x13;
-        rawData[px + 3] = 0xff;
-      }
-    }
-  }
-
-  function crc32(buf) {
-    let crc = 0xffffffff;
-    for (let i = 0; i < buf.length; i++) {
-      crc ^= buf[i];
-      for (let j = 0; j < 8; j++) {
-        crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-      }
-    }
-    return (crc ^ 0xffffffff) >>> 0;
-  }
-
-  function chunk(type, data) {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length, 0);
-    const typeBuf = Buffer.from(type, 'ascii');
-    const crcBuf = Buffer.alloc(4);
-    crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-    return Buffer.concat([len, typeBuf, data, crcBuf]);
-  }
-
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // RGBA
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-
-  const idat = zlib.deflateSync(rawData);
-  const iend = Buffer.alloc(0);
-
-  return Buffer.concat([
-    signature,
-    chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
-    chunk('IEND', iend),
-  ]);
-}
-
 /**
  * Load the provider registry itself (compiled on the fly) so manifest host
  * permissions and content-script matches come from the same code the adapters use.
@@ -263,7 +187,7 @@ async function loadManifestMatchPatterns() {
   if (siteData.length === 0) {
     throw new Error('Provider registry returned no ChatGPT / Claude match patterns');
   }
-  // Providers on hosts Threadkeeper does not hold from install (asked for at runtime, then their
+  // Providers on hosts ThreadStack does not hold from install (asked for at runtime, then their
   // content script is registered with chrome.scripting.registerContentScripts).
   const optionalCapture = registry.optionalCaptureMatchPatterns();
   if (!Array.isArray(optionalCapture) || optionalCapture.some((p) => capture.includes(p))) {
@@ -398,7 +322,7 @@ async function build() {
   });
 
   // 3b. Bundle the Sidebar Dock (Still) consent page (ESM). connect.html is NOT web-accessible:
-  // it only ever opens as Threadkeeper's own top-level popup.
+  // it only ever opens as ThreadStack's own top-level popup.
   await esbuild.build({
     entryPoints: [path.join(rootDir, 'src/entrypoints/connect/main.tsx')],
     outfile: path.join(outDir, 'assets/connect.js'),
@@ -449,8 +373,8 @@ async function build() {
 </body>
 </html>
 `;
-  fs.writeFileSync(path.join(outDir, 'manager.html'), pageHtml('page', 'Threadkeeper — AI thread library'), 'utf8');
-  fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'Threadkeeper'), 'utf8');
+  fs.writeFileSync(path.join(outDir, 'manager.html'), pageHtml('page', 'ThreadStack — AI thread library'), 'utf8');
+  fs.writeFileSync(path.join(outDir, 'sidepanel.html'), pageHtml('sidepanel', 'ThreadStack'), 'utf8');
   fs.writeFileSync(
     path.join(outDir, 'connect.html'),
     `<!DOCTYPE html>
@@ -458,7 +382,7 @@ async function build() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Threadkeeper — Connect Still?</title>
+  <title>ThreadStack — Connect Still?</title>
   <link rel="stylesheet" href="./assets/connect.css" />
 </head>
 <body>
@@ -488,20 +412,20 @@ async function build() {
   const identity = decideManifestKey(finalDir);
   const manifest = {
     manifest_version: 3,
-    name: 'Threadkeeper',
+    name: 'ThreadStack',
     // The same extension ID wherever the folder is (see decideManifestKey).
     ...(identity.key ? { key: identity.key } : {}),
     version: buildInfo.version,
     version_name: buildInfo.versionName,
     description:
       'Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.',
-    // activeTab: lets Settings → Capture read the address of the tab the user invoked Threadkeeper
+    // activeTab: lets Settings → Capture read the address of the tab the user invoked ThreadStack
     // on ("Add this site"); it adds no install warning. cookies: the browser account's sign-in
     // and the embedded pages' cookie bridge. declarativeNetRequestWithHostAccess: the session
     // rules that let provider pages load inside the workspace tab and put an added account's
     // saved sign-in in place there. webRequest: seeing (never changing) the cookies the pages of
     // an added account are given inside the workspace tab, so its saved sign-in stays current.
-    // None adds an install warning; all act only on hosts Threadkeeper already has access to.
+    // None adds an install warning; all act only on hosts ThreadStack already has access to.
     permissions: [
       'storage',
       'unlimitedStorage',
@@ -545,7 +469,7 @@ async function build() {
       default_path: 'sidepanel.html',
     },
     action: {
-      default_title: 'Threadkeeper',
+      default_title: 'ThreadStack',
       default_icon: {
         16: 'icons/icon-16.png',
         32: 'icons/icon-32.png',
@@ -559,24 +483,24 @@ async function build() {
           default: 'Alt+Shift+K',
           mac: 'Alt+Shift+K',
         },
-        description: 'Toggle Threadkeeper overlay on the active AI tab',
+        description: 'Toggle ThreadStack overlay on the active AI tab',
       },
       'open-side-panel': {
         suggested_key: {
           default: 'Alt+Shift+L',
           mac: 'Alt+Shift+L',
         },
-        description: 'Open Threadkeeper in the side panel',
+        description: 'Open ThreadStack in the side panel',
       },
       'open-manager': {
         suggested_key: {
           default: 'Alt+Shift+M',
           mac: 'Alt+Shift+M',
         },
-        description: 'Open Threadkeeper full-page library',
+        description: 'Open ThreadStack full-page library',
       },
     },
-    // all_frames: the same pages also load inside Threadkeeper's workspace tab. The scripts tell
+    // all_frames: the same pages also load inside ThreadStack's workspace tab. The scripts tell
     // an embedded frame (single ancestor: the extension) from a site's own iframes themselves.
     content_scripts: [
       {
@@ -641,14 +565,20 @@ async function build() {
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
   fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2), 'utf8');
 
-  // 7. Generate icons
+  // 7. Brand: the ThreadStack mark as the extension's icons, and the rail's mark and wordmark next
+  // to manager.html (assets/brand/). The PNGs are made from the brand artwork; see assets/brand/README.md.
+  const brandDir = path.join(rootDir, 'assets', 'brand');
   for (const size of [16, 32, 48, 128]) {
-    fs.writeFileSync(path.join(outDir, 'icons', `icon-${size}.png`), createPngBuffer(size));
+    fs.copyFileSync(path.join(brandDir, `icon-${size}.png`), path.join(outDir, 'icons', `icon-${size}.png`));
+  }
+  fs.mkdirSync(path.join(outDir, 'assets', 'brand'), { recursive: true });
+  for (const name of ['threadstack-wordmark.png', 'threadstack-mark.png']) {
+    fs.copyFileSync(path.join(brandDir, name), path.join(outDir, 'assets', 'brand', name));
   }
 
   publish(outDir, finalDir);
 
-  console.log(`Built Threadkeeper ${buildInfo.versionName} to ${finalDir}`);
+  console.log(`Built ThreadStack ${buildInfo.versionName} to ${finalDir}`);
   console.log(`Extension ID: ${identity.id}${identity.key ? ' (fixed: the same wherever this folder is)' : ''}`);
   if (identity.legacyId) {
     console.log(
@@ -664,8 +594,8 @@ async function build() {
     [
       '',
       'Next: reload the extension so the browser picks up the new manifest.',
-      '  Edge:   edge://extensions   → Threadkeeper → Reload',
-      '  Chrome: chrome://extensions → Threadkeeper → Reload',
+      '  Edge:   edge://extensions   → ThreadStack → Reload',
+      '  Chrome: chrome://extensions → ThreadStack → Reload',
       `The extensions page should then show version ${buildInfo.versionName}.`,
       'If you forget, the extension reloads itself within a few minutes, and an open library page offers a one-click Reload.',
     ].join('\n')

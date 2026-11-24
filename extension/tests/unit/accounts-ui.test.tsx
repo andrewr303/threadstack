@@ -14,7 +14,7 @@ import { realmHostOrigins } from '../../src/entrypoints/manager/accounts/common.
 import { configureWorkspaceClient } from '../../src/entrypoints/manager/workspace/client.js';
 import { WorkspaceProvider, type WorkspaceContextValue } from '../../src/entrypoints/manager/workspace/context.js';
 import type { WorkspaceController } from '../../src/entrypoints/manager/workspace/useWorkspace.js';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import { DEFAULT_SETTINGS, buildThreadKey } from '../../src/core/schema.js';
 import { parseSessionControlBackup, planSessionControlImport } from '../../src/core/session-control-import.js';
 import { realmById } from '../../src/core/workspace/realms.js';
@@ -395,14 +395,14 @@ describe('AddAccountDialog', () => {
     const permissions = { request: vi.fn(async () => true) };
     vi.stubGlobal('chrome', { permissions });
     const { value, spies } = makeCtx();
-    spies.addAccount.mockResolvedValueOnce({ ok: false, error: 'Allow Threadkeeper to access Claude first.', code: 'needs_host_access' });
+    spies.addAccount.mockResolvedValueOnce({ ok: false, error: 'Allow ThreadStack to access Claude first.', code: 'needs_host_access' });
     const { ref } = mountDialog(value);
     await open(ref);
     type(nameInput(), 'Team');
     await press(submit());
 
     const alert = document.querySelector('#tk-add-account-dialog [role="alert"]')!;
-    expect(alert.textContent).toContain('Allow Threadkeeper to access Claude first.');
+    expect(alert.textContent).toContain('Allow ThreadStack to access Claude first.');
     expect(ref.current!.hasAttribute('open')).toBe(true);
     expect(spies.openUrl).not.toHaveBeenCalled();
 
@@ -454,10 +454,10 @@ describe('AccountsSettings', () => {
     expect(rows).toHaveLength(3);
     expect(rows[0].textContent).toContain('work@example.com');
     expect(rows[0].textContent).toContain('The account this browser is signed in to');
-    expect(rows[0].textContent).toContain('In Threadkeeper and in your ordinary tabs');
+    expect(rows[0].textContent).toContain('In ThreadStack and in your ordinary tabs');
     expect(rows[1].textContent).toContain('Identity not seen yet');
     expect(rows[1].textContent).toContain('Signed in. Its sign-in is kept on this device, encrypted.');
-    expect(rows[1].textContent).toContain('Inside Threadkeeper only');
+    expect(rows[1].textContent).toContain('Inside ThreadStack only');
     expect(rows[2].textContent).toContain('Not signed in yet');
     expect(rows[2].textContent).not.toContain('own Chrome window');
   });
@@ -650,7 +650,7 @@ function backup() {
 }
 
 let dbCounter = 0;
-const freshDb = () => new ThreadkeeperDB(`AccountsUiImport_${Date.now()}_${++dbCounter}`);
+const freshDb = () => new ThreadStackDB(`AccountsUiImport_${Date.now()}_${++dbCounter}`);
 const bound = DEFAULT_SETTINGS.boundAccounts.claude_code;
 const plan = () =>
   planSessionControlImport(parseSessionControlBackup(JSON.stringify(backup())), {
@@ -878,7 +878,7 @@ describe('Library backups panel', () => {
     await settle();
     expect(send).toHaveBeenCalledWith({ type: 'BACKUP_RESTORE', name: backup.name });
     expect(container.querySelector('.tk-acct-backup-action')!.textContent).toContain('Restored 412 threads and your settings');
-    expect(button('Reload Threadkeeper')).toBeTruthy();
+    expect(button('Reload ThreadStack')).toBeTruthy();
   });
 
   it('shows the last backup, backs up on request, and confirms before restoring into a library with threads', async () => {
@@ -945,20 +945,20 @@ describe('Restore offer on an empty library', () => {
     await settle();
     expect(send).toHaveBeenCalledWith({ type: 'BACKUP_RESTORE', name: backup.name });
     expect(banner()!.textContent).toContain('Restored 412 threads');
-    expect(button('Reload Threadkeeper', banner()!)).toBeTruthy();
+    expect(button('Reload ThreadStack', banner()!)).toBeTruthy();
   });
 
   it('asks before talking to the helper when this copy has no permission yet', async () => {
     const { RestoreOfferBanner } = await import('../../src/entrypoints/manager/accounts/RestoreOfferBanner.js');
-    const { send, request } = setup(false, { BACKUP_STATUS: { ok: true, helper: false, reason: 'The Mac helper is installed, but not for this copy of Threadkeeper.', threads: 0, backups: [], last: null } });
+    const { send, request } = setup(false, { BACKUP_STATUS: { ok: true, helper: false, reason: 'The Mac helper is installed, but not for this copy of ThreadStack.', threads: 0, backups: [], last: null } });
     mount(<RestoreOfferBanner threads={0} />);
     await settle();
     expect(send).not.toHaveBeenCalled();
-    expect(banner()!.textContent).toContain('Used Threadkeeper on this Mac before?');
+    expect(banner()!.textContent).toContain('Used ThreadStack on this Mac before?');
     await press(button('Check for backups', banner()!));
     await settle();
     expect(request).toHaveBeenCalledWith({ permissions: ['nativeMessaging'] });
-    expect(banner()!.textContent).toContain('not for this copy of Threadkeeper');
+    expect(banner()!.textContent).toContain('not for this copy of ThreadStack');
     await press(button('Close', banner()!));
     expect(banner()).toBeNull();
     expect(localStorage.getItem('tk.restoreOffer.dismissed')).toBe('1');

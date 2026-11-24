@@ -94,7 +94,7 @@ export function PaperclipBridgeSettings({ companies, extensionCommit = commitOfB
               {status?.paired && status.shared && ` · ${status.sessionCount} session${status.sessionCount === 1 ? '' : 's'} shared`}
             </span>
             {status?.paired && extensionCommit && status.pluginCommit && commitOfBuildId(status.pluginCommit) && commitOfBuildId(status.pluginCommit) !== extensionCommit
-              && <p className="tk-settings-result" data-ok="false">Threadkeeper and Paperclip were built from different commits ({extensionCommit} and {commitOfBuildId(status.pluginCommit)}).</p>}
+              && <p className="tk-settings-result" data-ok="false">ThreadStack and Paperclip were built from different commits ({extensionCommit} and {commitOfBuildId(status.pluginCommit)}).</p>}
             {!status?.paired && <button type="button" className="tk-btn" disabled={busy} onClick={() => void run('pair', { companyId: company.id })}>Pair {company.name}</button>}
             {status?.pending && !status.paired && <p role="status">In Paperclip’s Browser sessions settings, enter this code in Confirm pairing code: <strong className="tk-paperclip-pair-code">{status.pending.code}</strong>. It expires in 10 minutes.</p>}
             {status?.paired && <>

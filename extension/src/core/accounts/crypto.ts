@@ -12,7 +12,7 @@
 //
 // A jar that fails to decrypt (key lost or replaced, data damaged) is treated as absent: the
 // account then needs a sign-in. It is never an error that blocks switching.
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import type { AccountJarRecord, StoredCookie } from '../workspace/types.js';
 
 export const JAR_KEY_KV = 'accounts.jarKey';
@@ -20,7 +20,7 @@ export const JAR_KEY_KV = 'accounts.jarKey';
 const IV_BYTES = 12;
 
 /** One key lookup per database at a time, so two first saves in one context share one key. */
-const keyCache = new WeakMap<ThreadkeeperDB, Promise<CryptoKey>>();
+const keyCache = new WeakMap<ThreadStackDB, Promise<CryptoKey>>();
 
 /** Cross-realm safe: a key read back from IndexedDB may come from another global. */
 function isAesKey(value: unknown): value is CryptoKey {
@@ -29,12 +29,12 @@ function isAesKey(value: unknown): value is CryptoKey {
   return key.algorithm?.name === 'AES-GCM' && key.usages.includes('encrypt') && key.usages.includes('decrypt');
 }
 
-async function readKey(db: ThreadkeeperDB): Promise<CryptoKey | null> {
+async function readKey(db: ThreadStackDB): Promise<CryptoKey | null> {
   const row = await db.kv.get(JAR_KEY_KV);
   return isAesKey(row?.value) ? row.value : null;
 }
 
-async function createKey(db: ThreadkeeperDB): Promise<CryptoKey> {
+async function createKey(db: ThreadStackDB): Promise<CryptoKey> {
   const existing = await readKey(db);
   if (existing) return existing;
   const fresh = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
@@ -48,7 +48,7 @@ async function createKey(db: ThreadkeeperDB): Promise<CryptoKey> {
   });
 }
 
-async function jarKey(db: ThreadkeeperDB): Promise<CryptoKey> {
+async function jarKey(db: ThreadStackDB): Promise<CryptoKey> {
   let pending = keyCache.get(db);
   if (!pending) {
     pending = createKey(db);
@@ -68,7 +68,7 @@ export interface EncryptedJar {
   cookieCount: number;
 }
 
-export async function encryptJar(db: ThreadkeeperDB, cookies: StoredCookie[]): Promise<EncryptedJar> {
+export async function encryptJar(db: ThreadStackDB, cookies: StoredCookie[]): Promise<EncryptedJar> {
   const key = await jarKey(db);
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const plain = new TextEncoder().encode(JSON.stringify(cookies));
@@ -100,7 +100,7 @@ function isStoredCookie(value: unknown): value is StoredCookie {
 
 /** The jar's cookies, or null when it cannot be read (then the account simply needs a sign-in). */
 export async function decryptJar(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   record: Pick<AccountJarRecord, 'iv' | 'data'>
 ): Promise<StoredCookie[] | null> {
   try {

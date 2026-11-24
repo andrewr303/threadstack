@@ -4,7 +4,7 @@
 // local-only thread, or one in a local-only project, never leaves the browser, and neither does
 // a value the person set on one.
 import { containsPromptInjectionAttempt } from '../../shared/cloud.js';
-import { ensureStarterCollectionsAndSettings, type ThreadkeeperDB } from './db.js';
+import { ensureStarterCollectionsAndSettings, type ThreadStackDB } from './db.js';
 import {
   MODEL_OPTIONS,
   fillColumnWithClaude,
@@ -86,7 +86,7 @@ export function estimateFillCostUsd(model: AiModelId, threads: number): number {
 
 /** Which of `threadKeys` a run would send, and why the others are left out. Reads nothing remote. */
 export async function planColumnFill(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   columnId: string,
   threadKeys: readonly string[],
   mode: FillMode
@@ -149,7 +149,7 @@ export function describeThreadForColumn(conv: ConversationRecord, insight: Threa
   return lines.join('\n');
 }
 
-async function loadThreadContext(db: ThreadkeeperDB, keys: readonly string[]) {
+async function loadThreadContext(db: ThreadStackDB, keys: readonly string[]) {
   const [convs, insightRows] = await Promise.all([
     db.conversations.bulkGet([...keys]),
     db.insights.where('threadKey').anyOf([...keys]).toArray(),
@@ -172,7 +172,7 @@ async function loadThreadContext(db: ThreadkeeperDB, keys: readonly string[]) {
 }
 
 /** The person's own values in this column, from threads that may be sent, as examples. */
-async function loadExamples(db: ThreadkeeperDB, column: TableColumnRecord, allowedOf: (keys: string[]) => Promise<Set<string>>): Promise<ColumnFillExample[]> {
+async function loadExamples(db: ThreadStackDB, column: TableColumnRecord, allowedOf: (keys: string[]) => Promise<Set<string>>): Promise<ColumnFillExample[]> {
   const manual = (await db.tableCells.where('columnId').equals(column.id).toArray())
     .filter((c) => c.source === 'manual')
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -197,7 +197,7 @@ const unsafe = (text: string) => containsPromptInjectionAttempt(text);
  * carries the message.
  */
 export async function runColumnFill(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   plan: Pick<FillPlan, 'column' | 'threadKeys' | 'mode'>,
   options: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void; fetchImpl?: typeof fetch } = {}
 ): Promise<FillOutcome> {
@@ -311,7 +311,7 @@ const SUGGEST_SAMPLE = 60;
  * sent (titles, gists, topics). Proposals that clash with existing columns are dropped.
  */
 export async function suggestTableColumns(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   { request = '', threadKeys, fetchImpl }: { request?: string; threadKeys?: readonly string[]; fetchImpl?: typeof fetch } = {}
 ): Promise<{ proposals: ColumnProposal[]; threadsRead: number }> {
   const settings = await ensureStarterCollectionsAndSettings(db);

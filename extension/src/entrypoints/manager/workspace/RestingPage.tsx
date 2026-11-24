@@ -76,7 +76,7 @@ export function RestingPage({
       <Notice icon="alert" tone="warn" title="Pages cannot be shown here right now" actions={
         <button type="button" className="tk-btn tk-btn-primary" onClick={() => openInChromeTab(tab.url)}>Open in Chrome tab</button>
       }>
-        <p>{workspace.error ?? 'Threadkeeper could not prepare this tab for embedded pages.'}</p>
+        <p>{workspace.error ?? 'ThreadStack could not prepare this tab for embedded pages.'}</p>
       </Notice>
     );
   }
@@ -102,7 +102,7 @@ export function RestingPage({
           <button type="button" className="tk-btn" onClick={() => openInChromeTab(tab.url)}>Open in Chrome tab</button>
         </>
       }>
-        <p>Threadkeeper needs your permission for this site before it can show its pages and save its sessions.</p>
+        <p>ThreadStack needs your permission for this site before it can show its pages and save its sessions.</p>
         {problem && <p role="alert">{problem}</p>}
       </Notice>
     );
@@ -117,7 +117,7 @@ export function RestingPage({
       <Notice icon="userPlus" title={mine ? `Sign in to ${who} in the browser tab` : `${realmName} is waiting for a sign-in`}>
         <p>
           {mine
-            ? 'Use the sign-in controls at the top of Threadkeeper to reopen the browser tab, finish, or cancel.'
+            ? 'Use the sign-in controls at the top of ThreadStack to reopen the browser tab, finish, or cancel.'
             : `${who} is signing in to ${realmName} in a browser tab. Until that ends, ${realmName} pages wait here.`}
         </p>
         <p className="tk-notice-note">
@@ -164,7 +164,7 @@ export function RestingPage({
             : `“Sign in here” opens ${realmName}’s sign-in page in this ${noun}. Your other ${realmName} account stays signed in beside it.`}
         </p>
         <p className="tk-notice-note">
-          Use a browser tab if your sign-in goes through Google, Apple, a passkey or a pop-up window. Threadkeeper sets your
+          Use a browser tab if your sign-in goes through Google, Apple, a passkey or a pop-up window. ThreadStack sets your
           browser’s own {realmName} sign-in aside while you sign in, then puts it back.
         </p>
         {!workspace.profilesSaved && (
@@ -188,7 +188,7 @@ export function RestingPage({
       }>
         <p>
           This window shows two {realmName} accounts at a time{shown ? `, now ${shown}` : ''}. Switching to {name} reloads
-          Threadkeeper’s pages; nothing is signed out.
+          ThreadStack’s pages; nothing is signed out.
         </p>
       </Notice>
     );
@@ -198,7 +198,7 @@ export function RestingPage({
 
   if (rest === 'stale') {
     return (
-      <Notice icon="swap" title={workspace.slots[tab.realm]?.moved ? `${name} moved to another Threadkeeper tab` : `${name}’s sign-in changed`} actions={
+      <Notice icon="swap" title={workspace.slots[tab.realm]?.moved ? `${name} moved to another ThreadStack tab` : `${name}’s sign-in changed`} actions={
         <button type="button" className="tk-btn tk-btn-primary" disabled={!account} onClick={() => void workspace.switchProfile(tab.id)}>
           Reload to show {name}
         </button>
@@ -206,7 +206,7 @@ export function RestingPage({
         <p>
           {workspace.slots[tab.realm]?.moved
             ? 'Reload this tab if you want to move the account back.'
-            : `Reload Threadkeeper to use the latest saved sign-in for ${name}.`}
+            : `Reload ThreadStack to use the latest saved sign-in for ${name}.`}
         </p>
       </Notice>
     );
@@ -216,7 +216,7 @@ export function RestingPage({
     const slot = workspace.slots[tab.realm];
     if (slot?.inUse) {
       return (
-        <Notice icon="swap" title={`${name} is open in another Threadkeeper tab`} actions={
+        <Notice icon="swap" title={`${name} is open in another ThreadStack tab`} actions={
           <button type="button" className="tk-btn tk-btn-primary" disabled={busy} onClick={async () => {
             setBusy(true);
             await workspace.showProfile(tab.accountId, true);
@@ -247,7 +247,7 @@ export function RestingPage({
           <button type="button" className="tk-btn" onClick={() => openInChromeTab(tab.url)}>Open in Chrome tab</button>
         </>
       }>
-        <p>{slot?.error ?? 'Threadkeeper could not put this account’s sign-in in place.'}</p>
+        <p>{slot?.error ?? 'ThreadStack could not put this account’s sign-in in place.'}</p>
       </Notice>
     );
   }
@@ -260,7 +260,7 @@ export function RestingPage({
           <button type="button" className="tk-btn" onClick={() => openInChromeTab(tab.url)}>Open in Chrome tab</button>
         </>
       }>
-        <p>If the page needs a sign-in step that cannot run inside Threadkeeper, finish it in a Chrome tab, then reload here.</p>
+        <p>If the page needs a sign-in step that cannot run inside ThreadStack, finish it in a Chrome tab, then reload here.</p>
       </Notice>
     ) : (
       <Notice title={`Loading ${hostOf(tab.url)}…`} />

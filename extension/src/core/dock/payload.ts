@@ -2,7 +2,7 @@
 // Every builder here assumes the caller already decided the thread may be shared, and
 // re-checks it anyway: a thread that is not remote-allowed never becomes a payload.
 
-import { ensureStarterCollectionsAndSettings, findMatchingTombstone, type ThreadkeeperDB } from '../db.js';
+import { ensureStarterCollectionsAndSettings, findMatchingTombstone, type ThreadStackDB } from '../db.js';
 import {
   THREAD_KIND_LABELS,
   buildThreadKey,
@@ -82,7 +82,7 @@ function singleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-/** Undo POSIX single/double quoting of one shell word (enough for the commands Threadkeeper writes). */
+/** Undo POSIX single/double quoting of one shell word (enough for the commands ThreadStack writes). */
 function unquoteWord(word: string): string {
   const w = word.trim();
   let out = '';
@@ -374,7 +374,7 @@ export interface ThreadRecords {
   summary: StructuredSummaryRecord | null;
 }
 
-export async function loadThreadRecords(db: ThreadkeeperDB, threadKey: string): Promise<ThreadRecords | null> {
+export async function loadThreadRecords(db: ThreadStackDB, threadKey: string): Promise<ThreadRecords | null> {
   const conv = await db.conversations.get(threadKey);
   if (!conv) return null;
   const [local, ai, summary] = await Promise.all([
@@ -387,7 +387,7 @@ export async function loadThreadRecords(db: ThreadkeeperDB, threadKey: string): 
 
 /** Whether a thread may ever go to Still (privacy rule plus tombstones; synthetic threads never). */
 export async function isShareable(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   conv: ConversationRecord,
   settings: SettingsRecord,
   localOnly: ReadonlySet<string>
@@ -409,10 +409,10 @@ export interface BuildPayloadOptions {
 
 /**
  * The full payload for one thread, or null when it is missing, deleted, synthetic or not
- * remote-allowed. Transcripts are included only when the caller asks and Threadkeeper shares them.
+ * remote-allowed. Transcripts are included only when the caller asks and ThreadStack shares them.
  */
 export async function buildThreadPayload(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord | null,
   threadKey: string,
   options: BuildPayloadOptions

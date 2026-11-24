@@ -1,14 +1,14 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, upsertThread } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings, upsertThread } from '../../src/core/db.js';
 import { DEFAULT_SETTINGS, type ThreadVectorRecord } from '../../src/core/schema.js';
 import { MemorySearchIndex, fuseThreadVectors, runHybridSearch, storeVectorEntries } from '../../src/core/search.js';
 
 let seq = 0;
-const databases: ThreadkeeperDB[] = [];
+const databases: ThreadStackDB[] = [];
 afterEach(() => databases.splice(0).forEach((db) => db.close()));
 async function fixture() {
-  const db = new ThreadkeeperDB(`SearchRetrieval_${Date.now()}_${++seq}`);
+  const db = new ThreadStackDB(`SearchRetrieval_${Date.now()}_${++seq}`);
   databases.push(db);
   await ensureStarterCollectionsAndSettings(db);
   await db.settings.put({ ...DEFAULT_SETTINGS, cloudExcludedProviders: [] });
@@ -26,7 +26,7 @@ async function fixture() {
 }
 const vector = () => [1, ...new Array(255).fill(0)];
 const query = () => ({ indexType: 'standard' as const, model: 'voyage-4' as const, dimensions: 256 as const, embedding: vector() });
-async function store(db: ThreadkeeperDB, threadKey: string) {
+async function store(db: ThreadStackDB, threadKey: string) {
   const chunks = await db.chunks.where('threadKey').equals(threadKey).toArray();
   return storeVectorEntries(db, { ...query(), threadKey, embeddingsByChunkKey: chunks.map((c) => ({ chunkKey: c.chunkKey, embedding: vector() })) });
 }

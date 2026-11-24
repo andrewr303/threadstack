@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useLayoutEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { RUN_FILTER_LABELS, type RunFilter } from './filters.js';
 import {
   THREAD_KINDS,
@@ -22,6 +23,7 @@ import { RowCheck, BulkActions, THREAD_SORT_LABELS, type ThreadSortMode } from '
 import { AskPanel } from '../AskPanel.js';
 import { relativeTime } from '../shared.js';
 import { Icon } from '../shell/icons.js';
+import { Segmented } from '../shell/primitives.js';
 import { useOptionalWorkspaceContext } from '../workspace/context.js';
 import { sessionGroupOf } from '../workspace/state.js';
 import {
@@ -57,6 +59,11 @@ export type CardGroup = [project: string, hits: SearchHit[]];
 export interface ListPaneProps {
   /** Full-page Threads uses the existing navigation column instead of a second list column. */
   placement?: 'main' | 'sidebar';
+  /**
+   * Full-page Threads: the element at the top of the rail, beside the view switch. The search
+   * row and the grouping control render there (through a portal, so they stay in this tree).
+   */
+  controlsTarget?: HTMLElement | null;
   /** Workspace filters (full page only): repository, account and observed run state. */
   repositoryFilter?: string | null;
   accountFilter?: string | null;
@@ -134,6 +141,7 @@ export interface ListPaneProps {
 /** Search bar, filters, bulk bar and the thread index as list, kanban or project cards. */
 export function ListPane({
   placement = 'main',
+  controlsTarget = null,
   repositoryFilter = null,
   accountFilter = null,
   runFilter = 'all',
@@ -263,6 +271,14 @@ export function ListPane({
       groupBy
     );
   }, [isPage, conversations, someRealmHasManyAccounts, groupBy]);
+  // The groupings kept one click away (Status, Provider, Account, None). A grouping chosen in the
+  // full Group by menu (Project, Repository, Type, Last active) joins them, so the control never
+  // shows a choice that is not in force.
+  const quickGroups = useMemo<ThreadsGroupBy[]>(() => {
+    const base: ThreadsGroupBy[] = ['status', 'provider', 'account', 'none'];
+    const offered = base.filter((value) => value === 'none' || value === 'status' || (groupOptions as string[]).includes(value));
+    return offered.includes(groupBy) ? offered : [...offered.slice(0, -1), groupBy, 'none'];
+  }, [groupOptions, groupBy]);
   const clearWorkspaceFilters = () => {
     onTypeFilterChange?.('all');
     onProviderFilterChange('all');
@@ -415,9 +431,9 @@ export function ListPane({
     </div>
   );
 
-  return (
-    <Pane id="tk-main-list" className={`tk-list-pane${sidebar ? ' tk-list-sidebar' : ''}`} aria-label={sidebar ? 'Sessions' : 'Conversation index'}>
-      <div className="tk-search-bar" data-filters-open={isPage ? (filtersShown ? 'true' : 'false') : undefined}>
+  const searchBar = (
+    <div className="tk-search-bar" data-filters-open={isPage ? (filtersShown ? 'true' : 'false') : undefined} data-placement={controlsTarget ? 'rail-top' : undefined}>
+
         <div className="tk-search-row">
           <div className="tk-segmented" role="tablist" aria-label="Search or ask">
             <button type="button" role="tab" aria-selected={listMode === 'search'} onClick={() => onListModeChange('search')}>
@@ -453,6 +469,15 @@ export function ListPane({
             />
           )}
         </div>
+        {sidebar && isPage && isListView && listMode === 'search' && (
+          <Segmented
+            label="Group sessions by"
+            className="tk-thr-quickgroup"
+            value={quickGroups.includes(groupBy) ? groupBy : 'none'}
+            options={quickGroups.map((value) => ({ value, label: value === 'none' ? 'None' : LENS_GROUP_BY_LABELS[value] }))}
+            onChange={(value) => void onPatchSettings({ threadsGroupBy: value as ThreadsGroupBy })}
+          />
+        )}
         {listMode === 'search' && rerankNote && (
           <div className="tk-muted" role="status" style={{ fontSize: 12 }}>
             {rerankNote}
@@ -651,7 +676,13 @@ export function ListPane({
             </button>
           </div>
         )}
-      </div>
+
+    </div>
+  );
+
+  return (
+    <Pane id="tk-main-list" className={`tk-list-pane${sidebar ? ' tk-list-sidebar' : ''}`} aria-label={sidebar ? 'Sessions' : 'Conversation index'}>
+      {controlsTarget ? createPortal(searchBar, controlsTarget) : searchBar}
 
       {listMode === 'ask' ? (
         <AskPanel

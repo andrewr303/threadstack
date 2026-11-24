@@ -2,36 +2,36 @@
 
 ## What it is for
 
-The Mac helper is a small program on your Mac that Threadkeeper talks to. It does two jobs.
+The Mac helper is a small program on your Mac that ThreadStack talks to. It does two jobs.
 
-**Account windows.** Threadkeeper can keep one account per provider signed in inside the workspace
+**Account windows.** ThreadStack can keep one account per provider signed in inside the workspace
 at a time. If you need two accounts of the same provider signed in at the same moment (two Claude
 accounts running Claude Code, two ChatGPT accounts running Codex), give the second one its own
 window. The helper opens a Google Chrome window with a separate profile for that account, so its
 logins never mix with your main browser.
 
-**Library backups.** A browser keeps Threadkeeper's library under the extension's ID. Loading
-Threadkeeper from another folder, removing and adding it again, or moving to another browser
+**Library backups.** A browser keeps ThreadStack's library under the extension's ID. Loading
+ThreadStack from another folder, removing and adding it again, or moving to another browser
 starts with an empty library. With the helper connected, the whole library is saved to a folder on
 your Mac about once an hour when it has changed, and Settings, Accounts, Library backups can
 restore it.
 
-It works on macOS with Node.js 22 or newer. Threadkeeper itself can run in Chrome, Edge, Brave,
+It works on macOS with Node.js 22 or newer. ThreadStack itself can run in Chrome, Edge, Brave,
 Arc, Vivaldi, Opera or Chromium. Account windows always open in Google Chrome.
 
 ## Install
 
 1. In the `mac-helper` folder, double-click `Install Mac Helper.command`.
-2. Press Return when asked for an extension ID. The installer finds Threadkeeper in every browser
+2. Press Return when asked for an extension ID. The installer finds ThreadStack in every browser
    on this Mac and sets the helper up for each of them.
-3. Return to Threadkeeper, open Settings, Accounts, and choose Check connection.
+3. Return to ThreadStack, open Settings, Accounts, and choose Check connection.
 
 If macOS blocks the file, right-click it, choose Open, then confirm. If the installer finds no
-Threadkeeper, copy the 32-letter ID from the Threadkeeper card on the browser's extensions page
+ThreadStack, copy the 32-letter ID from the ThreadStack card on the browser's extensions page
 (or from Settings, Accounts) and paste it when asked.
 
-Run the installer again after you load Threadkeeper in another browser or from another folder.
-Each browser has its own list of helpers and each copy of Threadkeeper has its own ID; the helper
+Run the installer again after you load ThreadStack in another browser or from another folder.
+Each browser has its own list of helpers and each copy of ThreadStack has its own ID; the helper
 answers only the IDs it was installed for. IDs registered earlier stay registered.
 
 ## If Check connection fails
@@ -39,7 +39,7 @@ answers only the IDs it was installed for. IDs registered earlier stay registere
 | Message | Cause | Fix |
 | --- | --- | --- |
 | Not installed for this browser | The helper is registered with another browser only. Chrome, Edge and the others never look in each other's folders. | Run the installer again. |
-| Installed, but not for this copy of Threadkeeper | The extension ID changed (another folder or browser), or Node.js was removed. | Run the installer again. |
+| Installed, but not for this copy of ThreadStack | The extension ID changed (another folder or browser), or Node.js was removed. | Run the installer again. |
 | The browser did not allow it | The permission prompt was dismissed. | Choose Check connection again and allow it. |
 
 ## Uninstall
@@ -75,7 +75,7 @@ and its registrations. Account profiles, their logins and library backups are ke
 
 ## The extension ID
 
-A build normally carries a fixed key (`shared/extension-key.json`), so Threadkeeper has the same
+A build normally carries a fixed key (`shared/extension-key.json`), so ThreadStack has the same
 ID wherever its folder is and the library survives moving the folder or loading another checkout.
 
 A folder that a browser already has loaded under the older, path-based ID keeps that ID, so the
@@ -84,14 +84,14 @@ folder (`TK_OUT_DIR`) has no key unless `TK_STABLE_ID=1` is set.
 
 To move an existing library to the fixed ID, keep the old copy until the new one is checked:
 
-1. In the old Threadkeeper: connect the helper and choose Back up now. Check that the newest backup
+1. In the old ThreadStack: connect the helper and choose Back up now. Check that the newest backup
    in the list shows your thread count.
 2. Build a second copy with the fixed ID into its own folder:
-   `TK_STABLE_ID=1 TK_OUT_DIR=~/Threadkeeper-fixed node scripts/build-extension.mjs`
+   `TK_STABLE_ID=1 TK_OUT_DIR=~/ThreadStack-fixed node scripts/build-extension.mjs`
 3. Load that folder on the extensions page (Load unpacked). Both copies are now installed.
 4. In the new copy: Settings, Accounts, Check connection, then Restore that backup. Look through
    the library.
-5. Only when it is all there, remove the old Threadkeeper card. Removing a card deletes that
+5. Only when it is all there, remove the old ThreadStack card. Removing a card deletes that
    copy's library in the browser; the backups on disk stay.
 
 From then on the library follows the fixed ID: a build of any folder with the key opens it.
@@ -107,9 +107,12 @@ From then on the library follows the fixed ID: a build of any folder with the ke
 | Account profiles | `~/Library/Application Support/Threadkeeper/Profiles/<profile id>` |
 | Library backups | `~/Library/Application Support/Threadkeeper/Backups` |
 
+These folders and the `com.threadkeeper.accounts` host name keep the extension's original name, so profiles,
+backups and browser registrations made before the rename to ThreadStack stay where the helper looks for them.
+
 ## Session Control profiles are reused
 
 If you used Session Control, its profiles live in
 `~/Library/Application Support/SessionControlChrome/Profiles/<profile id>`. When a profile with
 the same id already exists there, the helper uses that folder, so accounts you signed in with
-Session Control stay signed in. New profiles are created under Threadkeeper.
+Session Control stay signed in. New profiles are created under `Threadkeeper/Profiles`.

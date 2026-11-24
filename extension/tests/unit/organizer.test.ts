@@ -10,7 +10,7 @@ import {
   type MessageRecord,
 } from '../../src/core/schema.js';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   ensureStarterCollectionsAndSettings,
   saveSettingsPatch,
   updateManualThreadFields,
@@ -42,9 +42,9 @@ import { buildTranscript } from '../../src/core/ai/claude.js';
 import { validateRuntimeMessageSender } from '../../src/core/messaging.js';
 
 let dbCounter = 0;
-function freshDb(): ThreadkeeperDB {
+function freshDb(): ThreadStackDB {
   dbCounter += 1;
-  return new ThreadkeeperDB(`OrganizerTestDB_${dbCounter}_${Date.now()}`);
+  return new ThreadStackDB(`OrganizerTestDB_${dbCounter}_${Date.now()}`);
 }
 
 const ACCOUNT = { accountId: 'acct_test', workspaceId: 'ws_test' };
@@ -133,8 +133,8 @@ describe('Providers & URL identity', () => {
 
   it('reads ChatGPT Project names from project URLs and derives manifest match patterns from the registry', () => {
     expect(
-      extractChatGptProjectSlug('https://chatgpt.com/g/g-p-67c1a2b3c4d5e6f-threadkeeper-launch/c/abc')
-    ).toBe('Threadkeeper Launch');
+      extractChatGptProjectSlug('https://chatgpt.com/g/g-p-67c1a2b3c4d5e6f-threadstack-launch/c/abc')
+    ).toBe('Threadstack Launch');
     expect(extractChatGptProjectSlug('https://chatgpt.com/g/g-abc123/c/xyz')).toBeNull();
     const patterns = captureMatchPatterns();
     expect(patterns).toEqual(expect.arrayContaining(['https://claude.ai/*', 'https://grok.com/*', 'https://gemini.google.com/*']));
@@ -635,7 +635,7 @@ describe('Claude analysis pipeline (mocked Anthropic API)', () => {
     agentRun: null,
   };
 
-  async function seed(db: ThreadkeeperDB, key = 'sk-ant-test') {
+  async function seed(db: ThreadStackDB, key = 'sk-ant-test') {
     const settings = await ensureStarterCollectionsAndSettings(db);
     await saveSettingsPatch(db, { anthropicApiKey: key, autoOrganize: { ...settings.autoOrganize, aiDebounceSeconds: 0 } });
     const t = thread('pay-1', 'Webhook duplicates', [
@@ -798,7 +798,7 @@ describe('Migration and messaging', () => {
     await v1.table('conversations').put({ threadKey: 'k1', project: 'HypeStake', categoryLocked: false, workflowState: 'waiting' });
     v1.close();
 
-    const db = new ThreadkeeperDB(name);
+    const db = new ThreadStackDB(name);
     const settings = await ensureStarterCollectionsAndSettings(db);
     expect(settings.authorizedHosts.claude).toBe(true);
     expect(settings.authorizedHosts.grok).toBe(true);

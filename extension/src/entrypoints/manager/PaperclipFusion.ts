@@ -107,7 +107,7 @@ export function usePaperclipFusionDom({ fused, state, shellRef, control, onStale
     return Boolean(element && shell?.contains(element) && !element.closest('.tk-view-paperclip')) && element instanceof HTMLElement;
   };
 
-  // FR-4: with focus in a view, Command+K opens Paperclip's palette. A Threadkeeper handler that
+  // FR-4: with focus in a view, Command+K opens Paperclip's palette. A ThreadStack handler that
   // claimed the key first (preventDefault) wins; a provider page keeps the key because focus
   // inside its iframe never reaches this document.
   useEffect(() => {

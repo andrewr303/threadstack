@@ -51,6 +51,7 @@ import { BrowseView } from './browse/BrowseView.js';
 import { DashboardView } from './dashboard/DashboardView.js';
 import { TableView } from './table/TableView.js';
 import { Rail } from './shell/Rail.js';
+import { SessionPalette } from './shell/SessionPalette.js';
 import { FrameStage } from './workspace/FrameStage.js';
 import { WorkspaceProvider, type ThreadAccount, type WorkspaceContextValue } from './workspace/context.js';
 import { accountForThread, embedTargetFor, needsSignIn, threadTabId } from './workspace/state.js';
@@ -123,6 +124,8 @@ export function App() {
   const [selectedThreadKey, setSelectedThreadKey] = useState<string | null>(null);
   const [mobileDetailVisible, setMobileDetailVisible] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // Top of the rail beside the view switch, where Threads puts its search and grouping controls.
+  const [threadsTop, setThreadsTop] = useState<HTMLDivElement | null>(null);
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [statusAnnouncement, setStatusAnnouncement] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -147,6 +150,8 @@ export function App() {
   const bulkDeleteDialogRef = useRef<HTMLDialogElement | null>(null);
   const sendStillDialogRef = useRef<HTMLDialogElement | null>(null);
   const addAccountDialogRef = useRef<HTMLDialogElement | null>(null);
+  const paletteDialogRef = useRef<HTMLDialogElement | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [addAccountRealm, setAddAccountRealm] = useState<string | null>(null);
   const [sendStillRequest, setSendStillRequest] = useState<SendRequest | null>(null);
   const [settingsSection, setSettingsSection] = useState<SectionId | null>(null);
@@ -338,6 +343,14 @@ export function App() {
   const paperclipConnection = usePaperclipConnection(settings?.paperclip, isPage && settings !== null, view === 'paperclip' || fusion.engaged);
   const paperclipRunning = paperclipConnection.snapshot.state === 'running';
   const fused = isPage && fusion.engaged && paperclipRunning;
+  // The session palette (⌘K): the full page only, unless switched off in Settings. In fused mode
+  // ⌘K and the palette buttons belong to Paperclip's own palette.
+  const paletteSwitchedOn = isPage && settings?.commandBar !== false;
+  const paletteEnabled = paletteSwitchedOn && !fused;
+  const paletteSearch = useCallback(
+    (query: string) => searchIndex.searchLocal(query, { includeSyntheticBenchmark: false }, 500).hits.map((hit) => hit.conversation),
+    [searchIndex]
+  );
   const paperclipControl = useRef<PaperclipFrameControl | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const paperclipRouteRef = useRef(paperclipPath(urlParams.get('pc')) ?? '/');
@@ -405,7 +418,7 @@ export function App() {
       const owner = accountForThread(conv, workspace.realms, settings?.boundAccounts[conv.provider]?.accountId);
       if (!owner) return { realm: null, account: null, active: true, switchable: false };
       const entry = workspace.realms.find((r) => r.realm.id === owner.realm.id);
-      // Until the accounts are known, and for sign-ins Threadkeeper keeps no accounts for, the
+      // Until the accounts are known, and for sign-ins ThreadStack keeps no accounts for, the
       // browser's own login is the only one there is. Otherwise an account is signed in when it
       // is the browser's own, or an added one with a saved sign-in.
       const active =
@@ -703,7 +716,7 @@ export function App() {
   const conversationByKey = useMemo(() => new Map(conversations.map((c) => [c.threadKey, c])), [conversations]);
 
   // ---- Landing: the start page, once per browser tab ----
-  // Opening Threadkeeper lands on the person's start page (Claude Code unless changed in
+  // Opening ThreadStack lands on the person's start page (Claude Code unless changed in
   // Settings; "where I left off" skips this). A link that names a thread, a view or a search is
   // followed instead, and a reload of the page (which the workspace does to change accounts)
   // stays where it was.
@@ -876,6 +889,8 @@ export function App() {
       else openModal(settingsDialogRef);
     },
     announce: setStatusAnnouncement,
+    openPalette: paletteEnabled ? () => setPaletteOpen(true) : undefined,
+    paletteEnabled,
   };
 
   const handleCloseOverlay = () => {
@@ -907,14 +922,16 @@ export function App() {
     // before focusing it; the shortcut's immediate focus may still target the hidden box.
     if (isPage && (view !== 'threads' || document.querySelector('.tk-rail')?.getAttribute('data-collapsed') === 'true')) return;
     if (!searchInputRef.current) return;
+    // The expanded rail shows the box at its top (a portal): wait until it has moved there.
+    if (isPage && !fused && !threadsTop?.contains(searchInputRef.current)) return;
     searchInputRef.current.focus();
     searchFocusPending.current = false;
-  }, [searchFocusRequest, listMode, settings?.sidebarCollapsed, mobileDrawerOpen, isPage, view]);
+  }, [searchFocusRequest, listMode, settings?.sidebarCollapsed, mobileDrawerOpen, isPage, view, threadsTop, fused]);
 
   useWorkbenchKeyboard({
     surface,
     handshakeToken,
-    dialogRefs: [addAccountDialogRef, organizeDialogRef, importDialogRef, settingsDialogRef, bulkDeleteDialogRef, sendStillDialogRef],
+    dialogRefs: [paletteDialogRef, addAccountDialogRef, organizeDialogRef, importDialogRef, settingsDialogRef, bulkDeleteDialogRef, sendStillDialogRef],
     lastInnerModalCloseAtRef,
     listHits,
     selectedThreadKey: selectedConversation?.threadKey,
@@ -930,6 +947,9 @@ export function App() {
     },
     onCloseOverlay: handleCloseOverlay,
     listShortcuts: view === 'threads',
+    paletteEnabled: paletteSwitchedOn,
+    fused,
+    onOpenPalette: () => setPaletteOpen(true),
   });
 
   const handleOpenFullPage = () => {
@@ -1073,6 +1093,7 @@ export function App() {
   const listPane = (
     <ListPane
       placement={isPage ? 'sidebar' : 'main'}
+      controlsTarget={isPage && view === 'threads' && !fused ? threadsTop : null}
       repositoryFilter={repositoryFilter}
       accountFilter={accountFilter}
       runFilter={runFilter}
@@ -1306,14 +1327,15 @@ export function App() {
             <div
               ref={shellRef}
               className="tk-shell"
-              data-rail-collapsed={(!fused && view === 'paperclip') || Boolean(settings?.sidebarCollapsed)}
+              data-rail-collapsed={Boolean(settings?.sidebarCollapsed) && !fused}
               data-view={view}
-              // Fused: the shell is the Threadkeeper view, placed over Paperclip's content rectangle.
+              // Fused: the shell is the ThreadStack view, placed over Paperclip's content rectangle.
               style={fused && fusion.rect ? { left: fusion.rect.x, top: fusion.rect.y, width: fusion.rect.width, height: fusion.rect.height } : undefined}
             >
               <Rail
                 fused={fused}
-                collapsed={(!fused && view === 'paperclip') || Boolean(settings?.sidebarCollapsed)}
+                collapsed={Boolean(settings?.sidebarCollapsed)}
+                onThreadsTop={setThreadsTop}
                 drawerOpen={mobileDrawerOpen}
                 view={view}
                 effectiveTheme={effectiveTheme}
@@ -1365,6 +1387,8 @@ export function App() {
                   connection={paperclipConnection}
                   navigation={paperclipNavigation}
                   onMessage={onPaperclipMessage}
+                  header={view === 'paperclip' && !fused}
+                  onOpenInTab={() => openInChromeTab(`${paperclipOrigin}${paperclipPath(new URLSearchParams(window.location.search).get('pc')) ?? '/'}`)}
                   onConfigure={() => {
                     if (paperclipConnection.snapshot.state === 'setup_pending') {
                       openInChromeTab(paperclipOrigin);
@@ -1449,6 +1473,18 @@ export function App() {
             void reloadAll(selectedKeyRef.current);
           }}
         />
+
+        {isPage && (
+          <SessionPalette
+            dialogRef={paletteDialogRef}
+            open={paletteOpen && paletteEnabled}
+            search={paletteSearch}
+            onClose={() => {
+              lastInnerModalCloseAtRef.current = Date.now();
+              setPaletteOpen(false);
+            }}
+          />
+        )}
 
         <SendToStillDialog
           dialogRef={sendStillDialogRef}

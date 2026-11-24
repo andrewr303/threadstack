@@ -38,7 +38,7 @@ describe('external handler: senders and envelopes', () => {
 
   it('enforces proto, type allowlist, pairing and size in that order', async () => {
     const h = await harness();
-    expect(await h.dock.handleExternalMessage({ ...msg('hello'), proto: 'still-threadkeeper/9' }, stillSender())).toMatchObject({ ok: false, error: { code: 'version_mismatch' } });
+    expect(await h.dock.handleExternalMessage({ ...msg('hello'), proto: 'still-threadstack/9' }, stillSender())).toMatchObject({ ok: false, error: { code: 'version_mismatch' } });
     expect(await h.dock.handleExternalMessage(msg('threads.delete_everything'), stillSender())).toMatchObject({ ok: false, error: { code: 'unsupported' } });
     expect(await h.dock.handleExternalMessage(msg('threads.search', { query: 'x' }), stillSender())).toMatchObject({ ok: false, error: { code: 'not_paired' } });
     expect(await h.dock.handleExternalMessage('garbage', stillSender())).toMatchObject({ ok: false, error: { code: 'bad_request' } });
@@ -206,7 +206,7 @@ describe('pairing with consent and a one-time code', () => {
     expect((await settingsOf(h)).pairedId).toBe(STILL_ID);
   });
 
-  it('unpair from Threadkeeper flushes local_only removals first, then revokes', async () => {
+  it('unpair from ThreadStack flushes local_only removals first, then revokes', async () => {
     const h = await harness();
     await pairDirect(h);
     await h.db.dockOutbox.bulkPut([

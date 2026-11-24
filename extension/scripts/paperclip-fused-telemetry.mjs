@@ -153,7 +153,7 @@ export async function runSplitPointerProbe({ page, frame, origin, until, check, 
     await until(() => page.evaluate(() => Boolean(window.__tkSplitHeld)), Boolean, 3000, 'one valid childclose report intercepted');
     const empty = await until(() => frame.evaluate(value => {
       const target = document.elementFromPoint(value.x, value.y);
-      return { emptySlot: Boolean(target?.closest('.threadkeeper-slot')), openDialog: Boolean(document.querySelector('[role="dialog"][data-state="open"]')) };
+      return { emptySlot: Boolean(target?.closest('.threadstack-slot')), openDialog: Boolean(document.querySelector('[role="dialog"][data-state="open"]')) };
     }, point), value => value.emptySlot && !value.openDialog, 3000, 'child palette semantically closed over the empty slot');
     ctx.detail.injection = await page.evaluate(() => window.__tkSplitReceipt);
     ctx.detail.childBeforeDown = empty;
@@ -182,10 +182,10 @@ export async function runSplitPointerProbe({ page, frame, origin, until, check, 
     ctx.detail.timeline = [...shell, ...child].sort((a, b) => a.at - b.at);
     const childDown = child.find(event => event.kind === 'pointerdown');
     const shellUp = shell.find(event => event.kind === 'pointerup');
-    ctx.detail.splitAchieved = Boolean(childDown?.target?.cls?.includes('threadkeeper-slot') && shellUp);
+    ctx.detail.splitAchieved = Boolean(childDown?.target?.cls?.includes('threadstack-slot') && shellUp);
     await ctx.shot('-native-split');
     if (twoPresses) {
-      const presses = child.filter(event => event.kind === 'pointerdown' && event.target?.cls?.includes('threadkeeper-slot'));
+      const presses = child.filter(event => event.kind === 'pointerdown' && event.target?.cls?.includes('threadstack-slot'));
       const activations = ctx.detail.replay.delivered.filter(packet => packet.type === 'slot-activate');
       ctx.detail.twoPresses = { nativeChildPresses: presses.length, activations, closeWindowRenewedByProbe: false };
       check(presses.length === 2 && activations.length === 2 && Number.isSafeInteger(activations[0].sequence) && activations[1].sequence > activations[0].sequence, 'Two trusted old-surface presses yield distinct ordered gesture sequences', ctx.detail.twoPresses);

@@ -39,7 +39,7 @@ export function HelperPanel() {
       if (!granted) {
         setCheck({
           state: 'failed',
-          text: 'The browser did not allow Threadkeeper to talk to the Mac helper. Choose Check connection again and allow it.',
+          text: 'The browser did not allow ThreadStack to talk to the Mac helper. Choose Check connection again and allow it.',
         });
         return;
       }
@@ -73,7 +73,7 @@ export function HelperPanel() {
         library survives the extension being removed or its ID changing. It works on macOS with Node.js 22 or newer.
       </p>
       <p className="tk-settings-note">
-        Accounts no longer need it: every account now opens inside Threadkeeper. The helper does not read, copy or write cookies,
+        Accounts no longer need it: every account now opens inside ThreadStack. The helper does not read, copy or write cookies,
         passwords or any login data. It answers three kinds of request: ping, open an address in a separate Chrome profile on a
         fixed list of AI sites (used by earlier versions), and store or return a library backup in its own folder.
       </p>
@@ -114,15 +114,15 @@ export function HelperPanel() {
       <h4 className="tk-acct-subhead">Install the helper</h4>
       <ol className="tk-acct-steps">
         <li>
-          In the mac-helper folder of Threadkeeper, double-click Install Mac Helper.command. If macOS blocks the file,
+          In the mac-helper folder of ThreadStack, double-click Install Mac Helper.command. If macOS blocks the file,
           right-click it, choose Open, then confirm.
         </li>
         <li>
-          Press Return when asked for an extension ID. The installer finds Threadkeeper in every browser on this Mac (Chrome,
+          Press Return when asked for an extension ID. The installer finds ThreadStack in every browser on this Mac (Chrome,
           Edge, Brave and others) and sets the helper up for each. If it finds none, paste the extension ID above instead.
         </li>
         <li>Return here and choose Check connection.</li>
-        <li>After loading Threadkeeper in another browser or from another folder, run the installer again.</li>
+        <li>After loading ThreadStack in another browser or from another folder, run the installer again.</li>
       </ol>
       <p className="tk-settings-note">
         To remove it, double-click Uninstall Mac Helper.command, type REMOVE and press Return. Account profiles and their sign-ins
