@@ -1,49 +1,51 @@
 /** The extension is an optional host. It acquires no access through framing alone. */
 const EXTENSION_ID = /^[a-p]{32}$/;
-export type ThreadkeeperView = "browse" | "threads" | "dashboard";
+export type ThreadStackView = "browse" | "threads" | "dashboard";
 /** Route segments of the browser-sessions plugin pages that the shell can draw in place (REQ-6). */
-export type ThreadkeeperSlotView = "browse" | "threads" | "session-board";
-export const THREADKEEPER_PLUGIN_KEY = "browser-sessions";
-export const THREADKEEPER_SLOT_VIEWS: readonly ThreadkeeperSlotView[] = ["browse", "threads", "session-board"];
+export type ThreadStackSlotView = "browse" | "threads" | "session-board";
+export const THREADSTACK_PLUGIN_KEY = "browser-sessions";
+/** Sender tag on the extension's shell messages. Wire id kept from the Threadkeeper name for compatibility. */
+export const SHELL_MESSAGE_SOURCE = "threadkeeper-shell";
+export const THREADSTACK_SLOT_VIEWS: readonly ThreadStackSlotView[] = ["browse", "threads", "session-board"];
 
-export function threadkeeperSlotView(pluginKey: string | null | undefined, routePath: string | null | undefined): ThreadkeeperSlotView | null {
-  if (pluginKey !== THREADKEEPER_PLUGIN_KEY) return null;
+export function threadStackSlotView(pluginKey: string | null | undefined, routePath: string | null | undefined): ThreadStackSlotView | null {
+  if (pluginKey !== THREADSTACK_PLUGIN_KEY) return null;
   const view = routePath?.toLowerCase();
-  return (THREADKEEPER_SLOT_VIEWS as readonly string[]).includes(view ?? "") ? view as ThreadkeeperSlotView : null;
+  return (THREADSTACK_SLOT_VIEWS as readonly string[]).includes(view ?? "") ? view as ThreadStackSlotView : null;
 }
 
 export const MAX_NOTICE_REGIONS = 8;
 export const SLOT_ACTIVATION_WINDOW_MS = 250;
 export type ColorScheme = "light" | "dark";
-export interface ThreadkeeperRect { x: number; y: number; width: number; height: number }
-export interface ThreadkeeperSlot { view: ThreadkeeperSlotView; rect: ThreadkeeperRect; scheme: ColorScheme }
+export interface ThreadStackRect { x: number; y: number; width: number; height: number }
+export interface ThreadStackSlot { view: ThreadStackSlotView; rect: ThreadStackRect; scheme: ColorScheme }
 /** Native input that Chromium delivered to the empty slot just after its overlay closed. */
-export interface ThreadkeeperSlotActivation { view: "threads"; x: number; y: number }
+export interface ThreadStackSlotActivation { view: "threads"; x: number; y: number }
 
-export function finiteRect(rect: ThreadkeeperRect | null | undefined): rect is ThreadkeeperRect {
+export function finiteRect(rect: ThreadStackRect | null | undefined): rect is ThreadStackRect {
   return Boolean(rect) && [rect!.x, rect!.y, rect!.width, rect!.height].every(Number.isFinite) && rect!.width > 0 && rect!.height > 0;
 }
 
 /** Fused mode needs all three pages; without them the shell keeps its own view switch. */
 export function fusedPagesAvailable(contributions: ReadonlyArray<{ pluginKey: string; slots: ReadonlyArray<{ type: string; routePath?: string }> }> | null | undefined): boolean {
-  const plugin = contributions?.find((contribution) => contribution.pluginKey === THREADKEEPER_PLUGIN_KEY);
+  const plugin = contributions?.find((contribution) => contribution.pluginKey === THREADSTACK_PLUGIN_KEY);
   if (!plugin) return false;
   const routes = new Set(plugin.slots.filter((slot) => slot.type === "page").map((slot) => slot.routePath));
-  return THREADKEEPER_SLOT_VIEWS.every((view) => routes.has(view));
+  return THREADSTACK_SLOT_VIEWS.every((view) => routes.has(view));
 }
 
-export function readThreadkeeperExtensionIds(doc: Document = document): string[] {
-  const value = doc.querySelector<HTMLMetaElement>('meta[name="paperclip-threadkeeper-extension-ids"]')?.content ?? "";
+export function readThreadStackExtensionIds(doc: Document = document): string[] {
+  const value = doc.querySelector<HTMLMetaElement>('meta[name="paperclip-threadstack-extension-ids"]')?.content ?? "";
   return [...new Set(value.split(/[\s,]+/).filter((id) => EXTENSION_ID.test(id)))];
 }
 
-export function isThreadkeeperPath(value: unknown): value is string {
+export function isThreadStackPath(value: unknown): value is string {
   return typeof value === "string" && value.length <= 2000 && value.startsWith("/")
     && !value.startsWith("//") && !/[\\\u0000-\u0020\u007f]/.test(value);
 }
 
 /** Register before React mounts so iframe load messages survive lazy boot and effect remounts. */
-export function createThreadkeeperBootChannel(options: { eventTarget: EventTarget; parent: Window; extensionIds: readonly string[] }) {
+export function createThreadStackBootChannel(options: { eventTarget: EventTarget; parent: Window; extensionIds: readonly string[] }) {
   const origins = new Set(options.extensionIds.filter(id => EXTENSION_ID.test(id)).map(id => `chrome-extension://${id}`));
   let hello: MessageEvent | null = null;
   let navigation: MessageEvent | null = null;
@@ -53,11 +55,11 @@ export function createThreadkeeperBootChannel(options: { eventTarget: EventTarge
     const event = raw as MessageEvent;
     if (disposed || event.source !== options.parent || !origins.has(event.origin) || !event.data || typeof event.data !== "object") return;
     const data = event.data as Record<string, unknown>;
-    if (data.source !== "threadkeeper-shell" || data.v !== 1) return;
+    if (data.source !== SHELL_MESSAGE_SOURCE || data.v !== 1) return;
     if (data.type === "hello") {
       hello = event;
       if (consumer) consumer(event);
-    } else if (data.type === "navigate" && hello?.origin === event.origin && isThreadkeeperPath(data.path)) {
+    } else if (data.type === "navigate" && hello?.origin === event.origin && isThreadStackPath(data.path)) {
       if (consumer) consumer(event); else navigation = event;
     } else if (data.type !== "navigate" && hello?.origin === event.origin && consumer) {
       // Every other shell message (placed, command, overlay-query, …) goes to the host, which
@@ -89,18 +91,18 @@ interface HostOptions {
   fusedAvailable?: () => boolean;
   /** The shell asks again whether an overlay is still open (its 60 s check). */
   onOverlayQuery?: () => void;
-  /** Command+K pressed in a Threadkeeper view. */
+  /** Command+K pressed in a ThreadStack view. */
   onPalette?: () => void;
   /** The shell has laid this view over the content rectangle (or, with null, laid none). */
-  onPlaced?: (view: ThreadkeeperSlotView | null) => void;
+  onPlaced?: (view: ThreadStackSlotView | null) => void;
 }
 
-export function createThreadkeeperHost(options: HostOptions) {
+export function createThreadStackHost(options: HostOptions) {
   const origins = new Set(options.extensionIds.filter((id) => EXTENSION_ID.test(id)).map((id) => `chrome-extension://${id}`));
   let parentOrigin: string | null = null;
   let announcedMode: "fused" | "switching" | null = null;
   let lastSlot: string | null = null;
-  let reportedSlot: ThreadkeeperSlot | null = null;
+  let reportedSlot: ThreadStackSlot | null = null;
   // Owned by this host, never supplied by the input caller; retained across re-handshakes.
   let activationSequence = 0;
   const currentMode = () => (options.fusedAvailable?.() ? "fused" : "switching");
@@ -111,7 +113,7 @@ export function createThreadkeeperHost(options: HostOptions) {
   };
   const reportRoute = () => {
     const path = options.currentPath();
-    if (isThreadkeeperPath(path)) post({ type: "route", path, title: options.currentTitle().slice(0, 500) });
+    if (isThreadStackPath(path)) post({ type: "route", path, title: options.currentTitle().slice(0, 500) });
   };
   return {
     handleMessage(event: MessageEvent): boolean {
@@ -119,7 +121,7 @@ export function createThreadkeeperHost(options: HostOptions) {
       const data: unknown = event.data;
       if (!data || typeof data !== "object") return false;
       const message = data as Record<string, unknown>;
-      if (message.source !== "threadkeeper-shell" || message.v !== 1) return false;
+      if (message.source !== SHELL_MESSAGE_SOURCE || message.v !== 1) return false;
       if (message.type === "hello") {
         parentOrigin = event.origin;
         announcedMode = currentMode();
@@ -131,7 +133,7 @@ export function createThreadkeeperHost(options: HostOptions) {
         return true;
       }
       if (event.origin !== parentOrigin) return false;
-      if (message.type === "navigate" && isThreadkeeperPath(message.path)) {
+      if (message.type === "navigate" && isThreadStackPath(message.path)) {
         options.navigate(message.path);
         return true;
       }
@@ -140,8 +142,8 @@ export function createThreadkeeperHost(options: HostOptions) {
         return true;
       }
       if (message.type === "placed" && options.onPlaced
-        && (message.view === null || (THREADKEEPER_SLOT_VIEWS as readonly unknown[]).includes(message.view))) {
-        options.onPlaced(message.view as ThreadkeeperSlotView | null);
+        && (message.view === null || (THREADSTACK_SLOT_VIEWS as readonly unknown[]).includes(message.view))) {
+        options.onPlaced(message.view as ThreadStackSlotView | null);
         return true;
       }
       if (message.type === "command" && message.name === "palette" && options.onPalette) {
@@ -164,12 +166,12 @@ export function createThreadkeeperHost(options: HostOptions) {
       reportedSlot = null;
       return post({ type: "ready", mode });
     },
-    /** The page's content rectangle in this document's viewport, or null when no Threadkeeper page shows. */
-    reportSlot(slot: ThreadkeeperSlot | null, scheme: ColorScheme = slot?.scheme ?? "light"): boolean {
+    /** The page's content rectangle in this document's viewport, or null when no ThreadStack page shows. */
+    reportSlot(slot: ThreadStackSlot | null, scheme: ColorScheme = slot?.scheme ?? "light"): boolean {
       if (!parentOrigin) return false;
       let body: Record<string, unknown>;
       if (slot) {
-        if (!THREADKEEPER_SLOT_VIEWS.includes(slot.view) || !finiteRect(slot.rect)) return false;
+        if (!THREADSTACK_SLOT_VIEWS.includes(slot.view) || !finiteRect(slot.rect)) return false;
         const { x, y, width, height } = slot.rect;
         body = { type: "slot", view: slot.view, rect: { x, y, width, height }, scheme: slot.scheme };
       } else body = { type: "slot", view: null, rect: null, scheme };
@@ -180,7 +182,7 @@ export function createThreadkeeperHost(options: HostOptions) {
       return post(body);
     },
     /** Only session selection is eligible; the shell resolves the point against its current list. */
-    reportSlotActivation(activation: ThreadkeeperSlotActivation): boolean {
+    reportSlotActivation(activation: ThreadStackSlotActivation): boolean {
       if (!parentOrigin || announcedMode !== "fused" || currentMode() !== "fused"
         || activation.view !== "threads" || reportedSlot?.view !== "threads"
         || !Number.isFinite(activation.x) || !Number.isFinite(activation.y)) return false;
@@ -191,7 +193,7 @@ export function createThreadkeeperHost(options: HostOptions) {
       return post({ type: "slot-activate", view: "threads", x: activation.x, y: activation.y, sequence: ++activationSequence });
     },
     /** `open` counts blocking overlays only; notices travel as rectangles the shell cuts out of its view. */
-    reportOverlay(report: { open: boolean; regions: readonly ThreadkeeperRect[] }): boolean {
+    reportOverlay(report: { open: boolean; regions: readonly ThreadStackRect[] }): boolean {
       const regions = report.regions.filter(finiteRect).slice(0, MAX_NOTICE_REGIONS)
         .map(({ x, y, width, height }) => ({ x, y, width, height }));
       return post({ type: "overlay", open: report.open === true, regions });

@@ -1,4 +1,4 @@
-// Cross-package invariants between the Threadkeeper extension and the browser-sessions plugin (AGENTS.md §5.2).
+// Cross-package invariants between the ThreadStack extension and the browser-sessions plugin (AGENTS.md §5.2).
 // Neither package's suite sees the other's contracts, so a one-sided change could pass both.
 // Numeric timing literals are parsed below; navigation checks execute the real TypeScript contracts.
 import assert from 'node:assert/strict';
@@ -21,8 +21,8 @@ const files = {
   pluginContracts: 'packages/plugins/plugin-browser-sessions/src/contracts.ts',
   pluginManifest: 'packages/plugins/plugin-browser-sessions/src/manifest.ts',
   pluginPage: 'ui/src/pages/PluginPage.tsx',
-  uiHost: 'ui/src/lib/threadkeeper-host.ts',
-  uiSlot: 'ui/src/lib/threadkeeper-host-slot.ts',
+  uiHost: 'ui/src/lib/threadstack-host.ts',
+  uiSlot: 'ui/src/lib/threadstack-host-slot.ts',
 };
 
 /** Numeric value of `export const NAME = 1_500;` (digits, `_`, `*`, spaces only). */
@@ -126,8 +126,8 @@ function slotComponentFile() {
   const { program, errors } = parseSync(files.pluginPage, source);
   assert.deepEqual(errors, [], files.pluginPage);
   const imports = program.body.filter((node) => node.type === 'ImportDeclaration'
-    && node.specifiers.some((specifier) => specifier.local.name === 'ThreadkeeperSlot'));
-  assert.equal(imports.length, 1, 'PluginPage imports its ThreadkeeperSlot');
+    && node.specifiers.some((specifier) => specifier.local.name === 'ThreadStackSlot'));
+  assert.equal(imports.length, 1, 'PluginPage imports its ThreadStackSlot');
   const specifier = imports[0].source.value;
   return specifier.startsWith('@/') ? `ui/src/${specifier.slice(2)}.tsx`
     : path.join(path.dirname(files.pluginPage), `${specifier}.tsx`);
@@ -136,9 +136,9 @@ function slotComponentFile() {
 const placementEffect = messageEffect('manager', 'App', (node) =>
   node.type === 'ObjectExpression' && node.properties.some((property) =>
     (property.key?.name ?? property.key?.value) === 'type' && property.value?.value === 'placed'));
-const openViewEffect = messageEffect(slotComponentFile(), 'ThreadkeeperSlot', (node) =>
+const openViewEffect = messageEffect(slotComponentFile(), 'ThreadStackSlot', (node) =>
   node.type === 'NewExpression' && node.callee?.name === 'CustomEvent'
-    && node.arguments[0]?.value === 'paperclip:threadkeeper-open-view');
+    && node.arguments[0]?.value === 'paperclip:threadstack-open-view');
 
 const [extensionHost, fusion, uiHost, uiSlot, pluginManifest] = await Promise.all(
   ['extensionHost', 'fusion', 'uiHost', 'uiSlot', 'pluginManifest'].map((file) =>
@@ -152,7 +152,7 @@ test('native session presses carry host-owned sequence IDs through the extension
   const frame = {};
   const extensionOrigin = `chrome-extension://${'a'.repeat(32)}`;
   const pageOrigin = 'http://127.0.0.1:3100';
-  const host = uiHost.createThreadkeeperHost({ parent, extensionIds: ['a'.repeat(32)], currentPath: () => '/ACME/threads', currentTitle: () => 'Threads', navigate: () => {}, fusedAvailable: () => true });
+  const host = uiHost.createThreadStackHost({ parent, extensionIds: ['a'.repeat(32)], currentPath: () => '/ACME/threads', currentTitle: () => 'Threads', navigate: () => {}, fusedAvailable: () => true });
   host.handleMessage({ source: parent, origin: extensionOrigin, data: { source: 'threadkeeper-shell', v: 1, type: 'hello' } });
   host.reportSlot({ view: 'threads', rect: { x: 240, y: 48, width: 1040, height: 752 }, scheme: 'dark' }, 'dark');
   assert.equal(host.reportSlotActivation({ view: 'threads', x: 300, y: 100, sequence: 999 }), true);
@@ -161,10 +161,10 @@ test('native session presses carry host-owned sequence IDs through the extension
   assert.deepEqual(parsed, [{ type: 'slot-activate', view: 'threads', x: 300, y: 100, sequence: 1 }, { type: 'slot-activate', view: 'threads', x: 301, y: 100, sequence: 2 }]);
 });
 
-test('the plugin pages and UI host expose the same Threadkeeper routes', () => {
+test('the plugin pages and UI host expose the same ThreadStack routes', () => {
   const pages = pluginManifest.default.ui.slots.filter((slot) => slot.type === 'page').map((slot) => slot.routePath);
   assert.deepEqual(pages, views.map(([route]) => route));
-  assert.deepEqual(uiHost.THREADKEEPER_SLOT_VIEWS, pages);
+  assert.deepEqual(uiHost.THREADSTACK_SLOT_VIEWS, pages);
 });
 
 for (const [route, shellView] of views) {
@@ -176,7 +176,7 @@ for (const [route, shellView] of views) {
     const extensionOrigin = `chrome-extension://${'a'.repeat(32)}`;
     const pageOrigin = 'http://127.0.0.1:3100';
     const rect = { x: 240, y: 48, width: 1040, height: 752 };
-    const host = uiHost.createThreadkeeperHost({
+    const host = uiHost.createThreadStackHost({
       parent, extensionIds: ['a'.repeat(32)], currentPath: () => `/ACME/${route}`,
       currentTitle: () => route, navigate: () => {}, fusedAvailable: () => true,
       onPlaced: (view) => placed.push(view),
@@ -190,21 +190,21 @@ for (const [route, shellView] of views) {
     assert.equal(fromShell({ type: 'hello' }), true);
     const ready = fromPage(packets.find((packet) => packet.type === 'ready'));
     const window = new EventTarget();
-    window.addEventListener('paperclip:threadkeeper-open-view', (event) => {
+    window.addEventListener('paperclip:threadstack-open-view', (event) => {
       assert.equal(host.openView(event.detail.view), true);
     });
     const release = openViewEffect({
-      view: uiHost.threadkeeperSlotView('browser-sessions', route),
+      view: uiHost.threadStackSlotView('browser-sessions', route),
       ref: { current: { ownerDocument: { documentElement: { getAttribute: () => route } } } },
-      registerThreadkeeperSlot: uiSlot.registerThreadkeeperSlot, window, CustomEvent,
+      registerThreadStackSlot: uiSlot.registerThreadStackSlot, window, CustomEvent,
       // Placement observation belongs to the component's UI tests; keep this message effect deterministic.
       SLOT_ATTRIBUTE: uiSlot.SLOT_ATTRIBUTE, setUnresponsive: () => {},
       MutationObserver: class { observe() {} disconnect() {} }, setTimeout, clearTimeout,
     });
     try {
-      assert.equal(uiSlot.currentThreadkeeperSlot().view, route);
+      assert.equal(uiSlot.currentThreadStackSlot().view, route);
       assert.deepEqual(fromPage(packets.find((packet) => packet.type === 'open-view')), { type: 'open-view', view: shellView });
-      assert.equal(host.reportSlot({ view: uiSlot.currentThreadkeeperSlot().view, rect, scheme: 'dark' }), true);
+      assert.equal(host.reportSlot({ view: uiSlot.currentThreadStackSlot().view, rect, scheme: 'dark' }), true);
       const slot = fromPage(packets.find((packet) => packet.type === 'slot'));
       assert.deepEqual(slot, { type: 'slot', view: shellView, rect, scheme: 'dark' });
       const state = fusion.fusionReducer(fusion.fusionReducer(fusion.INITIAL_FUSION, { ...ready, at: 1000 }), { ...slot, at: 1100 });

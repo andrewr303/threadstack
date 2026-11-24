@@ -576,6 +576,7 @@ export function pluginRoutes(
       "x-request-id",
       // This paired-browser credential is intentionally separate from board
       // and agent bearer credentials and is consumed only by its owning plugin.
+      // Header name kept from the Threadkeeper name: paired ThreadStack builds send it.
       ...(pluginKey === "browser-sessions" ? ["x-threadkeeper-bridge-token"] : []),
     ]);
     const headers: Record<string, string> = {};

@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { ThreadkeeperSlotView } from "@/lib/threadkeeper-host";
-import { registerThreadkeeperSlot, SLOT_ATTRIBUTE } from "@/lib/threadkeeper-host-slot";
+import type { ThreadStackSlotView } from "@/lib/threadstack-host";
+import { registerThreadStackSlot, SLOT_ATTRIBUTE } from "@/lib/threadstack-host-slot";
 
 /** The host bridge keeps this content rectangle opaque until the shell acknowledges placement. */
-export function ThreadkeeperSlot({ view, label }: { view: ThreadkeeperSlotView; label: string }) {
+export function ThreadStackSlot({ view, label }: { view: ThreadStackSlotView; label: string }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [unresponsive, setUnresponsive] = useState(false);
   useEffect(() => {
     if (!ref.current) return;
-    const release = registerThreadkeeperSlot(view, ref.current);
+    const release = registerThreadStackSlot(view, ref.current);
     const documentRoot = ref.current.ownerDocument.documentElement;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let awaitingPlacement = false;
@@ -34,7 +34,7 @@ export function ThreadkeeperSlot({ view, label }: { view: ThreadkeeperSlotView; 
     updatePlacement();
     // After the slot report: a shell that is not fused (older, or past its 2 s window) still
     // switches to this view; a fused shell is already showing it.
-    window.dispatchEvent(new CustomEvent("paperclip:threadkeeper-open-view", { detail: { view: view === "session-board" ? "dashboard" : view } }));
+    window.dispatchEvent(new CustomEvent("paperclip:threadstack-open-view", { detail: { view: view === "session-board" ? "dashboard" : view } }));
     return () => {
       observer.disconnect();
       clearTimeout(timer);
@@ -42,8 +42,8 @@ export function ThreadkeeperSlot({ view, label }: { view: ThreadkeeperSlotView; 
     };
   }, [view]);
   return (
-    <div ref={ref} className="threadkeeper-slot" data-threadkeeper-slot-view={view} role="region" aria-label={label}>
-      {unresponsive && <p role="status" className="text-sm text-muted-foreground">Threadkeeper is not responding. Reload the window.</p>}
+    <div ref={ref} className="threadstack-slot" data-threadstack-slot-view={view} role="region" aria-label={label}>
+      {unresponsive && <p role="status" className="text-sm text-muted-foreground">ThreadStack is not responding. Reload the window.</p>}
     </div>
   );
 }

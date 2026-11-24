@@ -15,7 +15,7 @@ function relative(filePath) {
 
 function walk(directory, visit) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    // Threadkeeper is an independent npm/React 18 package, outside the pnpm workspace.
+    // ThreadStack is an independent npm/React 18 package, outside the pnpm workspace.
     if (directory === repoRoot && entry.name === "extension") continue;
     // Typechecking and builds install third-party Copilot distributions in these ignored runtime
     // assets are not workspace packages and do not declare our source package engine policy.

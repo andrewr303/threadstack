@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import manifest from "../src/manifest.js";
 
 // REQ-6 AC-1: Browse, Threads and Session board come from this plugin's sidebar entry and pages.
-describe("Threadkeeper pages in Paperclip's sidebar (REQ-6 AC-1)", () => {
+describe("ThreadStack pages in Paperclip's sidebar (REQ-6 AC-1)", () => {
   const slots = manifest.ui?.slots ?? [];
 
   it("declares the three pages with their routes and labels", () => {

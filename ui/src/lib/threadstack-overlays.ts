@@ -1,4 +1,4 @@
-import { MAX_NOTICE_REGIONS, finiteRect, type ThreadkeeperRect } from "./threadkeeper-host";
+import { MAX_NOTICE_REGIONS, finiteRect, type ThreadStackRect } from "./threadstack-host";
 
 /**
  * One document-level observer for REQ-6 fused mode. Paperclip's overlays come from several
@@ -7,14 +7,14 @@ import { MAX_NOTICE_REGIONS, finiteRect, type ThreadkeeperRect } from "./threadk
  *
  * - Blocking: active content portalled to <body> outside the app root, plus open dialogs and
  *   poppers drawn inside it. Closed Radix content may remain mounted for its exit animation.
- * - Notices: elements marked `data-threadkeeper-notice` (ToastViewport). They are reported as
+ * - Notices: elements marked `data-threadstack-notice` (ToastViewport). They are reported as
  *   rectangles that the shell cuts out of its view, so the view stays usable around them.
  */
-export interface ThreadkeeperOverlayState { open: boolean; regions: ThreadkeeperRect[] }
-type Measure = (element: Element) => ThreadkeeperRect;
+export interface ThreadStackOverlayState { open: boolean; regions: ThreadStackRect[] }
+type Measure = (element: Element) => ThreadStackRect;
 
-export const NOTICE_ATTRIBUTE = "data-threadkeeper-notice";
-const IGNORE_SELECTOR = '[data-threadkeeper-overlay="ignore"]';
+export const NOTICE_ATTRIBUTE = "data-threadstack-notice";
+const IGNORE_SELECTOR = '[data-threadstack-overlay="ignore"]';
 const INERT_TAGS = new Set(["script", "style", "link", "template", "noscript", "meta"]);
 const IN_ROOT_SELECTOR = [
   'dialog[open]',
@@ -55,7 +55,7 @@ function blockingOutsideRoot(element: Element, root: Element | null, view: Windo
   return shown(element, view);
 }
 
-export function readThreadkeeperOverlays(options: { doc: Document; root: Element | null; measure?: Measure }): ThreadkeeperOverlayState {
+export function readThreadStackOverlays(options: { doc: Document; root: Element | null; measure?: Measure }): ThreadStackOverlayState {
   const { doc, root } = options;
   const measure = options.measure ?? defaultMeasure;
   const view = doc.defaultView;
@@ -66,7 +66,7 @@ export function readThreadkeeperOverlays(options: { doc: Document; root: Element
   if (!open && root) {
     open = Array.from(root.querySelectorAll(IN_ROOT_SELECTOR)).some((element) => !closedOverlayTree(element) && shown(element, view));
   }
-  const regions: ThreadkeeperRect[] = [];
+  const regions: ThreadStackRect[] = [];
   for (const notice of Array.from(doc.querySelectorAll(`[${NOTICE_ATTRIBUTE}]`))) {
     if (regions.length >= MAX_NOTICE_REGIONS) break;
     if (!shown(notice, view)) continue;
@@ -82,11 +82,11 @@ export function readThreadkeeperOverlays(options: { doc: Document; root: Element
  * one scan per animation frame. A semantic close is checked in the mutation batch so restoring
  * input does not wait for another paint; other open overlays still keep the frame raised.
  */
-export function observeThreadkeeperOverlays(options: {
+export function observeThreadStackOverlays(options: {
   doc: Document;
   root: Element | null;
   measure?: Measure;
-  onChange: (state: ThreadkeeperOverlayState) => void;
+  onChange: (state: ThreadStackOverlayState) => void;
   /** Runs a scan on the next frame (requestAnimationFrame by default). */
   schedule?: (run: () => void) => void;
 }) {
@@ -96,13 +96,13 @@ export function observeThreadkeeperOverlays(options: {
     if (view?.requestAnimationFrame) view.requestAnimationFrame(() => run());
     else queueMicrotask(run);
   });
-  let last = readThreadkeeperOverlays(options);
+  let last = readThreadStackOverlays(options);
   let key = JSON.stringify(last);
   let pending = false;
   let dirty = false;
   let disposed = false;
   const check = () => {
-    const next = readThreadkeeperOverlays(options);
+    const next = readThreadStackOverlays(options);
     const nextKey = JSON.stringify(next);
     last = next;
     if (nextKey === key) return;
@@ -150,7 +150,7 @@ export function observeThreadkeeperOverlays(options: {
   view?.addEventListener("resize", request);
   return {
     /** A fresh reading, for the shell's overlay query. */
-    read(): ThreadkeeperOverlayState { dirty = false; check(); return last; },
+    read(): ThreadStackOverlayState { dirty = false; check(); return last; },
     dispose() {
       disposed = true;
       observer.disconnect();

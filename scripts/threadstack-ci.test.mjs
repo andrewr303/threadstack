@@ -20,9 +20,9 @@ function selected(job, repository, action = 'opened', label) {
 
 test('canonical and fork CI are mutually exclusive and retain supported PR label behavior', () => {
   const canonical = caller.jobs.ci;
-  const fork = caller.jobs.threadkeeper;
+  const fork = caller.jobs.threadstack;
   assert.equal(canonical.uses, 'paperclipai/paperclip/.github/workflows/pr-trusted.yml@master');
-  assert.equal(fork?.uses, './.github/workflows/threadkeeper-pr.yml');
+  assert.equal(fork?.uses, './.github/workflows/threadstack-pr.yml');
   for (const repository of ['paperclipai/paperclip', 'AVRCORP/threadkeeper', 'someone/other-fork']) {
     for (const [action, label, eventAllowed] of [
       ['opened', undefined, true], ['synchronize', undefined, true], ['reopened', undefined, true],
@@ -35,7 +35,7 @@ test('canonical and fork CI are mutually exclusive and retain supported PR label
 });
 
 test('the fork workflow executes PR source only on hosted runners with a read-only token', () => {
-  const { text, value } = readWorkflow('threadkeeper-pr.yml');
+  const { text, value } = readWorkflow('threadstack-pr.yml');
   assert.deepEqual(Object.keys(value.on), ['workflow_call']);
   assert.deepEqual(value.permissions, { contents: 'read' });
   assert.equal(value.concurrency['cancel-in-progress'], true);
@@ -53,7 +53,7 @@ test('the fork workflow executes PR source only on hosted runners with a read-on
 });
 
 test('fork checks use frozen separate installations and cover the actual extension and plugin', () => {
-  const { text, value } = readWorkflow('threadkeeper-pr.yml');
+  const { text, value } = readWorkflow('threadstack-pr.yml');
   assert.doesNotMatch(text, /--no-frozen-lockfile|--resolution-only|deploy:extension|TK_LIVE_DIR|TK_STABLE_ID=1/);
   for (const job of Object.values(value.jobs)) {
     const commands = job.steps.map(step => step.run ?? '').join('\n');
@@ -63,7 +63,7 @@ test('fork checks use frozen separate installations and cover the actual extensi
   }
   const extension = value.jobs.extension_plugin.steps.map(step => step.run ?? '').join('\n');
   assert.match(extension, /npm ci --prefix extension/);
-  assert.match(extension, /assertThreadkeeperSafety\(\)/);
+  assert.match(extension, /assertThreadStackSafety\(\)/);
   assert.match(extension, /npm --prefix extension run typecheck/);
   assert.match(extension, /npm --prefix extension test -- --maxWorkers=2/);
   assert.match(extension, /TK_OUT_DIR=\/tmp\/tk-build TK_STABLE_ID=0 npm --prefix extension run build/);
@@ -73,7 +73,7 @@ test('fork checks use frozen separate installations and cover the actual extensi
   assert.match(integration, /pnpm --filter @paperclipai\/ui typecheck/);
   assert.match(integration, /pnpm --filter @paperclipai\/server typecheck/);
   assert.match(integration, /pnpm --filter @paperclipai\/ui build/);
-  assert.match(integration, /ThreadkeeperSlot\.test\.tsx/);
+  assert.match(integration, /ThreadStackSlot\.test\.tsx/);
   assert.match(integration, /company-live-events-stream\.test\.ts/);
   assert.match(integration, /tool-gateway\.test\.ts/);
   assert.match(text, /full Paperclip/);

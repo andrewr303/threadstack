@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { createThreadkeeperBootChannel } from "./threadkeeper-host";
+import { createThreadStackBootChannel } from "./threadstack-host";
 const id = "abcdefghijklmnopabcdefghijklmnop";
 function setup() {
   const target = new EventTarget();
-  const channel = createThreadkeeperBootChannel({ eventTarget: target, parent: window, extensionIds: [id] });
+  const channel = createThreadStackBootChannel({ eventTarget: target, parent: window, extensionIds: [id] });
   const message = (data: Record<string, unknown>, origin = `chrome-extension://${id}`, source: Window | null = window) => target.dispatchEvent(new MessageEvent("message", { origin, source, data: { source: "threadkeeper-shell", v: 1, ...data } }));
   const send = (type: string, path?: string, origin = `chrome-extension://${id}`, source: Window | null = window) => message({ type, path }, origin, source);
   return { channel, send, message };

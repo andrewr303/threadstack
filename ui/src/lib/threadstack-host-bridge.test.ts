@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The real ThreadkeeperHostBridge, framed by an allowed extension: shell messages arrive as window
+// The real ThreadStackHostBridge, framed by an allowed extension: shell messages arrive as window
 // `message` events through the early boot channel, exactly as in the browser (REQ-6 round 3).
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -31,7 +31,7 @@ async function fromShell(data: Record<string, unknown>, from = origin, source: W
 
 beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  document.head.innerHTML = `<meta name="paperclip-threadkeeper-extension-ids" content="${id}">`;
+  document.head.innerHTML = `<meta name="paperclip-threadstack-extension-ids" content="${id}">`;
   parentFrame = document.createElement("iframe");
   document.body.append(parentFrame);
   parent = parentFrame.contentWindow!;
@@ -45,11 +45,11 @@ beforeEach(async () => {
   appRoot.append(mount);
   documentListeners = vi.spyOn(document, "addEventListener");
   vi.resetModules();
-  const { ThreadkeeperHostBridge } = await import("../components/ThreadkeeperHostBridge");
+  const { ThreadStackHostBridge } = await import("../components/ThreadStackHostBridge");
   root = createRoot(mount);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () => {
-    root.render(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, { initialEntries: ["/ACME/threads"] }, createElement(ThreadkeeperHostBridge))));
+    root.render(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, { initialEntries: ["/ACME/threads"] }, createElement(ThreadStackHostBridge))));
   });
   await flush();
 });
@@ -60,20 +60,20 @@ afterEach(async () => {
   Object.defineProperty(window, "parent", { configurable: true, get: () => window });
   document.body.innerHTML = "";
   document.head.innerHTML = "";
-  document.documentElement.removeAttribute("data-threadkeeper-slot");
-  document.documentElement.removeAttribute("data-threadkeeper-host");
+  document.documentElement.removeAttribute("data-threadstack-slot");
+  document.documentElement.removeAttribute("data-threadstack-host");
   document.documentElement.removeAttribute("style");
   vi.unstubAllGlobals();
 });
 
-describe("ThreadkeeperHostBridge through the boot channel", () => {
+describe("ThreadStackHostBridge through the boot channel", () => {
   it("captures pointerdown for selection recovery and refuses programmatic pointer events", async () => {
     expect(documentListeners.mock.calls.filter((call: unknown[]) => call[0] === "pointerdown" && call[2] === true)).toHaveLength(1);
     await fromShell({ type: "hello" });
-    const { registerThreadkeeperSlot } = await import("./threadkeeper-host-slot");
+    const { registerThreadStackSlot } = await import("./threadstack-host-slot");
     const slot = document.createElement("div");
     document.getElementById("root")!.append(slot);
-    const release = registerThreadkeeperSlot("threads", slot);
+    const release = registerThreadStackSlot("threads", slot);
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("data-state", "open");
@@ -96,13 +96,13 @@ describe("ThreadkeeperHostBridge through the boot channel", () => {
     await fromShell({ type: "hello" });
     await flush();
     expect(sent()).toContainEqual({ source: "paperclip-ui", v: 1, type: "ready", mode: "fused" });
-    const { registerThreadkeeperSlot } = await import("./threadkeeper-host-slot");
+    const { registerThreadStackSlot } = await import("./threadstack-host-slot");
     const slot = document.createElement("div");
     document.getElementById("root")!.append(slot);
-    const release = registerThreadkeeperSlot("threads", slot);
+    const release = registerThreadStackSlot("threads", slot);
 
     await fromShell({ type: "placed", view: "threads" });
-    expect(document.documentElement.getAttribute("data-threadkeeper-slot")).toBe("threads");
+    expect(document.documentElement.getAttribute("data-threadstack-slot")).toBe("threads");
 
     const keys: KeyboardEvent[] = [];
     const listener = (event: KeyboardEvent) => keys.push(event);
@@ -118,17 +118,17 @@ describe("ThreadkeeperHostBridge through the boot channel", () => {
   });
 
   it("keeps refusing other origins and sources, and anything before hello", async () => {
-    const { registerThreadkeeperSlot } = await import("./threadkeeper-host-slot");
+    const { registerThreadStackSlot } = await import("./threadstack-host-slot");
     const slot = document.createElement("div");
     document.getElementById("root")!.append(slot);
-    const release = registerThreadkeeperSlot("threads", slot);
+    const release = registerThreadStackSlot("threads", slot);
     const keys: KeyboardEvent[] = [];
     const listener = (event: KeyboardEvent) => keys.push(event);
     document.addEventListener("keydown", listener);
     const refuse = async (from = origin, source = parent) => {
       await fromShell({ type: "placed", view: "threads" }, from, source);
       // placed has no reply: inspect its actual effect on a registered slot (N-4).
-      expect(document.documentElement.hasAttribute("data-threadkeeper-slot")).toBe(false);
+      expect(document.documentElement.hasAttribute("data-threadstack-slot")).toBe(false);
       await fromShell({ type: "command", name: "palette" }, from, source);
       await fromShell({ type: "overlay-query" }, from, source);
       expect(keys).toEqual([]);
@@ -142,7 +142,7 @@ describe("ThreadkeeperHostBridge through the boot channel", () => {
       await refuse(origin, window);
       // Prove the registered slot and keyboard listener would expose an accepted message.
       await fromShell({ type: "placed", view: "threads" });
-      expect(document.documentElement.getAttribute("data-threadkeeper-slot")).toBe("threads");
+      expect(document.documentElement.getAttribute("data-threadstack-slot")).toBe("threads");
       await fromShell({ type: "command", name: "palette" });
       expect(keys.map((event) => [event.key, event.metaKey])).toEqual([["k", true]]);
     } finally {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { classifyThreadkeeperSlotActivation, connectThreadkeeperFusion } from "./threadkeeper-host-fusion";
-import { registerThreadkeeperSlot } from "./threadkeeper-host-slot";
+import { classifyThreadStackSlotActivation, connectThreadStackFusion } from "./threadstack-host-fusion";
+import { registerThreadStackSlot } from "./threadstack-host-slot";
 
 class InertResizeObserver { observe() {} unobserve() {} disconnect() {} }
 
@@ -13,7 +13,7 @@ function setup(initialMode: "fused" | "switching" | null = "fused") {
   document.body.append(root);
   let mode = initialMode;
   const host = { reportSlot: vi.fn(() => true), reportOverlay: vi.fn(() => true), reportSlotActivation: vi.fn(() => true), announceMode: vi.fn(() => true), mode: vi.fn(() => mode) };
-  const fusion = connectThreadkeeperFusion({
+  const fusion = connectThreadStackFusion({
     doc: document,
     root,
     host,
@@ -24,12 +24,12 @@ function setup(initialMode: "fused" | "switching" | null = "fused") {
   return { root, host, fusion, setMode: (next: typeof mode) => { mode = next; } };
 }
 
-describe("Threadkeeper fusion wiring", () => {
+describe("ThreadStack fusion wiring", () => {
   it("forwards slot placement and overlay changes to the host", async () => {
     const { host, fusion } = setup();
     const element = document.createElement("div");
     document.body.querySelector("#root")!.append(element);
-    const release = registerThreadkeeperSlot("threads", element);
+    const release = registerThreadStackSlot("threads", element);
     expect(host.reportSlot).toHaveBeenLastCalledWith({ view: "threads", rect: { x: 240, y: 48, width: 1200, height: 800 }, scheme: "light" }, "light");
     fusion.refresh(); // the fused ready (hello) starts the overlay observer
     const dialog = document.createElement("div");
@@ -82,7 +82,7 @@ describe("Threadkeeper fusion wiring", () => {
     const { host, fusion } = setup();
     const element = document.createElement("div");
     document.body.append(element);
-    const release = registerThreadkeeperSlot("threads", element);
+    const release = registerThreadStackSlot("threads", element);
     const order: string[] = [];
     host.announceMode.mockImplementation(() => { order.push("ready"); return true; });
     host.reportSlot.mockImplementation(() => { order.push("slot"); return true; });
@@ -101,13 +101,13 @@ describe("Threadkeeper fusion wiring", () => {
     const { fusion } = setup();
     const element = document.createElement("div");
     document.body.append(element);
-    const release = registerThreadkeeperSlot("threads", element);
-    expect(document.documentElement.hasAttribute("data-threadkeeper-slot")).toBe(false);
+    const release = registerThreadStackSlot("threads", element);
+    expect(document.documentElement.hasAttribute("data-threadstack-slot")).toBe(false);
     fusion.placed("threads");
-    expect(document.documentElement.getAttribute("data-threadkeeper-slot")).toBe("threads");
+    expect(document.documentElement.getAttribute("data-threadstack-slot")).toBe("threads");
     // hello or a mode change sends a new ready: the shell has to place its view again.
     fusion.refresh();
-    expect(document.documentElement.hasAttribute("data-threadkeeper-slot")).toBe(false);
+    expect(document.documentElement.hasAttribute("data-threadstack-slot")).toBe(false);
     release();
     fusion.dispose();
   });
@@ -158,7 +158,7 @@ describe("Threadkeeper fusion wiring", () => {
     const { root, host, fusion } = setup();
     const slot = document.createElement("div");
     root.append(slot);
-    const release = registerThreadkeeperSlot("threads", slot);
+    const release = registerThreadStackSlot("threads", slot);
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("data-state", "open");
@@ -181,27 +181,27 @@ describe("Threadkeeper fusion wiring", () => {
     document.body.append(element);
     const event = { type: "pointerdown", pointerType: "mouse", isPrimary: true, isTrusted: true, button: 0, buttons: 1, detail: 0, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: element, clientX: 300, clientY: 100 };
     const context = { slot: { view: "threads" as const, element }, closedSlot: element, placed: true, bounds: { x: 240, y: 48, width: 800, height: 600 }, overlayOpen: false, closedAt: 1000, now: 1250 };
-    expect(classifyThreadkeeperSlotActivation(event, context)).toEqual({ view: "threads", x: 300, y: 100 });
+    expect(classifyThreadStackSlotActivation(event, context)).toEqual({ view: "threads", x: 300, y: 100 });
     for (const patch of [{ isTrusted: false }, { button: 1 }, { type: "click", detail: 1 }, { type: "pointerup" }, { pointerType: "touch" }, { pointerType: "pen" }, { pointerType: "" }, { isPrimary: false }, { buttons: 0 }, { buttons: 3 }, { defaultPrevented: true }, { metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { target: document.body }, { clientX: NaN }, { clientY: Infinity }, { clientX: 239 }, { clientY: 648 }]) {
-      expect(classifyThreadkeeperSlotActivation({ ...event, ...patch }, context)).toBeNull();
+      expect(classifyThreadStackSlotActivation({ ...event, ...patch }, context)).toBeNull();
     }
     for (const patch of [{ overlayOpen: true }, { placed: false }, { closedAt: null }, { now: 999 }, { now: 1251 }, { closedSlot: null }, { bounds: null }, { slot: null }, { slot: { view: "browse" as const, element } }]) {
-      expect(classifyThreadkeeperSlotActivation(event, { ...context, ...patch })).toBeNull();
+      expect(classifyThreadStackSlotActivation(event, { ...context, ...patch })).toBeNull();
     }
     element.append(document.createElement("p"));
-    expect(classifyThreadkeeperSlotActivation(event, context)).toBeNull();
+    expect(classifyThreadStackSlotActivation(event, context)).toBeNull();
     element.replaceChildren("Visible slot message");
-    expect(classifyThreadkeeperSlotActivation(event, context)).toBeNull();
+    expect(classifyThreadStackSlotActivation(event, context)).toBeNull();
     element.replaceChildren();
     element.remove();
-    expect(classifyThreadkeeperSlotActivation(event, context)).toBeNull();
+    expect(classifyThreadStackSlotActivation(event, context)).toBeNull();
   });
 
   it("rejects another still-open overlay, expired closes, mode changes and unacknowledged placement", () => {
     vi.spyOn(Date, "now").mockReturnValue(1000);
     const { root, host, fusion, setMode } = setup();
     const slot = document.createElement("div"); root.append(slot);
-    const release = registerThreadkeeperSlot("threads", slot);
+    const release = registerThreadStackSlot("threads", slot);
     const dialog = document.createElement("div"); dialog.setAttribute("role", "dialog"); dialog.setAttribute("data-state", "open"); document.body.append(dialog);
     const click = { type: "pointerdown", pointerType: "mouse", isPrimary: true, isTrusted: true, button: 0, buttons: 1, detail: 0, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target: slot, clientX: 300, clientY: 100 };
     try {

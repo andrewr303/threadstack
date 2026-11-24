@@ -1,4 +1,4 @@
-name: Threadkeeper integration checks
+name: ThreadStack integration checks
 
 on:
   workflow_call:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: threadkeeper-integration-${{ github.event.pull_request.number || github.ref }}
+  group: threadstack-integration-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -21,7 +21,7 @@ env:
 # Runner, Docker release, real providers, browser consent or the Mac helper.
 jobs:
   extension_plugin:
-    name: Threadkeeper extension and browser sessions
+    name: ThreadStack extension and browser sessions
     if: github.repository == 'AVRCORP/threadkeeper'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -48,7 +48,7 @@ jobs:
 
       - name: Validate the fork CI boundary and source pins
         run: |
-          node --test scripts/threadkeeper-ci.test.mjs
+          node --test scripts/threadstack-ci.test.mjs
           node tests/runner-e2e/source-sdk-public-inputs.mjs "$(git rev-parse HEAD)" --check
 
       - name: Install the separate React 18 extension
@@ -63,8 +63,8 @@ jobs:
       # check:extension, with two test workers for the hosted runner.
       - name: Validate extension guards and cross-package contracts
         run: |
-          node --input-type=module -e "import { assertThreadkeeperSafety } from './scripts/threadkeeper-check.mjs'; assertThreadkeeperSafety()"
-          pnpm run test:threadkeeper
+          node --input-type=module -e "import { assertThreadStackSafety } from './scripts/threadstack-check.mjs'; assertThreadStackSafety()"
+          pnpm run test:threadstack
 
       - name: Typecheck and test the extension
         run: |
@@ -76,7 +76,7 @@ jobs:
           tk_ci_build_started="$(node -p 'Date.now()')"
           TK_OUT_DIR=/tmp/tk-build TK_STABLE_ID=0 npm --prefix extension run build
           TK_CI_BUILD_SINCE="$tk_ci_build_started" node --input-type=module <<'NODE'
-          import { assertBuiltManifest } from './scripts/threadkeeper-check.mjs';
+          import { assertBuiltManifest } from './scripts/threadstack-check.mjs';
           assertBuiltManifest('/tmp/tk-build', Number(process.env.TK_CI_BUILD_SINCE) - 1000);
           NODE
 
@@ -90,7 +90,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: threadkeeper-build-identities-${{ github.run_attempt }}
+          name: threadstack-build-identities-${{ github.run_attempt }}
           path: |
             /tmp/tk-build/build-info.json
             /tmp/tk-build/manifest.json
@@ -99,7 +99,7 @@ jobs:
           retention-days: 7
 
   ui_server:
-    name: Threadkeeper UI and server integration
+    name: ThreadStack UI and server integration
     if: github.repository == 'AVRCORP/threadkeeper'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -145,17 +145,17 @@ jobs:
           src/components/CommandPalette.test.tsx
           src/components/CoordinatorSidebar.test.tsx
           src/components/IssueDetailTabBar.test.tsx
-          src/components/ThreadkeeperSlot.test.tsx
+          src/components/ThreadStackSlot.test.tsx
           src/components/search/BrowserSessionResults.test.tsx
           src/context/LiveUpdatesProvider.recovery.test.tsx
           src/lib/hosted-live-transport.test.ts
-          src/lib/threadkeeper-boot-channel.test.ts
-          src/lib/threadkeeper-host-bridge.test.ts
-          src/lib/threadkeeper-host-fusion.test.ts
-          src/lib/threadkeeper-host-layout.test.ts
-          src/lib/threadkeeper-host-slot.test.ts
-          src/lib/threadkeeper-host.test.ts
-          src/lib/threadkeeper-overlays.test.ts
+          src/lib/threadstack-boot-channel.test.ts
+          src/lib/threadstack-host-bridge.test.ts
+          src/lib/threadstack-host-fusion.test.ts
+          src/lib/threadstack-host-layout.test.ts
+          src/lib/threadstack-host-slot.test.ts
+          src/lib/threadstack-host.test.ts
+          src/lib/threadstack-overlays.test.ts
           src/pages/CompanySettingsPluginPage.test.tsx
           src/pages/InviteLanding.test.tsx
           src/pages/PluginPage.test.tsx
@@ -182,4 +182,4 @@ jobs:
       - name: Record the qualification boundary
         if: always()
         run: |
-          printf '%s\n' 'Scoped Threadkeeper integration checks. Full Paperclip, native Runner, Docker, real-provider and browser acceptance remain separate qualifications.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Scoped ThreadStack integration checks. Full Paperclip, native Runner, Docker, real-provider and browser acceptance remain separate qualifications.' >> "$GITHUB_STEP_SUMMARY"

@@ -20,7 +20,7 @@ function route(routeKey: string, path: string, method: "GET" | "POST" = "POST"):
   return { routeKey, path, method, auth: "board", capability: "api.routes.register", companyResolution: { from: method === "GET" ? "query" : "body", key: "companyId" } };
 }
 const manifest: PaperclipPluginManifestV1 = {
-  id: PLUGIN_ID, apiVersion: 1, version: PLUGIN_VERSION, displayName: "Browser sessions", author: "Paperclip + Threadkeeper", description: "Company-scoped access to the founder's browser session library, task links and trusted browser actions.", categories: ["connector", "automation", "ui"],
+  id: PLUGIN_ID, apiVersion: 1, version: PLUGIN_VERSION, displayName: "Browser sessions", author: "Paperclip + ThreadStack", description: "Company-scoped access to the founder's browser session library, task links and trusted browser actions.", categories: ["connector", "automation", "ui"],
   capabilities: ["api.routes.register", "database.namespace.migrate", "database.namespace.read", "database.namespace.write", "companies.read", "issues.read", "issue.comments.read", "issue.comments.create", "issues.wakeup", "agents.read", "agent.tools.register", "events.subscribe", "events.emit", "secrets.read-ref", "activity.log.write", "instance.settings.register", "ui.sidebar.register", "ui.page.register", "ui.detailTab.register", "ui.dashboardWidget.register"],
   entrypoints: { worker: "./dist/worker.js", ui: "./dist/ui" },
   database: { namespaceSlug: "browser_sessions", migrationsDir: "migrations", coreReadTables: ["companies"] },
@@ -35,7 +35,7 @@ const manifest: PaperclipPluginManifestV1 = {
     route("links", "/links", "GET"), route("link", "/links"), route("unlink", "/links/remove"), route("tasks", "/tasks", "GET"), route("actions", "/actions", "GET"), route("credentials", "/credentials", "GET"), route("attention", "/attention", "GET"),
   ],
   ui: { slots: [
-    { type: "sidebar", id: "browser-session-views", displayName: "Threadkeeper", exportName: "SessionSidebar", order: 40 },
+    { type: "sidebar", id: "browser-session-views", displayName: "ThreadStack", exportName: "SessionSidebar", order: 40 },
     { type: "page", id: "browser-browse", displayName: "Browse", exportName: "BrowsePage", routePath: "browse" },
     { type: "page", id: "browser-threads", displayName: "Threads", exportName: "ThreadsPage", routePath: "threads" },
     { type: "page", id: "browser-session-board", displayName: "Session board", exportName: "BoardPage", routePath: "session-board" },

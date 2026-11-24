@@ -65,7 +65,7 @@ import { buildSameOriginWebSocketUrl } from "../lib/websocket-url";
 import { tryCreateWebSocket } from "../lib/websocket";
 import { notifyCompanyLiveDisconnected } from "../lib/company-live-connection-events";
 import { createHostedLiveTransport } from "../lib/hosted-live-transport";
-import { isVerifiedThreadkeeperHost, subscribeVerifiedThreadkeeperHost } from "../lib/threadkeeper-host-state";
+import { isVerifiedThreadStackHost, subscribeVerifiedThreadStackHost } from "../lib/threadstack-host-state";
 
 const TOAST_COOLDOWN_WINDOW_MS = 10_000;
 const TOAST_COOLDOWN_MAX = 3;
@@ -2494,8 +2494,8 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
         streamUrl: `/api/companies/${encodeURIComponent(liveCompanyId)}/events/stream`,
         createSocket: tryCreateWebSocket,
         disposeSocket: socket => closeSocketQuietly(socket, "transport_replaced"),
-        isVerifiedHost: isVerifiedThreadkeeperHost,
-        subscribeVerifiedHost: subscribeVerifiedThreadkeeperHost,
+        isVerifiedHost: isVerifiedThreadStackHost,
+        subscribeVerifiedHost: subscribeVerifiedThreadStackHost,
         onFallback: () => { clearReconnect(); stopPolling(); transcripts.close(); },
         onOpen: sender => {
         if (closed) return;
@@ -2584,7 +2584,7 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
       },
       onClosed: () => {
         if (closed) return;
-        if (!isVerifiedThreadkeeperHost()) startPolling();
+        if (!isVerifiedThreadStackHost()) startPolling();
         scheduleReconnect();
       },
       });

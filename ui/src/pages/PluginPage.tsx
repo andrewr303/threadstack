@@ -13,9 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { NotFoundPage } from "./NotFound";
-import { threadkeeperSlotView } from "@/lib/threadkeeper-host";
-import { isVerifiedThreadkeeperHost, subscribeVerifiedThreadkeeperHost } from "@/lib/threadkeeper-host-state";
-import { ThreadkeeperSlot } from "@/components/ThreadkeeperSlot";
+import { threadStackSlotView } from "@/lib/threadstack-host";
+import { isVerifiedThreadStackHost, subscribeVerifiedThreadStackHost } from "@/lib/threadstack-host-state";
+import { ThreadStackSlot } from "@/components/ThreadStackSlot";
 
 /**
  * Company-context plugin page. Renders a plugin's `page` slot at
@@ -115,8 +115,8 @@ export function PluginPage() {
     return resolveRouteSidebarSlot(flattened, pluginRoutePath) !== null;
   }, [contributions, pluginRoutePath]);
 
-  const verifiedHost = useSyncExternalStore(subscribeVerifiedThreadkeeperHost, isVerifiedThreadkeeperHost, () => false);
-  const fusedView = verifiedHost && pageSlot && !pluginId ? threadkeeperSlotView(pageSlot.pluginKey, pageSlot.routePath) : null;
+  const verifiedHost = useSyncExternalStore(subscribeVerifiedThreadStackHost, isVerifiedThreadStackHost, () => false);
+  const fusedView = verifiedHost && pageSlot && !pluginId ? threadStackSlotView(pageSlot.pluginKey, pageSlot.routePath) : null;
 
   useEffect(() => {
     if (!pageSlot) return;
@@ -173,7 +173,7 @@ export function PluginPage() {
     return <Navigate to={settingsPath} replace />;
   }
 
-  if (fusedView) return <ThreadkeeperSlot view={fusedView} label={pageSlot.displayName} />;
+  if (fusedView) return <ThreadStackSlot view={fusedView} label={pageSlot.displayName} />;
 
   return (
     <div className="space-y-4">

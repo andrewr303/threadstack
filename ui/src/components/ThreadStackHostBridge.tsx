@@ -1,22 +1,22 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { createThreadkeeperBootChannel, createThreadkeeperHost, fusedPagesAvailable, readThreadkeeperExtensionIds } from "../lib/threadkeeper-host";
-import { connectThreadkeeperFusion } from "../lib/threadkeeper-host-fusion";
+import { createThreadStackBootChannel, createThreadStackHost, fusedPagesAvailable, readThreadStackExtensionIds } from "../lib/threadstack-host";
+import { connectThreadStackFusion } from "../lib/threadstack-host-fusion";
 import { subscribeCompanyLiveDisconnected } from "../lib/company-live-connection-events";
-import { setVerifiedThreadkeeperHost } from "../lib/threadkeeper-host-state";
+import { setVerifiedThreadStackHost } from "../lib/threadstack-host-state";
 import { pluginsApi } from "../api/plugins";
 import { queryKeys } from "../lib/queryKeys";
 
-const framedByExtension = typeof window !== "undefined" && window.parent !== window && readThreadkeeperExtensionIds().length > 0;
+const framedByExtension = typeof window !== "undefined" && window.parent !== window && readThreadStackExtensionIds().length > 0;
 const earlyHostMessages = (() => {
   if (!framedByExtension) return null;
-  return createThreadkeeperBootChannel({ eventTarget: window, parent: window.parent, extensionIds: readThreadkeeperExtensionIds() });
+  return createThreadStackBootChannel({ eventTarget: window, parent: window.parent, extensionIds: readThreadStackExtensionIds() });
 })();
 if (import.meta.hot) import.meta.hot.dispose(() => earlyHostMessages?.dispose());
 
 /** Route synchronization leaves the real app, its authentication and its service worker intact. */
-export function ThreadkeeperHostBridge() {
+export function ThreadStackHostBridge() {
   const location = useLocation();
   const navigate = useNavigate();
   const path = `${location.pathname}${location.search}${location.hash}`;
@@ -24,8 +24,8 @@ export function ThreadkeeperHostBridge() {
   const navigateRef = useRef(navigate);
   pathRef.current = path;
   navigateRef.current = navigate;
-  const hostRef = useRef<ReturnType<typeof createThreadkeeperHost> | null>(null);
-  const fusionRef = useRef<ReturnType<typeof connectThreadkeeperFusion> | null>(null);
+  const hostRef = useRef<ReturnType<typeof createThreadStackHost> | null>(null);
+  const fusionRef = useRef<ReturnType<typeof connectThreadStackFusion> | null>(null);
   // REQ-6: fused mode is offered only while the browser-sessions plugin provides all three pages.
   const { data: contributions } = useQuery({
     queryKey: queryKeys.plugins.uiContributions,
@@ -38,10 +38,10 @@ export function ThreadkeeperHostBridge() {
   fusedRef.current = fused;
 
   useEffect(() => {
-    const extensionIds = readThreadkeeperExtensionIds();
+    const extensionIds = readThreadStackExtensionIds();
     if (window.parent === window || extensionIds.length === 0) return;
-    let fusion: ReturnType<typeof connectThreadkeeperFusion> | null = null;
-    const host = createThreadkeeperHost({
+    let fusion: ReturnType<typeof connectThreadStackFusion> | null = null;
+    const host = createThreadStackHost({
       extensionIds,
       parent: window.parent,
       navigate: (next) => navigateRef.current(next),
@@ -52,14 +52,14 @@ export function ThreadkeeperHostBridge() {
       onPalette: () => fusion?.openPalette(),
       onPlaced: (view) => fusion?.placed(view),
       onConnection: (connected) => {
-        setVerifiedThreadkeeperHost(connected);
-        document.documentElement.toggleAttribute("data-threadkeeper-host", connected);
-        window.dispatchEvent(new CustomEvent("paperclip:threadkeeper-host", { detail: { connected, mode: fusedRef.current ? "fused" : "switching" } }));
+        setVerifiedThreadStackHost(connected);
+        document.documentElement.toggleAttribute("data-threadstack-host", connected);
+        window.dispatchEvent(new CustomEvent("paperclip:threadstack-host", { detail: { connected, mode: fusedRef.current ? "fused" : "switching" } }));
         if (connected) fusion?.refresh();
       },
     });
     hostRef.current = host;
-    fusion = connectThreadkeeperFusion({ doc: document, root: document.getElementById("root"), host });
+    fusion = connectThreadStackFusion({ doc: document, root: document.getElementById("root"), host });
     fusionRef.current = fusion;
     const message = (event: MessageEvent) => { host.handleMessage(event); };
     const detachMessages = earlyHostMessages?.attach(message);
@@ -83,13 +83,13 @@ export function ThreadkeeperHostBridge() {
     const stopLiveObserver = subscribeCompanyLiveDisconnected(() => { host.reportDisconnected(); });
     title.observe(document.head, { childList: true, subtree: true, characterData: true });
     if (!earlyHostMessages) window.addEventListener("message", message);
-    window.addEventListener("paperclip:threadkeeper-open-view", openView);
+    window.addEventListener("paperclip:threadstack-open-view", openView);
     document.addEventListener("pointerdown", pointerDown, true);
     document.addEventListener("click", click, true);
     return () => {
       if (!earlyHostMessages) window.removeEventListener("message", message);
       detachMessages?.();
-      window.removeEventListener("paperclip:threadkeeper-open-view", openView);
+      window.removeEventListener("paperclip:threadstack-open-view", openView);
       document.removeEventListener("pointerdown", pointerDown, true);
       document.removeEventListener("click", click, true);
       title.disconnect();

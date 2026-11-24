@@ -122,7 +122,7 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
 
 /**
  * Keys ensured on a self-hosted instance (no managed config present).
- * This fork bundles its first-party Threadkeeper bridge alongside the existing
+ * This fork bundles its first-party ThreadStack bridge alongside the existing
  * Kubernetes provider. Installation remains fail-safe; explicit disable/uninstall
  * choices are preserved by ensureBundledPlugins on subsequent starts.
  */

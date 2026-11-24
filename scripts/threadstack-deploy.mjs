@@ -24,7 +24,7 @@ function realResolve(p) {
 const within = (inner, outer) => inner === outer || inner.startsWith(outer.endsWith(path.sep) ? outer : outer + path.sep);
 
 export function deploymentEnv(env = process.env, { home = os.homedir(), fork = path.resolve(here, '..') } = {}) {
-  if (!env.TK_LIVE_DIR?.trim()) throw new Error('Set TK_LIVE_DIR to the folder your browser loads Threadkeeper from.');
+  if (!env.TK_LIVE_DIR?.trim()) throw new Error('Set TK_LIVE_DIR to the folder your browser loads ThreadStack from.');
   const refusal = new Error('TK_LIVE_DIR must name an absolute dedicated build folder.');
   const target = path.resolve(env.TK_LIVE_DIR);
   if (!path.isAbsolute(env.TK_LIVE_DIR) || path.dirname(target) === target || target === path.resolve('.')) throw refusal;

@@ -1,5 +1,6 @@
 /** Wire contract shared with extension/src/core/paperclip/bridge.ts. */
 export const PLUGIN_ID = "browser-sessions";
+// Wire id kept from the Threadkeeper name for compatibility: extensions and servers of different builds must agree on it.
 export const PROTOCOL = "paperclip-threadkeeper/1";
 export const PLUGIN_VERSION = "0.1.0";
 export const API_BASE = "/api/plugins/browser-sessions/api";

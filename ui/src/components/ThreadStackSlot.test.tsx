@@ -2,13 +2,13 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ThreadkeeperSlot } from "./ThreadkeeperSlot";
-import { createThreadkeeperSlotReporter, currentThreadkeeperSlot, SLOT_ATTRIBUTE } from "@/lib/threadkeeper-host-slot";
+import { ThreadStackSlot } from "./ThreadStackSlot";
+import { createThreadStackSlotReporter, currentThreadStackSlot, SLOT_ATTRIBUTE } from "@/lib/threadstack-host-slot";
 
-const notice = "Threadkeeper is not responding. Reload the window.";
+const notice = "ThreadStack is not responding. Reload the window.";
 let root: Root | null;
 let container: HTMLDivElement;
-let reporter: ReturnType<typeof createThreadkeeperSlotReporter>;
+let reporter: ReturnType<typeof createThreadStackSlotReporter>;
 const status = () => container.querySelector('[role="status"]');
 const advance = async (ms: number) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
 const acknowledge = async (view: Parameters<typeof reporter.acknowledge>[0]) => {
@@ -21,7 +21,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  reporter = createThreadkeeperSlotReporter({ doc: document, report: vi.fn() });
+  reporter = createThreadStackSlotReporter({ doc: document, report: vi.fn() });
 });
 
 afterEach(async () => {
@@ -34,21 +34,21 @@ afterEach(async () => {
 });
 
 async function render(view: "threads" | "session-board" = "threads") {
-  await act(async () => { root!.render(<ThreadkeeperSlot view={view} label="Threads" />); });
+  await act(async () => { root!.render(<ThreadStackSlot view={view} label="Threads" />); });
 }
 
-describe("ThreadkeeperSlot placement status", () => {
+describe("ThreadStackSlot placement status", () => {
   it("registers the real slot and opens the matching fallback without making it transparent", async () => {
     const requested: unknown[] = [];
     const listener = (event: Event) => requested.push((event as CustomEvent).detail);
-    window.addEventListener("paperclip:threadkeeper-open-view", listener);
+    window.addEventListener("paperclip:threadstack-open-view", listener);
     try {
       await render("session-board");
       expect(requested).toEqual([{ view: "dashboard" }]);
-      expect(currentThreadkeeperSlot()).toEqual({ view: "session-board", element: container.firstElementChild });
+      expect(currentThreadStackSlot()).toEqual({ view: "session-board", element: container.firstElementChild });
       expect(document.documentElement.hasAttribute(SLOT_ATTRIBUTE)).toBe(false);
     } finally {
-      window.removeEventListener("paperclip:threadkeeper-open-view", listener);
+      window.removeEventListener("paperclip:threadstack-open-view", listener);
     }
   });
 
@@ -97,7 +97,7 @@ describe("ThreadkeeperSlot placement status", () => {
     const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
     await act(async () => root!.unmount());
     root = null;
-    expect(currentThreadkeeperSlot()).toBeNull();
+    expect(currentThreadStackSlot()).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
     expect(disconnect).toHaveBeenCalledTimes(1);
     await advance(2_000);

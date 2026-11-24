@@ -17,7 +17,7 @@ vi.mock("../api/auth", () => ({
 }));
 vi.mock("../api/health", () => ({ healthApi: { get: healthRead } }));
 import { LiveUpdatesProvider, useCompanyLiveEvent, useHasCompanyLiveConnection, useTaskRunLiveUpdates } from "./LiveUpdatesProvider";
-import { setVerifiedThreadkeeperHost } from "../lib/threadkeeper-host-state";
+import { setVerifiedThreadStackHost } from "../lib/threadstack-host-state";
 import { CONNECTED_ACTIVE_RUN_REFETCH_MS, liveRunRefetchInterval } from "../lib/live-runs-cache";
 import { taskBrowsersQueryKey } from "../lib/task-browsers-refresh";
 import { taskBrowsersRefetchInterval } from "../hooks/useTaskBrowsers";
@@ -65,7 +65,7 @@ describe("LiveUpdatesProvider connection recovery", () => {
     healthRead.mockReset().mockResolvedValue({ deploymentMode: "authenticated" });
     Socket.instances = [];
     EventStream.instances = [];
-    setVerifiedThreadkeeperHost(false);
+    setVerifiedThreadStackHost(false);
     client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: Infinity } } });
     client.setQueryData(queryKeys.auth.session, { user: { id: "viewer" }, session: { id: "session", userId: "viewer" } });
     client.setQueryData(queryKeys.health, { deploymentMode: "authenticated" });
@@ -75,7 +75,7 @@ describe("LiveUpdatesProvider connection recovery", () => {
 
   afterEach(async () => {
     await act(async () => root.unmount());
-    setVerifiedThreadkeeperHost(false);
+    setVerifiedThreadStackHost(false);
     client.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -121,7 +121,7 @@ describe("LiveUpdatesProvider connection recovery", () => {
 
   it("uses the same company event processor after verified iframe SSE fallback and cleans it up", async () => {
     vi.stubGlobal("WebSocket", Socket); vi.stubGlobal("EventSource", EventStream);
-    setVerifiedThreadkeeperHost(true);
+    setVerifiedThreadStackHost(true);
     const receive = vi.fn();
     function Consumer() { useCompanyLiveEvent(receive); return <IdleRuns companyId="company-1" />; }
     await act(async () => root.render(<QueryClientProvider client={client}><LiveUpdatesProvider><Consumer /></LiveUpdatesProvider></QueryClientProvider>));
@@ -139,7 +139,7 @@ describe("LiveUpdatesProvider connection recovery", () => {
   });
 
   it("notifies the verified host once across terminal stream retries until recovery", async () => {
-    vi.stubGlobal("WebSocket", Socket); vi.stubGlobal("EventSource", EventStream); setVerifiedThreadkeeperHost(true);
+    vi.stubGlobal("WebSocket", Socket); vi.stubGlobal("EventSource", EventStream); setVerifiedThreadStackHost(true);
     const lost = vi.fn(); window.addEventListener("paperclip:company-live-disconnected", lost);
     try {
       await renderPolling();

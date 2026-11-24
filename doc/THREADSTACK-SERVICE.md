@@ -1,4 +1,4 @@
-# Threadkeeper local service and safe checks
+# ThreadStack local service and safe checks
 
 The extension is an independent npm package in `extension/`. Paperclip uses the
 root pnpm workspace; the extension keeps React 18 and its own lockfile.
@@ -20,7 +20,7 @@ and that the root script definitions still use the guarded commands. All check
 builds go to `/tmp/tk-build` with a path-based extension ID, irrespective of
 inherited `TK_OUT_DIR`, `TK_LIVE_DIR`, or `TK_STABLE_ID` values. These checks never
 deploy to the founder's browser. Both modes also run the guard tests
-(`pnpm run test:threadkeeper`) and, after the build, require that
+(`pnpm run test:threadstack`) and, after the build, require that
 `/tmp/tk-build/manifest.json` was written by that run and has no `key`.
 
 Deployment is a separate action:
@@ -33,7 +33,7 @@ Keep the existing loaded folder to preserve its extension ID and library. The
 command refuses an unset or relative destination, symlinks resolved first: the
 home folder and its parents, the fork and anything inside it, and `/tmp/tk-build`
 and anything inside it are rejected. Other folders inside the home folder, such as
-`~/dev/threadkeeper/.output/chrome-mv3`, are allowed. It forces a path-based ID. Do not run it
+an existing live folder such as `~/dev/threadkeeper/.output/chrome-mv3`, are allowed. It forces a path-based ID. Do not run it
 without authorization for that deployment. Never regenerate the extension key.
 
 ## Registering the source checkout with the Mac helper
@@ -47,13 +47,14 @@ equivalent is:
 node extension/mac-helper/install.cjs --paperclip-root /absolute/path/to/fork
 ```
 
-This registers the native messaging host for the detected Threadkeeper IDs and
+This registers the native messaging host for the detected ThreadStack IDs and
 writes a fixed source shim under
 `~/Library/Application Support/Threadkeeper/Bridge/paperclip-source`. It does not
 register a login service. The shim records absolute Node, tsx and CLI paths and
-exports the registered extension IDs as
-`PAPERCLIP_THREADKEEPER_EXTENSION_IDS`, which enables the exact-origin host
-bridge in Paperclip's UI. It also sets `PAPERCLIP_BUNDLED_PLUGIN_ROOT` to this
+exports the registered extension IDs, which enables the exact-origin host
+bridge in Paperclip's UI. The server reads `PAPERCLIP_THREADSTACK_EXTENSION_IDS`
+and, for shims written before the rename, `PAPERCLIP_THREADKEEPER_EXTENSION_IDS`;
+when both are set their IDs are combined. Other launch methods can set either. It also sets `PAPERCLIP_BUNDLED_PLUGIN_ROOT` to this
 fork's `packages/plugins` so the browser-sessions plugin can be provisioned from
 the local source package.
 

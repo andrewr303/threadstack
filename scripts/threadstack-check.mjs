@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = {
-  'check:extension': 'node scripts/threadkeeper-check.mjs extension',
-  'check:all': 'node scripts/threadkeeper-check.mjs all',
-  'deploy:extension': 'node scripts/threadkeeper-deploy.mjs',
+  'check:extension': 'node scripts/threadstack-check.mjs extension',
+  'check:all': 'node scripts/threadstack-check.mjs all',
+  'deploy:extension': 'node scripts/threadstack-deploy.mjs',
 };
 
 /** Fail before any subprocess if the check can deploy or pnpm can override React 18. */
-export function assertThreadkeeperSafety(root = repoRoot, outputs = ['/tmp/tk-build', '/tmp/tk-build.staging']) {
+export function assertThreadStackSafety(root = repoRoot, outputs = ['/tmp/tk-build', '/tmp/tk-build.staging']) {
   for (const output of outputs) {
     if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error('check:extension must build to /tmp/tk-build only (no output symlinks)');
   }
@@ -19,7 +19,7 @@ export function assertThreadkeeperSafety(root = repoRoot, outputs = ['/tmp/tk-bu
   if (manifest.scripts?.['check:extension'] !== scripts['check:extension']) {
     throw new Error('check:extension must build to /tmp/tk-build only');
   }
-  if (manifest.scripts?.['check:all'] !== scripts['check:all']) throw new Error('check:all must use the guarded Threadkeeper check');
+  if (manifest.scripts?.['check:all'] !== scripts['check:all']) throw new Error('check:all must use the guarded ThreadStack check');
   const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8');
   const section = /^packages:\s*\n([\s\S]*?)(?=^\S|$(?![\s\S]))/m.exec(workspace)?.[1] ?? '';
   const patterns = [...section.matchAll(/^\s+-\s+(.+?)\s*(?:#.*)?$/gm)].map(m => m[1].replace(/^["']|["']$/g, ''));
@@ -55,15 +55,15 @@ export function safeBuildEnv(env = process.env) {
 }
 
 export function checkCommands(mode) {
-  if (!['all', 'extension'].includes(mode)) throw new Error('Use threadkeeper-check.mjs all or extension');
+  if (!['all', 'extension'].includes(mode)) throw new Error('Use threadstack-check.mjs all or extension');
   // `pnpm run check:all` must keep the caller's pinned pnpm, even if PATH contains another major.
   const pnpmScript = process.env.npm_execpath && /pnpm[^/\\]*\.(?:c?js|mjs)$/.test(process.env.npm_execpath) ? process.env.npm_execpath : null;
   const pnpm = args => pnpmScript ? { command: process.execPath, args: [pnpmScript, ...args], directory: '.' }
     : { command: process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', args, directory: '.' };
   return [
     ...(mode === 'all' ? [pnpm(['typecheck']), pnpm(['test:run'])] : []),
-    // The guard tests (`pnpm run test:threadkeeper`) run in both modes, as plain argv.
-    { command: process.execPath, args: ['--test', 'scripts/threadkeeper.test.mjs', 'scripts/threadkeeper-contracts.test.mjs'], directory: '.' },
+    // The guard tests (`pnpm run test:threadstack`) run in both modes, as plain argv.
+    { command: process.execPath, args: ['--test', 'scripts/threadstack.test.mjs', 'scripts/threadstack-contracts.test.mjs'], directory: '.' },
     { command: process.execPath, args: ['node_modules/typescript/bin/tsc', '--noEmit'], directory: 'extension' },
     { command: process.execPath, args: ['node_modules/vitest/vitest.mjs', 'run'], directory: 'extension' },
     { command: process.execPath, args: ['scripts/build-extension.mjs'], directory: 'extension' },
@@ -71,7 +71,7 @@ export function checkCommands(mode) {
 }
 
 function main() {
-  assertThreadkeeperSafety();
+  assertThreadStackSafety();
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 24 || (major === 24 && minor < 11)) throw new Error('The fork requires Node 24.11 or newer');
   const startedAt = Date.now();

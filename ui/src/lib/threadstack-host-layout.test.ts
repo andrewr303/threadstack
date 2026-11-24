@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const stylesheet = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../components/Layout.tsx", import.meta.url), "utf8");
-const mobileHost = '.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot)';
+const mobileHost = '.paperclip-app-shell[data-mobile="true"]:has(.threadstack-slot)';
 
 function cssBlock(selector: string): string {
   const start = stylesheet.indexOf(`${selector} {`);
@@ -15,7 +15,7 @@ function cssBlock(selector: string): string {
 
 // Structural contract only: jsdom cannot prove a slot's rendered size. Browser acceptance
 // must check desktop-to-mobile resize with the real Layout and the reported slot rectangle.
-describe("Threadkeeper mobile host layout", () => {
+describe("ThreadStack mobile host layout", () => {
   it("gives the absolute slot a bounded flex chain before placement is acknowledged", () => {
     // Layout's mobile document normally has natural height. Its named ancestors must remain
     // the ones scoped here, rather than reusing desktop-only flex utility classes.
@@ -35,11 +35,11 @@ describe("Threadkeeper mobile host layout", () => {
     expect(column).toContain("flex: 1;");
     expect(column).toContain("min-height: 0;");
     expect(cssBlock(`${mobileHost} .app-breadcrumb`)).toContain("flex-shrink: 0;");
-    expect(cssBlock("#main-content:has(.threadkeeper-slot)")).toContain("min-height: 0;");
+    expect(cssBlock("#main-content:has(.threadstack-slot)")).toContain("min-height: 0;");
   });
 
   it("keeps the slot measured from its actual content area, without a fabricated size", () => {
-    const slot = cssBlock(".threadkeeper-slot");
+    const slot = cssBlock(".threadstack-slot");
     expect(slot).toContain("position: absolute;");
     expect(slot).toContain("inset: 0;");
     expect(slot).not.toMatch(/(?:min-)?(?:width|height):/);

@@ -20,7 +20,7 @@ export function BrowserSessionCredentialSettings({ pluginId, companyId }: { plug
   return <section className="mt-6 space-y-4" aria-label="Model keys">
     <div className="space-y-1">
       <h2 className="text-base font-medium">Model keys</h2>
-      <p className="text-sm text-muted-foreground">Choose keys from this organization’s secrets. Linked keys reach Threadkeeper only when you turn on sharing below.</p>
+      <p className="text-sm text-muted-foreground">Choose keys from this organization’s secrets. Linked keys reach ThreadStack only when you turn on sharing below.</p>
     </div>
     {secrets.isError ? <QueryErrorState error={secrets.error} action="check linked model keys" onRetry={() => { void secrets.refetch(); }} /> : secrets.isPending ? <p className="text-sm text-muted-foreground">Checking linked keys…</p> : <ul className="space-y-1 text-sm" aria-label="Linked key status">
       {Object.entries(schema.properties?.credentialLinks?.properties ?? {}).map(([key, property]) => {

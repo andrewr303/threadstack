@@ -5,12 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider, useToastActions } from "../context/ToastContext";
 import { ToastViewport } from "../components/ToastViewport";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { observeThreadkeeperOverlays, readThreadkeeperOverlays } from "./threadkeeper-overlays";
+import { observeThreadStackOverlays, readThreadStackOverlays } from "./threadstack-overlays";
 
 let root: HTMLDivElement;
 const rects = new Map<Element, { x: number; y: number; width: number; height: number }>();
 const measure = (element: Element) => rects.get(element) ?? { x: 0, y: 0, width: 0, height: 0 };
-const read = () => readThreadkeeperOverlays({ doc: document, root, measure });
+const read = () => readThreadStackOverlays({ doc: document, root, measure });
 
 beforeEach(() => {
   root = document.createElement("div");
@@ -30,7 +30,7 @@ function portal(html: string, attrs: Record<string, string> = {}): HTMLElement {
 
 function toast(index: number, hidden = false): HTMLElement {
   const item = document.createElement("li");
-  item.setAttribute("data-threadkeeper-notice", "");
+  item.setAttribute("data-threadstack-notice", "");
   item.innerHTML = `<p>Notice ${index}</p><button>Open</button>`;
   if (hidden) item.style.display = "none";
   root.querySelector(".paperclip-app-shell")!.append(item);
@@ -38,7 +38,7 @@ function toast(index: number, hidden = false): HTMLElement {
   return item;
 }
 
-describe("Threadkeeper overlay observer", () => {
+describe("ThreadStack overlay observer", () => {
   it("reports nothing for the idle app", () => {
     expect(read()).toEqual({ open: false, regions: [] });
   });
@@ -57,7 +57,7 @@ describe("Threadkeeper overlay observer", () => {
     portal(`<p>Recovery</p>`, { hidden: "" });
     portal(`<div role="region">Bulk actions</div>`, { inert: "", "aria-hidden": "true" });
     portal("");
-    portal(`<p>Extension badge</p>`, { "data-threadkeeper-overlay": "ignore" });
+    portal(`<p>Extension badge</p>`, { "data-threadstack-overlay": "ignore" });
     portal(`<p>Not shown</p>`, { style: "display: none" });
     const script = document.createElement("script");
     script.textContent = "1";
@@ -130,7 +130,7 @@ describe("Threadkeeper overlay observer", () => {
     if (close === "native dialog close") { dialog.setAttribute("open", ""); root.append(dialog); }
     const frames: Array<() => void> = [];
     const onChange = vi.fn();
-    const observer = observeThreadkeeperOverlays({ doc: document, root, measure, onChange, schedule: (run) => { frames.push(run); } });
+    const observer = observeThreadStackOverlays({ doc: document, root, measure, onChange, schedule: (run) => { frames.push(run); } });
     try {
       expect(observer.read().open).toBe(true);
       if (close === "portal removal") dialog.remove(); else dialog.removeAttribute("open");
@@ -143,7 +143,7 @@ describe("Threadkeeper overlay observer", () => {
   it("does not lower the frame when another dialog opens in the same close batch", async () => {
     const palette = portal(`<input aria-label="Search">`, { role: "dialog", "data-state": "open" });
     const onChange = vi.fn();
-    const observer = observeThreadkeeperOverlays({ doc: document, root, measure, onChange, schedule: (run) => run() });
+    const observer = observeThreadStackOverlays({ doc: document, root, measure, onChange, schedule: (run) => run() });
     try {
       palette.setAttribute("data-state", "closed");
       portal(`<p>Approval</p>`, { role: "alertdialog", "data-state": "open" });
@@ -158,7 +158,7 @@ describe("Threadkeeper overlay observer", () => {
     const approval = portal(`<p>Approval</p>`, { role: "alertdialog", "data-state": "open" });
     const frames: Array<() => void> = [];
     const onChange = vi.fn();
-    const observer = observeThreadkeeperOverlays({ doc: document, root, measure, onChange, schedule: (run) => { frames.push(run); } });
+    const observer = observeThreadStackOverlays({ doc: document, root, measure, onChange, schedule: (run) => { frames.push(run); } });
     try {
       // Leave an unrelated DOM scan pending when the close arrives.
       root.querySelector("p")!.textContent = "Updated";
@@ -190,7 +190,7 @@ describe("Threadkeeper overlay observer", () => {
       } });
     });
     const reactRoot = createRoot(root);
-    let observer: ReturnType<typeof observeThreadkeeperOverlays> | undefined;
+    let observer: ReturnType<typeof observeThreadStackOverlays> | undefined;
     try {
       await act(async () => reactRoot.render(createElement(Dialog, { defaultOpen: true },
         createElement(DialogTrigger, null, "Search"),
@@ -206,7 +206,7 @@ describe("Threadkeeper overlay observer", () => {
       expect(content.getAttribute("data-state")).toBe("open");
       expect(read().open).toBe(true);
       const onChange = vi.fn();
-      observer = observeThreadkeeperOverlays({ doc: document, root, measure, onChange, schedule: (run) => run() });
+      observer = observeThreadStackOverlays({ doc: document, root, measure, onChange, schedule: (run) => run() });
       await act(async () => document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
       expect(content.getAttribute("data-state")).toBe("closed");
       expect(backdrop.getAttribute("data-state")).toBe("closed");
@@ -252,10 +252,10 @@ describe("Threadkeeper overlay observer", () => {
     }
     try {
       act(() => reactRoot.render(createElement(ToastProvider, null, createElement(Notify))));
-      const notices = root.querySelectorAll("[data-threadkeeper-notice]");
+      const notices = root.querySelectorAll("[data-threadstack-notice]");
       expect(notices).toHaveLength(1);
       expect(notices[0]!.textContent).toContain("Run finished");
-      const state = readThreadkeeperOverlays({ doc: document, root, measure: () => ({ x: 12, y: 700, width: 380, height: 64 }) });
+      const state = readThreadStackOverlays({ doc: document, root, measure: () => ({ x: 12, y: 700, width: 380, height: 64 }) });
       expect(state).toEqual({ open: false, regions: [{ x: 12, y: 700, width: 380, height: 64 }] });
     } finally {
       act(() => reactRoot.unmount());
@@ -266,7 +266,7 @@ describe("Threadkeeper overlay observer", () => {
   it("calls back once per distinct change, from one observer on the body", async () => {
     const onChange = vi.fn();
     // A synchronous frame keeps this test about change detection; coalescing is tested below.
-    const observer = observeThreadkeeperOverlays({ doc: document, root, measure, onChange, schedule: (run) => run() });
+    const observer = observeThreadStackOverlays({ doc: document, root, measure, onChange, schedule: (run) => run() });
     expect(observer.read()).toEqual({ open: false, regions: [] });
     const dialog = portal(`<div role="dialog">Palette</div>`);
     await Promise.resolve();
@@ -295,7 +295,7 @@ describe("Threadkeeper overlay observer", () => {
   it("coalesces separate mutation batches into one scan per frame (quality F-4)", async () => {
     const frames: Array<() => void> = [];
     const onChange = vi.fn();
-    const observer = observeThreadkeeperOverlays({ doc: document, root, measure, onChange, schedule: (run) => { frames.push(run); } });
+    const observer = observeThreadStackOverlays({ doc: document, root, measure, onChange, schedule: (run) => { frames.push(run); } });
     portal(`<div role="dialog">A</div>`);
     await Promise.resolve();
     portal(`<div role="dialog">B</div>`);

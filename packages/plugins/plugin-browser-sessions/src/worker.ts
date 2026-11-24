@@ -32,6 +32,7 @@ export function createBrowserSessionsPlugin(options: { store?: Store; commit?: s
       try {
         if (input.actor.actorType !== "user") throw new SessionError("denied", "Board access required.");
         const p = input.method === "GET" ? input.query as Record<string, unknown> : record(input.body);
+        // Header name kept from the Threadkeeper name for compatibility with paired extension builds.
         const companyId = input.companyId; const token = input.headers["x-threadkeeper-bridge-token"] ?? ""; const s = get();
         let body: unknown;
         switch (input.routeKey) {

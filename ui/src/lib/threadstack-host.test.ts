@@ -1,27 +1,27 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createThreadkeeperHost, fusedPagesAvailable, isThreadkeeperPath, readThreadkeeperExtensionIds, threadkeeperSlotView } from "./threadkeeper-host";
+import { createThreadStackHost, fusedPagesAvailable, isThreadStackPath, readThreadStackExtensionIds, threadStackSlotView } from "./threadstack-host";
 
 const id = "abcdefghijklmnopabcdefghijklmnop";
 
 afterEach(() => { document.head.innerHTML = ""; vi.restoreAllMocks(); });
 
-describe("Threadkeeper host boundary", () => {
+describe("ThreadStack host boundary", () => {
   it("reads only validated runtime extension IDs", () => {
-    document.head.innerHTML = `<meta name="paperclip-threadkeeper-extension-ids" content="${id},bad,${id}">`;
-    expect(readThreadkeeperExtensionIds()).toEqual([id]);
+    document.head.innerHTML = `<meta name="paperclip-threadstack-extension-ids" content="${id},bad,${id}">`;
+    expect(readThreadStackExtensionIds()).toEqual([id]);
   });
 
   it("refuses protocol-relative, escaped, control-character and overlength paths", () => {
     for (const path of ["//evil.test", "/\\evil.test", "/task\nfoo", "https://evil.test", "/" + "a".repeat(2000)]) {
-      expect(isThreadkeeperPath(path)).toBe(false);
+      expect(isThreadStackPath(path)).toBe(false);
     }
-    expect(isThreadkeeperPath("/ACME/issues/ACME-12?q=a#comment")).toBe(true);
+    expect(isThreadStackPath("/ACME/issues/ACME-12?q=a#comment")).toBe(true);
   });
 
   it("does nothing without a runtime allowlist or outside a frame", () => {
     const postMessage = vi.fn();
-    const host = createThreadkeeperHost({ extensionIds: [], parent: { postMessage } as unknown as Window, navigate: vi.fn(), currentPath: () => "/ACME/issues", currentTitle: () => "Tasks" });
+    const host = createThreadStackHost({ extensionIds: [], parent: { postMessage } as unknown as Window, navigate: vi.fn(), currentPath: () => "/ACME/issues", currentTitle: () => "Tasks" });
     expect(host.handleMessage({ origin: `chrome-extension://${id}`, source: window.parent, data: { source: "threadkeeper-shell", v: 1, type: "hello" } } as MessageEvent)).toBe(false);
     expect(postMessage).not.toHaveBeenCalled();
   });
@@ -30,7 +30,7 @@ describe("Threadkeeper host boundary", () => {
     const postMessage = vi.fn();
     const navigate = vi.fn();
     const parent = { postMessage } as unknown as Window;
-    const host = createThreadkeeperHost({ extensionIds: [id], parent, navigate, currentPath: () => "/ACME/issues", currentTitle: () => "Tasks" });
+    const host = createThreadStackHost({ extensionIds: [id], parent, navigate, currentPath: () => "/ACME/issues", currentTitle: () => "Tasks" });
     const event = (origin: string, source: unknown, type: string, path?: string) => ({ origin, source, data: { source: "threadkeeper-shell", v: 1, type, path } } as MessageEvent);
     host.handleMessage(event("https://evil.test", parent, "hello"));
     host.handleMessage(event(`chrome-extension://${id}`, {}, "hello"));
@@ -49,7 +49,7 @@ describe("Threadkeeper host boundary", () => {
   it("opens only safe external links through the authenticated parent", () => {
     const postMessage = vi.fn();
     const parent = { postMessage } as unknown as Window;
-    const host = createThreadkeeperHost({ extensionIds: [id], parent, navigate: vi.fn(), currentPath: () => "/", currentTitle: () => "Paperclip" });
+    const host = createThreadStackHost({ extensionIds: [id], parent, navigate: vi.fn(), currentPath: () => "/", currentTitle: () => "Paperclip" });
     expect(host.openExternal("https://claude.ai/code/session_123")).toBe(false);
     host.handleMessage({ origin: `chrome-extension://${id}`, source: parent, data: { source: "threadkeeper-shell", v: 1, type: "hello" } } as MessageEvent);
     expect(host.openExternal("javascript:alert(1)")).toBe(false);
@@ -59,7 +59,7 @@ describe("Threadkeeper host boundary", () => {
 
   it("reports a lost native connection only after the exact allowed-parent handshake", () => {
     const postMessage = vi.fn(); const parent = { postMessage } as unknown as Window;
-    const host = createThreadkeeperHost({ extensionIds: [id], parent, navigate: vi.fn(), currentPath: () => "/", currentTitle: () => "Paperclip" });
+    const host = createThreadStackHost({ extensionIds: [id], parent, navigate: vi.fn(), currentPath: () => "/", currentTitle: () => "Paperclip" });
     expect(host.reportDisconnected()).toBe(false);
     host.handleMessage({ origin: `chrome-extension://${id}`, source: parent, data: { source: "threadkeeper-shell", v: 1, type: "hello" } } as MessageEvent);
     expect(host.reportDisconnected()).toBe(true);
@@ -69,12 +69,12 @@ describe("Threadkeeper host boundary", () => {
   });
 });
 
-describe("Threadkeeper fused mode (REQ-6)", () => {
+describe("ThreadStack fused mode (REQ-6)", () => {
   const origin = `chrome-extension://${id}`;
-  const connect = (options: Partial<Parameters<typeof createThreadkeeperHost>[0]> = {}) => {
+  const connect = (options: Partial<Parameters<typeof createThreadStackHost>[0]> = {}) => {
     const postMessage = vi.fn();
     const parent = { postMessage } as unknown as Window;
-    const host = createThreadkeeperHost({ extensionIds: [id], parent, navigate: vi.fn(), currentPath: () => "/ACME/threads", currentTitle: () => "Threads", ...options });
+    const host = createThreadStackHost({ extensionIds: [id], parent, navigate: vi.fn(), currentPath: () => "/ACME/threads", currentTitle: () => "Threads", ...options });
     const send = (data: Record<string, unknown>, from: string = origin) =>
       host.handleMessage({ origin: from, source: parent, data: { source: "threadkeeper-shell", v: 1, ...data } } as MessageEvent);
     return { host, postMessage, parent, send };
@@ -138,7 +138,7 @@ describe("Threadkeeper fused mode (REQ-6)", () => {
     expect(host.reportSlotActivation(activation)).toBe(false);
   });
 
-  it("announces fused mode only while the Threadkeeper pages are available and re-announces a change once", () => {
+  it("announces fused mode only while the ThreadStack pages are available and re-announces a change once", () => {
     let available = false;
     const { host, postMessage, send } = connect({ fusedAvailable: () => available });
     expect(host.announceMode()).toBe(false);
@@ -239,8 +239,8 @@ describe("Threadkeeper fused mode (REQ-6)", () => {
     expect(fusedPagesAvailable([{ pluginKey: "browser-sessions", slots: slots(["browse"]) }])).toBe(false);
     expect(fusedPagesAvailable([{ pluginKey: "someone-else", slots: slots(["browse", "threads", "session-board"]) }])).toBe(false);
     expect(fusedPagesAvailable(undefined)).toBe(false);
-    expect(threadkeeperSlotView("browser-sessions", "session-board")).toBe("session-board");
-    expect(threadkeeperSlotView("browser-sessions", "wiki")).toBeNull();
-    expect(threadkeeperSlotView("someone-else", "threads")).toBeNull();
+    expect(threadStackSlotView("browser-sessions", "session-board")).toBe("session-board");
+    expect(threadStackSlotView("browser-sessions", "wiki")).toBeNull();
+    expect(threadStackSlotView("someone-else", "threads")).toBeNull();
   });
 });

@@ -47,7 +47,7 @@ describe("managed bundled plugin selection", () => {
 });
 
 describe("resolveBundledPluginInstalls", () => {
-  it("provisions the first-party Threadkeeper bridge in this fork", () => {
+  it("provisions the first-party ThreadStack bridge in this fork", () => {
     expect(SELF_HOSTED_AUTO_INSTALL_KEYS).toContain("browser-sessions");
     expect(resolveBundledPluginInstalls(["browser-sessions"], { catalogRoot: CATALOG_ROOT, env: {}, enforceCatalogRoot: true })).toEqual([{ key: "browser-sessions", pluginKey: "browser-sessions", localPath: path.join(CATALOG_ROOT, "plugin-browser-sessions"), allowSourceBuild: true }]);
   });
