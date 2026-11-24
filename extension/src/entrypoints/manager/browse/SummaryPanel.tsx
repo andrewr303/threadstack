@@ -1,4 +1,4 @@
-// The panel beside a Browse page: what Threadkeeper knows about the session in the tab. It is an
+// The panel beside a Browse page: what ThreadStack knows about the session in the tab. It is an
 // opaque reading surface; the page keeps its place and only this panel animates in.
 import React, { useState } from 'react';
 import { providerCategory } from '../../../core/providers.js';
@@ -239,7 +239,7 @@ export function SummaryPanel({
             <section className="tk-browse-sum-section" aria-labelledby={`${id}-unsaved`}>
               <h3 className="tk-eyebrow" id={`${id}-unsaved`}>Not saved yet</h3>
               <p className="tk-browse-sum-gist">
-                Threadkeeper saves this session by itself once the page shows a conversation. Nothing needs to be saved by hand.
+                ThreadStack saves this session by itself once the page shows a conversation. Nothing needs to be saved by hand.
               </p>
             </section>
           </>

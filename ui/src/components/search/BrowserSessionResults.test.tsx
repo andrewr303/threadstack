@@ -54,7 +54,7 @@ describe("independent session search", () => {
 
   it("shows offline, sharing and timeout copy and omits a disabled plugin", async () => {
     for (const [status, body, text] of [
-      [503, { error: { code: "browser_offline" } }, "Sessions can be searched while Threadkeeper is running."],
+      [503, { error: { code: "browser_offline" } }, "Sessions can be searched while ThreadStack is running."],
       [403, { error: { code: "denied" } }, "Sessions are not shared with this company."],
       [504, {}, "Session search did not answer. Try again."],
       [404, {}, ""],

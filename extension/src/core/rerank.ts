@@ -5,7 +5,7 @@ import {
   type MessageRecord,
   type SettingsRecord,
 } from './schema.js';
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import { awsModelCredentialsReady, credentialPresent, rerankCredentialKeys, resolveModelSettings } from './paperclip/credentials.js';
 import {
   AwsRequestError,
@@ -395,7 +395,7 @@ export async function rerankDocuments(
     const origins = rerankHostOrigins(settings);
     if (origins.length && !(await hasHostAccess(origins))) {
       const host = origins[0].replace(/^https:\/\//, '').replace(/\/\*$/, '');
-      throw new RerankError(`Threadkeeper has no access to ${host} yet. Allow it in Settings → Search & embeddings.`);
+      throw new RerankError(`ThreadStack has no access to ${host} yet. Allow it in Settings → Search & embeddings.`);
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? RERANK_TIMEOUT_MS);

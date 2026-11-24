@@ -30,12 +30,12 @@ export function helperConnectionReason(err: unknown): string | null {
     return 'The Mac helper is not installed for this browser. Each browser needs its own registration: run Install Mac Helper.command again, which sets it up for every browser on this Mac.';
   }
   if (/forbidden/i.test(text)) {
-    return 'The Mac helper is installed, but not for this copy of Threadkeeper. Run Install Mac Helper.command again so it picks up this one.';
+    return 'The Mac helper is installed, but not for this copy of ThreadStack. Run Install Mac Helper.command again so it picks up this one.';
   }
   if (/exited/i.test(text)) {
-    // The helper refuses a copy of Threadkeeper it was not installed for by stopping at once; a
+    // The helper refuses a copy of ThreadStack it was not installed for by stopping at once; a
     // missing Node.js or a crash looks the same from here.
-    return 'The Mac helper stopped before answering. Run Install Mac Helper.command again so it is set up for this copy of Threadkeeper (it needs Node.js 22 or newer).';
+    return 'The Mac helper stopped before answering. Run Install Mac Helper.command again so it is set up for this copy of ThreadStack (it needs Node.js 22 or newer).';
   }
   return null;
 }

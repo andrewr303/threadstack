@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { TableView } from '../../src/entrypoints/manager/table/TableView.js';
+import { TableView, tableCountText } from '../../src/entrypoints/manager/table/TableView.js';
 import { WorkspaceProvider, type WorkspaceContextValue } from '../../src/entrypoints/manager/workspace/context.js';
 import { sharedDb } from '../../src/entrypoints/manager/shared.js';
 import { ensureStarterCollectionsAndSettings, upsertThread } from '../../src/core/db.js';
@@ -201,8 +201,34 @@ describe('TableView', () => {
       search.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(titles()).toEqual(['Landing page']);
-    expect(container.querySelector('.tk-table-count')?.textContent).toBe('1 of 2 threads');
+    expect(container.querySelector('.tk-table-count')?.textContent).toBe('1 session of 2');
     await act(async () => container.querySelector<HTMLButtonElement>('tbody .tk-table-title')!.click());
     expect(openSession).toHaveBeenCalledWith(expect.objectContaining({ threadKey: b.threadKey }), 'threads');
+  });
+
+  it('narrows rows with the provider switch (All plus the providers the library holds)', async () => {
+    const a = await addThread('a', 'Webhook retries', 'chatgpt', '2026-10-01T12:00:00.000Z');
+    const b = await addThread('b', 'Landing page', 'claude', '2026-10-02T12:00:00.000Z');
+    const c = await addThread('c', 'Pricing copy', 'chatgpt', '2026-10-03T12:00:00.000Z');
+    await mount([a, b, c]);
+    const group = container.querySelector('[role="radiogroup"][aria-label="Provider"]')!;
+    const radios = [...group.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    // Most threads first: ChatGPT (2) before Claude (1).
+    expect(radios.map((r) => r.textContent)).toEqual(['All', 'ChatGPT', 'Claude']);
+    expect(radios[0].getAttribute('aria-checked')).toBe('true');
+    expect(container.querySelector('.tk-table-count')?.textContent).toBe('3 sessions');
+    await act(async () => radios[2].click());
+    expect(titles()).toEqual(['Landing page']);
+    expect(container.querySelector('.tk-table-count')?.textContent).toBe('1 session of 3');
+    await act(async () => radios[1].click());
+    expect(titles().sort()).toEqual(['Pricing copy', 'Webhook retries']);
+    expect(container.querySelector('.tk-table-count')?.textContent).toBe('2 sessions of 3');
+  });
+
+  it('says how many sessions show out of the whole library', () => {
+    expect(tableCountText(9, 1214)).toBe('9 sessions of 1,214');
+    expect(tableCountText(1, 3)).toBe('1 session of 3');
+    expect(tableCountText(1, 1)).toBe('1 session');
+    expect(tableCountText(0, 0)).toBe('0 sessions');
   });
 });

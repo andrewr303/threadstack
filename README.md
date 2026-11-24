@@ -1,4 +1,81 @@
 <p align="center">
+  <img src="doc/assets/brand/threadstack-wordmark.png" alt="ThreadStack" width="240" />
+</p>
+
+<p align="center"><strong>One workbench for your AI sessions, and the agent company behind them.</strong></p>
+
+<p align="center">
+  <a href="#threadstack-quickstart"><strong>Quickstart</strong></a> &middot;
+  <a href="doc/threadstack.md"><strong>ThreadStack guide</strong></a> &middot;
+  <a href="extension/README.md"><strong>Extension features</strong></a> &middot;
+  <a href="#paperclip-control-plane"><strong>Paperclip control plane</strong></a>
+</p>
+
+<br/>
+
+# ThreadStack
+
+ThreadStack is a Chrome and Edge extension that keeps every AI session you run (Claude Code, Claude, ChatGPT, Codex, Gemini, Grok and more) in one window. It captures and summarizes each conversation locally, files it into projects, and lets you work in the live provider pages without leaving the workbench. This repository pairs it with [Paperclip](#paperclip-control-plane), the open-source control plane for teams of AI agents, which ThreadStack embeds as one of its views.
+
+The workbench has five views behind one rail:
+
+| View | What you do there |
+| --- | --- |
+| **Browse** | Work in the live provider pages as tabs, side by side in a split view, or as a status board of what needs you, what is running and what is idle. |
+| **Threads** | Read each session's summary, where you left off, decisions and next steps, grouped by status, provider or account. |
+| **Table** | Sort and filter every session as a row, and add columns that Claude can fill. |
+| **Dashboard** | Keep pinned sessions in one to four panes. |
+| **Paperclip** | Open your Paperclip server's tasks and agents next to your sessions. |
+
+Press <kbd>⌘K</kbd> (<kbd>Ctrl</kbd>+<kbd>K</kbd> on Windows and Linux) anywhere in the workbench to jump to a session or open an address. Everything ThreadStack stores stays in your browser; AI analysis is optional and uses your own Anthropic or AWS credentials.
+
+## What's in this repository
+
+| Path | What it is |
+| --- | --- |
+| [`extension/`](extension/README.md) | The ThreadStack extension: Manifest V3, React 18, with its own `npm` install and lockfile (outside the pnpm workspace). |
+| `server/`, `ui/` | The Paperclip control plane: Express REST API and React board UI. |
+| [`packages/plugins/plugin-browser-sessions/`](packages/plugins/plugin-browser-sessions/README.md) | The first-party bridge that shares ThreadStack sessions with the Paperclip companies you choose. |
+| `packages/db`, `packages/shared`, `packages/adapters`, `cli/` | Paperclip's schema and migrations, shared contracts, agent adapters, and the `paperclipai` CLI. |
+| `doc/` | Developer docs. Start with [doc/threadstack.md](doc/threadstack.md) and [doc/DEVELOPING.md](doc/DEVELOPING.md). |
+
+## ThreadStack quickstart
+
+Build and load the extension:
+
+```bash
+cd extension
+npm ci
+npm run build
+```
+
+Open `chrome://extensions` (or `edge://extensions`), turn on **Developer mode**, choose **Load unpacked** and select `extension/.output/chrome-mv3`. Click the ThreadStack toolbar button to open it. The [extension README](extension/README.md#getting-started) covers the side panel, imports and AI settings.
+
+Run the Paperclip control plane from the repository root (Node.js 24.11 or newer, pnpm 9.15.4):
+
+```bash
+pnpm install
+pnpm dev
+```
+
+The API and UI start at `http://localhost:3100`. In ThreadStack, open **Settings → Paperclip** to connect to it; the Paperclip view then embeds the server's own app. [doc/threadstack.md](doc/threadstack.md) explains the Mac helper, pairing a company, sharing sessions and agent actions.
+
+Before you hand off a change, run the guarded checks. They build only into `/tmp/tk-build`, never into the folder your browser has loaded:
+
+```bash
+pnpm run check:extension
+pnpm run check:all
+```
+
+`check:extension` typechecks, tests and builds the extension. `check:all` also runs Paperclip's root typecheck and test suite.
+
+<br/>
+
+---
+
+<a id="paperclip-control-plane"></a>
+
+<p align="center">
   <img src="doc/assets/banner.jpg" alt="Paperclip is the app people use to manage AI agents for work." width="720" />
 </p>
 
@@ -23,9 +100,6 @@
 </p>
 
 <br/>
-
-This hard fork includes Threadkeeper's browser-session library and extension in `extension/`.
-See [Threadkeeper setup and safe verification](doc/threadkeeper.md).
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/773bdfb2-6d1e-4e30-8c5f-3487d5b70c8f" width="600" controls></video>

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { describe, it, expect, vi } from 'vitest';
 import { buildThreadKey, type ConversationRecord, type RelationshipRecord } from '../../src/core/schema.js';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   UNFILED_PROJECT,
   applyBulkThreadEdit,
   deleteConversationsCascade,
@@ -23,9 +23,9 @@ import {
 } from '../../src/entrypoints/manager/BulkActions.js';
 
 let dbCounter = 0;
-function freshDb(): ThreadkeeperDB {
+function freshDb(): ThreadStackDB {
   dbCounter += 1;
-  return new ThreadkeeperDB(`BulkTestDB_${dbCounter}_${Date.now()}`);
+  return new ThreadStackDB(`BulkTestDB_${dbCounter}_${Date.now()}`);
 }
 
 const ACCOUNT = { accountId: 'acct_bulk', workspaceId: 'ws_bulk' };
@@ -53,7 +53,7 @@ function thread(id: string, extra: Partial<UpsertThreadInput> = {}): UpsertThrea
 }
 
 /** Five threads: a, b and c are selected in most tests; d and e must never change. */
-async function seedLibrary(db: ThreadkeeperDB): Promise<Record<string, string>> {
+async function seedLibrary(db: ThreadStackDB): Promise<Record<string, string>> {
   const keys: Record<string, string> = {};
   const specs: Array<[string, Partial<UpsertThreadInput>]> = [
     ['a', { project: 'Daydock / Meridian', projectSource: 'ai' }],
@@ -69,7 +69,7 @@ async function seedLibrary(db: ThreadkeeperDB): Promise<Record<string, string>> 
   return keys;
 }
 
-async function snapshot(db: ThreadkeeperDB, keys: string[]): Promise<Record<string, ConversationRecord>> {
+async function snapshot(db: ThreadStackDB, keys: string[]): Promise<Record<string, ConversationRecord>> {
   const out: Record<string, ConversationRecord> = {};
   for (const k of keys) out[k] = (await db.conversations.get(k))!;
   return out;

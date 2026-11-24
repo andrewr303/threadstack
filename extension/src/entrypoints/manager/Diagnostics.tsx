@@ -92,7 +92,7 @@ export function StaleBuildBanner({ snapshot }: { snapshot: DiagnosticsSnapshot |
   return (
     <div className="tk-banner" data-tone="danger" role="alert" data-testid="stale-build-banner">
       <div className="tk-banner-body">
-        <strong>Threadkeeper needs a reload</strong>
+        <strong>ThreadStack needs a reload</strong>
         <span>{issue.message}</span>
       </div>
       <button type="button" className="tk-btn tk-btn-primary" onClick={reloadExtension}>
@@ -117,7 +117,7 @@ async function probeAiTab(): Promise<CaptureProbeReport | null> {
   }
 }
 
-/** "Check capture": what Threadkeeper sees in the AI tab you used last, with a verdict and a copyable report. */
+/** "Check capture": what ThreadStack sees in the AI tab you used last, with a verdict and a copyable report. */
 export function CaptureCheck() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CaptureCheckResult | null>(null);
@@ -135,7 +135,7 @@ export function CaptureCheck() {
   const copy = async () => {
     if (!result) return;
     try {
-      await navigator.clipboard.writeText(['Threadkeeper capture check', result.verdict, ...result.lines].join('\n'));
+      await navigator.clipboard.writeText(['ThreadStack capture check', result.verdict, ...result.lines].join('\n'));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -146,7 +146,7 @@ export function CaptureCheck() {
   return (
     <div className="tk-diag-capture">
       <p className="tk-settings-note">
-        Open a conversation on an AI site, then check what Threadkeeper can read from the tab you used last. The report has
+        Open a conversation on an AI site, then check what ThreadStack can read from the tab you used last. The report has
         counts only, never titles or message text.
       </p>
       <div className="tk-diag-actions">
@@ -178,7 +178,7 @@ export function CaptureCheck() {
 export function DiagnosticsPanel({ snapshot, onRefresh }: { snapshot: DiagnosticsSnapshot | null; onRefresh: () => void }) {
   const [copied, setCopied] = useState(false);
   if (!snapshot) {
-    return <p className="tk-settings-note">Diagnostics are available when Threadkeeper runs as an installed extension.</p>;
+    return <p className="tk-settings-note">Diagnostics are available when ThreadStack runs as an installed extension.</p>;
   }
   const { health } = snapshot;
   const rows: Array<[string, React.ReactNode]> = [
@@ -209,7 +209,7 @@ export function DiagnosticsPanel({ snapshot, onRefresh }: { snapshot: Diagnostic
       <div className="tk-diag-status" data-ok={health.ok ? 'true' : 'false'} role="status">
         {health.ok
           ? 'Everything checks out. The running manifest matches the files on disk.'
-          : 'Threadkeeper found a problem that can block its pages. Details below.'}
+          : 'ThreadStack found a problem that can block its pages. Details below.'}
       </div>
       <dl className="tk-diag-grid">
         {rows.map(([label, value]) => (

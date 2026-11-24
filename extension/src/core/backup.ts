@@ -2,7 +2,7 @@
 // JSON lines, and read back into a database.
 //
 // Why this exists: a browser keeps an extension's data under the extension's ID. An unpacked
-// extension's ID comes from its folder, so loading Threadkeeper from another folder, removing and
+// extension's ID comes from its folder, so loading ThreadStack from another folder, removing and
 // adding it again, or moving to another browser starts with an empty library, and nothing in the
 // old profile can be opened by the new ID. A backup file outside the browser is the one thing
 // that survives all of those. The Mac helper stores these files (backup-helper.ts).
@@ -12,7 +12,7 @@
 // pending jobs.
 import { Gunzip, Gzip, strToU8 } from 'fflate';
 import type { Table } from 'dexie';
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 
 export const BACKUP_FORMAT = 'threadkeeper-backup-v1';
 
@@ -176,7 +176,7 @@ async function* pages(table: Table): AsyncGenerator<unknown[]> {
  * `sink` is awaited, so a slow destination holds the reading back instead of filling memory.
  */
 export async function writeBackup(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   sink: (bytes: Uint8Array) => Promise<void> | void,
   info: { extensionVersion: string; extensionId: string; now?: () => Date }
 ): Promise<BackupMeta> {
@@ -244,17 +244,17 @@ interface RestoreState {
   result: RestoreResult;
 }
 
-async function applyLine(db: ThreadkeeperDB, text: string, state: RestoreState): Promise<void> {
+async function applyLine(db: ThreadStackDB, text: string, state: RestoreState): Promise<void> {
   let parsed: unknown;
   try {
     parsed = decodeRows(text);
   } catch {
-    throw new BackupFormatError('That file is not a Threadkeeper backup, or it is damaged.');
+    throw new BackupFormatError('That file is not a ThreadStack backup, or it is damaged.');
   }
   const obj = parsed as Record<string, unknown> | null;
-  if (!obj || typeof obj !== 'object') throw new BackupFormatError('That file is not a Threadkeeper backup, or it is damaged.');
+  if (!obj || typeof obj !== 'object') throw new BackupFormatError('That file is not a ThreadStack backup, or it is damaged.');
   if (!state.meta) {
-    if (obj.format !== BACKUP_FORMAT) throw new BackupFormatError('That file is not a Threadkeeper backup.');
+    if (obj.format !== BACKUP_FORMAT) throw new BackupFormatError('That file is not a ThreadStack backup.');
     state.meta = obj as unknown as BackupMeta;
     state.result.meta = state.meta;
     return;
@@ -324,7 +324,7 @@ async function applyLine(db: ThreadkeeperDB, text: string, state: RestoreState):
  * only when the library was empty. A file that ends early still restores what came before the
  * cut, then throws.
  */
-export async function restoreBackup(db: ThreadkeeperDB, source: AsyncIterable<Uint8Array>): Promise<RestoreResult> {
+export async function restoreBackup(db: ThreadStackDB, source: AsyncIterable<Uint8Array>): Promise<RestoreResult> {
   const state: RestoreState = {
     skipThreads: new Set(),
     deletedHere: new Set((await db.tombstones.toCollection().primaryKeys()) as string[]),
@@ -358,7 +358,7 @@ export async function restoreBackup(db: ThreadkeeperDB, source: AsyncIterable<Ui
       gunzip.push(bytes, final);
     } catch {
       throw new BackupFormatError(
-        state.meta ? 'That backup is incomplete. What could be read was restored.' : 'That file is not a Threadkeeper backup, or it is damaged.'
+        state.meta ? 'That backup is incomplete. What could be read was restored.' : 'That file is not a ThreadStack backup, or it is damaged.'
       );
     }
   };
@@ -371,13 +371,13 @@ export async function restoreBackup(db: ThreadkeeperDB, source: AsyncIterable<Ui
   }
   if (any) inflate(new Uint8Array(0), true);
   await drain(true);
-  if (!state.meta) throw new BackupFormatError('That file is not a Threadkeeper backup.');
+  if (!state.meta) throw new BackupFormatError('That file is not a ThreadStack backup.');
   if (!state.ended) throw new BackupFormatError('That backup is incomplete. What could be read was restored.');
   return state.result;
 }
 
 /** A cheap value that changes when the library does; used to skip backups of an unchanged library. */
-export async function libraryFingerprint(db: ThreadkeeperDB): Promise<{ threads: number; fingerprint: string }> {
+export async function libraryFingerprint(db: ThreadStackDB): Promise<{ threads: number; fingerprint: string }> {
   // Counts of what capture and organizing add to: threads, messages, summaries, insights, the
   // change log (every manual or automatic filing, tag and rename) and deletions.
   const [threads, messages, newest, summaries, insights, changes, deleted] = await Promise.all([

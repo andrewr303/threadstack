@@ -171,7 +171,7 @@ interface Props {
   onChanged: (message: string, deletedKeys: readonly string[]) => Promise<void>;
   onAnnounce: (message: string) => void;
   onDialogClosed: () => void;
-  /** Threadkeeper is connected to Still: offer "Send to Still…". */
+  /** ThreadStack is connected to Still: offer "Send to Still…". */
   stillPaired?: boolean;
 }
 
@@ -265,9 +265,9 @@ export function BulkActions({
       const bundle = await exportSelectedThreads(sharedDb, orderedSelection);
       const day = new Date().toISOString().slice(0, 10);
       if (format === 'markdown') {
-        downloadText(`threadkeeper-handoff-${day}.md`, bundleToMarkdown(bundle), 'text/markdown');
+        downloadText(`threadstack-handoff-${day}.md`, bundleToMarkdown(bundle), 'text/markdown');
       } else {
-        downloadText(`threadkeeper-selected-${day}.json`, JSON.stringify(bundle, null, 2), 'application/json');
+        downloadText(`threadstack-selected-${day}.json`, JSON.stringify(bundle, null, 2), 'application/json');
       }
       const n = bundle.conversations.length;
       return {

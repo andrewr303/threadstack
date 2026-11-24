@@ -117,7 +117,8 @@ export function DashboardView() {
       ctx.openSession(conv, 'threads');
       return;
     }
-    place(focusedPane, conv);
+    // Into the focused pane; a session already showing in another pane trades places with it.
+    swap(focusedPane, conv);
   };
 
   // Alt+1 .. Alt+4 focus a pane while the Dashboard is showing. Alt changes the typed character

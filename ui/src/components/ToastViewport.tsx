@@ -42,8 +42,8 @@ function AnimatedToast({
 
   return (
     <li
-      // A Threadkeeper shell laid over the content area cuts this rectangle out of its view.
-      data-threadkeeper-notice=""
+      // A ThreadStack shell laid over the content area cuts this rectangle out of its view.
+      data-threadstack-notice=""
       className={cn(
         "pointer-events-auto rounded-sm border shadow-lg backdrop-blur-xl transition-(--tp-transform-opacity) duration-200 ease-out",
         visible

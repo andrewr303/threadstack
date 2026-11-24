@@ -1,0 +1,182 @@
+/* The status board: Browse's other mode. A glass header and three glass columns (Needs you,
+   Running, Idle) of solid-ish cards. Cards are never glass (no glass inside glass). The run
+   state is said in words as well as by the dot, so colour is never the only signal. */
+
+.tk-board {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/* ---------- Header ---------- */
+.tk-board-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 10px 8px 18px;
+  border-radius: var(--r-chrome);
+}
+.tk-board-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.tk-board-groups { display: flex; flex-wrap: wrap; gap: 4px; }
+.tk-board-group {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-cap);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  transition: background-color var(--t-small) var(--ease-out), color var(--t-small) var(--ease-out);
+}
+.tk-board-group:hover { background: var(--ctl-hover); color: var(--text); }
+.tk-board-group:active { background: var(--ctl-press); }
+.tk-board-group[aria-checked="true"] {
+  background: var(--accent-tint);
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+.tk-board-spacer { flex: 1; }
+.tk-board-showall {
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-13);
+}
+.tk-board-showall:hover { color: var(--text); }
+.tk-board-tabs-btn { gap: 8px; }
+.tk-board-count { color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* ---------- Columns ---------- */
+.tk-board-cols {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+}
+.tk-board-col {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 10px 10px;
+  border-radius: var(--r-chrome);
+}
+.tk-board-col-head { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+.tk-board-col-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-idle);
+}
+.tk-board-col[data-column="needs"] .tk-board-col-dot { background: var(--warn); }
+.tk-board-col[data-column="running"] .tk-board-col-dot { background: var(--st-running); }
+.tk-board-col-title { margin: 0; font-size: var(--fs-13); font-weight: 600; color: var(--text-2); }
+.tk-board-col[data-column="needs"] .tk-board-col-title { color: var(--warn-text); }
+.tk-board-col[data-column="running"] .tk-board-col-title { color: var(--text); }
+.tk-board-col-count { font-size: var(--fs-13); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.tk-board-col-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+.tk-board-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.tk-board-empty,
+.tk-board-more { margin: 0; padding: 8px 4px; font-size: var(--fs-13); color: var(--text-3); }
+
+/* ---------- Cards ---------- */
+.tk-board-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--card-fill);
+}
+/* Already open in a Browse tab. */
+.tk-board-card[data-open="true"] { border-color: var(--accent-line); }
+.tk-board-card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.tk-board-card-main:hover { color: var(--accent-hover); }
+.tk-board-card-main .tk-mark { flex: none; margin-top: 1px; }
+.tk-board-card-title {
+  min-width: 0;
+  font-size: var(--fs-14);
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.tk-board-card-meta,
+.tk-board-card-needs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding-left: 30px;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+.tk-board-card-meta .tk-acct-name { color: var(--text-2); }
+.tk-board-card-needs { gap: 6px; }
+.tk-board-card-run {
+  flex: 1 1 auto;
+  font-weight: 600;
+  color: var(--warn-text);
+  white-space: nowrap;
+}
+.tk-board-card-open { min-height: 28px; padding: 0 12px; font-size: var(--fs-12); }
+
+/* ---------- Narrow windows: the columns stack and the board scrolls ---------- */
+@media (max-width: 899px) {
+  .tk-board-cols {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(220px, auto);
+    overflow-y: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-board-group { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .tk-board-group[aria-checked="true"],
+  .tk-board-card[data-open="true"] { border-color: Highlight; }
+  .tk-board-card { border-color: CanvasText; }
+  .tk-board-col-dot { forced-color-adjust: none; }
+}

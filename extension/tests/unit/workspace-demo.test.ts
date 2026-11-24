@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import {
   seedSyntheticWorkbenchLibrary,
   seedWorkspaceDemoLibrary,
@@ -13,9 +13,9 @@ import { primaryAccountId } from '../../src/core/workspace/realms.js';
 import { agentStateNeedsYou } from '../../src/core/workspace/types.js';
 
 let n = 0;
-let db: ThreadkeeperDB;
+let db: ThreadStackDB;
 beforeEach(() => {
-  db = new ThreadkeeperDB(`WorkspaceDemoDB_${Date.now()}_${++n}`);
+  db = new ThreadStackDB(`WorkspaceDemoDB_${Date.now()}_${++n}`);
 });
 
 const isCoding = (provider: string) => providerCategory(provider) === 'coding_agent';

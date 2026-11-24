@@ -22,6 +22,7 @@ Read the doc that matches your change before you start:
 | Schema, migrations, DB clients | `doc/DATABASE.md` |
 | An Apps catalog connection | `doc/connections/CONNECTOR-PLAYBOOK.md` (the canonical connection authoring runbook) |
 | Anything under `ui/` | `DESIGN.md` |
+| The ThreadStack extension (`extension/`) or its Paperclip bridge | `doc/threadstack.md`, `extension/README.md` |
 
 ### Scoped repository rules
 
@@ -61,6 +62,7 @@ Greptile setup.
 - `packages/skills-catalog/`: app-shipped skills catalog (`@paperclipai/skills-catalog`)
 - `packages/teams-catalog/`: app-shipped teams catalog (`@paperclipai/teams-catalog`)
 - `cli/`: `paperclipai` CLI package (published bin, agent-facing commands)
+- `extension/`: ThreadStack browser extension (Manifest V3, React 18; its own `npm ci` and lockfile, outside the pnpm workspace)
 - `skills/`: Paperclip runtime/operational skills (not part of the app catalog)
 - `doc/`: operational and product docs
 - `doc/plans/`: dated repo plan docs, named `YYYY-MM-DD-slug.md`. A plan for a Paperclip issue goes in the issue's `plan` document instead.

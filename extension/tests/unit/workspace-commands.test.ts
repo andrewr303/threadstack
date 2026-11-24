@@ -527,7 +527,7 @@ describe('service worker wiring', () => {
     const res = await call({ type: 'PASSIVE_DOM_CAPTURE', payload }, providerTab('https://chatgpt.com/c/c1'));
     expect(res).toMatchObject({ ok: true, status: 'stored', threadKey: `chatgpt:${SECOND.id}:ws_personal:c1:main` });
     expect(fake.resolveForCapture).toHaveBeenCalledWith('chatgpt', { accountId: 'acct_chatgpt_primary', workspaceId: 'ws_personal' });
-    const db = (globalThis as unknown as { __threadkeeperDb: { conversations: { get(k: string): Promise<Record<string, unknown> | undefined> } } }).__threadkeeperDb;
+    const db = (globalThis as unknown as { __threadStackDb: { conversations: { get(k: string): Promise<Record<string, unknown> | undefined> } } }).__threadStackDb;
     const record = await db.conversations.get(`chatgpt:${SECOND.id}:ws_personal:c1:main`);
     expect(record).toMatchObject({ accountId: SECOND.id, repository: 'acme/app' });
     expect(record?.agentState ?? null).toBeNull();
@@ -569,7 +569,7 @@ describe('service worker wiring', () => {
 
     sent.length = 0;
     expect(await call({ type: 'EMBED_AGENT_STATE', pane: null, url: '', state: 'running' }, embeddedFrame('https://chatgpt.com/c/c1'))).toEqual({ ok: true });
-    const db = (globalThis as unknown as { __threadkeeperDb: { conversations: { get(k: string): Promise<Record<string, unknown> | undefined> } } }).__threadkeeperDb;
+    const db = (globalThis as unknown as { __threadStackDb: { conversations: { get(k: string): Promise<Record<string, unknown> | undefined> } } }).__threadStackDb;
     const key = `chatgpt:${SECOND.id}:ws_personal:c1:main`;
     expect(await db.conversations.get(key)).toMatchObject({ agentState: 'running', agentStateAt: expect.any(String) });
     expect(sent).toContainEqual({ type: 'LIBRARY_CHANGED', threadKey: key });
@@ -723,7 +723,7 @@ describe('service worker wiring', () => {
     expect(removedTabs).not.toContain(40);
     expect(updatedTabs).toEqual([]);
 
-    // A tab Threadkeeper itself opens (Open original, online import) with no workspace page answering.
+    // A tab ThreadStack itself opens (Open original, online import) with no workspace page answering.
     openRequestAnswer = undefined;
     tabsById.set(41, { id: 41, url: 'https://claude.ai/chat/abc', windowId: 1 });
     listeners['tabs.onCreated']({ id: 41, openerTabId: 11, url: 'https://claude.ai/chat/abc', windowId: 1 });

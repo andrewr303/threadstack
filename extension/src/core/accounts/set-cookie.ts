@@ -1,4 +1,4 @@
-// A profile account's cookie jar kept by Threadkeeper itself: how `Set-Cookie` headers and
+// A profile account's cookie jar kept by ThreadStack itself: how `Set-Cookie` headers and
 // document.cookie assignments change it, which of its cookies a page at some address would be
 // sent or could read, and how a cookie is written back out as a `Set-Cookie` header.
 //

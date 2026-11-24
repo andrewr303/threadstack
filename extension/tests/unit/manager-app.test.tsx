@@ -43,7 +43,7 @@ function stubChrome(): ChromeStub {
     runtime: {
       id: EXTENSION_ID,
       getURL: (path: string) => `chrome-extension://${EXTENSION_ID}/${path}`,
-      getManifest: () => ({ manifest_version: 3, name: 'Threadkeeper', version: '0.0.0', version_name: BUILD_INFO.versionName }),
+      getManifest: () => ({ manifest_version: 3, name: 'ThreadStack', version: '0.0.0', version_name: BUILD_INFO.versionName }),
       sendMessage: async (message: Record<string, unknown>) => {
         stub.sent.push(message);
         if (message.type === 'WORKSPACE_HELLO') return { ok: true, tabId: 1, embedding: true, realms: stub.helloRealms };
@@ -456,14 +456,15 @@ describe('manager workbench interactions', () => {
     const frame = q<HTMLIFrameElement>('iframe.tk-paperclip-frame');
     expect(frame.src).toBe('http://localhost:3100/');
     expect(q('.tk-shell').getAttribute('data-view')).toBe('paperclip');
-    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('true');
+    // The rail stays as the person left it beside Paperclip (the design keeps it expanded).
+    expect(q('.tk-rail').getAttribute('data-collapsed')).toBe('false');
     expect(frame.hasAttribute('data-tab')).toBe(false);
     await click(q('button[aria-label="Browse"]'));
     expect(q('iframe.tk-paperclip-frame')).toBe(frame);
     await click(button('Paperclip', q('[role="radiogroup"][aria-label="View"]')));
     expect(q('iframe.tk-paperclip-frame')).toBe(frame);
   });
-  it('Escape dismisses the account menu before the narrow workspace drawer', async () => {
+  it('Escape dismisses a menu in the drawer before the narrow workspace drawer', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: query === '(max-width: 899px)', media: query,
       addEventListener() {}, removeEventListener() {},
@@ -474,9 +475,10 @@ describe('manager workbench interactions', () => {
       createdAt: '2026-11-01T00:00:00.000Z', lastActiveAt: null,
     }));
     chromeStub.helloRealms = [{ realm: realmById('anthropic')!, accounts, activeAccountId: 'work' }];
-    await mountApp();
+    await mountApp({ settings: { activeView: 'browse' } });
     await click(q('button[aria-label="Expand navigation"]'));
-    await click(q('.tk-rail-realms button'));
+    // Accounts moved to Settings; the Sessions list's Organize menu is the drawer's menu now.
+    await click(q('.tk-rail .tk-rail-heading button'));
     const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
     expect(menu).not.toBeNull();
     await press('Escape', menu);
@@ -619,7 +621,7 @@ describe('manager workbench interactions', () => {
     if (surface === 'page') expect(toggle.getAttribute('title')).toBe('Switch to light theme');
     else expect(toggle.textContent).toBe('Dark');
     if (surface === 'page') {
-      await click(button('Settings', q('.tk-rail-foot')));
+      await click(q('.tk-rail-head button[aria-label="Settings"]'));
       const density = qa('label').find((label) => label.textContent?.trim().startsWith('Density'))!.querySelector('select')!;
       await setValue(density, 'compact');
     } else await click(q('button[aria-label="Toggle density"]'));

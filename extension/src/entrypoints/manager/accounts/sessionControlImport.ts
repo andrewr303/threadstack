@@ -3,7 +3,7 @@
 // pure (core/session-control-import.ts); this is the part that touches storage and the account
 // service. Importing the same file twice adds nothing: an account is matched by its Chrome
 // profile id, and a session that already has a thread is left as it is.
-import { upsertThread, type ThreadkeeperDB } from '../../../core/db.js';
+import { upsertThread, type ThreadStackDB } from '../../../core/db.js';
 import { buildThreadKey } from '../../../core/schema.js';
 import type { PlannedAccount, SessionControlImportPlan } from '../../../core/session-control-import.js';
 import type {
@@ -52,7 +52,7 @@ export function previewSessionControlImport(plan: SessionControlImportPlan, real
     accounts: plan.accounts.map((a) => ({
       label: a.label,
       email: a.email,
-      where: a.mode === 'isolated' ? 'Inside Threadkeeper (sign in to it once)' : 'This browser’s Claude sign-in',
+      where: a.mode === 'isolated' ? 'Inside ThreadStack (sign in to it once)' : 'This browser’s Claude sign-in',
       status: a.primary ? 'Uses the account already here' : findAccountByProfile(realms, a.profileId) ? 'Already added' : 'Will be added',
     })),
     projects: plan.projects,
@@ -90,7 +90,7 @@ export function describeImportOutcome(o: Omit<ImportOutcome, 'message'>): string
 
 export async function applySessionControlImport(
   plan: SessionControlImportPlan,
-  deps: { db: ThreadkeeperDB; realms: readonly RealmAccounts[]; addAccount: AddAccountFn }
+  deps: { db: ThreadStackDB; realms: readonly RealmAccounts[]; addAccount: AddAccountFn }
 ): Promise<ImportOutcome> {
   const { db, addAccount } = deps;
   let realms = deps.realms;

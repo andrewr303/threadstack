@@ -5754,19 +5754,19 @@ html:has(.design-proposal-theme) .agent-markdown-name-field [data-slot="input"],
   -webkit-text-security: disc;
 }
 
-/* REQ-6 fused mode. Inside the Threadkeeper window the shell lays its view over the content
+/* REQ-6 fused mode. Inside the ThreadStack window the shell lays its view over the content
    rectangle of the Browse, Threads and Session board pages. The document stays transparent there
    and the app shell paints its background everywhere else (the hole follows --tk-slot-*, set by
-   lib/threadkeeper-host-slot.ts). Only the verified host ever sets data-threadkeeper-slot. */
-html[data-threadkeeper-slot],
-html[data-threadkeeper-slot] body {
+   lib/threadstack-host-slot.ts). Only the verified host ever sets data-threadstack-slot. */
+html[data-threadstack-slot],
+html[data-threadstack-slot] body {
   background: transparent;
 }
-html[data-threadkeeper-slot] .paperclip-app-shell {
+html[data-threadstack-slot] .paperclip-app-shell {
   background-color: transparent;
   isolation: isolate;
 }
-html[data-threadkeeper-slot] .paperclip-app-shell::before {
+html[data-threadstack-slot] .paperclip-app-shell::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -5783,34 +5783,34 @@ html[data-threadkeeper-slot] .paperclip-app-shell::before {
 }
 /* Mobile Layout normally follows document height. The fused page has only an absolute slot,
    so establish the same bounded flex chain as desktop before the first placement report. */
-.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) {
+.paperclip-app-shell[data-mobile="true"]:has(.threadstack-slot) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
-.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) :is(.app-main-row, .app-content-row) {
+.paperclip-app-shell[data-mobile="true"]:has(.threadstack-slot) :is(.app-main-row, .app-content-row) {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
-.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) .app-content-column {
+.paperclip-app-shell[data-mobile="true"]:has(.threadstack-slot) .app-content-column {
   flex: 1;
   min-height: 0;
 }
-.paperclip-app-shell[data-mobile="true"]:has(.threadkeeper-slot) .app-breadcrumb {
+.paperclip-app-shell[data-mobile="true"]:has(.threadstack-slot) .app-breadcrumb {
   flex-shrink: 0;
 }
-#main-content:has(.threadkeeper-slot) {
+#main-content:has(.threadstack-slot) {
   position: relative;
   min-height: 0;
   padding: 0;
   overflow: hidden;
   scrollbar-gutter: auto;
 }
-.threadkeeper-slot {
+.threadstack-slot {
   position: absolute;
   inset: 0;
   background: transparent;

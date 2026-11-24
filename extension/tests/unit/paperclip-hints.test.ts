@@ -1,13 +1,13 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings } from '../../src/core/db.js';
 import { normalizePaperclipSettings } from '../../src/core/schema.js';
 import { memoryStateStore, runPaperclipHintSync } from '../../src/core/paperclip/sync.js';
 import { FakePaperclip } from './paperclip-fake-server.js';
 
 describe('Paperclip change hints', () => {
   it('resolves a run-only hint through the existing company run step', async () => {
-    const db = new ThreadkeeperDB(`hints-${crypto.randomUUID()}`);
+    const db = new ThreadStackDB(`hints-${crypto.randomUUID()}`);
     const server = new FakePaperclip();
     server.addCompany({ id: 'one', name: 'One' });
     server.addIssue({ id: 'first', companyId: 'one', title: 'First' });
@@ -22,7 +22,7 @@ describe('Paperclip change hints', () => {
     await db.delete();
   });
   it('refreshes only named tasks, including comment-only changes, without altering sync cursors', async () => {
-    const db = new ThreadkeeperDB(`hints-${crypto.randomUUID()}`);
+    const db = new ThreadStackDB(`hints-${crypto.randomUUID()}`);
     const server = new FakePaperclip();
     server.addCompany({ id: 'one', name: 'One' });
     server.addIssue({ id: 'first', companyId: 'one', title: 'First' });
@@ -39,7 +39,7 @@ describe('Paperclip change hints', () => {
   });
 
   it('skips a missing task named in a hint and still stores the valid one (REQ-12 F-3)', async () => {
-    const db = new ThreadkeeperDB(`hints-${crypto.randomUUID()}`);
+    const db = new ThreadStackDB(`hints-${crypto.randomUUID()}`);
     const server = new FakePaperclip();
     server.addCompany({ id: 'one', name: 'One' });
     server.addIssue({ id: 'first', companyId: 'one', title: 'First' });
@@ -52,7 +52,7 @@ describe('Paperclip change hints', () => {
   });
 
   it('updates "Last synced" after a hint-driven fetch without touching cursors or run marks (REQ-12 UI Layout)', async () => {
-    const db = new ThreadkeeperDB(`hints-${crypto.randomUUID()}`);
+    const db = new ThreadStackDB(`hints-${crypto.randomUUID()}`);
     const server = new FakePaperclip();
     server.addCompany({ id: 'one', name: 'One' });
     server.addIssue({ id: 'first', companyId: 'one', title: 'First' });
@@ -68,7 +68,7 @@ describe('Paperclip change hints', () => {
   });
 
   it('rejects hints outside selected companies and cross-company issue substitution', async () => {
-    const db = new ThreadkeeperDB(`hints-${crypto.randomUUID()}`);
+    const db = new ThreadStackDB(`hints-${crypto.randomUUID()}`);
     const server = new FakePaperclip();
     server.addCompany({ id: 'one', name: 'One' });
     server.addCompany({ id: 'two', name: 'Two' });

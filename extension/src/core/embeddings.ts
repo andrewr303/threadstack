@@ -8,7 +8,7 @@ import {
   type ThreadInsight,
   type ThreadVectorRecord,
 } from './schema.js';
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import { awsModelCredentialsReady, credentialPresent, embeddingCredentialKeys, resolveModelSettings } from './paperclip/credentials.js';
 import {
   AwsRequestError,
@@ -387,7 +387,7 @@ async function embedWithBedrock(
   const origins = awsHostOrigins(region, ['runtime']);
   if (!(await hasHostAccess(origins))) {
     throw new EmbeddingError(
-      `Threadkeeper has no access to bedrock-runtime.${region}.amazonaws.com yet. Allow it in Settings → Search & embeddings.`
+      `ThreadStack has no access to bedrock-runtime.${region}.amazonaws.com yet. Allow it in Settings → Search & embeddings.`
     );
   }
   const dims = space.dimensions ?? bedrockEmbeddingDims(settings);
@@ -436,7 +436,7 @@ async function embedWithBedrock(
 async function requireOrigins(origins: string[], where: string): Promise<void> {
   if (origins.length > 0 && !(await hasHostAccess(origins))) {
     throw new EmbeddingError(
-      `Threadkeeper has no access to ${hostOf(origins[0])} yet. Allow it in Settings → Search & embeddings (${where}).`
+      `ThreadStack has no access to ${hostOf(origins[0])} yet. Allow it in Settings → Search & embeddings (${where}).`
     );
   }
 }
@@ -627,7 +627,7 @@ export async function testEmbedding(
   const space = remoteSpace(settings);
   if (!space) return { ok: false, message: 'Add the key, URL or AWS credentials first.' };
   try {
-    const [v] = await embedTexts(settings, space, ['Threadkeeper connection test'], 'query', fetchImpl);
+    const [v] = await embedTexts(settings, space, ['ThreadStack connection test'], 'query', fetchImpl);
     return { ok: true, message: `Connected: ${space.model} returns ${v.length}-dimensional vectors.` };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
@@ -640,7 +640,7 @@ export function vectorKeyFor(space: string, threadKey: string): string {
 
 /** Store (or refresh) a thread's vector in one space. */
 export async function putThreadVector(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   params: { space: string; threadKey: string; sourceRevision: number; doc: string; embedding: number[] }
 ): Promise<void> {
   const record: ThreadVectorRecord = {

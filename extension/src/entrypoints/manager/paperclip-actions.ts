@@ -42,7 +42,7 @@ export async function executePaperclipAction(action: AgentAction, signal: AbortS
   const text = action.type === 'session.send' ? action.text : action.prompt;
   if (typeof action.requestId !== 'string' || !action.requestId || typeof text !== 'string' || !text.trim() || text.length > 20_000) throw new ManagerActionError('bad_request', 'Invalid browser action.');
   const ws = env.workspace();
-  if (!ws.embedding || ws.tabId === null) throw new ManagerActionError('browser_offline', 'Open the Threadkeeper window to use browser actions.');
+  if (!ws.embedding || ws.tabId === null) throw new ManagerActionError('browser_offline', 'Open the ThreadStack window to use browser actions.');
   let conv: ConversationRecord | undefined;
   let url: string;
   let accountId: string | undefined;

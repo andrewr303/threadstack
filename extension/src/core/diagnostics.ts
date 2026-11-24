@@ -85,14 +85,14 @@ export function assessManifest(
   const running = manifest.version_name ?? manifest.version ?? '';
   const reloadHint =
     env.browser === 'Microsoft Edge'
-      ? 'Open edge://extensions and click Reload under Threadkeeper (or use the Reload button here).'
-      : 'Open chrome://extensions and click Reload under Threadkeeper (or use the Reload button here).';
+      ? 'Open edge://extensions and click Reload under ThreadStack (or use the Reload button here).'
+      : 'Open chrome://extensions and click Reload under ThreadStack (or use the Reload button here).';
 
   if (build.buildId !== 'unbundled' && running !== build.versionName) {
     issues.push({
       code: 'stale_manifest',
       severity: 'error',
-      message: `The browser is still running Threadkeeper ${running || '(unknown build)'}, but the files on disk are ${build.versionName}. The browser reads manifest.json only when the extension is reloaded.`,
+      message: `The browser is still running ThreadStack ${running || '(unknown build)'}, but the files on disk are ${build.versionName}. The browser reads manifest.json only when the extension is reloaded.`,
       fix: reloadHint,
     });
   }
@@ -104,7 +104,7 @@ export function assessManifest(
       issues.push({
         code: 'missing_permissions',
         severity: 'error',
-        message: `The running manifest lacks the ${missing.join(' and ')} permission${missing.length > 1 ? 's' : ''} this build needs to open AI sites inside Threadkeeper. The browser reads manifest.json only when the extension is reloaded.`,
+        message: `The running manifest lacks the ${missing.join(' and ')} permission${missing.length > 1 ? 's' : ''} this build needs to open AI sites inside ThreadStack. The browser reads manifest.json only when the extension is reloaded.`,
         fix: reloadHint,
       });
     }
@@ -255,7 +255,7 @@ export interface DiagnosticsSnapshot {
 /** Plain-text report the user can paste into an issue. Contains no keys or thread content. */
 export function formatDiagnosticsReport(s: DiagnosticsSnapshot): string {
   const lines = [
-    'Threadkeeper diagnostics',
+    'ThreadStack diagnostics',
     `Files on disk:     ${s.build.versionName} (built ${s.build.builtAt})`,
     `Running manifest:  ${s.health.runningVersionName || 'unknown'}`,
     `Extension ID:      ${s.extensionId}`,
@@ -313,14 +313,14 @@ export function describeCaptureProbe(report: CaptureProbeReport | null): Capture
   if (!report) {
     return {
       ok: false,
-      verdict: 'Threadkeeper is not running in that tab. Reload the tab (the extension may have been reloaded after the page opened).',
+      verdict: 'ThreadStack is not running in that tab. Reload the tab (the extension may have been reloaded after the page opened).',
       lines: ['Reader: no answer from the tab'],
     };
   }
   const last = report.lastCapture;
   const lines = [
     `Page: ${maskUrl(report.url)}`,
-    `Site: ${report.provider ?? 'not an AI site Threadkeeper knows'}`,
+    `Site: ${report.provider ?? 'not an AI site ThreadStack knows'}`,
     `Conversation open: ${report.conversationId ? 'yes' : 'no'}`,
     `Messages found in the page: ${report.domMessages}${report.domMessages ? ` (${Object.entries(report.domRoles).map(([r, n]) => `${n} ${r}`).join(', ')})` : ''}`,
     `Messages in the site's own data: ${report.siteDataMessages === null ? 'not received (it arrives when the page loads a conversation; reload the tab to capture it)' : report.siteDataMessages}`,
@@ -328,13 +328,13 @@ export function describeCaptureProbe(report: CaptureProbeReport | null): Capture
     ...(report.error ? [`Error while reading the page: ${report.error}`] : []),
   ];
   if (report.error) return { ok: false, verdict: 'Reading the page failed. Copy this report; the site may have changed its layout.', lines };
-  if (!report.provider) return { ok: false, verdict: 'That tab is not a page Threadkeeper captures.', lines };
+  if (!report.provider) return { ok: false, verdict: 'That tab is not a page ThreadStack captures.', lines };
   if (!report.conversationId) return { ok: false, verdict: 'No conversation is open in that tab, so there is nothing to capture. Open one and check again.', lines };
   if (last?.outcome === 'skipped') {
     return { ok: false, verdict: `Capture is switched off for this site, or was refused (${last.detail ?? 'skipped'}). Check Settings → Capture.`, lines };
   }
   if (report.domMessages === 0 && !report.siteDataMessages) {
-    return { ok: false, verdict: 'Threadkeeper found no messages on the page and received no conversation data from the site. Reload the tab and check again; if it stays empty, copy this report.', lines };
+    return { ok: false, verdict: 'ThreadStack found no messages on the page and received no conversation data from the site. Reload the tab and check again; if it stays empty, copy this report.', lines };
   }
   if (last?.outcome === 'error') return { ok: false, verdict: `The last capture did not reach the library (${last.detail ?? 'no detail'}).`, lines };
   if (report.siteDataMessages) return { ok: true, verdict: `Capture is working: the site's full conversation data (${report.siteDataMessages} messages) is being read.`, lines };

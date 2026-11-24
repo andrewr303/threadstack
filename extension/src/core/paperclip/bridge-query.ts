@@ -1,5 +1,5 @@
 // Browser-owned retrieval. Permissions are evaluated again just before an answer leaves.
-import { ensureStarterCollectionsAndSettings, type ThreadkeeperDB } from '../db.js';
+import { ensureStarterCollectionsAndSettings, type ThreadStackDB } from '../db.js';
 import { computeDeterministicHash, type ConversationRecord, type SettingsRecord } from '../schema.js';
 import { resolveInsight } from '../insights.js';
 import { providerCategory } from '../providers.js';
@@ -32,7 +32,7 @@ export function redactBridgeData<T>(value: T): T {
   return value;
 }
 
-async function permittedConversations(db: ThreadkeeperDB, settings: SettingsRecord): Promise<ConversationRecord[]> {
+async function permittedConversations(db: ThreadStackDB, settings: SettingsRecord): Promise<ConversationRecord[]> {
   const [rows, privateProjects] = await Promise.all([db.conversations.toArray(), localOnlyProjectNames(db)]);
   return rows.filter(c => c.provider !== 'paperclip' && isRemoteAllowed(c, settings, privateProjects));
 }
@@ -40,7 +40,7 @@ async function permittedConversations(db: ThreadkeeperDB, settings: SettingsReco
 /** Observed rows are re-sent at least this often; the plugin treats observations older than 120 s as stale. */
 export const OBSERVED_REFRESH_MS = 30_000;
 
-export async function buildSessionInventory(db: ThreadkeeperDB, settings?: SettingsRecord, options: { observations?: Pick<SessionObservations, 'snapshot'> } = {}): Promise<SessionRow[]> {
+export async function buildSessionInventory(db: ThreadStackDB, settings?: SettingsRecord, options: { observations?: Pick<SessionObservations, 'snapshot'> } = {}): Promise<SessionRow[]> {
   const current = settings ?? await ensureStarterCollectionsAndSettings(db);
   const [conversations, insights, accounts] = await Promise.all([permittedConversations(db, current), db.insights.toArray(), db.accounts.toArray()]);
   const local = new Map(insights.filter(i => i.source === 'local').map(i => [i.threadKey, i]));
@@ -64,7 +64,7 @@ export async function buildSessionInventory(db: ThreadkeeperDB, settings?: Setti
 }
 
 /** Project existing task-to-coding links with explicit company provenance and both privacy gates. */
-export async function buildAutomaticSessionLinks(db: ThreadkeeperDB, companyId: string, options: {
+export async function buildAutomaticSessionLinks(db: ThreadStackDB, companyId: string, options: {
   settings?: SettingsRecord;
   verifyIssueCompany?: (issueId: string) => Promise<string | null>;
   canVerifyIssue?: (issueId: string) => boolean;
@@ -94,7 +94,7 @@ export async function buildAutomaticSessionLinks(db: ThreadkeeperDB, companyId: 
 }
 
 export interface BridgeQueryDeps {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   companyId: string;
   isGranted: (companyId: string) => boolean | Promise<boolean>;
   allowRemoteModels?: boolean;
@@ -119,7 +119,7 @@ function prunePrivate(value: unknown, allowed: ReadonlySet<string>): unknown {
 }
 
 /** Last boundary used immediately before posting, after an asynchronous query or result wait. */
-export async function revalidateBridgeResult(db: ThreadkeeperDB, result: BridgeResult): Promise<BridgeResult> {
+export async function revalidateBridgeResult(db: ThreadStackDB, result: BridgeResult): Promise<BridgeResult> {
   if (!result.ok) return result;
   const settings = await ensureStarterCollectionsAndSettings(db);
   const rows = await permittedConversations(db, settings);
@@ -276,22 +276,22 @@ export async function handleBridgeRequest(deps: BridgeQueryDeps, raw: unknown): 
       case 'thread.open': {
         const { threadKey } = parseThreadOpen(p);
         if (!(await permittedConversations(deps.db, settings)).some(c => c.threadKey === threadKey)) return bridgeFailure(requestId, 'not_found', 'not_found');
-        if (!deps.openThread) return bridgeFailure(requestId, 'browser_offline', 'Open the Threadkeeper window to open a session.');
+        if (!deps.openThread) return bridgeFailure(requestId, 'browser_offline', 'Open the ThreadStack window to open a session.');
         await deps.openThread(threadKey);
         data = { opened: true, threadKey }; break;
       }
       case 'view.open': {
-        if (p.view !== 'browse' && p.view !== 'threads' && p.view !== 'dashboard') throw new BadRequest('Unknown Threadkeeper view.');
+        if (p.view !== 'browse' && p.view !== 'threads' && p.view !== 'dashboard') throw new BadRequest('Unknown ThreadStack view.');
         if (deps.openView) await deps.openView(p.view);
         else if (typeof chrome !== 'undefined' && chrome.tabs?.create && chrome.runtime?.getURL) {
           const url = new URL(chrome.runtime.getURL('manager.html')); url.searchParams.set('surface', 'page'); url.searchParams.set('view', p.view);
           await chrome.tabs.create({ url: url.toString() });
-        } else return bridgeFailure(requestId, 'browser_offline', 'Open the Threadkeeper window to use this view.');
+        } else return bridgeFailure(requestId, 'browser_offline', 'Open the ThreadStack window to use this view.');
         data = { opened: true }; break;
       }
       default: return bridgeFailure(requestId, 'unsupported', 'Unsupported read request.');
     }
-    if (now() >= request.deadlineAt) return bridgeFailure(requestId, 'timeout', 'Threadkeeper did not answer in time.');
+    if (now() >= request.deadlineAt) return bridgeFailure(requestId, 'timeout', 'ThreadStack did not answer in time.');
     if (!await deps.isGranted(deps.companyId)) return bridgeFailure(requestId, 'denied', 'Sessions are not shared with this company.');
     const fresh = await ensureStarterCollectionsAndSettings(deps.db);
     const allowed = new Set((await permittedConversations(deps.db, fresh)).map(c => c.threadKey));
@@ -311,6 +311,6 @@ export async function handleBridgeRequest(deps: BridgeQueryDeps, raw: unknown): 
     return revalidateBridgeResult(deps.db, { requestId, ok: true, data: boundedResult(enrich(filtered) as Record<string, unknown>, { transcriptPage }) });
   } catch (err) {
     if (err instanceof BadRequest) return bridgeFailure(requestId, err.code === 'unreachable' ? 'browser_offline' : err.code, err.message);
-    return bridgeFailure(requestId, 'internal', 'Threadkeeper could not handle that request.');
+    return bridgeFailure(requestId, 'internal', 'ThreadStack could not handle that request.');
   }
 }

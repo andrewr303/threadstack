@@ -167,7 +167,7 @@ function isLoopbackHostname(host: string): boolean {
 /**
  * The address of a page embedded in a workspace tab, or null when the sender is anything else.
  * An embedded frame is a content script of this extension in a frame (frameId not 0) of a tab
- * the worker remembers as a workspace tab, whose top document is Threadkeeper's manager.html;
+ * the worker remembers as a workspace tab, whose top document is ThreadStack's manager.html;
  * its own address is https (http only on loopback or an added site) and its origin agrees.
  *
  * The worker cannot see how deep the frame sits: a provider frame nested inside an embedded
@@ -224,7 +224,7 @@ export function captureSenderPage(
  * other iframes (an embedded page could otherwise file itself under the site that frames it),
  * from extension pages, or when the browser did not say which page sent it. Where the browser
  * also reports `sender.origin`, it must agree with the URL. The one kind of frame accepted is a
- * page embedded in Threadkeeper's own workspace tab (embeddedFrameUrl), and only when `embed`
+ * page embedded in ThreadStack's own workspace tab (embeddedFrameUrl), and only when `embed`
  * is given; it is still checked against its own URL, never the tab's.
  */
 export function captureSenderUrl(sender: RuntimeSender | null | undefined, embed?: EmbedSenderContext | null): string | null {
@@ -232,18 +232,18 @@ export function captureSenderUrl(sender: RuntimeSender | null | undefined, embed
 }
 
 /**
- * Workspace commands (accounts, embedding rules, the Mac helper) come only from Threadkeeper's
+ * Workspace commands (accounts, embedding rules, the Mac helper) come only from ThreadStack's
  * manager page running as a top-level tab: never the side panel (no tab), the consent page, the
  * in-page overlay (its tab is a website), a frame, or a website. An overlay handshake token
  * does not change this.
  */
 export function validateWorkspaceSender(type: string, sender: RuntimeSender, expectedExtensionId: string): SenderValidationResult {
   const page = managerPageRe(expectedExtensionId);
-  if (sender.id !== expectedExtensionId) return { allowed: false, reason: `Rejected ${type} from outside Threadkeeper` };
+  if (sender.id !== expectedExtensionId) return { allowed: false, reason: `Rejected ${type} from outside ThreadStack` };
   if (!sender.tab || typeof sender.tab.id !== 'number') return { allowed: false, reason: `Rejected ${type} from a page without a tab` };
   if (sender.frameId !== 0) return { allowed: false, reason: `Rejected ${type} from a framed page` };
   if (!page.test(sender.url ?? '') || !page.test(sender.tab.url ?? '')) {
-    return { allowed: false, reason: `Rejected ${type} from a page other than the Threadkeeper workspace` };
+    return { allowed: false, reason: `Rejected ${type} from a page other than the ThreadStack workspace` };
   }
   return { allowed: true };
 }
@@ -395,7 +395,7 @@ export function validateWindowPostMessage(
 }
 
 /**
- * Consent decisions and unpairing come only from a top-level Threadkeeper page: never from the
+ * Consent decisions and unpairing come only from a top-level ThreadStack page: never from the
  * manager framed inside a website (the overlay), where a hostile page could trick a click.
  * DOCK_DECIDE additionally requires connect.html itself.
  */
@@ -410,7 +410,7 @@ export function validateDockPageSender(
   if (typeof sender.frameId === 'number' && sender.frameId !== 0) return { allowed: false, reason: `Rejected ${type} from a framed page` };
   if (sender.tab && !(sender.tab.url ?? '').startsWith(base)) return { allowed: false, reason: `Rejected ${type} from a page inside a website` };
   if (type === 'DOCK_DECIDE' && !new RegExp(`^chrome-extension://${expectedExtensionId}/connect\\.html(?:$|[?#])`).test(url)) {
-    return { allowed: false, reason: 'Rejected DOCK_DECIDE outside the Threadkeeper consent window' };
+    return { allowed: false, reason: 'Rejected DOCK_DECIDE outside the ThreadStack consent window' };
   }
   return { allowed: true };
 }

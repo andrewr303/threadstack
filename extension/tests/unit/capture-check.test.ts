@@ -28,7 +28,7 @@ describe('describeCaptureProbe', () => {
 
   it.each([
     ['no answer from the tab', null, /not running in that tab/],
-    ['an unknown site', { ...base, provider: null }, /not a page Threadkeeper captures/],
+    ['an unknown site', { ...base, provider: null }, /not a page ThreadStack captures/],
     ['no open conversation', { ...base, conversationId: null }, /No conversation is open/],
     ['an empty page with no site data', { ...base, domMessages: 0, domRoles: {}, siteDataMessages: null }, /no messages on the page/],
     ['a refused capture', { ...base, lastCapture: { at: '2026-11-03T12:00:00.000Z', method: 'dom', outcome: 'skipped', detail: 'provider_not_authorized' } }, /switched off/],

@@ -81,6 +81,8 @@ interface Setup {
   signedIn?: string;
   /** Replace the accounts of the anthropic realm (to give one no saved sign-in, say). */
   anthropicAccounts?: AccountRecord[];
+  /** The session palette is switched on and opens through this. */
+  palette?: ReturnType<typeof vi.fn>;
 }
 
 let container: HTMLDivElement;
@@ -145,6 +147,7 @@ function Harness({ setup }: { setup: Setup }) {
     },
     openSession: spies.openSession, togglePinned: spies.togglePinned, openInChromeTab: spies.openInChromeTab,
     requestAddAccount: vi.fn(), openSettings: vi.fn(), announce: spies.announce,
+    openPalette: setup.palette, paletteEnabled: Boolean(setup.palette),
   };
   return (
     <WorkspaceProvider value={value}>
@@ -548,7 +551,7 @@ describe('Browse summary panel', () => {
     expect(document.activeElement).toBe(toggle);
   });
 
-  it('says Threadkeeper saves the session by itself when the tab has no thread yet', async () => {
+  it('says ThreadStack saves the session by itself when the tab has no thread yet', async () => {
     await mount({ tabs: [tab('a', 'Brand new session')] });
     click(byName('Summary'));
     const panel = q('[aria-label="Session summary"]')!;
@@ -605,5 +608,151 @@ describe('Browse summary panel', () => {
     await mount({ tabs: [tab('a', 'One', { threadKey: conv.threadKey })], conversations: [conv] });
     click(byName('Summary'));
     expect(byName('Unpin from dashboard')).not.toBeNull();
+  });
+});
+
+describe('Browse split view', () => {
+  const pane = (side: 'Left pane' | 'Right pane') => q(`section[aria-label="${side}"]`);
+  const paneTabs = (side: 'Left pane' | 'Right pane') =>
+    [...(pane(side)?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])].map((t) => t.getAttribute('title'));
+
+  it('splits into two panes with their own bars, and closes back to one strip keeping the focused tab', async () => {
+    await mount({ tabs: [tab('a', 'Alpha'), tab('b', 'Beta')], active: 'b' });
+    const toggle = byName('Split view')!;
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    await click(toggle);
+    expect(pane('Left pane')).not.toBeNull();
+    expect(pane('Right pane')).not.toBeNull();
+    expect(container.querySelectorAll('.tk-browse-bar')).toHaveLength(2);
+    // Every tab was in the left pane; the right one is empty and shows its new tab page.
+    expect(paneTabs('Left pane')).toEqual(['Alpha', 'Beta']);
+    expect(paneTabs('Right pane')).toEqual([]);
+    expect(pane('Right pane')?.querySelector('.tk-browse-launch')).not.toBeNull();
+    // The shown tab's pane is the focused one.
+    expect(pane('Left pane')?.getAttribute('data-focused')).toBe('true');
+    // Both split buttons say split is on.
+    const closers = [...container.querySelectorAll('button')].filter((b) => b.getAttribute('aria-label') === 'Close split view');
+    expect(closers).toHaveLength(2);
+    expect(closers.every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true);
+    // The board button is there once.
+    expect([...container.querySelectorAll('button')].filter((b) => b.getAttribute('aria-label') === 'Status board')).toHaveLength(1);
+
+    await click(closers[0]);
+    expect(pane('Left pane')).toBeNull();
+    expect(tabs()).toHaveLength(2);
+    expect(tabs()[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('focuses the pane that is clicked, and moves a tab to the other pane', async () => {
+    await mount({ tabs: [tab('a', 'Alpha'), tab('b', 'Beta')], active: 'a' });
+    await click(byName('Split view'));
+    act(() => { pane('Right pane')!.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    expect(pane('Right pane')?.getAttribute('data-focused')).toBe('true');
+    expect(pane('Left pane')?.getAttribute('data-focused')).toBeNull();
+
+    // Back to the left pane, then send its tab to the right one.
+    act(() => { pane('Left pane')!.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    await click(byName('Move tab to the right pane'));
+    expect(paneTabs('Left pane')).toEqual(['Beta']);
+    expect(paneTabs('Right pane')).toEqual(['Alpha']);
+    expect(pane('Right pane')?.getAttribute('data-focused')).toBe('true');
+    // Each pane shows its own page.
+    const slots = [...container.querySelectorAll('.tk-browse-stage')].map((el) => el.getAttribute('data-tab'));
+    expect(slots.sort()).toEqual(['a', 'b']);
+  });
+
+  it('closing a tab activates its neighbour within the same pane', async () => {
+    await mount({ tabs: [tab('a', 'Alpha'), tab('b', 'Beta'), tab('c', 'Gamma')], active: 'a' });
+    await click(byName('Split view'));
+    // a stays left; b and c go right.
+    act(() => { pane('Left pane')!.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    const strip = () => [...(pane('Left pane')?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+    await click(strip().find((t) => t.getAttribute('title') === 'Beta')!);
+    await click(byName('Move tab to the right pane'));
+    act(() => { pane('Left pane')!.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    await click(strip().find((t) => t.getAttribute('title') === 'Gamma')!);
+    await click(byName('Move tab to the right pane'));
+    expect(paneTabs('Right pane')).toEqual(['Beta', 'Gamma']);
+    // Gamma is shown on the right; closing it shows Beta, not the left pane's Alpha.
+    await click(byName('Close Gamma'));
+    const right = [...(pane('Right pane')?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+    expect(right.map((t) => t.getAttribute('aria-selected'))).toEqual(['true']);
+    expect(right[0].getAttribute('title')).toBe('Beta');
+    expect(paneTabs('Left pane')).toEqual(['Alpha']);
+  });
+});
+
+describe('Browse session palette chip', () => {
+  it('is absent while the palette is switched off', async () => {
+    await mount({ tabs: [tab('a', 'Alpha')] });
+    expect(q('.tk-browse-addr-kbd')).toBeNull();
+  });
+
+  it('opens the palette and leaves the address field editable', async () => {
+    const palette = vi.fn();
+    await mount({ tabs: [tab('a', 'Alpha')], palette });
+    const chip = q<HTMLButtonElement>('.tk-browse-addr-kbd')!;
+    expect(chip.getAttribute('aria-label')).toMatch(/^Search sessions \((⌘K|Ctrl K)\)$/);
+    await click(chip);
+    expect(palette).toHaveBeenCalledTimes(1);
+    expect(q<HTMLInputElement>('input[aria-label="Address"]')?.disabled).toBe(false);
+  });
+});
+
+describe('Browse status board', () => {
+  const KEY_NEEDS = 'claude_code:primary:ws:s1:main';
+  const library = () => [
+    conversation({ threadKey: KEY_NEEDS, title: 'Retry Stripe webhooks', agentState: 'waiting_permission' }),
+    conversation({ threadKey: 'claude_code:primary:ws:s2:main', canonicalUrl: 'https://claude.ai/code/s2', title: 'Pick a hero', agentState: 'waiting_answer' }),
+    conversation({ threadKey: 'claude_code:primary:ws:s3:main', canonicalUrl: 'https://claude.ai/code/s3', title: 'Port to Firefox', agentState: 'running' }),
+    conversation({ threadKey: 'claude:primary:ws:c1:main', provider: 'claude', canonicalUrl: 'https://claude.ai/chat/c1', title: 'Pricing copy', agentState: null }),
+  ];
+  const column = (label: string) => q(`section[aria-labelledby="tk-board-col-${label}"]`);
+  const titlesIn = (id: string) => [...(column(id)?.querySelectorAll('.tk-board-card-title') ?? [])].map((el) => el.textContent);
+
+  it('opens from the Browse bar and sorts sessions by their observed run state', async () => {
+    await mount({ tabs: [tab('a', 'Alpha')], conversations: library() });
+    await click(byName('Status board'));
+    expect(q('.tk-browse-bar')).toBeNull();
+    expect(q('.tk-board-title')?.textContent).toBe('Sessions');
+    expect(titlesIn('needs')).toEqual(['Retry Stripe webhooks', 'Pick a hero']);
+    expect(titlesIn('running')).toEqual(['Port to Firefox']);
+    expect(titlesIn('idle')).toEqual(['Pricing copy']);
+    // A session waiting on the person offers to open it (to answer a question: "Answer").
+    expect(byName('Open: Retry Stripe webhooks')).not.toBeNull();
+    expect(byName('Answer: Pick a hero')).not.toBeNull();
+    // Nothing on the board pretends to approve a permission request.
+    expect([...container.querySelectorAll('button')].some((b) => /approve/i.test(b.textContent ?? ''))).toBe(false);
+    await click(byName('Open: Retry Stripe webhooks'));
+    expect(spies.openSession).toHaveBeenCalledWith(expect.objectContaining({ threadKey: KEY_NEEDS }), 'browse');
+  });
+
+  it('uses the open page\'s live run state over the recorded one, and marks open sessions', async () => {
+    await mount({
+      tabs: [tab('thread~' + KEY_NEEDS, 'Retry Stripe webhooks', { threadKey: KEY_NEEDS })],
+      runtimes: { ['thread~' + KEY_NEEDS]: { agentState: 'running' } },
+      conversations: library(),
+    });
+    await click(byName('Status board'));
+    expect(titlesIn('running')).toEqual(['Retry Stripe webhooks', 'Port to Firefox']);
+    const card = [...container.querySelectorAll('.tk-board-card')].find((el) => el.textContent?.includes('Retry Stripe webhooks'));
+    expect(card?.getAttribute('data-open')).toBe('true');
+  });
+
+  it('filters by group and returns to the tabs', async () => {
+    await mount({ tabs: [tab('a', 'Alpha'), tab('b', 'Beta')], conversations: library() });
+    await click(byName('Status board'));
+    expect(byName(/^Show all/)?.textContent).toBe('Show all 4');
+    const chats = [...container.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((b) => b.textContent === 'Chats')!;
+    await click(chats);
+    expect(chats.getAttribute('aria-checked')).toBe('true');
+    expect(titlesIn('needs')).toEqual([]);
+    expect(titlesIn('idle')).toEqual(['Pricing copy']);
+    expect(byName(/^Show all/)?.textContent).toBe('Show all 1');
+    const back = byName(/^Open tabs/)!;
+    expect(back.textContent).toBe('Open tabs2');
+    await click(back);
+    expect(q('.tk-board')).toBeNull();
+    expect(tabs()).toHaveLength(2);
   });
 });

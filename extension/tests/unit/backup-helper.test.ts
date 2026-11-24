@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import {
   AUTO_BACKUP_MAX_AGE_MS,
   AUTO_BACKUP_MIN_GAP_MS,
@@ -23,9 +23,9 @@ const require = createRequire(import.meta.url);
 const core = require('../../mac-helper/core.cjs');
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`ThreadkeeperBackupHelper_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`ThreadStackBackupHelper_${Date.now()}_${++n}`);
 
-async function seed(db: ThreadkeeperDB, threads: number) {
+async function seed(db: ThreadStackDB, threads: number) {
   for (let i = 0; i < threads; i++) {
     const threadKey = `t${String(i).padStart(4, '0')}`;
     await db.table('conversations').put({ threadKey, provider: 'chatgpt', title: `Thread ${i}`, updatedAt: `2026-01-01T00:${String(i % 60).padStart(2, '0')}:00Z` });

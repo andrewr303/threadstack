@@ -4,7 +4,7 @@
 // Two places a tab's page can load, per login realm. Tabs of the realm's browser account (the
 // one the browser itself is signed in to) load in ordinary frames. Tabs of any other account
 // load in the page's profile slot: credentialless frames that share the page's own cookie
-// partition, which Threadkeeper fills with that account's saved sign-in. The slot holds one
+// partition, which ThreadStack fills with that account's saved sign-in. The slot holds one
 // account per realm for the life of the page, so two accounts of a realm are live at once; a
 // third needs the page reloaded.
 import {
@@ -18,9 +18,13 @@ import { buildThreadKey, type ConversationRecord } from '../../../core/schema.js
 import { primaryAccountId, realmForProvider, type RealmInfo } from '../../../core/workspace/realms.js';
 import {
   DASHBOARD_LAYOUTS,
+  DEFAULT_BROWSE_LAYOUT,
   EMPTY_WORKSPACE_STATE,
   type AccountRecord,
   type ActiveAccounts,
+  type BrowseLayout,
+  type BrowseMode,
+  type BrowsePane,
   type DashboardLayout,
   type RealmAccounts,
   type SessionTab,
@@ -38,7 +42,7 @@ export interface EmbedTarget {
 }
 
 /**
- * Whether an address can be shown as a session tab: an https page of a provider Threadkeeper
+ * Whether an address can be shown as a session tab: an https page of a provider ThreadStack
  * knows. Anything else (other sites, http, local files) opens in an ordinary Chrome tab.
  */
 export function embedTargetFor(url: string): EmbedTarget | null {
@@ -177,7 +181,15 @@ export type WorkspaceAction =
   | { type: 'dashboard_pane'; index: number; threadKey: string | null }
   | { type: 'dashboard_focus'; index: number }
   | { type: 'dashboard_unpin'; threadKey: string }
-  | { type: 'toggle_group'; group: string };
+  | { type: 'toggle_group'; group: string }
+  /** Browse split view on or off. Off keeps the focused pane's tab as the one shown. */
+  | { type: 'browse_split'; on: boolean }
+  /** Split view: sessions open in this pane from now on, and its tab is the active one. */
+  | { type: 'browse_focus'; pane: BrowsePane }
+  /** Put a tab in the other pane (it becomes that pane's tab, and that pane is focused). */
+  | { type: 'browse_move_tab'; id: string; pane: BrowsePane }
+  /** Browse shows the open tabs or the status board. */
+  | { type: 'browse_mode'; mode: BrowseMode };
 
 const MAX_TABS = 40;
 /**
@@ -185,6 +197,74 @@ const MAX_TABS = 40;
  * busy library has many; past the cap the oldest collapse is forgotten, never the newest.
  */
 export const MAX_COLLAPSED_GROUPS = 150;
+
+// ---------------------------------------------------------------------------------------------
+// Browse split view
+// ---------------------------------------------------------------------------------------------
+
+/** The Browse pane a tab belongs to. Tabs from before split view existed are in the left pane. */
+export function paneOfTab(tab: Pick<SessionTab, 'pane'>): BrowsePane {
+  return tab.pane === 1 ? 1 : 0;
+}
+
+/** A state written before split view existed (or built by hand in a test) has no layout yet. */
+export function browseOf(state: Pick<WorkspaceState, 'browse'>): BrowseLayout {
+  return state.browse ?? DEFAULT_BROWSE_LAYOUT;
+}
+
+/** The tabs of one pane, in strip order. */
+export function tabsInPane(tabs: readonly SessionTab[], pane: BrowsePane): SessionTab[] {
+  return tabs.filter((t) => paneOfTab(t) === pane);
+}
+
+function withPane(tab: SessionTab, pane: BrowsePane): SessionTab {
+  if (paneOfTab(tab) === pane) return tab;
+  const { pane: _old, ...rest } = tab;
+  return pane === 1 ? { ...rest, pane: 1 } : rest;
+}
+
+function setPaneActive(layout: BrowseLayout, pane: BrowsePane, id: string | null): BrowseLayout['paneActive'] {
+  const next: BrowseLayout['paneActive'] = [layout.paneActive[0], layout.paneActive[1]];
+  next[pane] = id;
+  return next;
+}
+
+/** The tab next to `id` within its pane, as a browser picks one: the next, else the previous. */
+function paneNeighbour(tabs: readonly SessionTab[], id: string): string | null {
+  const tab = tabs.find((t) => t.id === id);
+  if (!tab) return null;
+  const list = tabsInPane(tabs, paneOfTab(tab));
+  const i = list.findIndex((t) => t.id === id);
+  return (list[i + 1] ?? list[i - 1])?.id ?? null;
+}
+
+/** Whether `id` is a tab of `pane`. */
+function inPane(tabs: readonly SessionTab[], id: unknown, pane: BrowsePane): id is string {
+  return typeof id === 'string' && tabs.some((t) => t.id === id && paneOfTab(t) === pane);
+}
+
+/** Make `id` the shown tab: the active tab, its pane's tab, and (while split) the focused pane. */
+function showTab(state: WorkspaceState, id: string): Pick<WorkspaceState, 'activeTabId' | 'browse'> {
+  const tab = state.tabs.find((t) => t.id === id);
+  const layout = browseOf(state);
+  if (!tab) return { activeTabId: state.activeTabId, browse: layout };
+  const pane = paneOfTab(tab);
+  return { activeTabId: id, browse: { ...layout, paneActive: setPaneActive(layout, pane, id), focusedPane: pane } };
+}
+
+/**
+ * The tabs Browse shows right now: the active tab, or both panes' tabs while split (the focused
+ * pane first, so it is the last to be unloaded when few pages may be loaded). None on the board.
+ */
+export function browseVisibleTabs(state: WorkspaceState): string[] {
+  const layout = browseOf(state);
+  if (layout.mode === 'board') return [];
+  if (!layout.split) return state.activeTabId ? [state.activeTabId] : [];
+  const other: BrowsePane = layout.focusedPane === 0 ? 1 : 0;
+  return [layout.paneActive[layout.focusedPane], layout.paneActive[other]].filter(
+    (id): id is string => typeof id === 'string' && state.tabs.some((t) => t.id === id)
+  );
+}
 
 function clampPanes(panes: Array<string | null>, layout: DashboardLayout): Array<string | null> {
   const next = panes.slice(0, layout);
@@ -200,6 +280,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case 'open': {
       const existing = state.tabs.find((t) => t.id === action.id);
       const activate = action.activate !== false;
+      const layout = browseOf(state);
       if (existing) {
         const tabs = state.tabs.map((t) =>
           t.id === action.id
@@ -214,7 +295,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
               }
             : t
         );
-        return { ...state, tabs, activeTabId: activate ? action.id : state.activeTabId };
+        // An open tab is shown where it already is: its own pane, which takes the focus.
+        return activate ? { ...state, tabs, ...showTab({ ...state, tabs }, action.id) } : { ...state, tabs };
       }
       const tab: SessionTab = {
         id: action.id,
@@ -226,37 +308,57 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         threadKey: action.threadKey,
         createdAt: action.now,
         lastActiveAt: action.now,
+        // A new tab opens in the focused pane (split or not, so it sits next to what is shown).
+        ...(layout.focusedPane === 1 ? { pane: 1 as const } : {}),
       };
       let tabs = [...state.tabs, tab];
+      let paneActive = layout.paneActive;
       if (tabs.length > MAX_TABS) {
         // Close the least recently used tab that is neither the new one nor shown in Browse.
+        const shown = new Set([state.activeTabId, ...(layout.split ? layout.paneActive : [])]);
         const victim = tabs
-          .filter((t) => t.id !== tab.id && t.id !== state.activeTabId)
+          .filter((t) => t.id !== tab.id && !shown.has(t.id))
           .sort((a, b) => a.lastActiveAt - b.lastActiveAt)[0];
-        if (victim) tabs = tabs.filter((t) => t.id !== victim.id);
+        if (victim) {
+          tabs = tabs.filter((t) => t.id !== victim.id);
+          paneActive = [paneActive[0] === victim.id ? null : paneActive[0], paneActive[1] === victim.id ? null : paneActive[1]];
+        }
       }
-      return { ...state, tabs, activeTabId: activate ? tab.id : state.activeTabId };
+      const next: WorkspaceState = { ...state, tabs, browse: { ...layout, paneActive } };
+      return activate ? { ...next, ...showTab(next, tab.id) } : next;
     }
 
     case 'close': {
       const index = state.tabs.findIndex((t) => t.id === action.id);
       if (index === -1) return state;
+      const layout = browseOf(state);
+      const neighbour = paneNeighbour(state.tabs, action.id);
       const tabs = state.tabs.filter((t) => t.id !== action.id);
+      const paneActive: BrowseLayout['paneActive'] = [
+        layout.paneActive[0] === action.id ? neighbour : layout.paneActive[0],
+        layout.paneActive[1] === action.id ? neighbour : layout.paneActive[1],
+      ];
       let activeTabId = state.activeTabId;
-      if (activeTabId === action.id) {
+      let focusedPane = layout.focusedPane;
+      if (layout.split) {
+        // Split: the neighbour within the same pane; an emptied pane shows its new tab page.
+        if (activeTabId === action.id) activeTabId = neighbour;
+      } else if (activeTabId === action.id) {
         // Like a browser: the neighbour to the right, else the one to the left.
         activeTabId = (tabs[index] ?? tabs[index - 1])?.id ?? null;
+        const shown = tabs.find((t) => t.id === activeTabId);
+        if (shown) {
+          focusedPane = paneOfTab(shown);
+          paneActive[focusedPane] = shown.id;
+        }
       }
-      return { ...state, tabs, activeTabId };
+      return { ...state, tabs, activeTabId, browse: { ...layout, paneActive, focusedPane } };
     }
 
     case 'activate': {
       if (!state.tabs.some((t) => t.id === action.id)) return state;
-      return {
-        ...state,
-        activeTabId: action.id,
-        tabs: state.tabs.map((t) => (t.id === action.id ? { ...t, lastActiveAt: action.now } : t)),
-      };
+      const tabs = state.tabs.map((t) => (t.id === action.id ? { ...t, lastActiveAt: action.now } : t));
+      return { ...state, tabs, ...showTab({ ...state, tabs }, action.id) };
     }
 
     case 'navigated': {
@@ -345,6 +447,65 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
           : [...state.collapsedGroups, action.group].slice(-MAX_COLLAPSED_GROUPS),
       };
     }
+
+    case 'browse_split': {
+      const layout = browseOf(state);
+      if (layout.split === action.on) return state;
+      if (action.on) {
+        // The shown tab's pane takes the focus; each pane shows the tab it showed last, else its first.
+        const shown = state.tabs.find((t) => t.id === state.activeTabId);
+        const focusedPane = shown ? paneOfTab(shown) : layout.focusedPane;
+        let paneActive = shown ? setPaneActive(layout, focusedPane, shown.id) : layout.paneActive;
+        for (const pane of [0, 1] as const) {
+          if (!inPane(state.tabs, paneActive[pane], pane)) {
+            paneActive = setPaneActive({ ...layout, paneActive }, pane, tabsInPane(state.tabs, pane)[0]?.id ?? null);
+          }
+        }
+        return {
+          ...state,
+          activeTabId: paneActive[focusedPane],
+          browse: { ...layout, split: true, paneActive, focusedPane, mode: 'tabs' },
+        };
+      }
+      // Off: the focused pane's tab stays in front (the other pane's when the focused one is empty).
+      const other: BrowsePane = layout.focusedPane === 0 ? 1 : 0;
+      const keep = [layout.paneActive[layout.focusedPane], layout.paneActive[other], state.activeTabId, state.tabs[0]?.id ?? null]
+        .find((id): id is string => typeof id === 'string' && state.tabs.some((t) => t.id === id)) ?? null;
+      const kept = state.tabs.find((t) => t.id === keep);
+      return {
+        ...state,
+        activeTabId: keep,
+        browse: { ...layout, split: false, focusedPane: kept ? paneOfTab(kept) : layout.focusedPane },
+      };
+    }
+
+    case 'browse_focus': {
+      const layout = browseOf(state);
+      if (!layout.split || layout.focusedPane === action.pane) return state;
+      const id = inPane(state.tabs, layout.paneActive[action.pane], action.pane) ? layout.paneActive[action.pane] : null;
+      return { ...state, activeTabId: id, browse: { ...layout, focusedPane: action.pane } };
+    }
+
+    case 'browse_move_tab': {
+      const tab = state.tabs.find((t) => t.id === action.id);
+      if (!tab || paneOfTab(tab) === action.pane) return state;
+      const layout = browseOf(state);
+      const from = paneOfTab(tab);
+      const neighbour = paneNeighbour(state.tabs, action.id);
+      const tabs = state.tabs.map((t) => (t.id === action.id ? withPane(t, action.pane) : t));
+      const paneActive = setPaneActive(layout, from, layout.paneActive[from] === action.id ? neighbour : layout.paneActive[from]);
+      return {
+        ...state,
+        tabs,
+        activeTabId: action.id,
+        browse: { ...layout, paneActive: setPaneActive({ ...layout, paneActive }, action.pane, action.id), focusedPane: action.pane },
+      };
+    }
+
+    case 'browse_mode': {
+      const layout = browseOf(state);
+      return layout.mode === action.mode ? state : { ...state, browse: { ...layout, mode: action.mode } };
+    }
   }
 }
 
@@ -353,11 +514,14 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
  * when a tab was last used): a change here is written at once (useWorkspace).
  */
 export function workspaceShape(state: WorkspaceState): string {
+  const layout = browseOf(state);
   return JSON.stringify([
-    state.tabs.map((t) => [t.id, t.accountId, t.realm, t.threadKey]),
+    state.tabs.map((t) => [t.id, t.accountId, t.realm, t.threadKey, paneOfTab(t)]),
     state.activeTabId,
     state.dashboard,
     state.collapsedGroups,
+    // Which pane shows what is arranged only while split; unsplit, activeTabId says what is shown.
+    [layout.split, layout.mode, layout.split ? [layout.paneActive, layout.focusedPane] : null],
   ]);
 }
 
@@ -380,6 +544,7 @@ export function normalizeWorkspaceState(raw: unknown): WorkspaceState {
       threadKey: typeof t.threadKey === 'string' ? t.threadKey : null,
       createdAt: Number.isFinite(t.createdAt) ? t.createdAt : 0,
       lastActiveAt: Number.isFinite(t.lastActiveAt) ? t.lastActiveAt : 0,
+      ...(t.pane === 1 ? { pane: 1 as const } : {}),
     });
     if (tabs.length === MAX_TABS) break;
   }
@@ -397,10 +562,26 @@ export function normalizeWorkspaceState(raw: unknown): WorkspaceState {
     layout
   );
   const focused = base.dashboard?.focusedPane;
+  // Browse layout. A state from before split view has none: it reads as one pane showing the tabs.
+  const rawBrowse = (base.browse && typeof base.browse === 'object' ? base.browse : {}) as Partial<BrowseLayout>;
+  const rawActive = Array.isArray(rawBrowse.paneActive) ? rawBrowse.paneActive : [];
+  const paneActive: BrowseLayout['paneActive'] = [
+    inPane(tabs, rawActive[0], 0) ? (rawActive[0] as string) : null,
+    inPane(tabs, rawActive[1], 1) ? (rawActive[1] as string) : null,
+  ];
+  const split = rawBrowse.split === true;
+  const focusedPane: BrowsePane = rawBrowse.focusedPane === 1 ? 1 : 0;
+  let activeTabId: string | null =
+    typeof base.activeTabId === 'string' && seen.has(base.activeTabId) ? base.activeTabId : tabs[0]?.id ?? null;
+  if (split) {
+    // While split the active tab is the focused pane's (null when that pane is empty).
+    if (paneActive[focusedPane] === null && inPane(tabs, activeTabId, focusedPane)) paneActive[focusedPane] = activeTabId;
+    activeTabId = paneActive[focusedPane];
+  }
   return {
     version: 1,
     tabs,
-    activeTabId: typeof base.activeTabId === 'string' && seen.has(base.activeTabId) ? base.activeTabId : tabs[0]?.id ?? null,
+    activeTabId,
     dashboard: {
       layout,
       panes,
@@ -409,6 +590,7 @@ export function normalizeWorkspaceState(raw: unknown): WorkspaceState {
     collapsedGroups: Array.isArray(base.collapsedGroups)
       ? base.collapsedGroups.filter((g): g is string => typeof g === 'string').slice(-MAX_COLLAPSED_GROUPS)
       : [],
+    browse: { split, paneActive, focusedPane, mode: rawBrowse.mode === 'board' ? 'board' : 'tabs' },
   };
 }
 
@@ -439,7 +621,7 @@ export interface ProfileSlotState {
 export type ProfileSlotMap = Readonly<Record<string, ProfileSlotState>>;
 
 /**
- * Which place a tab loads in. A realm Threadkeeper keeps no accounts for, and a realm whose
+ * Which place a tab loads in. A realm ThreadStack keeps no accounts for, and a realm whose
  * accounts are not known yet, has only the browser's own sign-in.
  */
 export function slotOfTab(tab: Pick<SessionTab, 'realm' | 'accountId'>, realms: readonly RealmAccounts[]): TabSlot {

@@ -235,7 +235,7 @@ export class HistorySyncOrchestrator {
     try {
       enabled = await this.bounded(this.env.enabledProviders(), STEP_TIMEOUTS.database, 'step_timeout', false);
     } catch {
-      return { started: false, reason: 'Threadkeeper could not read its settings. Try again in a moment.' };
+      return { started: false, reason: 'ThreadStack could not read its settings. Try again in a moment.' };
     }
     const scope = request.scope === 'all' ? 'all' : 'recent';
     const providers = request.providers.filter((id, i, all) => all.indexOf(id) === i && syncProviderInfo(id) && enabled.has(id)
@@ -637,7 +637,7 @@ export class HistorySyncOrchestrator {
    *
    * For the sites that can say who is signed in (ChatGPT and Claude, with Codex and Claude Code on
    * the same sign-ins) nothing is imported unless the site named a person and the account
-   * Threadkeeper will file under is recorded as that same person. Any doubt (no answer, an answer
+   * ThreadStack will file under is recorded as that same person. Any doubt (no answer, an answer
    * the parser does not accept, the accounts service not taking it) stops the site instead of
    * filing under whichever account happened to be active.
    */

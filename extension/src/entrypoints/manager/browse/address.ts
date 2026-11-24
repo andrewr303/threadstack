@@ -6,7 +6,7 @@ export type AddressOutcome =
   | { kind: 'none' }
   /** Same sign-in as the tab: send the tab there. */
   | { kind: 'navigate'; url: string }
-  /** Another provider Threadkeeper knows: open it as its own tab. */
+  /** Another provider ThreadStack knows: open it as its own tab. */
   | { kind: 'open'; url: string }
   /** Cannot be shown here. `chromeUrl` is set when the address is a web page Chrome can open. */
   | { kind: 'refuse'; message: string; chromeUrl: string | null };
@@ -35,14 +35,14 @@ export function resolveAddress(raw: string, tab: { realm: string; url: string })
     return { kind: 'refuse', message: 'That is not a web address. Type an address such as claude.ai/code.', chromeUrl: null };
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { kind: 'refuse', message: 'Threadkeeper shows web pages only. Type an https address.', chromeUrl: null };
+    return { kind: 'refuse', message: 'ThreadStack shows web pages only. Type an https address.', chromeUrl: null };
   }
   const target = embedTargetFor(parsed.href);
   if (!target) {
     const reason =
       parsed.protocol === 'http:'
-        ? 'Threadkeeper shows https pages only.'
-        : `Threadkeeper cannot show ${hostOf(parsed)} here. It shows the AI sites it knows.`;
+        ? 'ThreadStack shows https pages only.'
+        : `ThreadStack cannot show ${hostOf(parsed)} here. It shows the AI sites it knows.`;
     return { kind: 'refuse', message: `${reason} You can open it in a Chrome tab instead.`, chromeUrl: parsed.href };
   }
   return target.realm.id === tab.realm ? { kind: 'navigate', url: target.url } : { kind: 'open', url: target.url };

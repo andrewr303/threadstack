@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { paperclipPath, parsePaperclipHostMessage, type PaperclipHostMessage } from '../../core/paperclip/host.js';
 import { EMBED_ALLOW, EMBED_SANDBOX } from './workspace/useWorkspace.js';
-import { PaperclipStatus, type PaperclipConnection } from './PaperclipConnection.js';
+import { PaperclipConnectCard, type PaperclipConnection } from './PaperclipConnection.js';
+import { Icon } from './shell/icons.js';
 
 export interface PaperclipNavigation { path: string; request: number }
 
@@ -13,8 +14,12 @@ export interface PaperclipFrameControl {
 }
 
 /** A sibling of provider frames, kept outside the session budget and capture channel. */
-export function PaperclipView({ origin, initialPath = '/', active, eager = false, connection, navigation, onMessage, onConfigure, controlRef }: {
+export function PaperclipView({ origin, initialPath = '/', active, eager = false, connection, navigation, onMessage, onConfigure, onOpenInTab, header = false, controlRef }: {
   origin: string;
+  /** Show the glass header (status, address, actions) above the app. Off in fused mode, where Paperclip lays out the window. */
+  header?: boolean;
+  /** Open the Paperclip app in an ordinary browser tab. */
+  onOpenInTab?: () => void;
   initialPath?: string;
   active: boolean;
   /** Load the frame while the server runs even before Paperclip is shown (it lays out the window). */
@@ -125,7 +130,26 @@ export function PaperclipView({ origin, initialPath = '/', active, eager = false
     return () => { clearInterval(timer); clearTimeout(stop); };
   }, [visited, running, origin, documentGeneration]);
   return (
-    <section className="tk-view tk-view-paperclip" aria-label="Paperclip" hidden={!active}>
+    <section className="tk-view tk-view-paperclip" aria-label="Paperclip" hidden={!active} data-header={header && running ? 'true' : undefined}>
+      {header && running && (
+        <div className="tk-paperclip-bar tk-glass" role="group" aria-label="Paperclip connection">
+          <span className="tk-paperclip-live" aria-hidden="true" />
+          <strong className="tk-paperclip-bar-title">Paperclip</strong>
+          <span className="tk-paperclip-bar-origin" title={origin}>{displayOrigin(origin)}</span>
+          <span className="tk-visually-hidden" role="status">Paperclip is running</span>
+          <span className="tk-paperclip-bar-spacer" />
+          {onOpenInTab && (
+            <button type="button" className="tk-btn tk-btn-quiet" onClick={onOpenInTab}>
+              <Icon name="external" />
+              <span className="tk-paperclip-bar-label">Open in Chrome tab</span>
+            </button>
+          )}
+          <button type="button" className="tk-btn" onClick={onConfigure}>
+            <Icon name="settings" />
+            <span className="tk-paperclip-bar-label">Connection</span>
+          </button>
+        </div>
+      )}
       {visited && <iframe
         ref={frame}
         className="tk-paperclip-frame"
@@ -143,8 +167,17 @@ export function PaperclipView({ origin, initialPath = '/', active, eager = false
           frame.current?.contentWindow?.postMessage({ source: 'threadkeeper-shell', v: 1, type: 'hello' }, origin);
         }}
       />}
-      {active && !running && <div className="tk-paperclip-empty"><PaperclipStatus connection={connection} onConfigure={onConfigure} /></div>}
+      {active && !running && <div className="tk-paperclip-empty"><PaperclipConnectCard connection={connection} onConfigure={onConfigure} /></div>}
       {active && running && !ready && <div className="tk-paperclip-loading" role="status">Opening Paperclip…</div>}
     </section>
   );
+}
+
+/** `localhost:3100` for http://localhost:3100: the host and port, without the scheme. */
+function displayOrigin(origin: string): string {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
 }

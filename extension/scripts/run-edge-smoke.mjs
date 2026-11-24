@@ -108,7 +108,7 @@ async function openOverlay(ctx, sw) {
   await page.waitForTimeout(1200);
   const tabId = await sw.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, CLAUDE_URL);
   await sw.evaluate(
-    async ({ tabId, url }) => globalThis.__threadkeeperInvokeAction(tabId, url, 'toolbar_action'),
+    async ({ tabId, url }) => globalThis.__threadStackInvokeAction(tabId, url, 'toolbar_action'),
     { tabId, url: CLAUDE_URL }
   );
   await page.waitForTimeout(2500);
@@ -165,7 +165,7 @@ async function scenarioCurrentBuild(edge) {
     const cdp = await ctx.newCDPSession(full);
     const { targetInfos } = await cdp.send('Target.getTargets');
     const panel = targetInfos.find((t) => t.url.includes(`${extId}/sidepanel.html`));
-    check(panel?.title === 'Threadkeeper', `side panel document loaded (title "${panel?.title}")`);
+    check(panel?.title === 'ThreadStack', `side panel document loaded (title "${panel?.title}")`);
   } finally {
     await ctx.close();
   }

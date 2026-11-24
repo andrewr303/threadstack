@@ -5,7 +5,7 @@ import { BoardPage, BrowsePage, SessionsNeedingYou, SettingsPage, TaskSessionsTa
 
 type BridgeGlobal = typeof globalThis & { __paperclipPluginBridge__?: { sdkUi: Record<string, unknown> } };
 afterEach(() => { delete (globalThis as BridgeGlobal).__paperclipPluginBridge__; });
-it.each([["Browse", BrowsePage], ["Threads", ThreadsPage], ["Session board", BoardPage]] as const)("renders the agreed ordinary-tab Threadkeeper handoff for %s", (_name, Page) => {
+it.each([["Browse", BrowsePage], ["Threads", ThreadsPage], ["Session board", BoardPage]] as const)("renders the agreed ordinary-tab ThreadStack handoff for %s", (_name, Page) => {
   (globalThis as BridgeGlobal).__paperclipPluginBridge__ = { sdkUi: {
     usePluginAction: () => async () => ({}),
     useHostLocation: () => ({ pathname: "/THR/threads", search: "", hash: "" }),
@@ -14,9 +14,9 @@ it.each([["Browse", BrowsePage], ["Threads", ThreadsPage], ["Session board", Boa
     usePluginStream: () => ({ lastEvent: null }),
   } };
   const html = renderToStaticMarkup(createElement(Page, { context: { companyId: "company", companyPrefix: "THR", projectId: null, entityId: null, entityType: null, userId: "board" } }));
-  expect(html).toContain("Open this in Threadkeeper");
-  expect(html).toContain("Browse, Threads and the session board run inside the Threadkeeper window.");
-  expect(html).toContain(">Open Threadkeeper</button>");
+  expect(html).toContain("Open this in ThreadStack");
+  expect(html).toContain("Browse, Threads and the session board run inside the ThreadStack window.");
+  expect(html).toContain(">Open ThreadStack</button>");
 });
 
 function withBridge(data: unknown) {

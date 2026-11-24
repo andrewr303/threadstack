@@ -1,4 +1,4 @@
-// Single source of truth for every AI product Threadkeeper understands.
+// Single source of truth for every AI product ThreadStack understands.
 // Manifest host permissions, content-script matches (static and runtime-registered), DOM
 // adapters, filters, categories and labels are all derived from this registry. Adding a
 // provider means: one entry here, its page routing in `providerForPage`, its id rule in
@@ -24,7 +24,7 @@ export const PROVIDER_IDS = [
   'imported',
   // Synced from the user's own Paperclip server (Settings → Paperclip), never captured from a page.
   'paperclip',
-  // Agents and chats on hosts Threadkeeper already reads (path-routed like claude_code).
+  // Agents and chats on hosts ThreadStack already reads (path-routed like claude_code).
   'chatgpt_dots',
   'claude_duet',
   'grok_bot',
@@ -82,9 +82,9 @@ export const CATEGORY_LABELS: Record<ProviderCategory, string> = {
 };
 
 /**
- * How Threadkeeper gets onto a provider's pages:
+ * How ThreadStack gets onto a provider's pages:
  * - `required`: an install-time host permission and a static content script (the providers
- *   Threadkeeper has always read; adding hosts here would disable the extension on update).
+ *   ThreadStack has always read; adding hosts here would disable the extension on update).
  * - `optional`: the host permission is requested when the user turns the provider on, then the
  *   content script is registered at runtime (custom-sites.ts).
  * - `custom`: only on sites the user adds in Settings → Capture.
@@ -775,7 +775,7 @@ export function detectProviderFromUrl(url: string): ProviderId | null {
 }
 
 /**
- * True for an https page of a provider whose host Threadkeeper holds from install: the pages
+ * True for an https page of a provider whose host ThreadStack holds from install: the pages
  * that get the static content script and may host the overlay (the overlay frame is only web
  * accessible there). Unlike detectProviderFromUrl it ignores the tk_provider test hint, so an
  * arbitrary site cannot opt itself in.

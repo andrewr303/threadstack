@@ -1,5 +1,5 @@
 import React from 'react';
-import { ThreadkeeperDB } from '../../core/db.js';
+import { ThreadStackDB } from '../../core/db.js';
 import {
   THREAD_KIND_LABELS,
   type CoverageState,
@@ -8,7 +8,7 @@ import {
   type WorkflowState,
 } from '../../core/schema.js';
 
-export const sharedDb = new ThreadkeeperDB();
+export const sharedDb = new ThreadStackDB();
 
 export function notifyBackground(message: Record<string, unknown>): void {
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;

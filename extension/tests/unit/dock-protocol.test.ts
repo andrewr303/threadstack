@@ -54,7 +54,7 @@ describe('ids (shared vectors with Still)', () => {
 describe('envelope and field validation', () => {
   it('checks proto, from and the type allowlist', () => {
     expect(checkEnvelope(null)).toMatchObject({ ok: false, code: 'bad_request' });
-    expect(checkEnvelope({ proto: 'still-threadkeeper/2', from: 'still', type: 'hello' })).toMatchObject({ ok: false, code: 'version_mismatch' });
+    expect(checkEnvelope({ proto: 'still-threadstack/2', from: 'still', type: 'hello' })).toMatchObject({ ok: false, code: 'version_mismatch' });
     expect(checkEnvelope({ proto: PROTO, from: 'threadkeeper', type: 'hello' })).toMatchObject({ ok: false, code: 'bad_request' });
     expect(checkEnvelope({ proto: PROTO, from: 'still', type: 'threads.upsert' })).toMatchObject({ ok: false, code: 'unsupported' });
     expect(checkEnvelope({ proto: PROTO, from: 'still', type: 'hello', requestId: 'x' })).toMatchObject({ ok: true, type: 'hello' });

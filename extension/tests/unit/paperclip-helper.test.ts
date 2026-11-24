@@ -26,6 +26,8 @@ describe('fixed Paperclip helper registration', () => {
       const config = JSON.parse(fs.readFileSync(path.join(result.root, 'config.json'), 'utf8'));
       expect(config.paperclip.root).toBe(fs.realpathSync(fork));
       expect(fs.readFileSync(config.paperclip.shim, 'utf8')).toContain('exec ');
+      // Both names: the server reads the new one, and a server from before the rename the old one.
+      expect(fs.readFileSync(config.paperclip.shim, 'utf8')).toContain(`PAPERCLIP_THREADSTACK_EXTENSION_IDS='${'a'.repeat(32)}'`);
       expect(fs.readFileSync(config.paperclip.shim, 'utf8')).toContain(`PAPERCLIP_THREADKEEPER_EXTENSION_IDS='${'a'.repeat(32)}'`);
       expect(fs.readFileSync(config.paperclip.shim, 'utf8')).toContain('PAPERCLIP_BUNDLED_PLUGIN_ROOT=');
       const execution = spawnSync(config.paperclip.shim, ['service', 'status', '--json'], { encoding: 'utf8' });

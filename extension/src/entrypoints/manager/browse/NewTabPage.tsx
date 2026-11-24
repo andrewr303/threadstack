@@ -88,7 +88,7 @@ export const NewTabPage = forwardRef<
           <h3 className="tk-eyebrow">Recent sessions</h3>
           {recent.length === 0 ? (
             <p className="tk-browse-launch-note">
-              No sessions are saved yet. Threadkeeper saves a session by itself once its page shows a conversation.
+              No sessions are saved yet. ThreadStack saves a session by itself once its page shows a conversation.
             </p>
           ) : (
             <ul className="tk-browse-recent">

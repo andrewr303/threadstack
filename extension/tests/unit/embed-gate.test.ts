@@ -172,7 +172,7 @@ describe('capture gate for embedded frames', () => {
   });
 
   it('checks the provider against the frame, never the tab', () => {
-    // The tab is Threadkeeper's own page; the frame is ChatGPT, so it cannot file a Claude thread.
+    // The tab is ThreadStack's own page; the frame is ChatGPT, so it cannot file a Claude thread.
     expect(decideCapture({ ...base, embed: ctx, payload: { provider: 'claude', sourceConversationId: 'c1' }, sender: embedded('https://chatgpt.com/c/c1') })).toMatchObject({
       ok: false,
       error: expect.stringMatching(/Claude page/),

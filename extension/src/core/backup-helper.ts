@@ -5,7 +5,7 @@
 // Backups are automatic once the helper is connected: the library is written out when it has
 // changed and the last backup is old enough. A library with no threads is never backed up, so a
 // fresh install cannot fill the folder with empty backups.
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import { base64ToBytes, bytesToBase64, libraryFingerprint, restoreBackup, writeBackup, type RestoreResult } from './backup.js';
 import { activeAnalysisHold } from './analysis-hold.js';
 import { HELPER_HOST } from './embed/helper-protocol.js';
@@ -126,7 +126,7 @@ function isFailure(value: HelperPort | WorkspaceFailure): value is WorkspaceFail
   return (value as WorkspaceFailure).ok === false;
 }
 
-export async function backupStatus(db: ThreadkeeperDB, env: BackupEnv | null): Promise<BackupStatus> {
+export async function backupStatus(db: ThreadStackDB, env: BackupEnv | null): Promise<BackupStatus> {
   const threads = await db.conversations.count();
   const last = env ? await env.load().catch(() => null) : null;
   const port = await open(env);
@@ -158,7 +158,7 @@ async function exclusive<T>(busy: T, run: () => Promise<T>): Promise<T> {
   }
 }
 
-export function backupNow(db: ThreadkeeperDB, env: BackupEnv | null): Promise<BackupNowResult> {
+export function backupNow(db: ThreadStackDB, env: BackupEnv | null): Promise<BackupNowResult> {
   return exclusive<BackupNowResult>({ ok: false, code: 'busy', error: 'A backup or restore is already running.' }, async () => {
     const before = await libraryFingerprint(db);
     if (before.threads === 0) return fail('There is nothing to back up yet: the library has no threads.');
@@ -225,7 +225,7 @@ export function backupNow(db: ThreadkeeperDB, env: BackupEnv | null): Promise<Ba
  * Back up when the library changed since the last backup and that backup is old enough.
  * Called from an alarm; never throws and does nothing without the helper.
  */
-export async function maybeAutoBackup(db: ThreadkeeperDB, env: BackupEnv | null): Promise<'skipped' | 'done' | 'failed'> {
+export async function maybeAutoBackup(db: ThreadStackDB, env: BackupEnv | null): Promise<'skipped' | 'done' | 'failed'> {
   try {
     if (!env || !(await env.hasPermission().catch(() => false))) return 'skipped';
     const { threads, fingerprint } = await libraryFingerprint(db);
@@ -259,7 +259,7 @@ async function* readBackup(port: HelperPort, name: string): AsyncGenerator<Uint8
   }
 }
 
-export function restoreFromHelper(db: ThreadkeeperDB, env: BackupEnv | null, name: unknown): Promise<BackupRestoreResult> {
+export function restoreFromHelper(db: ThreadStackDB, env: BackupEnv | null, name: unknown): Promise<BackupRestoreResult> {
   return exclusive<BackupRestoreResult>({ ok: false, code: 'busy', error: 'A backup or restore is already running.' }, async () => {
     if (typeof name !== 'string' || !/^library-[\d-]+\.tkbackup$/.test(name)) return fail('That backup no longer exists.');
     const port = await open(env);

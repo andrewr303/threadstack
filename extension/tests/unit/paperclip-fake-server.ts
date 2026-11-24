@@ -1,5 +1,5 @@
 /**
- * In-memory Paperclip server for tests: a fetch stub that answers the read routes Threadkeeper
+ * In-memory Paperclip server for tests: a fetch stub that answers the read routes ThreadStack
  * uses with the same shapes and semantics as Paperclip's server (strict updatedSince, ascending
  * sort with offset paging, comment `after` cursors, byte-offset log pages, 401 for missing keys
  * on an authenticated instance, the CLI-auth challenge flow).

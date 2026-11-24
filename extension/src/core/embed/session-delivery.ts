@@ -134,7 +134,7 @@ export function createSessionDeliveryHandler(options: { ownId: string; doc: Docu
     const m = message as Record<string, unknown>;
     if (m.type !== 'TK_SESSION_DELIVER' && m.type !== 'TK_SESSION_CANCEL') return false;
     const ownOrigin = `chrome-extension://${options.ownId}`;
-    if (!options.workspace || sender.id !== options.ownId || !(sender.origin === ownOrigin || sender.url?.startsWith(`${ownOrigin}/`))) { respond({ ok: false, error: { code: 'denied', message: 'Browser actions require the Threadkeeper workspace.' } }); return true; }
+    if (!options.workspace || sender.id !== options.ownId || !(sender.origin === ownOrigin || sender.url?.startsWith(`${ownOrigin}/`))) { respond({ ok: false, error: { code: 'denied', message: 'Browser actions require the ThreadStack workspace.' } }); return true; }
     if (m.type === 'TK_SESSION_CANCEL') { if (typeof m.requestId === 'string') pending.get(m.requestId)?.abort(parseAbortReason(m.reason)); respond({ ok: true }); return true; }
     if (typeof m.requestId !== 'string' || pending.has(m.requestId)) { respond({ ok: false, error: { code: 'busy', message: 'This browser action is already running.' } }); return true; }
     const controller = new AbortController(); pending.set(m.requestId, controller);

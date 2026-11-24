@@ -135,7 +135,7 @@ export function RunState({
       className="tk-run"
       data-state={state}
       data-needs-you={agentStateNeedsYou(state) ? 'true' : 'false'}
-      title={`${label}.${when} This is what the page showed when Threadkeeper last read it.`}
+      title={`${label}.${when} This is what the page showed when ThreadStack last read it.`}
     >
       <span className="tk-run-dot" aria-hidden="true" />
       {compact ? <span className="tk-visually-hidden">{label}</span> : <span className="tk-run-label">{label}</span>}

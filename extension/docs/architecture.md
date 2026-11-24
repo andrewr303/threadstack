@@ -1,6 +1,6 @@
-# Threadkeeper architecture
+# ThreadStack architecture
 
-The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `threadkeeper/`.
+The implementation follows the supplied `online-thread-organizer-build-prompt.md`. The reference extension trees are read-only research inputs, not application code or build inputs. All new application code is in `extension/` (originally its own `threadkeeper/` repository).
 
 ## Table view: every thread as a row, with columns the person and Claude fill (2026-11-17)
 
@@ -159,7 +159,7 @@ browser account.
 ## Workspace: embedded sessions and accounts (2026-11-10)
 
 Session Control (the separate extension that kept a hand-made list of Claude Code session links per
-account) is merged into Threadkeeper. The full-page manager is now a workspace with three views over
+account) is merged into ThreadStack. The full-page manager is now a workspace with three views over
 the same sessions, and sessions are saved by capture; there is no "save a session" form.
 
 **Views** (`src/entrypoints/manager`). `App.tsx` stays the composition root. On the full page it renders
@@ -204,7 +204,7 @@ handshake token changes that.
 Code share one, ChatGPT, Codex and dots another. A Chrome profile has one set of cookies per site, and no
 extension API gives a frame its own persistent cookie jar (checked: declarativeNetRequest cannot target a
 frame; credentialless iframes share one throwaway jar the cookies API cannot see). So one account per
-realm is signed in at a time, in Threadkeeper and in every other tab. Switching (`service.ts`) saves the
+realm is signed in at a time, in ThreadStack and in every other tab. Switching (`service.ts`) saves the
 outgoing account's cookies as an AES-GCM jar in IndexedDB (`accountJars`; the non-extractable key is a
 separate row), writes a journal, clears the realm's cookies, restores the incoming jar, then deletes that
 jar; a worker stopped mid-switch finishes it on the next start. The jar keeps saved sign-ins out of
@@ -266,7 +266,7 @@ knows is told to stop.
 
 Before listing, the page asks its own site who is signed in (`/api/auth/session`; for Claude
 `/api/account`, then `/api/bootstrap`; parsed by `accounts/identity.ts`). The answer goes through
-`noteIdentity` like a page's own report, and the site is imported only if the account Threadkeeper
+`noteIdentity` like a page's own report, and the site is imported only if the account ThreadStack
 will file under is recorded as that same person; no answer, an unparsed one or a service that did not
 take it stops the site ("could not confirm which account"), never a fallback to whichever account was
 active. Conversations the page reads are held in batches of five and stored only after the site
@@ -364,7 +364,7 @@ Paperclip sync, analysis v2). What holds them together:
 
 ## Still (Sidebar Dock) link (2026-11-03)
 
-Threadkeeper talks to the separate Still extension over `chrome.runtime.onMessageExternal` / `sendMessage(id)`
+ThreadStack talks to the separate Still extension over `chrome.runtime.onMessageExternal` / `sendMessage(id)`
 (protocol `still-threadkeeper/1`, `docs/sidebar-dock-integration.md`). All of it lives in `src/core/dock/`:
 
 - `protocol.ts` — constants, `threadHash` (two FNV-1a 64 over UTF-8; shared test vectors), shapes, hand validators
@@ -411,21 +411,21 @@ moves, deletes, organize, undo) set `privacy: true` so the worker takes copies b
 1. **Registry fields.** Every provider in `providers.ts` now has a `category` (`chat`, `coding_agent`, `agent`, `builder`, `search`, `companion`; shared with Sidebar Dock), a `hostAccess` (`required` = install-time host permission and static content script, the v0.4 set, unchanged; `optional` = asked for from the Settings toggle; `custom` = only on sites the user adds; `none` = imports), a `captureMode` (`passive` or `explicit`), `defaultEnabled`, `idParams` (query parameters kept in canonical URLs) and a `selectorConfidence`. Path routing still lives in `providerForPage` (chatgpt.com/dots → `chatgpt_dots`, claude.ai/duet → `claude_duet`, x.com/i/chat → `grok_bot`, huggingface.co/chat, github.com/copilot and pull-request agent sessions, cursor.com/agents, lovable.dev/projects, replit.com/@user/app) and per-provider id rules in `extractConversationIdFromUrl` (which also fixes copilot.com/chat/conversation and HuggingChat ids the generic `/chat/` rule misread).
 2. **Host permissions do not grow at install.** `host_permissions` is exactly the v0.4 list (an update that adds hosts disables the extension until the user re-approves). New hosts, `www.kimi.ai`, and `https://*/*` / `http://*/*` are `optional_host_permissions`. Turning a product on requests its origins inside the click; `custom-sites.ts` then registers `content.js` for it with `chrome.scripting.registerContentScripts` (`persistAcrossSessions`, top frame, `document_idle`). The service worker reconciles registrations against settings, added sites and `chrome.permissions.contains` on install, startup, `permissions.onAdded/onRemoved`, `SETTINGS_CHANGED` and `CAPTURE_SITES_CHANGED`, and injects into tabs already open on a newly granted site. The overlay stays limited to install-time hosts (only they are web accessible); elsewhere the toolbar opens the side panel or the full library.
 3. **Any AI site.** Added origins live in `chrome.storage.local` (`tk.captureSites.v1`, ≤ 50, exact origin with port; http only for loopback and private-network hosts; known providers are refused with a pointer to their toggle). The content script on a page no provider owns asks the worker `GET_CAPTURE_SITE`; only a yes (decided from `sender.url`, never from the page) enables reading. The page is then read as Open WebUI, LibreChat, LobeChat or AnythingLLM when their markup is present, else as `custom_web` with the generic and heuristic readers. Conversation ids are namespaced by host and port (`localhost-3000~<id>`); a page with no id in its address is named by a hash of its opening message. `data-tk-*` attributes and the `tk_provider` hint are ignored there.
-4. **Capture gate.** `capture-gate.ts` decides every `PASSIVE_DOM_CAPTURE`: the sender must be a top frame http(s) page whose `origin` agrees with its URL (`messaging.ts captureSenderUrl`); a provider capture must come from that provider's own pages (`isProviderAllowedOnUrl`), and an added-site capture from that exact origin with its own id prefix; a canonical URL pointing elsewhere is replaced by the sender page. A content script's `explicitInvoke` no longer bypasses a turned-off provider: only a token the worker handed to that tab within 60 s does (`overlay` when Threadkeeper is opened on the page, `capture` for Settings → Capture → Capture this tab).
+4. **Capture gate.** `capture-gate.ts` decides every `PASSIVE_DOM_CAPTURE`: the sender must be a top frame http(s) page whose `origin` agrees with its URL (`messaging.ts captureSenderUrl`); a provider capture must come from that provider's own pages (`isProviderAllowedOnUrl`), and an added-site capture from that exact origin with its own id prefix; a canonical URL pointing elsewhere is replaced by the sender page. A content script's `explicitInvoke` no longer bypasses a turned-off provider: only a token the worker handed to that tab within 60 s does (`overlay` when ThreadStack is opened on the page, `capture` for Settings → Capture → Capture this tab).
 5. **Explicit-only Grok Bot.** X Chat carries human DMs, so `grok_bot` (off by default) is read only when it is on **and** the capture carries a `capture` token. The content script never observes X Chat; it reads the chat's open shadow root only for that request. Roles are inferred from alignment classes (low confidence).
 6. **Settling.** Pages without a dependable streaming signal (generic or heuristic readers, added sites, adapters marked `stabilize`) are sent only when two reads in a row see the same text; adapters with a page-wide stop button (`docStreaming`) skip the newest reply while it is shown. Character.AI's newest-first list is reversed and keyed by content hashes.
 7. **Not built:** network readers (MAIN world) and Catch up for the new products, Pi export import, and live verification. Every new adapter is tested against synthetic fixtures modelled on public exporters and the sites' own code (`tests/unit/providers-*.test.ts`); the README table lists each product's selector confidence.
 
 ## Paperclip sync (2026-11-03)
 
-`src/core/paperclip/`. Paperclip (github.com/paperclipai/paperclip, read at commit `4d31588`, server 0.3.1) is a self-hosted server that runs companies of AI agents. Threadkeeper reads it over its REST API from the service worker (Paperclip sends no CORS headers, so content scripts cannot), with host access requested from the Settings click (`http://localhost/*` and `http://127.0.0.1/*` are optional host permissions; other hosts need a broader optional grant).
+`src/core/paperclip/`. Paperclip (github.com/paperclipai/paperclip, read at commit `4d31588`, server 0.3.1) is a self-hosted server that runs companies of AI agents. ThreadStack reads it over its REST API from the service worker (Paperclip sends no CORS headers, so content scripts cannot), with host access requested from the Settings click (`http://localhost/*` and `http://127.0.0.1/*` are optional host permissions; other hosts need a broader optional grant).
 
 - **Model:** one thread per issue (`provider: 'paperclip'`, category `agent`, `sourceConversationId = issue.id`, the bound `paperclip` account). Messages: the description (`issue:<id>:description`, role user), comments (`comment:<id>`; user → user, agent → assistant, system/system notices → system, deleted skipped), and per run a block: a system header whose id `run:<runId>:h:<status>:<logBytes>[:s:<sessionId>]` records what makes the stored transcript reusable and the CLI session it resumed, then `run:<runId>:<n>` messages. Transcripts come from the run log (stdout JSON lines of Claude Code stream-json, `codex exec --json`, OpenCode, Grok Build, Gemini/Cursor) or, for native runs, from `/events?view=conversation` (`paperclip.prp.event.v1` items). Thinking, progress and stderr are dropped; tool calls are condensed like `cli-sessions.ts`. Bounds: 30 runs with transcripts per issue, 4 MiB of log per run, 400 messages per run, 4000 per thread.
 - **New optional fields:** `ConversationRecord.agentLabel` ("Engineer · Claude Code") and `linkedThreadKeys` (Claude Code / Codex threads whose session id equals a run's `sessionIdAfter`; the expected key is stored before that session is imported). `upsertThread` keeps them across re-imports. The manager shows the agent in the meta strip and a "Linked session" / "Run by Paperclip" row.
 - **Sync** (`sync.ts`, background alarm `tk-paperclip-sync` every 5 min while enabled, `PAPERCLIP_SYNC_NOW` from Settings): per company, the newest 100 runs mark changed runs' issues dirty (runs do not always bump their issue), then `issues?updatedSince=<cursor − 2 s>&sortField=updated&sortDir=asc` is paged; issues already stored at the cursor are skipped. Each changed issue is fetched in full; a finished run with an unchanged log size reuses its stored messages. State (cursors, run marks, last result/error, backoff) lives in `chrome.storage.local` `tk.paperclip.sync.v1`. Budgets: 50 s / 150 issues per alarm (a partial sync re-arms itself in 30 s), 240 s / 1000 issues for Sync now. 429 is retried in place up to 30 s, else the sync stops with backoff; failures back off 5 → 60 min. Stored threads go through `processThreadLocally` (analysis, filing by `providerProjectName` = project → goal → company, AI queue), then the issue status is applied unless the user set the status by hand.
 - **Auth** (`auth.ts`): none for `local_trusted`; otherwise the CLI approval flow (`POST /api/cli-auth/challenges`, open `approvalUrl`, poll, verify with `/api/cli-auth/me`) or a pasted `pcp_board_…` key, kept in `settings.paperclip.apiKey` like other keys. Requests never send cookies.
 - **Live hint** (`live.ts`): on a `local_trusted` server the worker opens `/api/companies/:id/events/ws` and schedules a sync 8 s after an issue or run event. Board keys are refused by that socket, so authenticated servers are polled only.
-- **Read-only:** the only non-GET calls are the sign-in challenge and revoking Threadkeeper's own key on sign-out.
+- **Read-only:** the only non-GET calls are the sign-in challenge and revoking ThreadStack's own key on sign-out.
 
 Not verified against a live Paperclip server (none was run): the shapes follow the server source and are exercised against an in-memory fake (`tests/unit/paperclip-fake-server.ts`).
 
@@ -504,7 +504,7 @@ Use neutral layered surfaces with a restrained teal accent, 4px spacing rhythm, 
 
 `Y` = implemented, `P` = partial by design, `N` = not supported and must be shown as unsupported in the UI.
 
-| Capability | Web DOM capture (ChatGPT, Claude, Claude Code web, Codex web, Grok, Gemini, Perplexity, DeepSeek, Le Chat, Copilot) | ChatGPT / Claude export | Claude Code / Codex CLI sessions | Threadkeeper portable |
+| Capability | Web DOM capture (ChatGPT, Claude, Claude Code web, Codex web, Grok, Gemini, Perplexity, DeepSeek, Le Chat, Copilot) | ChatGPT / Claude export | Claude Code / Codex CLI sessions | ThreadStack portable |
 |---|---|---|---|---|
 | Account identification | P — user-bound label only | P — user declares the archive's account | P — bound per provider | Y — carried in the file |
 | Thread discovery | P — only threads the user opens | Y — every conversation in the file | Y — every session file in the picked folder | Y |

@@ -1,4 +1,4 @@
-// Real-browser runner for REQ-6 fused mode (Threadkeeper views laid inside Paperclip's own window).
+// Real-browser runner for REQ-6 fused mode (ThreadStack views laid inside Paperclip's own window).
 // Verification only: it never edits product source. Fresh temp profile, private build, loopback only.
 //
 //   TK_E2E_DIST=/tmp/tk-fused-build \
@@ -153,16 +153,16 @@ async function measure() {
   const f = await frame();
   const inFrame = await f.evaluate(() => {
     const rect = e => e ? e.getBoundingClientRect().toJSON() : null;
-    const slot = document.querySelector('.threadkeeper-slot');
+    const slot = document.querySelector('.threadstack-slot');
     return {
       path: location.pathname, timeOrigin: performance.timeOrigin,
       paperclipTheme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-      slot: rect(slot), slotAttr: document.documentElement.getAttribute('data-threadkeeper-slot'),
+      slot: rect(slot), slotAttr: document.documentElement.getAttribute('data-threadstack-slot'),
       slotVars: ['--tk-slot-x', '--tk-slot-y', '--tk-slot-w', '--tk-slot-h'].map(k => document.documentElement.style.getPropertyValue(k)),
       viewport: { w: innerWidth, h: innerHeight },
       sidebar: rect(document.querySelector('aside.coordinator-sidebar')),
-      nav: [...document.querySelectorAll('nav[aria-label="Threadkeeper"] a')].map(a => ({ text: a.textContent.trim(), href: a.getAttribute('href'), rect: rect(a) })),
-      current: [...document.querySelectorAll('nav[aria-label="Threadkeeper"] a[aria-current]')].map(a => a.textContent.trim()),
+      nav: [...document.querySelectorAll('nav[aria-label="ThreadStack"] a')].map(a => ({ text: a.textContent.trim(), href: a.getAttribute('href'), rect: rect(a) })),
+      current: [...document.querySelectorAll('nav[aria-label="ThreadStack"] a[aria-current]')].map(a => a.textContent.trim()),
     };
   });
   const inShell = await page.evaluate(() => {
@@ -173,7 +173,7 @@ async function measure() {
     const view = document.querySelector('.tk-view-threads');
     return {
       workbench: wb ? { ...wb.dataset } : null, url: location.search,
-      threadkeeperTheme: document.documentElement.getAttribute('data-theme'),
+      threadStackTheme: document.documentElement.getAttribute('data-theme'),
       shell: rect(document.querySelector('.tk-shell')), shellData: document.querySelector('.tk-shell') ? { ...document.querySelector('.tk-shell').dataset } : null,
       shellStyle: document.querySelector('.tk-shell')?.getAttribute('style') ?? null,
       frameRect: rect(frameEl), frameZ: frameEl ? getComputedStyle(frameEl.closest('.tk-view-paperclip') ?? frameEl).zIndex : null,
@@ -244,7 +244,7 @@ async function seedThreads() {
       const sourceConversationId = i === 0 ? 'fused_layout_chat' : `fused_seed_${i}`;
       rows.push({ threadKey: `${provider}:${accountId}:default:${sourceConversationId}:main`, provider, accountId, workspaceId: 'default', sourceConversationId, branchId: 'main', parentBranchId: null, siblingBranchIds: [], canonicalUrl: i === 0 ? 'https://chatgpt.com/c/fused_layout_chat' : `https://claude.ai/code/session_fused_${i}`, title: i === 0 ? 'Create Research Agent Plugin' : `Fused seed thread ${i + 1}`, manualTitleOverride: null, createdAt: now, updatedAt: new Date(Date.now() - i * 60000).toISOString(), lastCapturedAt: now, sourceRevision: 1, contentHash: 'fused-seed', coverage: 'full', captureSource: 'manual', messageCount: 1, project: 'General research', categoryLocked: true, tags: [], manualTags: [], workflowState: 'active', manualNotes: '', pinned: false, snoozedUntil: null, dismissedQueues: [], cloudExcluded: false, cloudTaskStatus: 'unsupported', isSyntheticBenchmark: false, latestDecisionText: null, latestDecisionMsgIndex: null, latestDecisionSpeaker: null, nextStepText: null, nextStepMsgIndex: null, nextStepSpeaker: null, agentState: null });
     }
-    await globalThis.__threadkeeperDb.conversations.bulkPut(rows);
+    await globalThis.__threadStackDb.conversations.bulkPut(rows);
   }, { now });
 }
 
@@ -344,7 +344,7 @@ try {
     if (location.origin !== 'http://127.0.0.1:3217' || window.parent === window) return;
     window.__tkLog = []; const t0 = performance.now();
     window.addEventListener('message', e => { if (e.data && e.data.source === 'threadkeeper-shell') window.__tkLog.push([Math.round(performance.now() - t0), 'msg', JSON.stringify(e.data).slice(0, 160)]); });
-    const start = () => new MutationObserver(ms => { for (const m of ms) if (m.attributeName === 'data-threadkeeper-slot') window.__tkLog.push([Math.round(performance.now() - t0), 'slot-attr', document.documentElement.getAttribute('data-threadkeeper-slot')]); }).observe(document.documentElement, { attributes: true });
+    const start = () => new MutationObserver(ms => { for (const m of ms) if (m.attributeName === 'data-threadstack-slot') window.__tkLog.push([Math.round(performance.now() - t0), 'slot-attr', document.documentElement.getAttribute('data-threadstack-slot')]); }).observe(document.documentElement, { attributes: true });
     if (document.documentElement) start(); else document.addEventListener('DOMContentLoaded', start);
   });
   [sw] = context.serviceWorkers(); if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 30_000 });
@@ -563,7 +563,7 @@ try {
       const item = m.nav.find(n => n.text === text);
       check(item && item.href === href && item.rect.width > 0 && item.rect.x + item.rect.width <= m.sidebar.x + m.sidebar.width + 1, `Sidebar entry ${text} -> ${href}`, m.nav);
     }
-    check(m.nav.length === 3, 'Exactly three Threadkeeper entries', m.nav);
+    check(m.nav.length === 3, 'Exactly three ThreadStack entries', m.nav);
     ctx.detail.navigation = [];
     for (const [text, href, view] of [['Browse', `${base}/browse`, 'browse'], ['Session board', `${base}/session-board`, 'dashboard'], ['Threads', `${base}/threads`, 'threads']]) {
       await clickFrameLink(href);
@@ -595,7 +595,7 @@ try {
       const named = [...document.querySelectorAll('.tk-shell button, .tk-shell [role="radio"], .tk-shell [role="tab"], .tk-shell a')].filter(e => visible(e) && names.test((e.getAttribute('aria-label') || e.textContent).trim())).map(e => `${e.tagName}:${(e.getAttribute('aria-label') || e.textContent).trim()}`);
       return { shellGroups: shell, shellNamed: named };
     });
-    const frameNavGroups = await f.evaluate(() => [...document.querySelectorAll('nav[aria-label="Threadkeeper"]')].filter(n => n.getBoundingClientRect().width > 0).length);
+    const frameNavGroups = await f.evaluate(() => [...document.querySelectorAll('nav[aria-label="ThreadStack"]')].filter(n => n.getBoundingClientRect().width > 0).length);
     ctx.detail.switches = { ...switches, paperclipNavGroups: frameNavGroups };
     check(switches.shellGroups.length === 0 && switches.shellNamed.length === 0 && frameNavGroups === 1, 'Exactly one view switch in the window (Paperclip sidebar group)', ctx.detail.switches);
     await ctx.shot('-threads');
@@ -659,9 +659,9 @@ try {
   await runCase('fused-layering', "Paperclip's content rectangle goes transparent after the shell sends placed; opaque again on leaving", ['REQ-6-design'], async ctx => {
     await goThreads();
     const f = await frame();
-    const attr = () => f.evaluate(() => document.documentElement.getAttribute('data-threadkeeper-slot'));
+    const attr = () => f.evaluate(() => document.documentElement.getAttribute('data-threadstack-slot'));
     const t0 = Date.now();
-    const onThreads = await until(attr, v => v === 'threads', 5_000, 'data-threadkeeper-slot=threads').catch(() => attr());
+    const onThreads = await until(attr, v => v === 'threads', 5_000, 'data-threadstack-slot=threads').catch(() => attr());
     const log = await f.evaluate(() => window.__tkLog ?? null);
     const placedMessages = (log ?? []).filter(e => e[1] === 'msg' && e[2].includes('"type":"placed"')).map(e => e[2]);
     ctx.detail.onThreads = { attr: onThreads, waitedMs: Date.now() - t0, placedMessagesReceivedByFrame: placedMessages.slice(-4), slotAttrMutations: (log ?? []).filter(e => e[1] === 'slot-attr').slice(-6) };
@@ -678,7 +678,7 @@ try {
     const onBrowse = await until(attr, v => v === 'browse', 5_000, 'attribute browse').catch(() => attr());
     ctx.detail.onBrowse = { attr: onBrowse };
     await clickFrameLink(`${base}/threads`); await waitFusedOn('threads');
-    check(onThreads === 'threads', 'data-threadkeeper-slot="threads" set after placed:threads', ctx.detail);
+    check(onThreads === 'threads', 'data-threadstack-slot="threads" set after placed:threads', ctx.detail);
     check(onTasks === null, 'attribute removed on a Paperclip page', ctx.detail);
     check(back === 'threads' && onBrowse === 'browse', 'attribute follows the placed view on return and on Browse', ctx.detail);
     return `Attribute: threads on Threads, removed on Tasks, threads again on return, browse on Browse (first set after ${ctx.detail.onThreads.waitedMs} ms).`;
@@ -853,13 +853,13 @@ try {
       const create = f.locator('[role="dialog"]').getByRole('button', { name: 'Create task', exact: true });
       await create.waitFor({ state: 'visible', timeout: 10_000 });
       await create.click();
-      const toast = f.locator('[data-threadkeeper-notice]').first();
+      const toast = f.locator('[data-threadstack-notice]').first();
       try { await toast.waitFor({ state: 'visible', timeout: 6_000 }); found = toast; } catch { /* try again */ }
     }
     check(found, 'A real toast appeared after creating a task through the UI', { attempts: attempt });
     // Everything below must fit inside the 3.5 s success-toast lifetime, so measure in one pass.
     await sleep(350); // let its enter transition and the shell's hole follow it
-    const g = await f.evaluate(() => { const t = document.querySelector('[data-threadkeeper-notice]'); if (!t) return null; const r = t.getBoundingClientRect().toJSON(); const dismiss = t.querySelector('button[aria-label="Dismiss notification"]').getBoundingClientRect().toJSON(); return { rect: r, dismiss, bg: getComputedStyle(t).backgroundColor, text: t.textContent.slice(0, 80) }; });
+    const g = await f.evaluate(() => { const t = document.querySelector('[data-threadstack-notice]'); if (!t) return null; const r = t.getBoundingClientRect().toJSON(); const dismiss = t.querySelector('button[aria-label="Dismiss notification"]').getBoundingClientRect().toJSON(); return { rect: r, dismiss, bg: getComputedStyle(t).backgroundColor, text: t.textContent.slice(0, 80) }; });
     check(g, 'Toast still present for measurement', g);
     const m = await measure();
     const overlap = (() => { const a = g.rect, b = m.shell; const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y), x2 = Math.min(a.x + a.width, b.x + b.width), y2 = Math.min(a.y + a.height, b.y + b.height); return x2 > x1 && y2 > y1 ? { x: x1, y: y1, width: x2 - x1, height: y2 - y1 } : null; })();
@@ -884,12 +884,12 @@ try {
     const sel = await page.evaluate(() => [...document.querySelectorAll('.tk-shell .tk-row-btn')].findIndex(b => b.getAttribute('aria-selected') === 'true'));
     ctx.detail.clickThrough = { selectedIndex: sel };
     // Dismiss with a real click.
-    const stillThere = await f.evaluate(() => !!document.querySelector('[data-threadkeeper-notice]'));
+    const stillThere = await f.evaluate(() => !!document.querySelector('[data-threadstack-notice]'));
     if (stillThere) {
-      const d = await f.evaluate(() => { const b = document.querySelector('[data-threadkeeper-notice] button[aria-label="Dismiss notification"]')?.getBoundingClientRect().toJSON(); return b ?? null; });
+      const d = await f.evaluate(() => { const b = document.querySelector('[data-threadstack-notice] button[aria-label="Dismiss notification"]')?.getBoundingClientRect().toJSON(); return b ?? null; });
       if (d) { const dh = await topAt(d.x + d.width / 2, d.y + d.height / 2); ctx.detail.dismissHit = dh; await page.mouse.click(d.x + d.width / 2, d.y + d.height / 2); }
-      await f.locator('[data-threadkeeper-notice]').first().waitFor({ state: 'detached', timeout: 3_000 }).catch(() => {});
-      ctx.detail.dismissed = !(await f.evaluate(() => !!document.querySelector('[data-threadkeeper-notice]')));
+      await f.locator('[data-threadstack-notice]').first().waitFor({ state: 'detached', timeout: 3_000 }).catch(() => {});
+      ctx.detail.dismissed = !(await f.evaluate(() => !!document.querySelector('[data-threadstack-notice]')));
     } else ctx.detail.dismissed = 'toast expired before the dismiss click';
     check(sel === 6, 'The view stayed clickable while the toast was up', ctx.detail.clickThrough);
     check(ctx.detail.dismissHit?.inFrame && ctx.detail.dismissed === true, 'The dismiss button was clickable and removed the toast', { hit: ctx.detail.dismissHit, dismissed: ctx.detail.dismissed });
@@ -932,20 +932,20 @@ try {
   });
 
   // ---------------------------------------------------------------- fused-fallback (AC-2)
-  await runCase('fused-fallback', 'An ordinary tab at /THR/threads offers Open this in Threadkeeper', ['AC-2'], async ctx => {
+  await runCase('fused-fallback', 'An ordinary tab at /THR/threads offers Open this in ThreadStack', ['AC-2'], async ctx => {
     const ordinary = await context.newPage();
     try {
       await ordinary.goto(`${origin}${base}/threads`);
-      const heading = ordinary.getByRole('heading', { name: 'Open this in Threadkeeper', exact: true });
+      const heading = ordinary.getByRole('heading', { name: 'Open this in ThreadStack', exact: true });
       await heading.waitFor({ timeout: 30_000 });
       ctx.detail.url = ordinary.url();
       ctx.detail.body = (await ordinary.locator('main#main-content').innerText().catch(() => '')).slice(0, 600);
-      ctx.detail.hostAttr = await ordinary.evaluate(() => document.documentElement.hasAttribute('data-threadkeeper-host'));
-      ctx.detail.slotPresent = await ordinary.evaluate(() => !!document.querySelector('.threadkeeper-slot'));
+      ctx.detail.hostAttr = await ordinary.evaluate(() => document.documentElement.hasAttribute('data-threadstack-host'));
+      ctx.detail.slotPresent = await ordinary.evaluate(() => !!document.querySelector('.threadstack-slot'));
       ctx.evidence.push(await shot('fused-fallback', ordinary));
     } finally { await ordinary.close(); await page.bringToFront(); }
     check(ctx.detail.hostAttr === false && ctx.detail.slotPresent === false, 'Ordinary tab is not treated as a verified host', ctx.detail);
-    return 'The ordinary tab at /THR/threads shows the heading "Open this in Threadkeeper" and no slot.';
+    return 'The ordinary tab at /THR/threads shows the heading "Open this in ThreadStack" and no slot.';
   });
 
   // ---------------------------------------------------------------- fused-offline (AC-8)
@@ -974,7 +974,7 @@ try {
     ctx.detail.offline = { ...off, ...state };
     await ctx.shot('-offline');
     check(state.threadsVisible && state.rows >= 30 && state.railVisible && state.switchVisible && state.sameNode, 'Offline: Threads view kept (same node), shell rail and its own view switch visible', ctx.detail.offline);
-    // The user's screenshot shows standalone Threadkeeper. Verify that surface while the
+    // The user's screenshot shows standalone ThreadStack. Verify that surface while the
     // owned Paperclip server is stopped, then retain the original recovery case afterwards.
     ctx.detail.standaloneLayouts = [];
     for (const width of [1280, 700]) {

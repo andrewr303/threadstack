@@ -1,0 +1,185 @@
+name: ThreadStack integration checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threadstack-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NPM_CONFIG_AUDIT: 'false'
+  NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_UPDATE_NOTIFIER: 'false'
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+# These checks cover the extension, browser-sessions plugin and the affected
+# UI/server integration. They do not qualify the full Paperclip suite, native
+# Runner, Docker release, real providers, browser consent or the Mac helper.
+jobs:
+  extension_plugin:
+    name: ThreadStack extension and browser sessions
+    if: github.repository == 'AVRCORP/threadkeeper'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the tested PR revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup pinned pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          version: 9.15.4
+          run_install: false
+
+      - name: Install the locked workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate the fork CI boundary and source pins
+        run: |
+          node --test scripts/threadstack-ci.test.mjs
+          node tests/runner-e2e/source-sdk-public-inputs.mjs "$(git rev-parse HEAD)" --check
+
+      - name: Install the separate React 18 extension
+        run: npm ci --prefix extension
+
+      - name: Prepare workspace imports
+        run: |
+          pnpm run preflight:workspace-links
+          pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+
+      # Same guard, typecheck, full extension suite and isolated build as
+      # check:extension, with two test workers for the hosted runner.
+      - name: Validate extension guards and cross-package contracts
+        run: |
+          node --input-type=module -e "import { assertThreadStackSafety } from './scripts/threadstack-check.mjs'; assertThreadStackSafety()"
+          pnpm run test:threadstack
+
+      - name: Typecheck and test the extension
+        run: |
+          npm --prefix extension run typecheck
+          npm --prefix extension test -- --maxWorkers=2
+
+      - name: Build the isolated extension
+        run: |
+          tk_ci_build_started="$(node -p 'Date.now()')"
+          TK_OUT_DIR=/tmp/tk-build TK_STABLE_ID=0 npm --prefix extension run build
+          TK_CI_BUILD_SINCE="$tk_ci_build_started" node --input-type=module <<'NODE'
+          import { assertBuiltManifest } from './scripts/threadstack-check.mjs';
+          assertBuiltManifest('/tmp/tk-build', Number(process.env.TK_CI_BUILD_SINCE) - 1000);
+          NODE
+
+      - name: Typecheck, test and build browser sessions
+        run: |
+          pnpm --filter @paperclipai/plugin-browser-sessions typecheck
+          pnpm --filter @paperclipai/plugin-browser-sessions test
+          pnpm --filter @paperclipai/plugin-browser-sessions build
+
+      - name: Upload isolated extension and plugin build identities
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: threadstack-build-identities-${{ github.run_attempt }}
+          path: |
+            /tmp/tk-build/build-info.json
+            /tmp/tk-build/manifest.json
+            packages/plugins/plugin-browser-sessions/dist/manifest.js
+          if-no-files-found: warn
+          retention-days: 7
+
+  ui_server:
+    name: ThreadStack UI and server integration
+    if: github.repository == 'AVRCORP/threadkeeper'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PAPERCLIP_TYPECHECK_LOW_MEMORY: '1'
+    steps:
+      - name: Checkout the tested PR revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup pinned pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          version: 9.15.4
+          run_install: false
+
+      - name: Install the locked workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare workspace imports and check source pins
+        run: |
+          pnpm run preflight:workspace-links
+          pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+          node tests/runner-e2e/source-sdk-public-inputs.mjs "$(git rev-parse HEAD)" --check
+
+      - name: Typecheck the UI and layered server
+        run: |
+          pnpm --filter @paperclipai/ui typecheck
+          pnpm --filter @paperclipai/server typecheck
+
+      - name: Test the affected UI integration
+        run: >-
+          pnpm --filter @paperclipai/ui exec vitest run --maxWorkers=2
+          src/api/browser-sessions.test.ts
+          src/components/BrowserSessionCredentialSettings.test.tsx
+          src/components/CommandPalette.test.tsx
+          src/components/CoordinatorSidebar.test.tsx
+          src/components/IssueDetailTabBar.test.tsx
+          src/components/ThreadStackSlot.test.tsx
+          src/components/search/BrowserSessionResults.test.tsx
+          src/context/LiveUpdatesProvider.recovery.test.tsx
+          src/lib/hosted-live-transport.test.ts
+          src/lib/threadstack-boot-channel.test.ts
+          src/lib/threadstack-host-bridge.test.ts
+          src/lib/threadstack-host-fusion.test.ts
+          src/lib/threadstack-host-layout.test.ts
+          src/lib/threadstack-host-slot.test.ts
+          src/lib/threadstack-host.test.ts
+          src/lib/threadstack-overlays.test.ts
+          src/pages/CompanySettingsPluginPage.test.tsx
+          src/pages/InviteLanding.test.tsx
+          src/pages/PluginPage.test.tsx
+
+      - name: Test the affected server integration
+        run: >-
+          pnpm --filter @paperclipai/server exec vitest run --maxWorkers=1 --no-file-parallelism
+          src/__tests__/bundled-plugins.test.ts
+          src/__tests__/cli-invocation-safety.test.ts
+          src/__tests__/company-live-events-stream.test.ts
+          src/__tests__/http-log-policy.test.ts
+          src/__tests__/logger-browser-session-redaction.test.ts
+          src/__tests__/plugin-install-autobuild.test.ts
+          src/__tests__/plugin-scoped-api-routes.test.ts
+          src/__tests__/redact-sensitive.test.ts
+          src/__tests__/static-index-html.test.ts
+          src/__tests__/tool-access-policy-service.test.ts
+          src/__tests__/tool-gateway.test.ts
+          src/__tests__/workspace-runtime.test.ts
+
+      - name: Build the UI
+        run: pnpm --filter @paperclipai/ui build
+
+      - name: Record the qualification boundary
+        if: always()
+        run: |
+          printf '%s\n' 'Scoped ThreadStack integration checks. Full Paperclip, native Runner, Docker, real-provider and browser acceptance remain separate qualifications.' >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,4 @@
-// Capture on sites Threadkeeper does not hold from install: optional providers (host access asked
+// Capture on sites ThreadStack does not hold from install: optional providers (host access asked
 // for from the Settings toggle) and "any AI site" origins the user adds (self-hosted Open WebUI,
 // LibreChat, LobeChat, AnythingLLM, or anything else).
 //
@@ -201,7 +201,7 @@ export interface CaptureScript {
   matches: string[];
   js: string[];
   runAt: 'document_idle' | 'document_start';
-  /** Every frame: the same pages also load inside Threadkeeper's workspace tab. */
+  /** Every frame: the same pages also load inside ThreadStack's workspace tab. */
   allFrames: true;
   persistAcrossSessions: true;
   world?: 'MAIN';

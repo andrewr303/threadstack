@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   deleteConversationCascade,
   ensureStarterCollectionsAndSettings,
   saveSettingsPatch,
@@ -21,7 +21,7 @@ import { paperclipThreadKey } from '../../src/core/paperclip/mapper.js';
 import { FakePaperclip, claudeSession, runLog } from './paperclip-fake-server.js';
 
 let n = 0;
-let db: ThreadkeeperDB;
+let db: ThreadStackDB;
 let server: FakePaperclip;
 let settings: SettingsRecord;
 let store: ReturnType<typeof memoryStateStore>;
@@ -77,7 +77,7 @@ function seed() {
 
 beforeEach(async () => {
   n += 1;
-  db = new ThreadkeeperDB(`PaperclipSyncDB_${n}_${Date.now()}`);
+  db = new ThreadStackDB(`PaperclipSyncDB_${n}_${Date.now()}`);
   settings = await ensureStarterCollectionsAndSettings(db);
   server = new FakePaperclip();
   store = memoryStateStore();
@@ -284,7 +284,7 @@ describe('Paperclip sync', () => {
     expect(outcome.threadKeys).toEqual([key('side-1')]);
   });
 
-  it('respects threads deleted in Threadkeeper', async () => {
+  it('respects threads deleted in ThreadStack', async () => {
     seed();
     await enable();
     await sync();

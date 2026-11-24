@@ -7,9 +7,15 @@
   display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; min-height: 40px; flex-wrap: wrap;
   padding: 3px 6px; border-radius: var(--r-chrome);
 }
-.tk-table-search { display: flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 0; max-width: 420px; color: var(--text-3); }
-.tk-table-search .tk-input { flex: 1; min-width: 0; }
-.tk-table-count { font-size: var(--fs-12); color: var(--text-3); white-space: nowrap; margin-right: auto; }
+.tk-table-bar > .tk-dash-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Filter field: the icon sits inside the 34px field, like the design's filter header. */
+.tk-table-search { position: relative; display: flex; align-items: center; flex: 1 1 220px; min-width: 0; max-width: 380px; color: var(--text-3); }
+.tk-table-search > .tk-icon { position: absolute; left: 11px; pointer-events: none; }
+.tk-table-search .tk-input { flex: 1; min-width: 0; min-height: 34px; padding-left: 34px; border-radius: var(--r-row); }
+.tk-table-providers { border-radius: var(--r-panel); }
+.tk-table-providers .tk-seg-thumb, .tk-table-providers .tk-seg-item { border-radius: var(--r-row); }
+.tk-table-providers .tk-seg-item { min-height: 30px; padding: 0 10px; }
+.tk-table-count { font-size: var(--fs-12); color: var(--text-3); white-space: nowrap; margin-left: auto; padding-right: 6px; }
 .tk-table-progress { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-12); color: var(--text-2); }
 .tk-table-progress progress { width: 96px; height: 6px; accent-color: var(--accent); }
 
@@ -25,7 +31,7 @@
 }
 .tk-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: var(--fs-13); color: var(--text); }
 .tk-table th, .tk-table td {
-  padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle;
+  padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle;
   white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis;
 }
 .tk-table thead th {
@@ -33,7 +39,7 @@
   background: var(--surface-2); border-bottom: 1px solid var(--line-2); font-weight: 600; font-size: var(--fs-12); color: var(--text-2);
 }
 /* The title stays in view while the other columns scroll sideways. */
-.tk-table [data-col="title"] { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 240px; max-width: 360px; border-right: 1px solid var(--line); }
+.tk-table [data-col="title"] { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 280px; max-width: 360px; border-right: 1px solid var(--line); }
 .tk-table thead [data-col="title"] { z-index: 3; background: var(--surface-2); }
 .tk-table tbody tr:hover > * { background: var(--surface-2); }
 .tk-table tbody th { font-weight: 400; }
@@ -46,6 +52,7 @@
 }
 .tk-table-sort:hover { background: var(--ctl-hover); color: var(--text); }
 .tk-table-sortmark { font-size: 9px; color: var(--accent); min-width: 9px; }
+.tk-table [data-col="messages"] { text-align: right; font-variant-numeric: tabular-nums; }
 .tk-table-colmenu { flex: none; width: 26px; height: 26px; }
 
 .tk-table-titlecell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }

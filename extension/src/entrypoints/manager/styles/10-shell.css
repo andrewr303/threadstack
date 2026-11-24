@@ -49,9 +49,27 @@
   display: none !important;
 }
 
-.tk-view-paperclip { position: relative; overflow: hidden; border-radius: var(--r-chrome); background: var(--surface); }
+.tk-view-paperclip { position: relative; overflow: hidden; border-radius: var(--r-chrome); background: var(--surface); border: 1px solid var(--line); }
 .tk-paperclip-frame { flex: 1; width: 100%; min-height: 0; border: 0; border-radius: inherit; }
 .tk-paperclip-empty { display: grid; place-items: center; flex: 1; padding: var(--gap); }
+
+/* Running: a glass bar over the app (no glass inside it), the app below in a solid panel. */
+.tk-view-paperclip[data-header="true"] { overflow: visible; background: transparent; border: 0; border-radius: 0; }
+.tk-view-paperclip[data-header="true"] .tk-paperclip-frame { border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface); }
+.tk-paperclip-bar { display: flex; align-items: center; gap: 10px; flex: none; min-height: 44px; padding: 4px 6px 4px 14px; border-radius: var(--r-chrome); }
+.tk-paperclip-live { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-count); }
+.tk-paperclip-bar-title { font-size: var(--fs-13); font-weight: 600; }
+.tk-paperclip-bar-origin { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: var(--fs-12); color: var(--text-3); }
+.tk-paperclip-bar-spacer { flex: 1; }
+@media (max-width: 1179px) { .tk-paperclip-bar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+
+/* Stopped: one centered card with what is wrong and the action that fixes it. */
+.tk-paperclip-card { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 360px; text-align: center; }
+.tk-paperclip-card-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 4px; border: 1px solid var(--line-2); border-radius: var(--r-panel); background: var(--surface-2); color: var(--text-2); }
+.tk-paperclip-card-title { margin: 0; font-family: var(--font-serif); font-size: var(--fs-20); font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+.tk-paperclip-card-body, .tk-paperclip-card-note { margin: 0; font-size: var(--fs-13); line-height: 1.55; color: var(--text-2); }
+.tk-paperclip-card-note { font-size: var(--fs-12); color: var(--text-3); overflow-wrap: anywhere; }
+.tk-paperclip-card-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
 .tk-paperclip-loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--surface); pointer-events: none; }
 .tk-paperclip-status { padding: 8px 12px; color: var(--text-2); font-size: var(--fs-12); overflow-wrap: anywhere; }
 .tk-paperclip-status p { margin: 0 0 6px; }
@@ -95,27 +113,81 @@
   flex: 1;
 }
 
+/* ThreadStack brand: the stacked-layers mark collapsed, the mark + "TS" wordmark expanded. Images
+   (assets/brand/*.png, 4x the shown size); the accessible name is their alt text. */
 .tk-rail-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--r-ctl);
-  background: var(--accent);
-  color: var(--on-accent);
-  font: 700 var(--fs-12) / 1 var(--font-serif);
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  user-select: none;
 }
 
 .tk-rail-wordmark {
+  display: block;
+  flex: none;
+  width: auto;
+  height: 29px;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
+  user-select: none;
+}
+
+/* Theme, add account, Settings, search (when the palette is on) and collapse: 32px icon buttons. */
+.tk-rail-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  margin-left: auto;
+}
+
+.tk-rail-actions .tk-icon-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: var(--r-ctl);
+  color: var(--text-2);
+}
+
+.tk-rail-actions .tk-icon-btn:hover {
+  color: var(--text);
+}
+
+.tk-rail-top {
+  flex: none;
   min-width: 0;
-  font-family: var(--font-serif);
-  font-size: var(--fs-16);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* Threads: a wider rail whose top has two columns, the brand and view switch on the left and the
+   list's search and grouping on the right; the grouped list spans the full width below. */
+.tk-shell .tk-rail[data-view="threads"]:not([data-collapsed="true"]):not([data-drawer-open="true"]) {
+  width: clamp(264px, 46vw, 644px);
+}
+
+.tk-rail[data-view="threads"]:not([data-collapsed="true"]) .tk-rail-top {
+  display: grid;
+  grid-template-columns: minmax(0, 262px) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 4px;
+}
+
+.tk-rail[data-view="threads"]:not([data-collapsed="true"]) .tk-rail-head,
+.tk-rail[data-view="threads"]:not([data-collapsed="true"]) .tk-rail-views {
+  grid-column: 1;
+}
+
+.tk-rail-threads-top {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 0;
+  padding: 8px 8px 8px 0;
+}
+
+.tk-rail-threads-top:empty {
+  display: none;
 }
 
 .tk-rail-toggle .tk-icon {
@@ -126,7 +198,8 @@
   transform: scaleX(-1);
 }
 
-/* View switch: icon over label, so "Dashboard" fits at 13px in three equal columns. */
+/* View switch: five icons on an inked track, a raised thumb sliding under the chosen view. Each
+   view's name stays its accessible name and tooltip. */
 .tk-rail-views {
   flex: none;
   padding: 0 8px 8px;
@@ -135,11 +208,15 @@
 .tk-rail-seg {
   display: grid;
   width: 100%;
+  border-color: var(--line);
   border-radius: var(--r-panel);
+  background: var(--switch-track);
 }
 
 .tk-rail-seg .tk-seg-thumb {
   border-radius: var(--r-row);
+  background: var(--switch-thumb);
+  box-shadow: inset 0 0 0 1px var(--switch-ring);
 }
 
 .tk-rail-seg .tk-seg-item {
@@ -148,8 +225,29 @@
   min-height: 36px;
   padding: 4px 1px;
   border-radius: var(--r-row);
+  color: var(--switch-idle);
   font-size: var(--fs-12);
   line-height: 18px;
+  transition: color var(--t-small) var(--ease-out), transform var(--t-small) var(--ease-out);
+}
+
+.tk-rail-seg .tk-seg-item .tk-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.tk-rail-seg .tk-seg-item:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+.tk-rail-seg .tk-seg-item:active {
+  transform: scale(0.94);
+}
+
+.tk-rail-seg .tk-seg-item[aria-checked="true"],
+.tk-rail-seg .tk-seg-item[aria-checked="true"] .tk-icon {
+  color: var(--text);
 }
 
 .tk-rail-seg .tk-seg-item:focus-visible {
@@ -235,6 +333,47 @@
   color: var(--text-3);
 }
 
+/* "Sessions" above the recent-session groups. */
+.tk-rail-heading .tk-rail-label {
+  font-size: 15px;
+  color: var(--text);
+}
+
+/* Threads controls lifted into the rail's top (ListPane renders them through a portal). */
+.tk-rail-threads-top .tk-search-bar {
+  padding: 0;
+  border-bottom: 0;
+  gap: 6px;
+}
+
+.tk-rail-threads-top .tk-search-input {
+  min-height: 34px;
+  border-radius: var(--r-row);
+}
+
+.tk-rail-threads-top .tk-thr-quickgroup {
+  display: grid;
+  width: 100%;
+  border-radius: var(--r-panel);
+}
+
+.tk-rail-threads-top .tk-thr-quickgroup .tk-seg-thumb,
+.tk-rail-threads-top .tk-thr-quickgroup .tk-seg-item {
+  border-radius: var(--r-row);
+}
+
+.tk-thr-quickgroup .tk-seg-item {
+  min-height: 32px;
+  padding: 0 8px;
+}
+
+/* At the top of the rail only the search row and the grouping switch show; view, order, the full
+   Group by menu and the filters open from the filters button. */
+.tk-search-bar[data-placement="rail-top"][data-filters-open="false"] .tk-filter-row,
+.tk-search-bar[data-placement="rail-top"][data-filters-open="false"] .tk-thr-groupby {
+  display: none;
+}
+
 .tk-rail-group + .tk-rail-group {
   margin-top: 2px;
 }
@@ -249,9 +388,9 @@
   border: 0;
   border-radius: var(--r-ctl);
   background: transparent;
-  color: var(--text-2);
+  color: var(--text);
   font: inherit;
-  font-size: var(--fs-12);
+  font-size: var(--fs-14);
   font-weight: 600;
   text-align: left;
 }
@@ -284,7 +423,7 @@
 .tk-rail-count {
   margin-left: auto;
   font-weight: 400;
-  color: var(--text-3);
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -333,13 +472,14 @@
 }
 
 .tk-rail-row-title {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-size: var(--fs-13);
   font-weight: 500;
   line-height: 18px;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .tk-rail-row-meta {
@@ -586,91 +726,48 @@
   padding: 4px 8px 2px;
 }
 
-/* Footer: who is signed in, then the tools */
-.tk-rail-foot {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 6px 8px;
-  border-top: 1px solid var(--line);
-}
-
-.tk-rail-realms {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.tk-rail-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding-top: 4px;
-}
-
-.tk-rail-tools .tk-btn {
-  flex: 1;
-  min-width: 0;
-  justify-content: flex-start;
-  color: var(--text-2);
-}
-
-.tk-rail-tools .tk-btn:hover {
-  color: var(--text);
-}
-
-.tk-rail-add {
-  width: 100%;
-  justify-content: flex-start;
-  color: var(--text-2);
-}
-
-/* Collapsed: icons only, every one with a name and a tooltip */
+/* Collapsed: a 64px strip. The mark, expand and search at the top, the five views, a spacer, then
+   add account, Settings and the theme at the foot. Every control has a name and a tooltip. */
 .tk-rail[data-collapsed="true"] .tk-rail-head {
   flex-direction: column;
+  gap: 4px;
   min-height: 0;
-  padding: 10px 0 8px;
+  padding: 12px 0 8px;
 }
 
 .tk-rail[data-collapsed="true"] .tk-rail-brand {
   flex: none;
+  margin-bottom: 6px;
 }
 
-.tk-rail[data-collapsed="true"] .tk-rail-foot,
-.tk-rail[data-collapsed="true"] .tk-rail-tools,
-.tk-rail[data-collapsed="true"] .tk-rail-realms {
-  align-items: center;
-}
-
-.tk-rail[data-collapsed="true"] .tk-rail-tools {
-  flex-direction: column;
-}
-
-/* Each sign-in shrinks to its account dot; the button keeps its own accessible name. */
-.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-name,
-.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-realm,
-.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-fixed,
-.tk-rail[data-collapsed="true"] .tk-rail-realms .tk-acct-chev {
-  display: none;
-}
-
-.tk-rail[data-collapsed="true"] .tk-rail-realms button {
-  display: grid;
-  grid-template-columns: auto;
-  place-items: center;
+.tk-rail[data-collapsed="true"] .tk-rail-head .tk-icon-btn,
+.tk-rail-foot .tk-icon-btn {
   width: 40px;
-  min-width: 0;
-  padding: 0;
+  height: 40px;
+  border-radius: var(--r-row);
+  color: var(--text-2);
 }
 
-.tk-rail[data-collapsed="true"] .tk-rail-realms > li {
+.tk-rail[data-collapsed="true"] .tk-rail-head .tk-icon-btn:hover,
+.tk-rail-foot .tk-icon-btn:hover {
+  color: var(--text);
+}
+
+.tk-rail-viewlist .tk-icon-btn[aria-current="page"] {
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  color: var(--text);
+}
+
+.tk-rail-foot {
+  flex: none;
+  margin-top: auto;
   display: flex;
-  justify-content: center;
-  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--line);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -856,7 +953,7 @@ iframe.tk-frame[data-loaded="false"] {
 
 /* ---------------------------------------------------------------------------------------------
    REQ-6 fused mode (layered variant). Paperclip's frame fills the window under everything and its
-   sidebar is the only view switch. The shell becomes the Threadkeeper view: it is placed (inline
+   sidebar is the only view switch. The shell becomes the ThreadStack view: it is placed (inline
    left/top/width/height) over the content rectangle Paperclip reports, which Paperclip leaves
    transparent. Layers: frame 1, views 2, embedded pages 5, rail 10; a blocking Paperclip overlay
    raises the frame to 50 so the dialog is above the view, which stays visible through the hole.
@@ -894,7 +991,7 @@ iframe.tk-frame[data-loaded="false"] {
   z-index: 2;
 }
 
-/* On a Paperclip page no Threadkeeper view is shown, so nothing of the shell is drawn. */
+/* On a Paperclip page no ThreadStack view is shown, so nothing of the shell is drawn. */
 .tk-workbench[data-fused="true"] .tk-shell[data-view="paperclip"] > .tk-rail,
 .tk-workbench[data-fused="true"] .tk-shell[data-view="paperclip"] > .tk-rail-scrim,
 .tk-workbench[data-fused="true"] .tk-shell[data-view="paperclip"] .tk-main > .tk-banner {

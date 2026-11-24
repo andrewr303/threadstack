@@ -76,7 +76,7 @@ export function PaperclipCredentials({ settings, onPatch, companies = [] }: {
   const hasStored = MODEL_CREDENTIAL_KEYS.some((key) => getModelCredential(settings, key).trim());
   return <section className="tk-settings-section" aria-label="Model keys">
     <h3 className="tk-settings-h3">Model keys</h3>
-    <p className="tk-settings-note">Keep model keys in Paperclip. Linked values stay in memory for the current call and are left out of Threadkeeper storage and backups.</p>
+    <p className="tk-settings-note">Keep model keys in Paperclip. Linked values stay in memory for the current call and are left out of ThreadStack storage and backups.</p>
     <div className="tk-field">
       <label htmlFor={`${id}-company`}>Read keys from</label>
       <select id={`${id}-company`} className="tk-input" disabled={busy} value={config.companyId} onChange={(event) => {
@@ -91,7 +91,7 @@ export function PaperclipCredentials({ settings, onPatch, companies = [] }: {
       </select>
     </div>
     <label className="tk-toggle"><input type="checkbox" checked={config.allowSecretTransfer} disabled={!config.companyId || busy} onChange={(event) => void change('credentials.consent', { companyId: config.companyId, enabled: event.target.checked })} />
-      <span>Allow paired Threadkeeper to use this company’s model keys<span className="tk-toggle-hint">Keys cross the paired connection only when a feature needs them. Linked remote features pause while Paperclip is unavailable; local search keeps working.</span></span>
+      <span>Allow paired ThreadStack to use this company’s model keys<span className="tk-toggle-hint">Keys cross the paired connection only when a feature needs them. Linked remote features pause while Paperclip is unavailable; local search keeps working.</span></span>
     </label>
     {config.companyId && <>
       {MODEL_CREDENTIAL_KEYS.map((key) => {

@@ -1,4 +1,4 @@
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import { ensureStarterCollectionsAndSettings } from '../db.js';
 import { isRemoteAllowed, localOnlyProjectNames } from '../privacy.js';
 import { providerLabel } from '../providers.js';
@@ -21,7 +21,7 @@ export function chromeActionJournal(): ActionJournal {
 }
 
 export interface BrowserActionDeps {
-  db: ThreadkeeperDB; journal: ActionJournal;
+  db: ThreadStackDB; journal: ActionJournal;
   policy: () => ActionPolicy | Promise<ActionPolicy>;
   links: (companyId: string) => SessionLink[] | Promise<SessionLink[]>;
   execute: (action: AgentAction, signal: AbortSignal) => Promise<ActionOutcome>;

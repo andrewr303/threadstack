@@ -32,7 +32,7 @@ interface Props {
   searchIndex: MemorySearchIndex;
   onSelectThread: (threadKey: string) => void;
   onOpenSettings: () => void;
-  /** Set when Threadkeeper is connected to Still: "Send these threads to Still…" under the answer. */
+  /** Set when ThreadStack is connected to Still: "Send these threads to Still…" under the answer. */
   onSendToStill?: (threadKeys: string[]) => void;
 }
 

@@ -9,7 +9,7 @@ import {
   type ThreadInsight,
 } from './schema.js';
 import { buildSummaryMarkdown } from './summary-markdown.js';
-import type { UpsertThreadInput, ThreadkeeperDB } from './db.js';
+import type { UpsertThreadInput, ThreadStackDB } from './db.js';
 import { upsertThread } from './db.js';
 import { providerLabel } from './providers.js';
 import { normalizePullRequestUrl, normalizeRepository } from './repository.js';
@@ -151,7 +151,7 @@ export const CAPABILITY_MATRIX: AdapterCapabilityRow[] = [
   },
   {
     adapterId: 'portable_bundle',
-    label: 'Threadkeeper Portable JSON / Markdown',
+    label: 'ThreadStack Portable JSON / Markdown',
     visibleDom: 'N',
     fullExport: 'Y',
     branchHistory: 'Y',
@@ -465,7 +465,7 @@ export interface PortableBundle {
 }
 
 export async function exportPortableBundle(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options?: { includeSyntheticBenchmark?: boolean }
 ): Promise<PortableBundle> {
   const allConvs = await db.conversations.toArray();
@@ -491,7 +491,7 @@ export async function exportPortableBundle(
 }
 
 export async function importPortableBundle(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   bundle: PortableBundle,
   options?: { overrideAccountId?: string; overrideWorkspaceId?: string }
 ): Promise<{ importedCount: number; skippedTombstones: number }> {

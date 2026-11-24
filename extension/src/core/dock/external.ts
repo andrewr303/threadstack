@@ -1,5 +1,5 @@
-// The Sidebar Dock (Still) link at runtime: the external-message handler (Still → Threadkeeper),
-// outbound sends (Threadkeeper → Still), pairing with consent, and the internal operations the
+// The Sidebar Dock (Still) link at runtime: the external-message handler (Still → ThreadStack),
+// outbound sends (ThreadStack → Still), pairing with consent, and the internal operations the
 // manager and the consent page reach through background.ts (DOCK_* messages).
 //
 // Rules (docs/sidebar-dock-integration.md):
@@ -8,7 +8,7 @@
 //   sender never causes a storage write, except the single pending pair request.
 // - handleExternalMessage never throws; every answer is a flat envelope.
 
-import { ensureStarterCollectionsAndSettings, type ThreadkeeperDB } from '../db.js';
+import { ensureStarterCollectionsAndSettings, type ThreadStackDB } from '../db.js';
 import type { SettingsRecord, SidebarDockSettings } from '../schema.js';
 import { localOnlyProjectNames } from '../privacy.js';
 import { enqueueAnalysis, isOlderAnalysis } from '../pipeline.js';
@@ -113,7 +113,7 @@ export function validateDockSender(sender: DockSender | null | undefined, ownId:
 }
 
 export interface DockDeps {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   /** This extension's id (chrome.runtime.id). */
   ownId: string;
   version: string;
@@ -128,7 +128,7 @@ export interface DockDeps {
   scheduleDrain?: (atMs: number | null) => void;
   /** Schedule the pair.granted retry alarm (every 30 s) or clear it. */
   schedulePairRetry?: (on: boolean) => void;
-  /** Tell open Threadkeeper pages that the link state changed. */
+  /** Tell open ThreadStack pages that the link state changed. */
   broadcast?: () => void;
   log?: (reason: string) => void;
   fetchImpl?: typeof fetch;
@@ -164,7 +164,7 @@ const NOT_PAIRED_CONFIRM_MS = 60_000;
 const MAX_WRONG_CODES = 5;
 
 export class DockService {
-  private readonly db: ThreadkeeperDB;
+  private readonly db: ThreadStackDB;
   private readonly deps: DockDeps;
   private readonly session: KeyValueStore;
   private readonly now: () => number;
@@ -199,7 +199,7 @@ export class DockService {
   }
 
   // -------------------------------------------------------------------------
-  // Inbound (Still → Threadkeeper)
+  // Inbound (Still → ThreadStack)
   // -------------------------------------------------------------------------
 
   async handleExternalMessage(message: unknown, sender: DockSender): Promise<DockResponse> {
@@ -208,7 +208,7 @@ export class DockService {
     } catch (err) {
       if (err instanceof BadRequest) return errorResponse(err.code, err.message);
       this.deps.log?.(`[dock] handler failed: ${err instanceof Error ? err.message : String(err)}`);
-      return errorResponse('internal', 'Threadkeeper could not handle that request');
+      return errorResponse('internal', 'ThreadStack could not handle that request');
     }
   }
 
@@ -220,7 +220,7 @@ export class DockService {
     const who = validateDockSender(sender, this.deps.ownId);
     if (!who.ok) {
       this.reject(who.reason);
-      return errorResponse('not_paired', 'Only an extension page may talk to Threadkeeper');
+      return errorResponse('not_paired', 'Only an extension page may talk to ThreadStack');
     }
     const env = checkEnvelope(message);
     if (!env.ok) {
@@ -240,14 +240,14 @@ export class DockService {
     const dock = settings.sidebarDock;
     if (!paired && !UNPAIRED_TYPES.has(env.type)) {
       this.reject(`Rejected ${env.type} from unpaired ${who.id}`);
-      return errorResponse('not_paired', 'This extension is not connected to Threadkeeper');
+      return errorResponse('not_paired', 'This extension is not connected to ThreadStack');
     }
     if (jsonByteLength(message) > MAX_MESSAGE_BYTES) return errorResponse('too_large', 'Message is larger than 4 MB');
     const m = env.message;
 
     if (READ_TYPES.has(env.type)) {
       const trackGet = env.type === 'threads.get' && m.track === true;
-      if (!dock.allowSearch && !trackGet) return errorResponse('disabled', 'Searching Threadkeeper from Still is turned off in Threadkeeper');
+      if (!dock.allowSearch && !trackGet) return errorResponse('disabled', 'Searching ThreadStack from Still is turned off in ThreadStack');
       return this.withReadSlot(() => this.handleRead(env.type, m, settings));
     }
 
@@ -297,7 +297,7 @@ export class DockService {
   private async withReadSlot(fn: () => Promise<DockResponse>): Promise<DockResponse> {
     const t = this.now();
     this.readTimes = this.readTimes.filter((x) => t - x < 60_000);
-    if (this.readsInFlight >= READ_MAX_IN_FLIGHT) return errorResponse('busy', 'Threadkeeper is answering other requests', 500);
+    if (this.readsInFlight >= READ_MAX_IN_FLIGHT) return errorResponse('busy', 'ThreadStack is answering other requests', 500);
     if (this.readTimes.length >= READ_MAX_PER_MINUTE) {
       return errorResponse('busy', 'Too many requests; try again shortly', Math.max(500, 60_000 - (t - this.readTimes[0])));
     }
@@ -374,12 +374,12 @@ export class DockService {
       if (req.epoch) await this.adoptEpoch(req.epoch, settings);
       return okResponse({ status: 'paired', tk: { version: this.deps.version, capabilities: capabilitiesFor(settings) } });
     }
-    if (dock.pairedId) return errorResponse('busy', 'Threadkeeper is connected to another extension. Disconnect it in Threadkeeper first.');
-    if (dock.blockedIds.includes(senderId)) return errorResponse('denied', 'This extension was denied in Threadkeeper');
+    if (dock.pairedId) return errorResponse('busy', 'ThreadStack is connected to another extension. Disconnect it in ThreadStack first.');
+    if (dock.blockedIds.includes(senderId)) return errorResponse('denied', 'This extension was denied in ThreadStack');
     const nowMs = this.now();
     const state = await readPendingState(this.session, nowMs);
     if (state.pending && state.pending.senderId !== senderId) {
-      return errorResponse('busy', 'Another extension is asking Threadkeeper for access right now', Math.max(1000, Date.parse(state.pending.at) + PAIR_REQUEST_TTL_MS - nowMs));
+      return errorResponse('busy', 'Another extension is asking ThreadStack for access right now', Math.max(1000, Date.parse(state.pending.at) + PAIR_REQUEST_TTL_MS - nowMs));
     }
     const codeHash = await codeHashFor(req.requestId, req.code);
     if (state.pending) {
@@ -563,7 +563,7 @@ export class DockService {
   }
 
   // -------------------------------------------------------------------------
-  // Outbound (Threadkeeper → Still)
+  // Outbound (ThreadStack → Still)
   // -------------------------------------------------------------------------
 
   /** Send one message to the paired Still (or `to`). Never throws. */
@@ -721,7 +721,7 @@ export class DockService {
     return { ok: false, error: 'Still is no longer waiting for this request. Connect again from Still.', status: 'expired' };
   }
 
-  /** Disconnect from Threadkeeper's side: flush private removals, tell Still, forget everything. */
+  /** Disconnect from ThreadStack's side: flush private removals, tell Still, forget everything. */
   async unpair(): Promise<{ ok: true }> {
     const settings = await this.settings();
     if (!settings.sidebarDock.pairedId) return { ok: true };
@@ -914,7 +914,7 @@ export class DockService {
     return { ok: true, queued };
   }
 
-  /** Threadkeeper-side Resync: forget the ledger and re-offer everything in scope. */
+  /** ThreadStack-side Resync: forget the ledger and re-offer everything in scope. */
   async resync(): Promise<{ ok: true; queued: number }> {
     const settings = await this.settings();
     if (!settings.sidebarDock.pairedId) return { ok: true, queued: 0 };

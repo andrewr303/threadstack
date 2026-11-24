@@ -18,7 +18,7 @@ import {
   ensureStarterCollectionsAndSettings,
   saveSettingsPatch,
   UNFILED_PROJECT,
-  type ThreadkeeperDB,
+  type ThreadStackDB,
 } from './db.js';
 import {
   LOCAL_ANALYZER_MODEL,
@@ -75,13 +75,13 @@ export function analyzeJobId(threadKey: string): string {
   return `${ANALYZE_JOB}:${threadKey}`;
 }
 
-async function sortedMessages(db: ThreadkeeperDB, threadKey: string): Promise<MessageRecord[]> {
+async function sortedMessages(db: ThreadStackDB, threadKey: string): Promise<MessageRecord[]> {
   return db.messages.where('threadKey').equals(threadKey).sortBy('ordinal');
 }
 
 /** Whether a thread may be sent to third-party AI or embedding APIs. */
 export async function isRemoteProcessingAllowed(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   conv: ConversationRecord,
   settings: SettingsRecord
 ): Promise<boolean> {
@@ -112,7 +112,7 @@ export function needsAgentRunUpgrade(
  * account id, the signed-in identity, an email or a cookie. Null when there is no such account.
  */
 export async function accountLabelForThread(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   conv: Pick<ConversationRecord, 'provider' | 'accountId'>,
   settings: Pick<SettingsRecord, 'boundAccounts'>
 ): Promise<string | null> {
@@ -156,7 +156,7 @@ function needsRemoteWork(
 }
 
 export async function enqueueAnalysis(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   conv: Pick<ConversationRecord, 'threadKey' | 'sourceRevision'>,
   delaySeconds: number,
   options: { requested?: boolean } = {}
@@ -203,7 +203,7 @@ export interface LocalProcessResult {
  * a no-op when the local insight already matches the current revision.
  */
 export async function processThreadLocally(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKey: string,
   options: {
     settings?: SettingsRecord;
@@ -291,7 +291,7 @@ export async function processThreadLocally(
 
 /** Run the local pass over many threads, sharing one organize context. */
 export async function processThreadsLocally(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKeys: string[],
   options: { onProgress?: (done: number, total: number) => void; aiDelaySeconds?: number; force?: boolean } = {}
 ): Promise<{ analyzed: number; enqueued: number; filed: number; createdProjects: string[] }> {
@@ -517,7 +517,7 @@ export function analysisToSummary(
   );
 }
 
-async function reserveAiSlot(db: ThreadkeeperDB): Promise<boolean> {
+async function reserveAiSlot(db: ThreadStackDB): Promise<boolean> {
   return db.transaction('rw', db.settings, async () => {
     const s = normalizeSettings(await db.settings.get('default'));
     const today = currentUtcDateKey();
@@ -530,7 +530,7 @@ async function reserveAiSlot(db: ThreadkeeperDB): Promise<boolean> {
 }
 
 /** Give back a reserved slot when the Claude call did not produce an analysis. */
-async function refundAiSlot(db: ThreadkeeperDB): Promise<void> {
+async function refundAiSlot(db: ThreadStackDB): Promise<void> {
   await db.transaction('rw', db.settings, async () => {
     const s = normalizeSettings(await db.settings.get('default'));
     if (s.aiAnalysesDate !== currentUtcDateKey() || s.aiAnalysesToday <= 0) return;
@@ -545,7 +545,7 @@ export interface AiThreadResult {
 
 /** Claude analysis + remote embedding for one thread, then re-file with the stronger signal. */
 export async function analyzeThreadRemotely(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKey: string,
   options: {
     settings?: SettingsRecord;
@@ -669,7 +669,7 @@ export async function analyzeThreadRemotely(
   return didAnalyze ? { status: 'analyzed' } : embedded ? { status: 'embedded' } : { status: 'skipped', reason: 'Already up to date' };
 }
 
-async function claimNextJob(db: ThreadkeeperDB, nowMs: number): Promise<JobRecord | null> {
+async function claimNextJob(db: ThreadStackDB, nowMs: number): Promise<JobRecord | null> {
   return db.transaction('rw', db.jobs, async () => {
     const nowIso = new Date(nowMs).toISOString();
     const candidates = await db.jobs.where('jobType').equals(ANALYZE_JOB).toArray();
@@ -707,7 +707,7 @@ export interface RunJobsSummary {
  * limit, an abort signal or the time budget.
  */
 export async function runAnalysisJobs(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options: {
     maxJobs?: number;
     timeBudgetMs?: number;
@@ -811,13 +811,13 @@ function msUntilNextUtcDay(): number {
   return next - now.getTime();
 }
 
-export async function countPendingAnalysis(db: ThreadkeeperDB): Promise<number> {
+export async function countPendingAnalysis(db: ThreadStackDB): Promise<number> {
   const jobs = await db.jobs.where('jobType').equals(ANALYZE_JOB).toArray();
   return jobs.filter((j) => j.status === 'pending' || j.status === 'running').length;
 }
 
 /** Earliest pending notBefore, so the service worker can schedule an alarm for it. */
-export async function nextDueAnalysisAt(db: ThreadkeeperDB): Promise<number | null> {
+export async function nextDueAnalysisAt(db: ThreadStackDB): Promise<number | null> {
   // Nothing is due while an import holds analysis; ending the hold starts the queue itself.
   if (await activeAnalysisHold(db, Date.now())) return null;
   const jobs = await db.jobs.where('jobType').equals(ANALYZE_JOB).toArray();
@@ -830,7 +830,7 @@ export async function nextDueAnalysisAt(db: ThreadkeeperDB): Promise<number | nu
 
 /** Queue every analysable thread (used by "Analyze library" in the manager). */
 export async function enqueueLibraryAnalysis(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options: { onlyMissing?: boolean } = {}
 ): Promise<number> {
   const settings = await ensureStarterCollectionsAndSettings(db);
@@ -873,7 +873,7 @@ export interface QueueAnalysisResult {
  * against the daily limit.
  */
 export async function queueAnalysis(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKeys: string[],
   options: { settings?: SettingsRecord; upgrade?: boolean } = {}
 ): Promise<QueueAnalysisResult> {
@@ -913,7 +913,7 @@ export async function queueAnalysis(
 }
 
 /** Threads whose current AI analysis predates ANALYSIS_VERSION and may be sent to Claude. */
-export async function listOlderAnalyses(db: ThreadkeeperDB, settings?: SettingsRecord): Promise<string[]> {
+export async function listOlderAnalyses(db: ThreadStackDB, settings?: SettingsRecord): Promise<string[]> {
   const s = settings ?? (await ensureStarterCollectionsAndSettings(db));
   const aiInsights = await db.insights.where('source').equals('ai').toArray();
   const keys: string[] = [];
@@ -928,7 +928,7 @@ export async function listOlderAnalyses(db: ThreadkeeperDB, settings?: SettingsR
 }
 
 /** Queue every older-format AI analysis for an upgrade ("Upgrade older summaries"). */
-export async function queueOlderAnalysisUpgrades(db: ThreadkeeperDB): Promise<QueueAnalysisResult> {
+export async function queueOlderAnalysisUpgrades(db: ThreadStackDB): Promise<QueueAnalysisResult> {
   const settings = await ensureStarterCollectionsAndSettings(db);
   return queueAnalysis(db, await listOlderAnalyses(db, settings), { settings, upgrade: true });
 }

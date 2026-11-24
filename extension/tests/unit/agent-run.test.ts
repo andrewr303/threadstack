@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, saveSettingsPatch, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings, saveSettingsPatch, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
 import {
   buildThreadKey,
   insightKeyFor,
@@ -26,7 +26,7 @@ import { normalizeSettings } from '../../src/core/schema.js';
 import { primaryAccountId } from '../../src/core/workspace/realms.js';
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`AgentRunDB_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`AgentRunDB_${Date.now()}_${++n}`);
 const ACCOUNT = { accountId: 'acct_test', workspaceId: 'ws_test' };
 
 function msgs(rows: Array<[MessageRecord['role'], string]>): MessageRecord[] {
@@ -367,7 +367,7 @@ describe('analysis request header', () => {
   });
 });
 
-async function seedAgent(db: ThreadkeeperDB, patch: Partial<UpsertThreadInput> = {}) {
+async function seedAgent(db: ThreadStackDB, patch: Partial<UpsertThreadInput> = {}) {
   const settings = await ensureStarterCollectionsAndSettings(db);
   await saveSettingsPatch(db, { anthropicApiKey: 'sk-ant-test', autoOrganize: { ...settings.autoOrganize, aiDebounceSeconds: 0 } });
   const input: UpsertThreadInput = {

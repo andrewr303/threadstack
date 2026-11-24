@@ -149,7 +149,7 @@ describe("browser sessions", () => {
     await service.connect(COMPANY, token, { protocol: PROTOCOL, extensionCommit: "20261114.113000-abc123", policy: { enabled: false, providers: [], disabledAt: 0 } });
     expect(await service.status(COMPANY)).toMatchObject({ warning: null, extensionCommit: "abc123" });
     await service.connect(COMPANY, token, { protocol: PROTOCOL, extensionCommit: "20261114.113000-def4567", policy: { enabled: false, providers: [], disabledAt: 0 } });
-    expect((await service.status(COMPANY)).warning).toBe("Threadkeeper and Paperclip were built from different commits (def4567 and abc123).");
+    expect((await service.status(COMPANY)).warning).toBe("ThreadStack and Paperclip were built from different commits (def4567 and abc123).");
   });
   it("REQ-7 finding 4: a version mismatch purges the company's rows and counts none", async () => {
     const { service, store } = fixture(); const token = await paired(service); await service.inventory(COMPANY, token, { upserts: [row] });

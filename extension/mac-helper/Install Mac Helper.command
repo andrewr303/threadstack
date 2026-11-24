@@ -12,11 +12,11 @@ if [ -z "$TASK_NODE" ]; then
   read -r -p "Press Return to close. " unused
   exit 1
 fi
-echo "Threadkeeper · Mac helper setup"
-echo "Press Return to find Threadkeeper in your browsers automatically,"
-echo "or paste the extension ID from the Threadkeeper card on the extensions page."
+echo "ThreadStack · Mac helper setup"
+echo "Press Return to find ThreadStack in your browsers automatically,"
+echo "or paste the extension ID from the ThreadStack card on the extensions page."
 read -r -p "Extension ID (optional): " TASK_EXTENSION_ID
-echo "To start the Paperclip fork from Threadkeeper, enter its folder."
+echo "To start the Paperclip fork from ThreadStack, enter its folder."
 echo "Leave blank to detect the fork when this installer is inside it."
 read -r -p "Paperclip folder (optional): " TASK_PAPERCLIP_ROOT
 # Stock macOS Bash treats an empty array as unbound under `set -u`; positional

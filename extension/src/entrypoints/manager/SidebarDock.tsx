@@ -1,4 +1,4 @@
-// Threadkeeper's side of the Still (Sidebar Dock) link in the manager: the Settings panel, the
+// ThreadStack's side of the Still (Sidebar Dock) link in the manager: the Settings panel, the
 // "Send to Still" target picker and dialog, and the "In Still" badge. Data comes from ./dock.ts.
 //
 // Consent decisions are never taken here: a pending request is reviewed only in the top-level
@@ -82,14 +82,14 @@ function DockSection({ title, note, children }: { title: string; note?: React.Re
 
 type Line = { message: string | null; ok?: boolean };
 
-/** This Threadkeeper's extension id, for pasting into Still when it cannot find Threadkeeper itself. */
+/** This ThreadStack's extension id, for pasting into Still when it cannot find ThreadStack itself. */
 function OwnId({ id }: { id: string }) {
   const [copied, setCopied] = useState<Line>({ message: null });
-  if (!id) return <p className="tk-settings-note">The ID is shown when Threadkeeper runs as an extension.</p>;
+  if (!id) return <p className="tk-settings-note">The ID is shown when ThreadStack runs as an extension.</p>;
   return (
     <>
       <div className="tk-field-row tk-dock-id-row">
-        <code className="tk-dock-id" aria-label="This Threadkeeper's extension ID">
+        <code className="tk-dock-id" aria-label="This ThreadStack's extension ID">
           {groupedId(id)}
         </code>
         <button
@@ -147,8 +147,8 @@ export function SidebarDockPanel({
   const ownId = state?.ownId ?? (typeof chrome !== 'undefined' && chrome.runtime?.id ? chrome.runtime.id : '');
   const framedNote = framed ? (
     <p className="tk-settings-note tk-dock-framed">
-      To review requests, disconnect or change these options, open Threadkeeper in its own window (side panel or full
-      page). Websites can frame this overlay, so Threadkeeper does not accept those changes here.
+      To review requests, disconnect or change these options, open ThreadStack in its own window (side panel or full
+      page). Websites can frame this overlay, so ThreadStack does not accept those changes here.
     </p>
   ) : null;
 
@@ -174,7 +174,7 @@ export function SidebarDockPanel({
     <>
       <DockSection
         title="Sidebar Dock (Still)"
-        note="Still is a separate sidebar extension. Connected, it keeps a copy of the threads it chooses as chats in its collections, and its assistant can search your threads. Still keeps working if Threadkeeper is off."
+        note="Still is a separate sidebar extension. Connected, it keeps a copy of the threads it chooses as chats in its collections, and its assistant can search your threads. Still keeps working if ThreadStack is off."
       >
         <p className="tk-dock-status" data-tone={summary.tone} role="status">
           <span className="tk-dock-dot" aria-hidden="true" data-on={Boolean(state?.paired)} />
@@ -204,11 +204,11 @@ export function SidebarDockPanel({
               </dd>
             </dl>
             {pending.granted ? (
-              <p className="tk-settings-note">You allowed it. Threadkeeper is waiting for Still to confirm; this finishes on its own.</p>
+              <p className="tk-settings-note">You allowed it. ThreadStack is waiting for Still to confirm; this finishes on its own.</p>
             ) : (
               <>
                 <p className="tk-settings-note">
-                  Review it in the Threadkeeper window: you type the 6-digit code Still shows, then allow or deny. Deny
+                  Review it in the ThreadStack window: you type the 6-digit code Still shows, then allow or deny. Deny
                   blocks this extension until you unblock it below.
                 </p>
                 {!framed && (
@@ -235,7 +235,7 @@ export function SidebarDockPanel({
 
         {!state?.paired && !pending && (
           <p className="tk-settings-note">
-            To connect, open Still: Settings → Integrations → AI chat threads → Find Threadkeeper. Threadkeeper then
+            To connect, open Still: Settings → Integrations → AI chat threads → Find ThreadStack. ThreadStack then
             opens a window where you type the code Still shows. Nothing is shared until you allow it.
           </p>
         )}
@@ -395,8 +395,8 @@ export function SidebarDockPanel({
       )}
 
       <DockSection
-        title="This Threadkeeper's ID"
-        note="If Still cannot find Threadkeeper by itself, paste this ID into Still's connect form."
+        title="This ThreadStack's ID"
+        note="If Still cannot find ThreadStack by itself, paste this ID into Still's connect form."
       >
         <OwnId id={ownId} />
       </DockSection>

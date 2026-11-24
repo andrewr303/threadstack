@@ -206,7 +206,7 @@ describe('threads.get with a transcript window', () => {
   });
 });
 
-describe('seq after a Threadkeeper data reset', () => {
+describe('seq after a ThreadStack data reset', () => {
   it('a fresh database starts above every seq an earlier database handed out', async () => {
     const t0 = Date.parse('2026-11-01T12:00:00.000Z');
     const clock = vi.spyOn(Date, 'now').mockReturnValue(t0);

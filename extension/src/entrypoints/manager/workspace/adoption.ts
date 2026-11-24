@@ -2,7 +2,7 @@
 //
 // Chrome names the active tab as the opener of far more than the windows a page opens: a tab the
 // user creates with Cmd/Ctrl+T or the New Tab button, an address typed with Alt+Enter, and every
-// tab an extension creates with chrome.tabs.create (Threadkeeper's own "Open original" and online
+// tab an extension creates with chrome.tabs.create (ThreadStack's own "Open original" and online
 // import included) all get the tab that was active at the time. When the full-tab manager is that
 // tab, the worker used to take every one of them that showed ChatGPT or Claude "back into the
 // workspace" and close it. Without the webNavigation permission the worker cannot see which frame

@@ -1,4 +1,4 @@
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import type { ConversationRecord, SettingsRecord } from './schema.js';
 
 /**
@@ -17,7 +17,7 @@ export function isRemoteAllowed(
   return !localOnlyProjects.has(conv.project);
 }
 
-export async function localOnlyProjectNames(db: ThreadkeeperDB): Promise<Set<string>> {
+export async function localOnlyProjectNames(db: ThreadStackDB): Promise<Set<string>> {
   const collections = await db.collections.toArray();
   return new Set(collections.filter((c) => c.cloudExcluded).map((c) => c.name));
 }
@@ -28,7 +28,7 @@ export async function localOnlyProjectNames(db: ThreadkeeperDB): Promise<Set<str
  * the caller's copy is stale.
  */
 export async function remoteAllowedKeys(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   threadKeys: string[]
 ): Promise<Set<string>> {

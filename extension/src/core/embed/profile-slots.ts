@@ -3,7 +3,7 @@
 //
 // A workspace page has two places a realm's account can load. Ordinary frames use the browser's
 // own cookies (the realm's browser account). Credentialless frames use the page's separate,
-// throwaway cookie partition, which starts empty with every page load; Threadkeeper fills it
+// throwaway cookie partition, which starts empty with every page load; ThreadStack fills it
 // with one profile account's saved cookies per realm (profile-seed.ts) and from then on the
 // browser handles cookies there itself. All credentialless frames of a page share that one
 // partition, so a page shows one profile per realm; another profile needs a new page load, which
@@ -86,7 +86,7 @@ interface TabState {
   held: HeldResponse[];
 }
 
-const BUSY: WorkspaceFailure = { ok: false, error: 'Threadkeeper could not prepare this account here. Reload the page and try again.' };
+const BUSY: WorkspaceFailure = { ok: false, error: 'ThreadStack could not prepare this account here. Reload the page and try again.' };
 
 export class ProfileSlots {
   private tabs = new Map<number, TabState>();
@@ -261,7 +261,7 @@ export class ProfileSlots {
       if (!move && movedFrom.length) {
         return {
           ok: false,
-          error: 'This account is open in another Threadkeeper tab.',
+          error: 'This account is open in another ThreadStack tab.',
           code: 'profile_in_use',
         };
       }

@@ -1,6 +1,7 @@
 /* Browse: the bar (tab strip and toolbar), the stage, the summary panel and the new tab page.
    Glass is only the bar. The page slot, the summary panel and the new tab page are opaque.
-   Only transform and opacity animate. */
+   Split view puts two panes side by side, each with its own bar; the focused one (where
+   sessions open) has an accent edge. Only transform, opacity and colours animate. */
 
 .tk-browse {
   flex: 1;
@@ -8,9 +9,18 @@
   min-height: 0;
   height: 100%;
   display: flex;
+  gap: var(--gap);
+}
+.tk-browse-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
   flex-direction: column;
   gap: var(--gap);
 }
+.tk-browse-pane[data-focused="true"] > .tk-browse-bar { border-color: var(--accent-line); }
+.tk-browse[data-split="true"] .tk-browse-bar { transition: border-color var(--t-small) var(--ease-out); }
 
 /* ---------- Bar ---------- */
 .tk-browse-bar {
@@ -52,8 +62,11 @@
   font-size: var(--fs-13);
   color: var(--text-3);
 }
-.tk-browse-newtab { flex: none; }
+.tk-browse-newtab,
+.tk-browse-toggle { flex: none; }
 .tk-browse-newtab[data-open="true"] { background: var(--accent-tint); color: var(--text); }
+.tk-browse-toggle:active,
+.tk-browse-newtab:active { transform: scale(0.94); }
 
 .tk-browse-tab {
   position: relative;
@@ -194,13 +207,53 @@ html[data-theme="light"] .tk-browse-tab[data-active="true"] { background: var(--
   font: inherit;
   text-overflow: ellipsis;
 }
+/* The session palette's chip at the end of the field (only while the palette is switched on). */
+.tk-browse-addr[data-palette="true"] .tk-browse-addr-view { right: 52px; }
+.tk-browse-addr[data-palette="true"] .tk-browse-addr-input { padding-right: 52px; }
+.tk-browse-addr-kbd {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-grid;
+  place-items: center;
+  height: 24px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+}
+.tk-browse-addr-kbd kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  color: inherit;
+}
+.tk-browse-addr-kbd:hover { background: var(--ctl-hover); color: var(--text); }
+.tk-browse-addr-kbd:active { background: var(--ctl-press); }
+.tk-browse-addr-kbd:focus-visible { outline-offset: 0; }
+
 /* At rest the formatted address above is what is read; the input keeps the caret and the value. */
 .tk-browse-addr[data-editing="false"] .tk-browse-addr-input { color: transparent; caret-color: var(--text); }
 .tk-browse-addr-input::placeholder { color: var(--text-3); opacity: 1; }
 .tk-browse-addr-input:disabled { color: var(--text-disabled); cursor: not-allowed; }
 
 .tk-browse-chrome-btn,
-.tk-browse-summary-btn { flex: none; }
+.tk-browse-summary-btn,
+.tk-browse-move-btn { flex: none; }
+/* Split view: two toolbars share the width, so buttons are icons and the account button drops
+   the realm name (the dot and the account name stay). */
+.tk-browse-toolbar[data-compact="true"] .tk-browse-btn-label,
+.tk-browse-toolbar[data-compact="true"] .tk-acct-realm { display: none; }
+.tk-browse-toolbar[data-compact="true"] .tk-browse-chrome-btn,
+.tk-browse-toolbar[data-compact="true"] .tk-browse-summary-btn { padding: 0; width: 32px; justify-content: center; }
+.tk-browse-toolbar[data-compact="true"] .tk-browse-addr { min-width: 120px; }
+.tk-browse-toolbar[data-compact="true"] .tk-acct-menu-btn { min-width: 0; flex: 0 1 auto; }
 .tk-browse-summary-btn[aria-pressed="true"] {
   background: var(--accent-tint);
   border-color: var(--accent-line);
@@ -490,17 +543,29 @@ html[data-theme="light"] .tk-browse-tab[data-active="true"] { background: var(--
   color: var(--text-2);
 }
 
+/* A pane is half the width: its summary panel and new tab page take less of it. */
+.tk-browse[data-split="true"] .tk-browse-summary { width: min(320px, 45%); }
+.tk-browse[data-split="true"] .tk-browse-launch-in { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 28px 24px; }
+.tk-browse[data-split="true"] .tk-browse-tab { min-width: 112px; }
+
 /* ---------- Narrow windows ---------- */
 @media (max-width: 1180px) {
   .tk-browse-btn-label { display: none; }
   .tk-browse-summary { width: 340px; }
   .tk-browse-launch-in { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 28px 24px; }
 }
+/* Too narrow for two pages side by side: the panes stack. */
+@media (max-width: 899px) {
+  .tk-browse[data-split="true"] { flex-direction: column; }
+}
 
 /* ---------- Reduced motion: no movement; the state change stays visible ---------- */
 @media (prefers-reduced-motion: reduce) {
   .tk-browse-summary { animation: none; }
   .tk-browse-tab-ind { transition: none; }
+  .tk-browse[data-split="true"] .tk-browse-bar { transition: none; }
+  .tk-browse-toggle:active,
+  .tk-browse-newtab:active { transform: none; }
 }
 
 /* ---------- Forced colours ---------- */
@@ -508,6 +573,8 @@ html[data-theme="light"] .tk-browse-tab[data-active="true"] { background: var(--
   .tk-browse-tab[data-active="true"] { border-color: Highlight; }
   .tk-browse-tab-ind { background: Highlight; }
   .tk-browse-addr-view { display: none; }
+  .tk-browse-pane[data-focused="true"] > .tk-browse-bar { border-color: Highlight; }
+  .tk-browse-addr-kbd kbd { border-color: CanvasText; }
   .tk-browse-addr[data-editing="false"] .tk-browse-addr-input { color: CanvasText; }
   .tk-browse-summary,
   .tk-browse-launch,

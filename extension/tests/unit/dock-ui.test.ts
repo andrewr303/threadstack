@@ -1,4 +1,4 @@
-// Threadkeeper manager UI for the Still (Sidebar Dock) link: page client, pure helpers, the
+// ThreadStack manager UI for the Still (Sidebar Dock) link: page client, pure helpers, the
 // Settings panel, Send to Still (dialog, bulk bar), the In Still badge, and DOCK_SYNC_NOW after
 // page writes.
 import 'fake-indexeddb/auto';
@@ -385,11 +385,11 @@ describe('page client', () => {
 // ---------------------------------------------------------------------------
 
 describe('Settings → Sidebar Dock', () => {
-  it('not connected: says how to connect from Still and shows this Threadkeeper’s ID', async () => {
+  it('not connected: says how to connect from Still and shows this ThreadStack’s ID', async () => {
     fakeWorker();
     await render(React.createElement(SidebarDockPanel, { state: stateView(), loaded: true, onRefresh: () => undefined, framed: false }));
     expect(container.querySelector('.tk-dock-status')?.textContent).toContain('Not connected');
-    expect(container.textContent).toContain('Settings → Integrations → AI chat threads → Find Threadkeeper');
+    expect(container.textContent).toContain('Settings → Integrations → AI chat threads → Find ThreadStack');
     expect(container.querySelector('.tk-dock-id')?.textContent).toBe('aaaa bbbb cccc dddd aaaa bbbb cccc dddd');
     expect(buttonByText('Copy ID')).toBeTruthy();
     expect(buttonByText('Disconnect…')).toBeUndefined();
@@ -423,7 +423,7 @@ describe('Settings → Sidebar Dock', () => {
   it('framed in a website (overlay): no review, toggles or disconnect, and it says why', async () => {
     fakeWorker();
     await render(React.createElement(SidebarDockPanel, { state: { ...PAIRED, pending: PENDING }, loaded: true, onRefresh: () => undefined, framed: true }));
-    expect(container.querySelector('.tk-dock-framed')?.textContent).toContain('open Threadkeeper in its own window');
+    expect(container.querySelector('.tk-dock-framed')?.textContent).toContain('open ThreadStack in its own window');
     expect(buttonByText('Review request…')).toBeUndefined();
     expect(buttonByText('Disconnect…')).toBeUndefined();
     expect(buttonByText('Resync')).toBeUndefined();
@@ -462,7 +462,7 @@ describe('Settings → Sidebar Dock', () => {
   });
 
   it('shows the worker’s refusal (e.g. from a framed page) as an error line', async () => {
-    fakeWorker({ DOCK_UNBLOCK: () => ({ ok: false, error: 'Open Threadkeeper in its own window to do this.' }) });
+    fakeWorker({ DOCK_UNBLOCK: () => ({ ok: false, error: 'Open ThreadStack in its own window to do this.' }) });
     await render(
       React.createElement(SidebarDockPanel, { state: stateView({ blockedIds: [STILL_ID] }), loaded: true, onRefresh: () => undefined, framed: false })
     );
@@ -470,7 +470,7 @@ describe('Settings → Sidebar Dock', () => {
     await click(buttonByText('Unblock'));
     const line = container.querySelector('.tk-settings-result');
     expect(line?.getAttribute('data-ok')).toBe('false');
-    expect(line?.textContent).toBe('Open Threadkeeper in its own window to do this.');
+    expect(line?.textContent).toBe('Open ThreadStack in its own window to do this.');
   });
 });
 

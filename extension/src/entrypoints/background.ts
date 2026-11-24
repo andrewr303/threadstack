@@ -1,5 +1,5 @@
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   ensureStarterCollectionsAndSettings,
   upsertThread,
   processResumableJobs,
@@ -93,7 +93,7 @@ import { BridgeActionError } from '../core/paperclip/actions.js';
 import type { AgentAction, ActionOutcome } from '../core/paperclip/bridge-protocol.js';
 import { SessionObservationLedger } from '../core/paperclip/observations.js';
 
-const db = new ThreadkeeperDB();
+const db = new ThreadStackDB();
 const sessionObservations = new SessionObservationLedger();
 const observedFrameUrls = new Map<string, string>();
 
@@ -122,7 +122,7 @@ function accounts(): AccountService | null {
   try {
     accountService = createAccountService(db, chromeAccountsEnv());
   } catch {
-    if (!accountServiceWarned) console.warn('[threadkeeper] account service unavailable');
+    if (!accountServiceWarned) console.warn('[threadstack] account service unavailable');
     accountServiceWarned = true;
     return null;
   }
@@ -182,7 +182,7 @@ if (typeof chrome !== 'undefined' && typeof chrome.cookies?.getAll === 'function
   void Promise.resolve()
     .then(() => accounts()?.recover())
     .then(() => retireBrowserAccountSlots())
-    .catch(() => console.warn('[threadkeeper] account switch recovery failed'));
+    .catch(() => console.warn('[threadstack] account switch recovery failed'));
 }
 
 /** Tell extension pages (the workspace) about accounts and embedded pages. */
@@ -508,9 +508,9 @@ async function organizeStoredThread(threadKey: string, settings: SettingsRecord)
     if (outcome.createdProject) organizeCtxCache = null;
     if (outcome.enqueued) await scheduleAnalysisAlarm();
   } catch (err) {
-    console.warn('[threadkeeper] local organize failed', err);
+    console.warn('[threadstack] local organize failed', err);
   }
-  await dock.markDirty([threadKey]).catch((err) => console.warn('[threadkeeper] Still sync mark failed', err));
+  await dock.markDirty([threadKey]).catch((err) => console.warn('[threadstack] Still sync mark failed', err));
   broadcastLibraryChanged(threadKey);
 }
 
@@ -776,12 +776,12 @@ const dock = new DockService({
   log: logSecurity,
 });
 
-// Still (Sidebar Dock) talks to Threadkeeper only on the external channel, with its own validator;
+// Still (Sidebar Dock) talks to ThreadStack only on the external channel, with its own validator;
 // external messages never reach the internal handler. Registered synchronously at top level.
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessageExternal) {
   chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
     void dock.handleExternalMessage(message, sender).then(sendResponse, () =>
-      sendResponse({ ok: false, proto: 'still-threadkeeper/1', error: { code: 'internal', message: 'Threadkeeper failed' } })
+      sendResponse({ ok: false, proto: 'still-threadkeeper/1', error: { code: 'internal', message: 'ThreadStack failed' } })
     );
     return true;
   });
@@ -846,7 +846,7 @@ async function injectIntoOpenTabs(patterns: string[]): Promise<void> {
   }
 }
 
-/** Whether Threadkeeper may read this page at all: a provider page it has access to, or an added site. */
+/** Whether ThreadStack may read this page at all: a provider page it has access to, or an added site. */
 async function capturablePage(url: string): Promise<{ ok: true; label: string } | { ok: false; error: string }> {
   const provider = detectProviderFromUrl(url);
   if (provider && PROVIDERS[provider].hostAccess !== 'custom' && isProviderAllowedOnUrl(provider, url)) {
@@ -854,7 +854,7 @@ async function capturablePage(url: string): Promise<{ ok: true; label: string } 
   }
   const site = matchCustomSite(await readCustomSites(chrome.storage?.local), url);
   if (site) return { ok: true, label: site.label };
-  return { ok: false, error: 'This tab is not an AI page Threadkeeper reads. Add the site under "Any AI site" first.' };
+  return { ok: false, error: 'This tab is not an AI page ThreadStack reads. Add the site under "Any AI site" first.' };
 }
 
 /** Settings → Capture → "Capture this tab": save the conversation open in the given (or active) tab. */
@@ -873,7 +873,7 @@ async function captureTabNow(requestedTabId?: number): Promise<CaptureTabResult>
   if (url.startsWith('chrome-extension://') || url.startsWith('edge://') || url.startsWith('chrome://')) {
     return { ok: false, error: 'Switch to the tab with the chat, then use Capture this tab from the side panel.' };
   }
-  if (!url) return { ok: false, error: 'Threadkeeper has no access to this tab. Turn its site on (or add it) under Capture first.' };
+  if (!url) return { ok: false, error: 'ThreadStack has no access to this tab. Turn its site on (or add it) under Capture first.' };
   const page = await capturablePage(url);
   if (!page.ok) return { ok: false, error: page.error };
   const tabId = tab.id;
@@ -897,7 +897,7 @@ async function captureTabNow(requestedTabId?: number): Promise<CaptureTabResult>
       await ask();
     } catch {
       explicitWaiters.delete(tabId);
-      return { ok: false, error: `Threadkeeper could not read this ${page.label} tab. Reload the tab and try again.` };
+      return { ok: false, error: `ThreadStack could not read this ${page.label} tab. Reload the tab and try again.` };
     }
   }
   return result;
@@ -1010,7 +1010,7 @@ const workspaceTabs = new WorkspaceTabs({
       // The tab is gone.
       return null;
     }
-    // Without the "tabs" permission the address of Threadkeeper's own page is not visible.
+    // Without the "tabs" permission the address of ThreadStack's own page is not visible.
     return tab.url ?? undefined;
   },
   managerUrl: MANAGER_URL,
@@ -1044,7 +1044,7 @@ async function forgetWorkspaceTab(tabId: number, options: { gone?: boolean } = {
 }
 
 // The workspace page keeps a port open for as long as it is showing. It is how the worker knows a
-// tab is still a workspace page (the worker cannot read the address of Threadkeeper's own pages),
+// tab is still a workspace page (the worker cannot read the address of ThreadStack's own pages),
 // so the header rule leaves with the page: when its last port closes (the tab closed, reloaded
 // or went to another address), the tab is forgotten and its rule removed. A reloaded page says
 // hello and connects again. Regular messages on the port also keep the worker running under a
@@ -1183,7 +1183,7 @@ if (typeof chrome !== 'undefined' && chrome.tabs?.onUpdated) {
     void (async () => {
       await workspaceTabs.ready();
       // Chrome reports a frame of the page loading as the tab loading, without the address of
-      // Threadkeeper's own page (no "tabs" permission). Only an address seen to be another
+      // ThreadStack's own page (no "tabs" permission). Only an address seen to be another
       // page's means the tab left; the page's own connection reports the rest (below).
       const url = tab.url ?? changeInfo.url;
       if (workspaceTabs.has(tabId) && typeof url === 'string' && !isManagerTabUrl(url, MANAGER_URL)) await forgetWorkspaceTab(tabId, { gone: true });
@@ -1293,7 +1293,7 @@ async function handleEmbedEvent(
     return { ok: true };
   }
   if (!frameUrl || typeof tabId !== 'number' || typeof frameId !== 'number') {
-    return { ok: false, error: 'Not a page embedded in Threadkeeper.', code: 'not_allowed' };
+    return { ok: false, error: 'Not a page embedded in ThreadStack.', code: 'not_allowed' };
   }
   // What kind of frame this is, as its own content script read it: said with the first message
   // of every document, before the page has run.
@@ -1388,7 +1388,7 @@ export async function invokeOverlayOnTab(
   if (canInjectOverlay && tabId !== undefined) {
     const handshakeToken = generateHandshakeToken();
     await setTabHandshake(tabId, { token: handshakeToken, redeemed: false });
-    // Opening Threadkeeper on a page counts as asking for it (except where capture is explicit-only).
+    // Opening ThreadStack on a page counts as asking for it (except where capture is explicit-only).
     grantExplicitCapture(tabId, 'overlay', handshakeToken);
     try {
       // Top frame only: content scripts also run in the page's own iframes.
@@ -1487,7 +1487,7 @@ async function initializeBackground(): Promise<void> {
   await scheduleAnalysisAlarm();
   // Still link: catch up with anything changed while the browser was closed (no-op when unpaired;
   // skipped when the last full pass is under 10 minutes old), then push what is due.
-  await dock.reconcile(false).catch((err) => console.warn('[threadkeeper] Still reconcile failed', err));
+  await dock.reconcile(false).catch((err) => console.warn('[threadstack] Still reconcile failed', err));
   await reconcileCaptureSites(settings);
   dock.kickDrain();
   await schedulePaperclipAlarm(settings);
@@ -1524,7 +1524,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest && chrome.stora
         });
       }
     })
-    .catch((err) => console.warn('[threadkeeper] manifest self-check failed', err));
+    .catch((err) => console.warn('[threadstack] manifest self-check failed', err));
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
@@ -1601,7 +1601,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
 
-      // Workspace commands: the sender is Threadkeeper's manager page as a top-level tab.
+      // Workspace commands: the sender is ThreadStack's manager page as a top-level tab.
       if (type === 'PAPERCLIP_INTEGRATION' || type === 'PAPERCLIP_SERVICE_STATUS' || type === 'PAPERCLIP_SERVICE_START' || type === 'PAPERCLIP_SERVICE_INSTALL') {
         if (type === 'PAPERCLIP_INTEGRATION' && message.action === 'frame_gone') {
           const frameId = message.payload?.frameId;
@@ -1627,7 +1627,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           else if (type === 'BACKUP_NOW') sendResponse(await backupNow(db, backupEnv));
           else sendResponse(await restoreFromHelper(db, backupEnv, message.name));
         } catch {
-          sendResponse({ ok: false, error: 'Threadkeeper could not reach its backups. Try again.' });
+          sendResponse({ ok: false, error: 'ThreadStack could not reach its backups. Try again.' });
         }
         return;
       }
@@ -1712,7 +1712,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
               decision.error ??
               (decision.skipped === 'provider_not_authorized'
                 ? `Capture is off for ${label}. Turn it on under AI products, then try again.`
-                : 'Threadkeeper did not save this tab.'),
+                : 'ThreadStack did not save this tab.'),
           });
           sendResponse(decision.error ? { ok: false, error: decision.error } : { ok: false, skipped: decision.skipped });
           return;
@@ -1724,7 +1724,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (!bound) {
           // A profile page whose account is not known: nothing is filed, least of all under
           // the browser's account, which that page is not signed in as.
-          settleExplicitWaiter(tabId, message.explicitToken, { ok: false, error: 'Threadkeeper could not tell which account this page belongs to.' });
+          settleExplicitWaiter(tabId, message.explicitToken, { ok: false, error: 'ThreadStack could not tell which account this page belongs to.' });
           sendResponse({ ok: false, skipped: 'no_account' });
           return;
         }
@@ -1940,7 +1940,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       }
 
       // A manager frame inside a website, or inside a page embedded in a workspace tab (whose tab
-      // URL is Threadkeeper's own): either way a page Threadkeeper does not control frames it.
+      // URL is ThreadStack's own): either way a page ThreadStack does not control frames it.
       const isEmbeddedInHostTab =
         typeof sender.tab?.id === 'number' &&
         (!(sender.tab.url ?? '').startsWith('chrome-extension://') || (typeof sender.frameId === 'number' && sender.frameId !== 0));
@@ -2106,7 +2106,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   });
 }
 
-/** Internal DOCK_* messages from Threadkeeper's own pages (sender already validated as privileged). */
+/** Internal DOCK_* messages from ThreadStack's own pages (sender already validated as privileged). */
 async function handleDockCommand(
   message: Record<string, unknown> & { type: string },
   sender: chrome.runtime.MessageSender
@@ -2116,7 +2116,7 @@ async function handleDockCommand(
     const check = validateDockPageSender(message.type, sender, chrome.runtime.id);
     if (!check.allowed) {
       logSecurity(check.reason ?? `Rejected ${message.type}`);
-      return { ok: false, error: 'Open Threadkeeper in its own window to do this.' };
+      return { ok: false, error: 'Open ThreadStack in its own window to do this.' };
     }
   }
   switch (message.type) {
@@ -2164,13 +2164,13 @@ async function handleDockCommand(
 }
 
 // Expose test-harness entrypoints on ServiceWorker globalThis for packaged-extension acceptance testing
-(globalThis as unknown as Record<string, unknown>).__threadkeeperInvokeAction =
+(globalThis as unknown as Record<string, unknown>).__threadStackInvokeAction =
   invokeOverlayOnTab;
-(globalThis as unknown as Record<string, unknown>).__threadkeeperGetSecurityRejections =
+(globalThis as unknown as Record<string, unknown>).__threadStackGetSecurityRejections =
   () => [...securityRejectionLog];
-(globalThis as unknown as Record<string, unknown>).__threadkeeperDb = db;
-(globalThis as unknown as Record<string, unknown>).__threadkeeperDock = dock;
-(globalThis as unknown as Record<string, unknown>).__threadkeeperClearInMemoryHandshakes =
+(globalThis as unknown as Record<string, unknown>).__threadStackDb = db;
+(globalThis as unknown as Record<string, unknown>).__threadStackDock = dock;
+(globalThis as unknown as Record<string, unknown>).__threadStackClearInMemoryHandshakes =
   () => {
     tabHandshakeTokens.clear();
     return tabHandshakeTokens.size;

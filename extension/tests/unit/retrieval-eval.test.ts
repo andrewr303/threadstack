@@ -89,7 +89,7 @@ describe('offline retrieval evaluation (synthetic fixtures, on-device path)', ()
     for (const q of LABELLED_QUERIES) dockRankings.set(q.query, await dockRank(q.query));
     results['Still search (dock), current'] = evaluate(lib, (q) => dockRankings.get(q) ?? []);
 
-    const out = path.join(os.tmpdir(), 'threadkeeper-retrieval-eval.json');
+    const out = path.join(os.tmpdir(), 'threadstack-retrieval-eval.json');
     fs.writeFileSync(out, JSON.stringify(results, null, 2));
     console.log(`${table(results)}\n(per-query detail: ${out})`);
     expect(results['manager first stage, baseline'].queries).toBeGreaterThanOrEqual(25);

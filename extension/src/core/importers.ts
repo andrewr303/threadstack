@@ -1,7 +1,7 @@
 import { unzipSync, strFromU8 } from 'fflate';
 import { decompress as zstdDecompress } from 'fzstd';
 import { buildThreadKey, type MessageRecord, type SettingsRecord } from './schema.js';
-import { upsertThread, type ThreadkeeperDB, type UpsertThreadInput } from './db.js';
+import { upsertThread, type ThreadStackDB, type UpsertThreadInput } from './db.js';
 import {
   importPortableBundle,
   parseChatGPTExport,
@@ -95,7 +95,7 @@ function decodeFiles(files: ImportFileInput[], errors: string[]): Array<{ name: 
  * pre-revert file is re-read once Codex compresses it), so older content never
  * replaces a newer stored thread; fork links stored by earlier imports are kept.
  */
-async function mergeStoredCodexThread(db: ThreadkeeperDB, thread: UpsertThreadInput): Promise<UpsertThreadInput | null> {
+async function mergeStoredCodexThread(db: ThreadStackDB, thread: UpsertThreadInput): Promise<UpsertThreadInput | null> {
   const existing = await db.conversations.get(thread.threadKey);
   if (!existing) return thread;
   if (Date.parse(thread.updatedAt ?? '') < Date.parse(existing.updatedAt ?? '')) return null;
@@ -108,7 +108,7 @@ async function mergeStoredCodexThread(db: ThreadkeeperDB, thread: UpsertThreadIn
  * everything imported and queue Claude analysis for it.
  */
 export async function importFiles(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   files: ImportFileInput[],
   onProgress?: (message: string) => void
@@ -202,7 +202,7 @@ export async function importFiles(
  * after a "Forked from…" marker, so its parent's history is prepended (one
  * level at a time) for a later fork of that fork to recognise what it replays.
  */
-async function storedCodexHistory(db: ThreadkeeperDB, threadKey: string, depth = 0): Promise<MessageRecord[]> {
+async function storedCodexHistory(db: ThreadStackDB, threadKey: string, depth = 0): Promise<MessageRecord[]> {
   const messages = await db.messages.where('threadKey').equals(threadKey).sortBy('ordinal');
   if (depth >= 8 || !messages[0]?.sourceMessageId.endsWith('_forked')) return messages;
   const conv = await db.conversations.get(threadKey);

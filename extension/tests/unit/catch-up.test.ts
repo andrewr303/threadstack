@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ThreadkeeperDB, UNFILED_PROJECT, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
+import { ThreadStackDB, UNFILED_PROJECT, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
 import {
   buildLocalBrief,
   collectCatchUpThreads,
@@ -13,7 +13,7 @@ import {
 import { THREAD_KINDS, buildThreadKey, normalizeSettings, type SettingsRecord, type ThreadInsight } from '../../src/core/schema.js';
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`ThreadkeeperCatchUp_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`ThreadStackCatchUp_${Date.now()}_${++n}`);
 
 const NOW = Date.parse('2026-11-03T12:00:00.000Z');
 const DAY = 86_400_000;
@@ -40,7 +40,7 @@ function input(id: string, daysAgo: number, patch: Partial<UpsertThreadInput> = 
 
 const keyOf = (id: string) => input(id, 0).threadKey;
 
-async function addInsight(db: ThreadkeeperDB, id: string, gist: string, summary = `Summary of ${id}.`, source: ThreadInsight['source'] = 'local') {
+async function addInsight(db: ThreadStackDB, id: string, gist: string, summary = `Summary of ${id}.`, source: ThreadInsight['source'] = 'local') {
   const threadKey = keyOf(id);
   await db.insights.put({
     insightKey: `${source}|${threadKey}`,

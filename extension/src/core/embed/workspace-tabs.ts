@@ -1,4 +1,4 @@
-// Workspace tabs: Threadkeeper's own manager.html running as a top-level tab that embeds provider
+// Workspace tabs: ThreadStack's own manager.html running as a top-level tab that embeds provider
 // pages. The service worker remembers each one (chrome.storage.session, so a restarted worker
 // still knows them), keeps one header rule per tab (rules.ts), answers the workspace page's
 // account commands, and decides which new windows an embedded page opens are taken back into
@@ -36,7 +36,7 @@ export interface WorkspaceTabsEnv {
   rules: SessionRulesApi | null;
   /**
    * The tab's address; `undefined` when the tab exists but its address is not visible to the
-   * extension (which is always the case for Threadkeeper's own pages: it holds no "tabs"
+   * extension (which is always the case for ThreadStack's own pages: it holds no "tabs"
    * permission), `null` when the tab is gone.
    */
   tabUrl(tabId: number): Promise<string | null | undefined>;
@@ -181,7 +181,7 @@ export type NewTabAdoption = 'adopt' | 'wait' | 'leave';
 
 /**
  * What to do with a tab that a page inside a workspace tab opened. Only an https page of a
- * provider Threadkeeper knows, opened in a normal window, is taken back into the workspace;
+ * provider ThreadStack knows, opened in a normal window, is taken back into the workspace;
  * popup windows (sign-in flows use them) and every other address are left alone. An empty or
  * about:blank address means the real one has not arrived yet.
  */
@@ -267,8 +267,8 @@ export interface WorkspaceCommandDeps {
   closeSignInTab?(pending: PendingSignIn): Promise<void>;
 }
 
-const UNAVAILABLE: WorkspaceFailure = { ok: false, error: 'Accounts are not available right now. Reload Threadkeeper and try again.' };
-const FAILED: WorkspaceFailure = { ok: false, error: 'Threadkeeper could not change accounts. Try again.' };
+const UNAVAILABLE: WorkspaceFailure = { ok: false, error: 'Accounts are not available right now. Reload ThreadStack and try again.' };
+const FAILED: WorkspaceFailure = { ok: false, error: 'ThreadStack could not change accounts. Try again.' };
 
 function idString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 && value.length <= 100 ? value : null;

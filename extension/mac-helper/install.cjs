@@ -8,14 +8,14 @@ const {HOST,BROWSERS,SUPPORT,EXTENSION_ID,extensionIdFromKey}=require('./core.cj
 function readJson(file){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}}
 
 /**
- * Extension IDs of every Threadkeeper found on this Mac: the fixed ID (shared/extension-key.json),
- * and any Threadkeeper a browser profile has loaded (from the profile's own list
+ * Extension IDs of every ThreadStack found on this Mac: the fixed ID (shared/extension-key.json),
+ * and any ThreadStack a browser profile has loaded (from the profile's own list
  * of extensions; nothing else in the profile is read).
  */
 function detectExtensionIds({home=os.homedir(),source=__dirname}={}){
   const found=new Map();
   // The fixed ID every keyed build has, registered ahead of time so the helper (and the library
-  // backups it holds) is reachable the moment Threadkeeper moves to that ID.
+  // backups it holds) is reachable the moment ThreadStack moves to that ID.
   const fixed=readJson(path.join(source,'..','shared','extension-key.json'));
   if(fixed&&typeof fixed.key==='string'&&fixed.key) found.set(extensionIdFromKey(fixed.key),'fixed ID');
   for(const browser of BROWSERS){
@@ -28,13 +28,13 @@ function detectExtensionIds({home=os.homedir(),source=__dirname}={}){
         if(!settings||typeof settings!=='object') continue;
         for(const [id,entry] of Object.entries(settings)){
           if(!EXTENSION_ID.test(id)||!entry||typeof entry!=='object') continue;
-          // Only a Threadkeeper loaded from a folder on this Mac (unpacked) is trusted without
+          // Only a ThreadStack loaded from a folder on this Mac (unpacked) is trusted without
           // asking: such an entry has no manifest copy in the profile, only its folder. An
-          // installed extension that merely calls itself Threadkeeper is not added; the helper
+          // installed extension that merely calls itself ThreadStack is not added; the helper
           // hands library backups to every ID it is installed for.
           if(entry.manifest||typeof entry.path!=='string'||!path.isAbsolute(entry.path)) continue;
           const name=readJson(path.join(entry.path,'manifest.json'))?.name;
-          if(name==='Threadkeeper'&&!found.has(id)) found.set(id,browser.name);
+          if((name==='ThreadStack'||name==='Threadkeeper')&&!found.has(id)) found.set(id,browser.name);
         }
       }
     }
@@ -46,11 +46,11 @@ function install({platform=process.platform,home=os.homedir(),extensionId,extens
   if(platform!=='darwin')throw Error('Run this installer on your Mac.');
   if(Number(process.versions.node.split('.')[0])<22)throw Error('Install Node.js 22 or newer first.');
   const wanted=[...extensionIds,extensionId].filter(Boolean);
-  if(!wanted.length||wanted.some(id=>!EXTENSION_ID.test(id)))throw Error('Paste the 32-letter extension ID from the Threadkeeper card on the extensions page.');
+  if(!wanted.length||wanted.some(id=>!EXTENSION_ID.test(id)))throw Error('Paste the 32-letter extension ID from the ThreadStack card on the extensions page.');
   if(!path.isAbsolute(node))throw Error('Node.js must have an absolute installation path.');
   const root=path.join(home,SUPPORT,'Threadkeeper/Bridge');
   fs.mkdirSync(root,{recursive:true,mode:0o700});
-  // IDs registered earlier stay registered, so Threadkeeper in a second browser keeps working.
+  // IDs registered earlier stay registered, so ThreadStack in a second browser keeps working.
   const before=readJson(path.join(root,'config.json'))||{};
   const ids=[...new Set([...wanted,...(Array.isArray(before.extensionIds)?before.extensionIds:[]),before.extensionId].filter(id=>EXTENSION_ID.test(id||'')))];
   for(const file of ['core.cjs','host.cjs']) fs.writeFileSync(path.join(root,file),fs.readFileSync(path.join(source,file)),{mode:0o600});
@@ -65,7 +65,7 @@ function install({platform=process.platform,home=os.homedir(),extensionId,extens
     if(!fs.existsSync(cli)||!fs.existsSync(tsx))throw Error('Install the Paperclip fork dependencies before registering it with the helper.');
     const shim=path.join(root,'paperclip-source');
     paperclip={root:fs.realpathSync(candidate),node,cli,tsx,shim,instanceId:'default'};
-    fs.writeFileSync(shim,`#!/bin/sh\ncd ${quote(paperclip.root)} || exit 1\nexport PAPERCLIP_SHIM_PATH=${quote(shim)}\nexport PAPERCLIP_THREADKEEPER_EXTENSION_IDS=${quote(ids.join(','))}\nexport PAPERCLIP_BUNDLED_PLUGIN_ROOT=${quote(path.join(paperclip.root,'packages/plugins'))}\nexport PATH=${quote(path.dirname(node)+':/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin')}\nexec ${quote(node)} ${quote(tsx)} ${quote(cli)} "$@"\n`,{mode:0o700});
+    fs.writeFileSync(shim,`#!/bin/sh\ncd ${quote(paperclip.root)} || exit 1\nexport PAPERCLIP_SHIM_PATH=${quote(shim)}\nexport PAPERCLIP_THREADSTACK_EXTENSION_IDS=${quote(ids.join(','))}\nexport PAPERCLIP_THREADKEEPER_EXTENSION_IDS=${quote(ids.join(','))}\nexport PAPERCLIP_BUNDLED_PLUGIN_ROOT=${quote(path.join(paperclip.root,'packages/plugins'))}\nexport PATH=${quote(path.dirname(node)+':/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin')}\nexec ${quote(node)} ${quote(tsx)} ${quote(cli)} "$@"\n`,{mode:0o700});
     fs.chmodSync(shim,0o700);
   }
   fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({extensionIds:ids,...(paperclip?{paperclip}:{})}),{mode:0o600});
@@ -80,7 +80,7 @@ done
 exit 1
 `,{mode:0o700});
   fs.chmodSync(launcher,0o700);
-  const body=JSON.stringify({name:HOST,description:'Threadkeeper account windows and library backups',path:launcher,type:'stdio',allowed_origins:ids.map(id=>`chrome-extension://${id}/`)},null,2);
+  const body=JSON.stringify({name:HOST,description:'ThreadStack account windows and library backups',path:launcher,type:'stdio',allowed_origins:ids.map(id=>`chrome-extension://${id}/`)},null,2);
   const manifests=[],browsers=[];
   for(const browser of BROWSERS){
     const base=path.join(home,SUPPORT,browser.dir);
@@ -117,10 +117,10 @@ if(require.main===module){
       if(folderIndex>=0&&!paperclipRoot)throw Error('Pass the Paperclip fork folder after --paperclip-root.');
       const typed=args;
       const detected=typed.length?[]:detectExtensionIds();
-      if(!typed.length&&!detected.length)throw Error('Threadkeeper was not found in any browser on this Mac. Load it first, or run this again and paste its extension ID.');
-      for(const d of detected)console.log(`Found Threadkeeper ${d.id} (${d.where}).`);
+      if(!typed.length&&!detected.length)throw Error('ThreadStack was not found in any browser on this Mac. Load it first, or run this again and paste its extension ID.');
+      for(const d of detected)console.log(`Found ThreadStack ${d.id} (${d.where}).`);
       const r=install({extensionIds:typed.length?typed:detected.map(d=>d.id),paperclipRoot});
-      console.log(`\nMac helper installed for: ${r.browsers.join(', ')}.\n\nReturn to Threadkeeper and choose Check connection.\nNo existing browser profiles were changed.`);
+      console.log(`\nMac helper installed for: ${r.browsers.join(', ')}.\n\nReturn to ThreadStack and choose Check connection.\nNo existing browser profiles were changed.`);
     }
   }catch(e){console.error(e.message);process.exitCode=1;}
 }

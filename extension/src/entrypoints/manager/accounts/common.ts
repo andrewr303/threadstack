@@ -17,7 +17,7 @@ export const COLOR_LABELS: Record<AccountColor, string> = {
 
 export const MAX_ACCOUNT_NAME = 40;
 
-/** Origin patterns Threadkeeper needs to save and restore a sign-in's cookies. */
+/** Origin patterns ThreadStack needs to save and restore a sign-in's cookies. */
 export function realmHostOrigins(realm: RealmInfo): string[] {
   return [...new Set([...realm.cookieDomains.map((d) => `https://*.${d}/*`), ...realm.extraHostPatterns])];
 }
@@ -37,7 +37,7 @@ export async function requestOrigins(origins: string[]): Promise<boolean> {
   }
 }
 
-/** The Threadkeeper page that manages accounts, from the side panel or the in-page overlay. */
+/** The ThreadStack page that manages accounts, from the side panel or the in-page overlay. */
 export function openFullPage(): void {
   try {
     if (typeof chrome !== 'undefined' && chrome.tabs?.create && chrome.runtime?.getURL) {

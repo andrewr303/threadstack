@@ -8,7 +8,7 @@ import {
   type ChangeLogEntry,
   type WorkflowState,
 } from './schema.js';
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import { findMatchingProject } from './project-match.js';
 
 const TAG_SYNONYM_MAP: Record<string, string> = {
@@ -326,7 +326,7 @@ export function previewNaturalLanguageOrganize(
 }
 
 export async function applyOrganizeProposals(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   description: string,
   proposals: OrganizeProposalItem[]
 ): Promise<ChangeLogEntry> {
@@ -400,7 +400,7 @@ export async function applyOrganizeProposals(
 }
 
 export async function undoChangeLog(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   changeId: string
 ): Promise<{ restoredCount: number }> {
   const entry = await db.changeLogs.get(changeId);

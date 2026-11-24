@@ -111,7 +111,7 @@ function stubChrome() {
     runtime: {
       id: EXTENSION_ID,
       getURL: (path: string) => `chrome-extension://${EXTENSION_ID}/${path}`,
-      getManifest: () => ({ manifest_version: 3, name: 'Threadkeeper', version: '0.0.0', version_name: BUILD_INFO.versionName }),
+      getManifest: () => ({ manifest_version: 3, name: 'ThreadStack', version: '0.0.0', version_name: BUILD_INFO.versionName }),
       sendMessage: async (message: Record<string, unknown>) => {
         if (message.type === 'WORKSPACE_HELLO') return { ok: true, tabId: 1, embedding: true, realms: [] };
         if (message.type === 'PAPERCLIP_SERVICE_STATUS') return { ok: false, error: 'helper_not_installed' };

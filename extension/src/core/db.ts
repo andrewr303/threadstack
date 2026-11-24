@@ -35,7 +35,7 @@ import type { PortableBundle } from './adapters.js';
 import type { DockMetaRecord, DockOutboxRecord, DockSentRecord, DockTrackedRecord } from './dock/records.js';
 import type { AccountJarRecord, AccountRecord, AgentState, KvRecord } from './workspace/types.js';
 
-export class ThreadkeeperDB extends Dexie {
+export class ThreadStackDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
   messages!: Table<MessageRecord, string>;
   chunks!: Table<ChunkRecord, string>;
@@ -65,6 +65,8 @@ export class ThreadkeeperDB extends Dexie {
   tableColumns!: Table<TableColumnRecord, string>;
   tableCells!: Table<TableCellRecord, string>;
 
+  // The database keeps the name it had before ThreadStack was renamed: renaming it would start an
+  // empty library. See doc/threadstack.md, "Naming and compatibility".
   constructor(dbName = 'ThreadkeeperDB') {
     super(dbName);
     this.version(1).stores({
@@ -155,7 +157,7 @@ export class ThreadkeeperDB extends Dexie {
 export const UNFILED_PROJECT = 'Unfiled / Uncertain';
 
 export async function ensureStarterCollectionsAndSettings(
-  db: ThreadkeeperDB
+  db: ThreadStackDB
 ): Promise<SettingsRecord> {
   const existingSettings = await db.settings.get('default');
   if (!existingSettings) {
@@ -201,7 +203,7 @@ export const STARTER_AREA_KEYWORDS: Record<string, string[]> = {
 
 /** Persist a settings patch and return the normalized result. */
 export async function saveSettingsPatch(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   patch: Partial<SettingsRecord>
 ): Promise<SettingsRecord> {
   return db.transaction('rw', db.settings, async () => {
@@ -304,7 +306,7 @@ export function buildChunksFromMessages(
 }
 
 export async function findMatchingTombstone(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   input: {
     threadKey: string;
     provider: ProviderId;
@@ -323,7 +325,7 @@ export async function findMatchingTombstone(
 export { pairStoredWithIncoming } from './merge.js';
 
 export async function upsertThread(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   input: UpsertThreadInput
 ): Promise<{ status: 'skipped_tombstone' | 'stored'; record?: ConversationRecord }> {
   return db.transaction(
@@ -571,7 +573,7 @@ export async function upsertThread(
 }
 
 export async function updateManualThreadFields(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKey: string,
   patch: {
     manualTitleOverride?: string | null;
@@ -655,7 +657,7 @@ export async function updateManualThreadFields(
 }
 
 export async function applySummaryEnrichment(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   params: {
     threadKey: string;
     sourceRevision: number;
@@ -860,7 +862,7 @@ export async function applySummaryEnrichment(
 }
 
 export async function deleteConversationCascade(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKey: string
 ): Promise<void> {
   await db.transaction(
@@ -940,7 +942,7 @@ export interface BulkThreadPatch {
  * `description` may depend on how many threads were changed.
  */
 export async function applyBulkThreadEdit(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKeys: readonly string[],
   patch: BulkThreadPatch,
   description: string | ((changedCount: number) => string)
@@ -1000,7 +1002,7 @@ export async function applyBulkThreadEdit(
 
 /** Delete several threads at once; each leaves a tombstone, as deleting one thread does. */
 export async function deleteConversationsCascade(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKeys: readonly string[]
 ): Promise<number> {
   return db.transaction(
@@ -1035,7 +1037,7 @@ export async function deleteConversationsCascade(
  * relationships between them. Same shape as exportPortableBundle, so it re-imports.
  */
 export async function exportSelectedThreads(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKeys: readonly string[]
 ): Promise<PortableBundle> {
   const keys = Array.from(new Set(threadKeys));
@@ -1079,7 +1081,7 @@ export interface LibraryReconciledCounts {
 }
 
 export async function reconcileLibraryCounts(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options?: { includeSyntheticBenchmark?: boolean; accountId?: string; workspaceId?: string }
 ): Promise<LibraryReconciledCounts> {
   const all = await db.conversations.toArray();
@@ -1148,7 +1150,7 @@ export async function reconcileLibraryCounts(
 }
 
 export async function enqueueJob(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   params: {
     jobType: JobRecord['jobType'];
     threadKey: string;
@@ -1175,7 +1177,7 @@ export async function enqueueJob(
 }
 
 export async function processResumableJobs(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   handler: (job: JobRecord, conv: ConversationRecord) => Promise<void>,
   maxBatchSize = 5
 ): Promise<{ processed: number; completed: number; cancelled: number; failed: number }> {

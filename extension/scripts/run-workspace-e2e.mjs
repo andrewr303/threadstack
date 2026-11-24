@@ -183,7 +183,7 @@ function startProviderServer() {
   const key = path.join(dir, 'key.pem');
   const cert = path.join(dir, 'cert.pem');
   // A throwaway certificate; the browser is started with --ignore-certificate-errors.
-  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '2', '-subj', '/CN=threadkeeper-e2e'], { stdio: 'ignore' });
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '2', '-subj', '/CN=threadstack-e2e'], { stdio: 'ignore' });
   const server = https.createServer({ key: fs.readFileSync(key), cert: fs.readFileSync(cert) }, (req, res) => {
     const headers = res.writeHead.bind(res);
     // Empty header values mean "do not send this header".
@@ -218,7 +218,7 @@ async function launch(port) {
 
 const threads = (sw) =>
   sw.evaluate(async () =>
-    (await globalThis.__threadkeeperDb.conversations.toArray()).map((c) => ({
+    (await globalThis.__threadStackDb.conversations.toArray()).map((c) => ({
       key: c.threadKey,
       provider: c.provider,
       accountId: c.accountId,
@@ -229,7 +229,7 @@ const threads = (sw) =>
       messages: c.messageCount,
     }))
   );
-const accountsOf = (sw) => sw.evaluate(async () => (await globalThis.__threadkeeperDb.accounts.toArray()).filter((a) => a.realm === 'anthropic'));
+const accountsOf = (sw) => sw.evaluate(async () => (await globalThis.__threadStackDb.accounts.toArray()).filter((a) => a.realm === 'anthropic'));
 const cookieMap = (sw) =>
   sw.evaluate(async () => Object.fromEntries((await chrome.cookies.getAll({ domain: 'claude.ai' })).map((c) => [c.name, c.value])));
 const command = (page, message) => page.evaluate((m) => chrome.runtime.sendMessage(m), message);
@@ -357,7 +357,7 @@ async function main() {
     check((await frameB.textContent('#who')) === 'Signed in as B', 'and the embedded page then loads as the second account');
     const fourth = await until(() => threads(sw), (t) => t.some((x) => x.id === 'session_b2'), { label: 'capture of the embedded session_b2' });
     check(fourth.find((x) => x.id === 'session_b2').accountId === workId, 'the embedded session of the second account is filed under the second account');
-    const jars = await sw.evaluate(async () => (await globalThis.__threadkeeperDb.accountJars.toArray()).map((j) => ({ accountId: j.accountId, readable: typeof j.data === 'string' || JSON.stringify(j).includes('sessionKey') })));
+    const jars = await sw.evaluate(async () => (await globalThis.__threadStackDb.accountJars.toArray()).map((j) => ({ accountId: j.accountId, readable: typeof j.data === 'string' || JSON.stringify(j).includes('sessionKey') })));
     check(jars.length === 1 && jars[0].accountId === primaryId && jars[0].readable === false, 'only the account that is not signed in has a saved jar, and it is not stored as readable text', jars);
     await page.screenshot({ path: path.join(out, '02-embedded-second-account.png') });
 
@@ -390,7 +390,7 @@ async function main() {
     await until(() => context.pages().length, (n) => n === pagesBefore, { label: 'the stray browser tab to be closed' });
     check(context.pages().length === pagesBefore, 'and no extra browser tab is left behind');
 
-    const rejections = await sw.evaluate(() => globalThis.__threadkeeperGetSecurityRejections?.() ?? []);
+    const rejections = await sw.evaluate(() => globalThis.__threadStackGetSecurityRejections?.() ?? []);
     log(`security rejections recorded during the run: ${rejections.length}`);
     for (const r of rejections.slice(-6)) log(`  ${r.reason}`);
   } finally {

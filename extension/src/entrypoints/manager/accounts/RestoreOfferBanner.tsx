@@ -1,5 +1,5 @@
 // Shown at the top of the full page when the library is empty on a Mac: the moment someone who
-// loaded Threadkeeper from another folder, or added it again, sees no threads and thinks their
+// loaded ThreadStack from another folder, or added it again, sees no threads and thinks their
 // history is gone. If the Mac helper holds a backup, it is offered right here.
 //
 // The helper's permission is per extension ID, so a new copy usually does not hold it yet. Then
@@ -48,7 +48,7 @@ export function RestoreOfferBanner({ threads }: { threads: number | null }) {
   const look = async (): Promise<void> => {
     const status = await workspaceApi.backupStatus();
     if (!mounted.current) return;
-    if (!status.ok || !Array.isArray(status.backups)) return setState({ kind: 'note', text: 'Threadkeeper could not check for backups. Try again from Settings, Accounts.' });
+    if (!status.ok || !Array.isArray(status.backups)) return setState({ kind: 'note', text: 'ThreadStack could not check for backups. Try again from Settings, Accounts.' });
     if (!status.helper) return setState({ kind: 'note', text: status.reason ?? 'The Mac helper is not connected.' });
     const fullest = status.backups.reduce<BackupListing | null>((best, b) => (!best || b.threads > best.threads ? b : best), null);
     if (!fullest || fullest.threads === 0) return setState({ kind: 'note', text: 'No library backup was found on this Mac.' });
@@ -96,7 +96,7 @@ export function RestoreOfferBanner({ threads }: { threads: number | null }) {
       granted = false;
     }
     if (!mounted.current) return;
-    if (!granted) return setState({ kind: 'note', text: 'The browser did not allow Threadkeeper to talk to the Mac helper, so backups could not be checked.' });
+    if (!granted) return setState({ kind: 'note', text: 'The browser did not allow ThreadStack to talk to the Mac helper, so backups could not be checked.' });
     await look();
   };
 
@@ -114,7 +114,7 @@ export function RestoreOfferBanner({ threads }: { threads: number | null }) {
       <div className="tk-banner-body">
         {state.kind === 'ask' && (
           <>
-            <strong>Used Threadkeeper on this Mac before?</strong>
+            <strong>Used ThreadStack on this Mac before?</strong>
             <span>This library is empty. If the Mac helper kept a backup of your earlier library, it can be restored.</span>
           </>
         )}
@@ -131,7 +131,7 @@ export function RestoreOfferBanner({ threads }: { threads: number | null }) {
         {state.kind === 'restored' && (
           <>
             <strong>Restored {count(state.threads)}</strong>
-            <span>Reload Threadkeeper to see them. Accounts need signing in again.</span>
+            <span>Reload ThreadStack to see them. Accounts need signing in again.</span>
           </>
         )}
         {state.kind === 'note' && <span>{state.text}</span>}
@@ -148,7 +148,7 @@ export function RestoreOfferBanner({ threads }: { threads: number | null }) {
       )}
       {state.kind === 'restored' && (
         <button type="button" className="tk-btn tk-btn-primary" onClick={() => window.location.reload()}>
-          Reload Threadkeeper
+          Reload ThreadStack
         </button>
       )}
       {!busy && state.kind !== 'restored' && (

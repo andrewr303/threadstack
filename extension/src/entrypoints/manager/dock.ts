@@ -70,7 +70,7 @@ export function dockErrorText(error: unknown): { text: string; code?: string } {
 
 async function call<T extends { ok: true }>(message: Record<string, unknown>): Promise<T | DockFailure> {
   const send = transport();
-  if (!send) return { ok: false, error: 'Threadkeeper is not running as an extension here.' };
+  if (!send) return { ok: false, error: 'ThreadStack is not running as an extension here.' };
   try {
     const res = (await send(overlayToken ? { ...message, handshakeToken: overlayToken } : message)) as
       | (Record<string, unknown> & { ok?: unknown; error?: unknown })
@@ -79,7 +79,7 @@ async function call<T extends { ok: true }>(message: Record<string, unknown>): P
     const { text, code } = dockErrorText(res?.error);
     return { ok: false, error: text, code };
   } catch (err) {
-    return { ok: false, error: `Threadkeeper's background did not answer (${err instanceof Error ? err.message : String(err)}).` };
+    return { ok: false, error: `ThreadStack's background did not answer (${err instanceof Error ? err.message : String(err)}).` };
   }
 }
 
@@ -104,7 +104,7 @@ export async function getDockState(): Promise<DockStateView | null> {
  * Tell the worker that this page changed threads (DOCK_SYNC_NOW). `privacy` marks writes that can
  * make a thread private or delete it (local-only, project moves, deletes, undo): the worker then
  * takes back from Still at once whatever may no longer be shared. Fire and forget; a no-op when the
- * page knows Threadkeeper is not paired.
+ * page knows ThreadStack is not paired.
  */
 export function dockSyncNow(threadKeys: readonly string[] = [], options: { privacy?: boolean } = {}): void {
   if (knownPaired === false) return;

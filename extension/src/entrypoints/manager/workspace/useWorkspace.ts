@@ -2,7 +2,7 @@
 // One instance lives in the manager page (full-tab surface only). Views read it and call its
 // actions; the frame stage mounts an iframe for every tab in `plan.live`.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { ThreadkeeperDB } from '../../../core/db.js';
+import type { ThreadStackDB } from '../../../core/db.js';
 import type { ConversationRecord, SettingsRecord } from '../../../core/schema.js';
 import { parsePaneName } from '../../../core/embed/frame.js';
 import { realmById } from '../../../core/workspace/realms.js';
@@ -28,6 +28,7 @@ import { loadSeed, reloadWorkspacePage, sendFrameCommand, startWorkspacePort, wo
 import { LAUNCH_PROVIDERS } from './launch.js';
 import {
   accountForThread,
+  browseVisibleTabs,
   embedTargetFor,
   fallbackTabTitle,
   findAccount,
@@ -69,11 +70,11 @@ const EMPTY_RUNTIME: FrameRuntime = {
 
 export type OpenOutcome =
   | { ok: true; tabId: string }
-  /** `external`: not a page Threadkeeper embeds; the caller may open it in a Chrome tab. */
+  /** `external`: not a page ThreadStack embeds; the caller may open it in a Chrome tab. */
   | { ok: false; reason: 'external' | 'no_account'; message: string };
 
 export interface WorkspaceInput {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   /** False on the side panel and the in-page overlay: nothing is embedded there. */
   enabled: boolean;
   view: WorkspaceView;
@@ -152,7 +153,7 @@ export interface WorkspaceController {
   reload: (id: string) => void;
   /**
    * Send a tab to another address of the same sign-in. An address of another sign-in, or one
-   * Threadkeeper cannot embed, is refused: open it as its own tab or in Chrome instead.
+   * ThreadStack cannot embed, is refused: open it as its own tab or in Chrome instead.
    */
   navigate: (id: string, url: string) => OpenOutcome;
   /** Called by the frame stage when an iframe's load event fires. */
@@ -242,7 +243,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
         setEmbedding(hello.embedding);
         setProfilesSaved(hello.profiles !== false);
         setTabId(hello.tabId);
-        setError(hello.embedding ? null : 'Threadkeeper could not prepare this tab for embedded pages. Reload the extension, then this page.');
+        setError(hello.embedding ? null : 'ThreadStack could not prepare this tab for embedded pages. Reload the extension, then this page.');
       } else {
         setError(hello.error);
       }
@@ -442,13 +443,14 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   // ---- which pages are mounted ---------------------------------------------------------------
   const visible = useMemo(() => {
     if (!enabled) return [];
-    if (view === 'browse') return state.activeTabId ? [state.activeTabId] : [];
+    // Split view shows two pages at once; the status board shows none.
+    if (view === 'browse') return browseVisibleTabs(state);
     if (view === 'threads') return liveThreadKey ? [threadTabId(liveThreadKey)] : [];
     const panes = state.dashboard.panes.filter((k): k is string => typeof k === 'string').map(threadTabId);
     // The focused pane first, so it is the last to be unloaded when the limit is small.
     const focused = state.dashboard.panes[state.dashboard.focusedPane];
     return focused ? [threadTabId(focused), ...panes.filter((id) => id !== threadTabId(focused))] : panes;
-  }, [enabled, view, state.activeTabId, state.dashboard, liveThreadKey]);
+  }, [enabled, view, state.activeTabId, state.tabs, state.browse, state.dashboard, liveThreadKey]);
 
   const plan = useMemo(
     () =>
@@ -583,7 +585,7 @@ export function useWorkspace(input: WorkspaceInput): WorkspaceController {
   const openThread = useCallback<WorkspaceController['openThread']>((conv, options) => {
     const target = embedTargetFor(conv.canonicalUrl);
     if (!target) {
-      return { ok: false, reason: 'external', message: 'This thread has no web page Threadkeeper can show here.' };
+      return { ok: false, reason: 'external', message: 'This thread has no web page ThreadStack can show here.' };
     }
     const legacy = settingsRef.current?.boundAccounts[conv.provider]?.accountId;
     const owner = accountForThread(conv, realmsRef.current, legacy);

@@ -134,7 +134,7 @@ async function launch() {
 
 const storedThreads = (sw) =>
   sw.evaluate(async () =>
-    (await globalThis.__threadkeeperDb.conversations.toArray()).map((c) => ({
+    (await globalThis.__threadStackDb.conversations.toArray()).map((c) => ({
       id: c.sourceConversationId,
       title: c.title,
       count: c.messageCount,
@@ -162,7 +162,7 @@ async function run() {
   const first = rows.find((r) => r.id === uuid(1));
   check(first?.count === 4 && first.coverage === 'full' && first.source === 'network_observer', `a conversation whose page shows 2 messages is stored complete from the site's own data (${first?.count} messages, ${first?.coverage}, ${first?.source})`);
   const messages = await sw.evaluate(async (id) => {
-    const db = globalThis.__threadkeeperDb;
+    const db = globalThis.__threadStackDb;
     const c = (await db.conversations.toArray()).find((x) => x.sourceConversationId === id);
     return (await db.messages.where('threadKey').equals(c.threadKey).sortBy('ordinal')).map((m) => m.content);
   }, uuid(1));

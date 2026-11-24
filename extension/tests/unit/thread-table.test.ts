@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   deleteConversationCascade,
   ensureStarterCollectionsAndSettings,
   saveSettingsPatch,
@@ -24,6 +24,7 @@ import {
   rowMatchesQuery,
   setManualCell,
   sortTableRows,
+  tableProviderOptions,
   updateTableColumn,
   type TableRow,
 } from '../../src/core/thread-table.js';
@@ -32,9 +33,9 @@ import { buildColumnFillRequest, columnFillSchema } from '../../src/core/ai/clau
 import { BACKUP_TABLES } from '../../src/core/backup.js';
 
 let counter = 0;
-function freshDb(): ThreadkeeperDB {
+function freshDb(): ThreadStackDB {
   counter += 1;
-  return new ThreadkeeperDB(`ThreadTableTestDB_${counter}_${Date.now()}`);
+  return new ThreadStackDB(`ThreadTableTestDB_${counter}_${Date.now()}`);
 }
 
 function thread(id: string, title: string, provider: ProviderId = 'chatgpt', extra: Partial<UpsertThreadInput> = {}): UpsertThreadInput {
@@ -127,6 +128,37 @@ describe('built-in columns', () => {
     expect(by('title', 'asc')).toEqual(['b', 'a', 'c']);
     expect(by('created', 'asc')).toEqual(['b', 'a', 'c']);
     expect(by('created', 'desc')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('breaks ties by recent activity, then thread key, in both directions', () => {
+    const same = { provider: 'chatgpt' as const, updatedAt: '2026-10-05T12:00:00.000Z', lastCapturedAt: '2026-10-05T12:00:00.000Z' };
+    const rows = [
+      row({ threadKey: 'k3', title: 'Same', ...same }),
+      row({ threadKey: 'k1', title: 'Same', ...same }),
+      row({ threadKey: 'k2', title: 'Same', provider: 'chatgpt', updatedAt: '2026-10-06T12:00:00.000Z', lastCapturedAt: '2026-10-06T12:00:00.000Z' }),
+    ];
+    const none = new Map();
+    for (const direction of ['asc', 'desc'] as const) {
+      expect(sortTableRows(rows, { column: 'provider', direction }, none, () => undefined).map((r) => r.conv.threadKey)).toEqual(['k2', 'k1', 'k3']);
+    }
+  });
+
+  it('offers the providers the library holds, most threads first', () => {
+    const convs = [
+      { provider: 'claude', isSyntheticBenchmark: false },
+      { provider: 'chatgpt', isSyntheticBenchmark: false },
+      { provider: 'chatgpt', isSyntheticBenchmark: false },
+      { provider: 'claude_code', isSyntheticBenchmark: false },
+      { provider: 'claude_code', isSyntheticBenchmark: false },
+      { provider: 'gemini', isSyntheticBenchmark: true },
+    ] as const;
+    const label = (p: string) => ({ claude: 'Claude', chatgpt: 'ChatGPT', claude_code: 'Claude Code' })[p] ?? p;
+    expect(tableProviderOptions(convs, label).map((o) => [o.label, o.count])).toEqual([
+      ['ChatGPT', 2],
+      ['Claude Code', 2],
+      ['Claude', 1],
+    ]);
+    expect(tableProviderOptions(convs, label, 1).map((o) => o.provider)).toEqual(['chatgpt']);
   });
 });
 

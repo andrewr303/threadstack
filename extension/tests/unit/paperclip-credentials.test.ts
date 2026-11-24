@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gunzipSync, strFromU8 } from 'fflate';
 import { writeBackup } from '../../src/core/backup.js';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings } from '../../src/core/db.js';
 import { normalizeSettings } from '../../src/core/schema.js';
 import { embedTexts, remoteSpace } from '../../src/core/embeddings.js';
 import { requestQueryEmbedding } from '../../src/core/cloud-client.js';
@@ -72,7 +72,7 @@ describe('Paperclip model credentials', () => {
     configureModelCredentialResolver(async () => { throw coded('not_paired'); });
     const unpaired = await resolveModelSettings(settings(), 'embeddings', ['voyageApiKey']).catch((e) => e);
     expect(unpaired.reason).toBe('not_paired');
-    expect(unpaired.message).toBe('Threadkeeper is not paired with Paperclip, so embeddings is paused.');
+    expect(unpaired.message).toBe('ThreadStack is not paired with Paperclip, so embeddings is paused.');
     configureModelCredentialResolver(async () => { throw new TypeError('Failed to fetch'); });
     const down = await resolveModelSettings(settings(), 'embeddings', ['voyageApiKey']).catch((e) => e);
     expect(down.reason).toBe('unavailable');
@@ -91,7 +91,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('deletes each original key only after exact readback and preserves failed/concurrently edited keys', async () => {
-    const db = new ThreadkeeperDB(`credentials-${Date.now()}`);
+    const db = new ThreadStackDB(`credentials-${Date.now()}`);
     const original = { ...await ensureStarterCollectionsAndSettings(db), voyageApiKey: 'move-voyage', openaiApiKey: 'keep-openai', cohereApiKey: 'old-cohere', paperclipCredentials: { companyId: 'company-a', linkedKeys: [], allowSecretTransfer: true } };
     await db.settings.put(original);
     const backend = {
@@ -119,7 +119,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('clears the stored value once a link is read back, so IndexedDB and backups are free of it (REQ-14 F-2)', async () => {
-    const db = new ThreadkeeperDB(`credential-link-clear-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-link-clear-${Date.now()}`);
     const base = await ensureStarterCollectionsAndSettings(db);
     await db.settings.put({ ...base, voyageApiKey: 'stale-stored-voyage', paperclipCredentials: { companyId: 'company-a', linkedKeys: [], allowSecretTransfer: true } });
     const factory = (() => ({ listSecrets: async () => [{ id: 'secret-1', name: 'Voyage' }], link: async () => undefined, resolve: async () => 'from-paperclip',
@@ -137,7 +137,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('keeps the stored value when the linked secret cannot be read back', async () => {
-    const db = new ThreadkeeperDB(`credential-link-keep-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-link-keep-${Date.now()}`);
     const base = await ensureStarterCollectionsAndSettings(db);
     await db.settings.put({ ...base, voyageApiKey: 'kept-voyage', paperclipCredentials: { companyId: 'company-a', linkedKeys: [], allowSecretTransfer: true } });
     const factory = (() => ({ listSecrets: async () => [{ id: 'secret-1', name: 'Voyage' }], link: async () => undefined, resolve: async () => { throw new Error('offline'); } })) as any;
@@ -147,7 +147,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('switching the source company A to B clears the PREVIOUS company A config on the server (REQ-14 F-6)', async () => {
-    const db = new ThreadkeeperDB(`credential-switch-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-switch-${Date.now()}`);
     await db.settings.put(settings());
     const cleared: string[] = [];
     const factory = ((_s: unknown, companyId: string) => ({ clearLinks: async () => { cleared.push(companyId); },
@@ -159,7 +159,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('deselecting the source company clears local consent first and then the previous company config', async () => {
-    const db = new ThreadkeeperDB(`credential-deselect-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-deselect-${Date.now()}`);
     await db.settings.put(settings());
     const cleared: string[] = [];
     const factory = ((_s: unknown, companyId: string) => ({ clearLinks: async () => { cleared.push(companyId); throw new Error('offline'); } })) as any;
@@ -170,7 +170,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('cloud calls accept a linked worker token with an empty local value (REQ-14 F-8)', async () => {
-    const db = new ThreadkeeperDB(`credential-worker-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-worker-${Date.now()}`);
     const base = await ensureStarterCollectionsAndSettings(db);
     await db.settings.put({ ...base, cloudEnabled: true, workerEndpointUrl: 'https://worker.example.test', workerBearerToken: '', dailyCloudRequestBudget: 10,
       paperclipCredentials: { companyId: 'company-a', linkedKeys: ['workerBearerToken'], allowSecretTransfer: true } });
@@ -185,7 +185,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('denies another company and revocation while a secret read is in flight', async () => {
-    const db = new ThreadkeeperDB(`credential-gate-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-gate-${Date.now()}`);
     await db.settings.put(settings());
     const resolve = vi.fn(async () => { await db.settings.update('default', { paperclipCredentials: { companyId: 'company-a', linkedKeys: ['voyageApiKey'], allowSecretTransfer: false } }); return 'never-delivered'; });
     const factory = (() => ({ resolve })) as any;
@@ -196,7 +196,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('commits local denial even if the server cannot save the switch-off', async () => {
-    const db = new ThreadkeeperDB(`credential-off-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-off-${Date.now()}`);
     await db.settings.put(settings());
     const factory = (() => ({ setConsent: async () => { throw new Error('offline'); } })) as any;
     await expect(handleCredentialCommand(db, async () => '', 'credentials.consent', { companyId: 'company-a', enabled: false }, factory)).rejects.toThrow('offline');
@@ -251,7 +251,7 @@ describe('Paperclip model credentials', () => {
   });
 
   it('does not resurrect an unlink when the offline server still reports the old link', async () => {
-    const db = new ThreadkeeperDB(`credential-unlink-${Date.now()}`);
+    const db = new ThreadStackDB(`credential-unlink-${Date.now()}`);
     await db.settings.put(settings());
     const factory = (() => ({ link: async () => { throw new Error('offline'); }, metadata: async () => ({ companyId: 'company-a', linkedKeys: ['voyageApiKey'], allowSecretTransfer: true }), listSecrets: async () => [] })) as any;
     await expect(handleCredentialCommand(db, async () => '', 'credentials.link', { companyId: 'company-a', keyName: 'voyageApiKey', secretId: null }, factory)).rejects.toThrow('offline');
