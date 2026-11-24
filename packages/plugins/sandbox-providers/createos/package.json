@@ -51,13 +51,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "^5.7.3",
-    "vitest": "^4.1.8"
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
   },
   "engines": {
     "node": ">=24.11.0"
   },
   "dependencies": {
-    "tar": "^7.5.22"
+    "tar": "^7.5.23"
   }
 }
