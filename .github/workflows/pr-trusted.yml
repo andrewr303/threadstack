@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
           # The merge commit and its two parent trees are the complete diff.
           fetch-depth: 2
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24
           package-manager-cache: false
@@ -65,7 +65,7 @@ jobs:
       # Node immediately first, and no npm audit, fund or update-notifier calls.
       - name: Setup Node.js for pnpm bootstrap
         if: steps.eligible.outputs.enabled == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -89,7 +89,7 @@ jobs:
       - name: Upload validated selection and audit
         id: upload_selection
         if: steps.select.outputs.selected == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: vitest-selection-${{ github.run_attempt }}
           path: |
@@ -192,7 +192,7 @@ jobs:
           fi
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -271,7 +271,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -302,7 +302,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -413,7 +413,7 @@ jobs:
           rustup toolchain list
 
       - name: Restore Runner Rust dependencies (read only)
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: ${{ steps.runner_rust_workspace.outputs.path }} -> target
           shared-key: release-runner-v2-${{ hashFiles('packages/paperclip-runner/runner/Cargo.toml', '.cargo/config', '.cargo/config.toml', 'packages/.cargo/config', 'packages/.cargo/config.toml', 'packages/paperclip-runner/.cargo/config', 'packages/paperclip-runner/.cargo/config.toml', 'packages/paperclip-runner/runner/.cargo/config', 'packages/paperclip-runner/runner/.cargo/config.toml') }}
@@ -485,7 +485,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -532,7 +532,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -603,7 +603,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -660,7 +660,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -694,7 +694,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -726,7 +726,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -761,7 +761,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -787,7 +787,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -851,7 +851,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -965,7 +965,7 @@ jobs:
           rustup toolchain list
 
       - name: Restore Runner Rust dependencies (read only)
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: ${{ steps.runner_rust_workspace.outputs.path }} -> target
           shared-key: release-runner-v2-${{ hashFiles('packages/paperclip-runner/runner/Cargo.toml', '.cargo/config', '.cargo/config.toml', 'packages/.cargo/config', 'packages/.cargo/config.toml', 'packages/paperclip-runner/.cargo/config', 'packages/paperclip-runner/.cargo/config.toml', 'packages/paperclip-runner/runner/.cargo/config', 'packages/paperclip-runner/runner/.cargo/config.toml') }}
@@ -1058,7 +1058,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -1089,7 +1089,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -1219,7 +1219,7 @@ jobs:
           rustup toolchain list
 
       - name: Restore Runner Rust dependencies (read only)
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: ${{ steps.runner_rust_workspace.outputs.path }} -> target
           shared-key: release-runner-v2-${{ hashFiles('packages/paperclip-runner/runner/Cargo.toml', '.cargo/config', '.cargo/config.toml', 'packages/.cargo/config', 'packages/.cargo/config.toml', 'packages/paperclip-runner/.cargo/config', 'packages/paperclip-runner/.cargo/config.toml', 'packages/paperclip-runner/runner/.cargo/config', 'packages/paperclip-runner/runner/.cargo/config.toml') }}
@@ -1313,7 +1313,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -1357,7 +1357,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -1422,7 +1422,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -1453,7 +1453,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -1564,7 +1564,7 @@ jobs:
           rustup toolchain list
 
       - name: Restore Runner Rust dependencies (read only)
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: ${{ steps.runner_rust_workspace.outputs.path }} -> target
           shared-key: release-runner-v2-${{ hashFiles('packages/paperclip-runner/runner/Cargo.toml', '.cargo/config', '.cargo/config.toml', 'packages/.cargo/config', 'packages/.cargo/config.toml', 'packages/paperclip-runner/.cargo/config', 'packages/paperclip-runner/.cargo/config.toml', 'packages/paperclip-runner/runner/.cargo/config', 'packages/paperclip-runner/runner/.cargo/config.toml') }}
@@ -1640,7 +1640,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
@@ -1675,7 +1675,7 @@ jobs:
         run: node scripts/ci-profile/initialize.mjs
 
       - name: Setup Node.js for pnpm bootstrap
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           package-manager-cache: false
@@ -1761,7 +1761,7 @@ jobs:
           pnpm run test:e2e $specs
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: playwright-report-${{ matrix.shard_index }}
@@ -1773,7 +1773,7 @@ jobs:
       - name: Upload CI profile timings
         continue-on-error: true
         if: always() && env.PAPERCLIP_CI_PROFILE == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-profile-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
           path: .ci-profile/*.ndjson
