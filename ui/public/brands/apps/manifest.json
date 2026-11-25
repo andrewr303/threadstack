@@ -490,6 +490,13 @@
       "localAsset": "/brands/apps/todoist.svg"
     },
     {
+      "slug": "treg",
+      "provider": "Treg",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/treg.svg",
+      "darkAsset": "/brands/apps/treg-dark.svg"
+    },
+    {
       "slug": "vercel",
       "provider": "Vercel",
       "catalogVisible": true,

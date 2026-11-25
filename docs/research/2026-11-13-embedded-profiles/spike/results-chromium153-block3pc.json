@@ -1,0 +1,208 @@
+{
+  "block3pc": true,
+  "findings": {
+    "01_tab_signed_in": "A",
+    "01b_control_third_party_frame_cookies": {},
+    "02_host_tab": {
+      "ok": true,
+      "tabId": 1783529347
+    },
+    "03_plain_frame_cookies": {
+      "sessionKey": "A",
+      "lastActiveOrg": "org-A",
+      "cf_clearance": "device-A"
+    },
+    "03_plain_frame_document_cookie": "",
+    "04_credentialless_frame_initial_cookies": {},
+    "04_credentialless_flag_page_world": true,
+    "05_credentialless_after_login_page_shows": "B",
+    "05_credentialless_after_login_fetch_cookies": {
+      "sessionKey": "B",
+      "lastActiveOrg": "org-B",
+      "cf_clearance": "device-B"
+    },
+    "05_credentialless_document_cookie": "",
+    "06_browser_jar_plain": {
+      "sessionKey": "A",
+      "lastActiveOrg": "org-A",
+      "cf_clearance": "device-A"
+    },
+    "06_browser_jar_partitions": {
+      "https://claude.ai": [],
+      "chrome-extension://oahbhpkkgcoiciicfcafcikjdinkldoi": []
+    },
+    "07_plain_frame_still": {
+      "sessionKey": "A",
+      "lastActiveOrg": "org-A",
+      "cf_clearance": "device-A"
+    },
+    "08_second_credentialless_frame_cookies": {
+      "sessionKey": "B",
+      "lastActiveOrg": "org-B",
+      "cf_clearance": "device-B"
+    },
+    "09_webrequest_login_seen": [
+      {
+        "tabId": 1783529347,
+        "frameId": 10,
+        "parentFrameId": 0,
+        "type": "sub_frame",
+        "setCookie": [
+          "sessionKey=B; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400",
+          "lastActiveOrg=org-B; Path=/; Secure; SameSite=Lax; Max-Age=86400",
+          "cf_clearance=device-B; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=86400"
+        ]
+      }
+    ],
+    "09_frames_reported_by_content_script": [
+      {
+        "name": "",
+        "frameId": 0,
+        "credentialless": false
+      },
+      {
+        "name": "third",
+        "frameId": 6,
+        "credentialless": false
+      },
+      {
+        "name": "plain-1",
+        "frameId": 8,
+        "credentialless": false
+      },
+      {
+        "name": "cred-1",
+        "frameId": 9,
+        "credentialless": true
+      },
+      {
+        "name": "cred-1b",
+        "frameId": 10,
+        "credentialless": true
+      },
+      {
+        "name": "cred-2",
+        "frameId": 11,
+        "credentialless": true
+      }
+    ],
+    "10_credentialless_js_written_document_cookie": "js_none=1",
+    "10_credentialless_js_written_sent": {
+      "sessionKey": "B",
+      "lastActiveOrg": "org-B",
+      "cf_clearance": "device-B",
+      "js_none": "1"
+    },
+    "11_localStorage_seen_by_credentialless": null,
+    "11_localStorage_seen_by_plain_after": "plain",
+    "11_localStorage_shared_between_credentialless": "cred",
+    "12_tab_sw_state": "controlled",
+    "12_plain_frame_controlled_by_tab_sw": {
+      "sw": true,
+      "cookies": {
+        "sessionKey": "A",
+        "lastActiveOrg": "org-A",
+        "cf_clearance": "device-A"
+      }
+    },
+    "12_credentialless_frame_controlled_by_tab_sw": {
+      "sw": false,
+      "cookies": {
+        "sessionKey": "B",
+        "lastActiveOrg": "org-B",
+        "cf_clearance": "device-B",
+        "js_none": "1"
+      }
+    },
+    "13_credentialless_sw_state": "controlled",
+    "13_credentialless_fetch_through_own_sw": {
+      "sw": true,
+      "cookies": {
+        "cf_clearance": "device-B",
+        "js_none": "1"
+      }
+    },
+    "13_webrequest_for_sw_fetch": [
+      {
+        "url": "/echo",
+        "tabId": -1,
+        "frameId": -1,
+        "type": "xmlhttprequest",
+        "cookie": [
+          "cf_clearance=device-B; js_none=1"
+        ]
+      }
+    ],
+    "14_popup_from_credentialless": {
+      "title": "no-opener",
+      "who": "A"
+    },
+    "15_after_host_reload_credentialless_cookies": {},
+    "15_after_host_reload_credentialless_localStorage": null,
+    "15_after_host_reload_controlled_by_old_sw": {
+      "sw": false,
+      "cookies": {}
+    },
+    "16_seed_rule": {
+      "ok": true,
+      "id": 100
+    },
+    "16_seeded_cookies_sent_from_credentialless": {
+      "sessionKey": "C",
+      "lastActiveOrg": "org-C",
+      "domainwide": "1",
+      "__Host-strict": "1"
+    },
+    "16_seeded_path_scoped_cookie": [
+      [
+        "scoped=1; sessionKey=C; lastActiveOrg=org-C; domainwide=1; __Host-strict=1"
+      ]
+    ],
+    "16_seeded_on_subdomain": {
+      "domainwide": "1"
+    },
+    "16_seed_response_as_webrequest_saw_it": [
+      {
+        "setCookie": [],
+        "type": "sub_frame"
+      }
+    ],
+    "16_browser_jar_after_seed": {
+      "sessionKey": "A",
+      "lastActiveOrg": "org-A",
+      "cf_clearance": "device-A"
+    },
+    "17_after_expiring_seed": {
+      "domainwide": "1",
+      "__Host-strict": "1"
+    },
+    "18_seed_through_fetch": {
+      "domainwide": "1",
+      "__Host-strict": "1",
+      "viafetch": "1"
+    },
+    "19_cookie_header_rule_plain_frame": {
+      "sessionKey": "Z",
+      "lastActiveOrg": "org-Z"
+    },
+    "19_cookie_header_rule_through_tab_sw": {
+      "sw": true,
+      "cookies": {
+        "sessionKey": "A",
+        "lastActiveOrg": "org-A",
+        "cf_clearance": "device-A"
+      }
+    },
+    "20_set_cookie_removed_but_seen_by_webrequest": [
+      [
+        "leak=1; Path=/; Secure; SameSite=Lax"
+      ]
+    ],
+    "20_browser_jar_after_removed_set_cookie": {
+      "sessionKey": "A",
+      "lastActiveOrg": "org-A",
+      "cf_clearance": "device-A"
+    }
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36"
+}

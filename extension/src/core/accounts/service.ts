@@ -372,6 +372,7 @@ export function createAccountService(db: ThreadStackDB, env: AccountsEnv): Accou
   }
 
   async function hasRealmAccess(realm: RealmInfo): Promise<boolean> {
+    // An auth redirect alone does not give access to the application's session.
     for (const domain of appCookieDomains(realm)) {
       if (await env.hasHostAccess([`https://${domain}/*`])) return true;
     }

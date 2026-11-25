@@ -87,7 +87,7 @@ export function PaperclipBridgeSettings({ companies, extensionCommit = commitOfB
         {companies?.map(company => {
           const status = state.companies[company.id];
           return <div className="tk-paperclip-company" key={company.id}>
-            <strong>{company.name}</strong>
+            <strong>{company.name}{company.issuePrefix && ` (${company.issuePrefix})`}</strong>
             <span className="tk-muted" role="status">
               {status?.lastError?.startsWith('version_mismatch') ? 'Version mismatch' : status?.paired && status.connected ? 'Connected' : 'Not connected'}
               {status?.paired && !status.connected && status.lastSeenAt > 0 && ` · Last seen ${lastSeenText(status.lastSeenAt)}`}

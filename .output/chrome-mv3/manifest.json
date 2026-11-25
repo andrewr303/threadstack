@@ -1,0 +1,283 @@
+{
+  "manifest_version": 3,
+  "name": "Threadkeeper",
+  "version": "0.5.0",
+  "version_name": "0.5.0 (build 20261121.181910-5adc60f8a)",
+  "description": "Automatically captures, understands and organizes your AI threads across ChatGPT, Claude, Claude Code, Codex, Grok, Gemini and more.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "scripting",
+    "sidePanel",
+    "activeTab",
+    "cookies",
+    "declarativeNetRequestWithHostAccess",
+    "webRequest"
+  ],
+  "optional_permissions": [
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://grok.com/*",
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://gemini.google.com/*",
+    "https://aistudio.google.com/*",
+    "https://www.perplexity.ai/*",
+    "https://perplexity.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://chat.mistral.ai/*",
+    "https://copilot.microsoft.com/*",
+    "https://copilot.com/*",
+    "https://www.copilot.com/*",
+    "https://www.kimi.com/*",
+    "https://kimi.com/*",
+    "https://kimi.ai/*",
+    "https://api.anthropic.com/*",
+    "https://api.voyageai.com/*",
+    "https://api.openai.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.api.aws/*",
+    "https://*.amazonaws.com/*",
+    "https://ai.mongodb.com/*",
+    "https://us.ai.mongodb.com/*",
+    "https://eu.ai.mongodb.com/*",
+    "https://api.cohere.com/*",
+    "https://www.kimi.ai/*",
+    "https://muse.ai/*",
+    "https://www.muse.ai/*",
+    "https://www.meta.ai/*",
+    "https://meta.ai/*",
+    "https://poe.com/*",
+    "https://huggingface.co/*",
+    "https://chat.qwen.ai/*",
+    "https://www.doubao.com/*",
+    "https://chat.z.ai/*",
+    "https://zchat.z.ai/*",
+    "https://manus.im/*",
+    "https://www.manus.im/*",
+    "https://www.genspark.ai/*",
+    "https://genspark.ai/*",
+    "https://agent.minimax.io/*",
+    "https://agent.minimaxi.com/*",
+    "https://character.ai/*",
+    "https://duck.ai/*",
+    "https://lumo.proton.me/*",
+    "https://arena.ai/*",
+    "https://lmarena.ai/*",
+    "https://t3.chat/*",
+    "https://notebook.google.com/*",
+    "https://notebooklm.google.com/*",
+    "https://github.com/*",
+    "https://cursor.com/*",
+    "https://www.cursor.com/*",
+    "https://app.devin.ai/*",
+    "https://jules.google.com/*",
+    "https://lovable.dev/*",
+    "https://bolt.new/*",
+    "https://v0.app/*",
+    "https://v0.dev/*",
+    "https://replit.com/*",
+    "https://app.lobehub.com/*",
+    "https://auth.openai.com/*",
+    "https://accounts.x.ai/*",
+    "https://authenticator.cursor.sh/*",
+    "https://*/*",
+    "http://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Threadkeeper",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "commands": {
+    "toggle-overlay": {
+      "suggested_key": {
+        "default": "Alt+Shift+K",
+        "mac": "Alt+Shift+K"
+      },
+      "description": "Toggle Threadkeeper overlay on the active AI tab"
+    },
+    "open-side-panel": {
+      "suggested_key": {
+        "default": "Alt+Shift+L",
+        "mac": "Alt+Shift+L"
+      },
+      "description": "Open Threadkeeper in the side panel"
+    },
+    "open-manager": {
+      "suggested_key": {
+        "default": "Alt+Shift+M",
+        "mac": "Alt+Shift+M"
+      },
+      "description": "Open Threadkeeper full-page library"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://kimi.ai/*"
+      ],
+      "js": [
+        "content-scripts/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content-scripts/content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content-scripts/grok-x-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "content-scripts/site-data-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://kimi.ai/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content-scripts/embed-bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://kimi.ai/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content-scripts/embed-cookie-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "manager.html",
+        "assets/*"
+      ],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://x.com/*",
+        "https://twitter.com/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://kimi.ai/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}

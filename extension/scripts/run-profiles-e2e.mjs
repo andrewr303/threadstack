@@ -21,6 +21,7 @@
 // Build first, into a folder no browser has loaded:
 //   TK_OUT_DIR=/tmp/tk-build node scripts/build-extension.mjs
 //   TK_E2E_DIST=/tmp/tk-build node scripts/run-profiles-e2e.mjs
+// TK_E2E_OUT redirects screenshots from the default evidence/profiles/.
 import fs from 'node:fs';
 import https from 'node:https';
 import os from 'node:os';
@@ -248,6 +249,7 @@ async function main() {
   const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tk-profile-fixture-'));
   const fixtureDist = path.join(fixtureDir, 'extension');
   fs.cpSync(dist, fixtureDist, { recursive: true });
+  // Fixture only: pre-grant the Cursor hosts so the run does not depend on a native permission prompt.
   manifest.host_permissions.push('https://cursor.com/*', 'https://www.cursor.com/*', 'https://authenticator.cursor.sh/*');
   fs.writeFileSync(path.join(fixtureDist, 'manifest.json'), JSON.stringify(manifest));
   log('fixture build:', fs.readFileSync(path.join(fixtureDist, 'build-info.json'), 'utf8'));
@@ -398,6 +400,7 @@ async function main() {
     await until(() => textOf(paneFrame(page, aThreadTab), '#who'), (t) => t === 'Signed in as A', { label: "A's pane after that reload" });
     check(true, 'after that reload Work is signed in from its new saved sign-in, beside A');
 
+    // A second Chrome tab can take over a saved account without closing the original workspace.
     const secondWorkspace = await context.newPage();
     await secondWorkspace.goto(page.url());
     const dashboard = (workspace) => workspace.getByRole('region', { name: 'Dashboard', exact: true });
@@ -437,6 +440,7 @@ async function main() {
     await until(() => Promise.resolve(signInTab.isClosed()), (closed) => closed === true, { label: 'the sign-in tab to close' });
     check(true, 'and the sign-in tab is closed');
 
+    // With capture off and host access granted, Cursor's own response still identifies the account.
     await until(() => sw.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((s) => s.id)),
       (ids) => ids.includes('tk-provider-cursor_agents~site-data'), { label: 'the Cursor identity observer' });
     const cursor = await context.newPage();

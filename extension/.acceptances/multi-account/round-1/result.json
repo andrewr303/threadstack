@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "title": "Threadkeeper multi-account sign-in and tab handoff",
+  "requirement": "Make additional account sign-ins recoverable, improve Cursor identity detection, and open a saved account in a second extension tab.",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Add a second Cursor account while preserving the original browser sign-in."
+    },
+    {
+      "id": "R2",
+      "text": "Open a saved account in a second full-page Threadkeeper tab."
+    },
+    {
+      "id": "R3",
+      "text": "Preserve the working Claude sign-in flows."
+    }
+  ],
+  "createdAt": "2026-11-23T20:18:47.225590+00:00",
+  "runtime": {
+    "expected": "browseros-neo",
+    "observed": "chrome",
+    "selection": "fallback",
+    "tools": [
+      "extension/scripts/run-profiles-e2e.mjs (Playwright)"
+    ],
+    "fallbacks": [
+      {
+        "runtime": "browseros-neo",
+        "status": "missing_capability",
+        "capability": "isolated unpacked extension test profile",
+        "reason": "Neo responded in its own profile. Its exposed tools did not attach to the repository\u2019s separate Chrome extension fixture profile."
+      },
+      {
+        "runtime": "codex-in-app-browser",
+        "status": "missing_capability",
+        "capability": "Chrome extension lifecycle",
+        "reason": "The available in-app runtime reports a shared Electron webview. The test needs Chrome extension service workers, real cookie partitions, and two extension tabs."
+      }
+    ]
+  },
+  "context": {
+    "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+    "revision": "5adc60f8a with local account changes",
+    "buildIdentity": "20261123.201535-5adc60f8a",
+    "buildVerified": true,
+    "role": "Synthetic provider identities in a disposable profile. Cursor host permissions are pre-granted in the test-only manifest copy.",
+    "viewport": "1440\u00d7900 CSS pixels, HeadlessChrome 156"
+  },
+  "plan": [
+    {
+      "id": "cursor-fixture",
+      "requirements": [
+        "R1"
+      ],
+      "title": "Recover and finish a second Cursor sign-in",
+      "category": "Threadkeeper accounts",
+      "verifier": "agent",
+      "method": "Use the packaged extension and a synthetic Cursor account. Try premature completion, reopen the sign-in tab, choose the original identity, and then choose the new one.",
+      "expected": "The extension refuses early and duplicate completion, retains the pending attempt, saves the second account, and restores the first in its ordinary Chrome tab.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "workspace-move",
+      "requirements": [
+        "R2"
+      ],
+      "title": "Move a saved account to the second workspace",
+      "category": "Threadkeeper accounts",
+      "verifier": "agent",
+      "method": "Open two top-level Threadkeeper tabs displaying the same saved profile and use Move account here in the second one.",
+      "expected": "The second tab loads the signed-in profile. The first tab pauses that profile and its other account stays available.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "claude-regression",
+      "requirements": [
+        "R3"
+      ],
+      "title": "Retain Claude\u2019s embedded and browser-tab flows",
+      "category": "Threadkeeper accounts",
+      "verifier": "agent",
+      "method": "Add a Claude account inside Threadkeeper, reload its saved sign-in, and add a third using an ordinary browser tab.",
+      "expected": "Embedded accounts remain distinct, the saved account survives reload, and the browser-tab flow restores the original account.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    },
+    {
+      "id": "live-cursor",
+      "requirements": [
+        "R1"
+      ],
+      "title": "Second live Cursor login",
+      "category": "Threadkeeper accounts",
+      "verifier": "agent",
+      "method": "Use an isolated Chrome profile with two authorized real Cursor identities.",
+      "expected": "Complete the provider\u2019s actual login and reopen the saved second identity without losing the first.",
+      "requiredEvidence": [
+        "screenshot",
+        "transcript"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "cursor-fixture",
+      "name": "Recover and finish a second Cursor sign-in",
+      "category": "Threadkeeper accounts",
+      "surface": "web",
+      "status": "pass",
+      "observation": "A native Chrome tab opened and reopened. The extension left the attempt open after early completion, flagged the duplicate identity, displayed the new identity in the profile, and restored the original identity in Chrome.",
+      "evidence": [
+        {
+          "path": "assets/06-cursor-duplicate.png",
+          "type": "screenshot",
+          "description": "Duplicate identity warning and open-tab recovery",
+          "capturedAt": "2026-11-23T20:17:12.142054+00:00",
+          "capturedBy": "chrome",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a"
+          }
+        },
+        {
+          "path": "assets/07-cursor-second-account.png",
+          "type": "screenshot",
+          "description": "Signed-in Cursor fixture in the added account\u2019s pane",
+          "capturedAt": "2026-11-23T20:17:14.550607+00:00",
+          "capturedBy": "chrome",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a"
+          }
+        },
+        {
+          "path": "assets/profiles-e2e.log",
+          "type": "transcript",
+          "description": "Packaged Chrome fixture assertions and runtime identity",
+          "capturedAt": "2026-11-23T20:17:15.071699+00:00",
+          "capturedBy": "cli",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a",
+            "command": "TK_E2E_DIST=/tmp/threadkeeper-multi-account-build TK_E2E_OUT=extension/.acceptances/multi-account/round-1/assets node extension/scripts/run-profiles-e2e.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "workspace-move",
+      "name": "Move a saved account to the second workspace",
+      "category": "Threadkeeper accounts",
+      "surface": "web",
+      "status": "pass",
+      "observation": "The second tab loaded fixture account B. The first displayed the move notice, unmounted B, and kept account A. Closing the second tab let the first load B again.",
+      "evidence": [
+        {
+          "path": "assets/04-move-account.png",
+          "type": "screenshot",
+          "description": "Move account here before ownership changes",
+          "capturedAt": "2026-11-23T20:17:07.717591+00:00",
+          "capturedBy": "chrome",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a"
+          }
+        },
+        {
+          "path": "assets/05-account-after-move.png",
+          "type": "screenshot",
+          "description": "Both signed-in fixture accounts visible in the second workspace",
+          "capturedAt": "2026-11-23T20:17:08.007978+00:00",
+          "capturedBy": "chrome",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a"
+          }
+        },
+        {
+          "path": "assets/profiles-e2e.log",
+          "type": "transcript",
+          "description": "Packaged Chrome fixture assertions and runtime identity",
+          "capturedAt": "2026-11-23T20:17:15.071699+00:00",
+          "capturedBy": "cli",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a",
+            "command": "TK_E2E_DIST=/tmp/threadkeeper-multi-account-build TK_E2E_OUT=extension/.acceptances/multi-account/round-1/assets node extension/scripts/run-profiles-e2e.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "claude-regression",
+      "name": "Retain Claude\u2019s embedded and browser-tab flows",
+      "category": "Threadkeeper accounts",
+      "surface": "web",
+      "status": "pass",
+      "observation": "Accounts A and B rendered together, B survived reload, and account C was saved through the browser-tab flow before Chrome returned to A.",
+      "evidence": [
+        {
+          "path": "assets/03-dashboard-after-reload.png",
+          "type": "screenshot",
+          "description": "Both Claude fixture accounts still signed in after a workspace reload",
+          "capturedAt": "2026-11-23T20:17:06.891301+00:00",
+          "capturedBy": "chrome",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a"
+          }
+        },
+        {
+          "path": "assets/profiles-e2e.log",
+          "type": "transcript",
+          "description": "Packaged Chrome fixture assertions and runtime identity",
+          "capturedAt": "2026-11-23T20:17:15.071699+00:00",
+          "capturedBy": "cli",
+          "tool": "extension/scripts/run-profiles-e2e.mjs (Playwright)",
+          "inspected": true,
+          "source": {
+            "url": "chrome-extension://imacnnfmhcfmaedlffiojaiolgdlmhho/manager.html?surface=page",
+            "revision": "5adc60f8a with local account changes",
+            "buildIdentity": "20261123.201535-5adc60f8a",
+            "command": "TK_E2E_DIST=/tmp/threadkeeper-multi-account-build TK_E2E_OUT=extension/.acceptances/multi-account/round-1/assets node extension/scripts/run-profiles-e2e.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "live-cursor",
+      "name": "Second live Cursor login",
+      "category": "Threadkeeper accounts",
+      "surface": "web",
+      "status": "blocked",
+      "observation": "Two authorized real Cursor test identities were not available. The isolated Chrome run used local stand-ins.",
+      "evidence": []
+    }
+  ],
+  "coverageGaps": [
+    "Live Cursor authentication, the native permission prompt, and other providers beyond the Claude and Cursor fixtures were not exercised."
+  ]
+}

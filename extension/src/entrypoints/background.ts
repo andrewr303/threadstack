@@ -172,6 +172,7 @@ async function resolveSenderAccount(
       return { accountId: threadAccountId(owner.account, bound.accountId), workspaceId: bound.workspaceId, account: owner.account };
     }
   }
+  // The browser temporarily holds a login whose identity has not been confirmed.
   const pending = await accounts()?.pendingSignIn();
   if (pending && pending.realm === realmForProvider(provider)?.id) return null;
   return resolveCaptureAccount(provider, bound);
@@ -368,6 +369,7 @@ async function openSignInTab(url: string, pending: PendingSignIn): Promise<void>
     const tab = await chrome.tabs.create({ url: 'about:blank', active: true });
     if (tab.id === undefined) throw new Error('Browser did not return a sign-in tab ID');
     try {
+      // Register the tab before navigation so even its first identity report is attributable.
       await chrome.storage.session.set({ [key]: tab.id });
       if (await isCurrent()) await chrome.tabs.update(tab.id, { url });
       else await closeSignInTab(pending);
@@ -389,6 +391,7 @@ async function closeSignInTab(pending: PendingSignIn): Promise<void> {
   const stored = await signInTabId(pending);
   await chrome.storage.session.remove(signInTabKey(pending)).catch(() => undefined);
   if (typeof stored !== 'number') return;
+  // Leave the tab alone if it has since been used for another site.
   const tab = await chrome.tabs.get(stored).catch(() => null);
   let host: string | null = null;
   try {

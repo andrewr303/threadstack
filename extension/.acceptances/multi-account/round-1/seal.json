@@ -1,0 +1,16 @@
+{
+  "files": {
+    "assets/03-dashboard-after-reload.png": "682da045ef0af5363798e1ebbbc2b0d70d08b206d1c9abea8cd11140112c78b2",
+    "assets/04-move-account.png": "6cd80daac44780f57f972f3bab5383c0b97a12cfe15a914009f7504598c80a9a",
+    "assets/05-account-after-move.png": "ee5cc8c21a34ef90d9323ce3cac71879cb35d288390e2f9288d68a9da1137347",
+    "assets/06-cursor-duplicate.png": "ce317f204c2f9912f716ca1727acf3fa38db9256915cb3c1362e71d1d017c1e4",
+    "assets/07-cursor-second-account.png": "d17436c3c5d70cf6d784c56a76a683e5fbdf60e1109cbd6ae24365337c94aad9",
+    "assets/profiles-e2e.log": "89353df668de3dc06559df5090a041296b86c265f0caa7b495f1d21c4336f955",
+    "report.md": "b401be5e836d403c71d00e1e8a9cc81012a771bf08626977ccda5cc6f3d145f2",
+    "result.json": "52e2547608d4f18ecc1b6c6bfbb06d890a3653ddab229967f87ac531d6fe2e6f"
+  },
+  "missingFiles": [],
+  "schemaVersion": 1,
+  "sealedAt": "2026-11-23T20:19:17.998100+00:00",
+  "verdictAtSeal": "blocked"
+}

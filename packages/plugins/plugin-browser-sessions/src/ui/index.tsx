@@ -5,7 +5,7 @@ import { SUPPORTED_PROVIDERS, type ActionPolicy, type ActionRecord, type Session
 const button = "inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50";
 const input = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground";
 type Status = { connected: boolean; shared: boolean; lastSeenAt: string | null; browser: string; sessionCount: number; warning: string | null; versionMismatch: boolean; policy: ActionPolicy; effectivePolicy: ActionPolicy; message?: string };
-type Settings = Status & { trustedAgentIds: string[]; eventsEnabled: boolean; agents: { id: string; name: string; status: string }[]; credentials: { linkedKeys: string[]; allowSecretTransfer: boolean }; actions: ActionRecord[] };
+type Settings = Status & { paired?: boolean; trustedAgentIds: string[]; eventsEnabled: boolean; agents: { id: string; name: string; status: string }[]; credentials: { linkedKeys: string[]; allowSecretTransfer: boolean }; actions: ActionRecord[] };
 function errorText(error: unknown) { return error && typeof error === "object" && "message" in error ? String(error.message) : String(error); }
 function Empty({ children }: { children: ReactNode }) { return <p className="py-4 text-sm text-muted-foreground">{children}</p>; }
 function useSessionData<T>(key: string, params: Record<string, unknown>) {
@@ -26,25 +26,49 @@ export function relativeTime(iso: string, now = Date.now()): string {
 function statusLabel(data: Status) { return data.versionMismatch ? "Version mismatch" : data.connected ? `Connected to ThreadStack${data.browser ? ` in ${data.browser}` : ""}` : "Not connected"; }
 function StateLabel({ row }: { row: SessionRow }) { return <span>{row.observed ? ({ running: "Running", idle: "Idle", signed_out: "Signed out", turn_complete: "Finished", waiting_answer: "Needs your answer", waiting_permission: "Needs approval", needs_user_answer: "Needs your answer", needs_answer: "Needs your answer", needs_approval: "Needs approval", failed: "Failed" } as Record<string, string>)[String(row.agentState)] ?? "Unknown" : "Not observed"}{!row.observed && row.agentStateAt ? ` · Last seen ${relativeTime(row.agentStateAt)}` : ""}</span>; }
 
+function PairingForm({ companyId, refresh }: { companyId: string; refresh: () => void }) {
+  const confirm = usePluginAction("pair-confirm");
+  const [code, setCode] = useState("");
+  const [shareAfterPair, setShareAfterPair] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  async function submit() {
+    setFailure(null);
+    setPending(true);
+    try {
+      await confirm({ companyId, code, shared: shareAfterPair });
+      setCode("");
+    } catch (error) {
+      setFailure(errorText(error));
+    } finally {
+      setPending(false);
+      refresh();
+    }
+  }
+  return <form className="space-y-3 rounded-lg border border-border p-4" onSubmit={event => { event.preventDefault(); void submit(); }}>
+    <label className="block space-y-2"><span className="text-sm font-medium">Confirm pairing code</span><input className={input} value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setFailure(null); }} maxLength={8} autoComplete="off" placeholder="8-character code" /></label>
+    {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
+    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={shareAfterPair} onChange={e => setShareAfterPair(e.target.checked)} />Share sessions with this company after pairing</label>
+    <div className="flex justify-end border-t border-border pt-3"><button className={button} disabled={pending || code.length !== 8}>Confirm code</button></div>
+  </form>;
+}
+
 export function SettingsPage({ context }: PluginCompanySettingsPageProps) {
   const { data, loading, error, refresh } = useSessionData<Settings>("settings", { companyId: context.companyId });
-  const confirm = usePluginAction("pair-confirm"); const share = usePluginAction("sharing"); const disconnect = usePluginAction("disconnect"); const policy = usePluginAction("policy-save");
-  const [code, setCode] = useState(""); const [shareAfterPair, setShareAfterPair] = useState(false); const [failure, setFailure] = useState<string | null>(null); const [pending, setPending] = useState(false);
+  const share = usePluginAction("sharing"); const disconnect = usePluginAction("disconnect"); const policy = usePluginAction("policy-save");
+  const [failure, setFailure] = useState<string | null>(null); const [pending, setPending] = useState(false);
   const navigation = useHostNavigation();
   async function act(fn: () => Promise<unknown>) { setPending(true); setFailure(null); try { await fn(); await refresh(); } catch (error) { setFailure(errorText(error)); } finally { setPending(false); } }
   if (!context.companyId) return <Empty>Select a company to configure browser sessions.</Empty>;
   if (loading && !data) return <Empty>Loading browser session settings…</Empty>;
   if (error) return <p role="alert">{error.message}</p>;
   if (!data) return null;
+  const paired = data.paired ?? (data.connected || !!data.lastSeenAt || data.versionMismatch);
   const savePolicy = (next: ActionPolicy) => act(() => policy({ companyId: context.companyId, policy: next }));
   return <section className="space-y-6" aria-label="Browser sessions settings">
     <div className="space-y-2"><h2 className="text-lg font-semibold">Browser sessions</h2><p role="status" className="text-sm">{statusLabel(data)}</p>{!data.connected && data.lastSeenAt && <p className="text-sm text-muted-foreground">Last seen {relativeTime(data.lastSeenAt)}</p>}{data.warning && <p className="text-sm text-muted-foreground">{data.warning}</p>}<button className={button} onClick={() => void refresh()}>Refresh status</button></div>
     {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
-    <form className="space-y-3 rounded-lg border border-border p-4" onSubmit={(event) => { event.preventDefault(); void act(() => confirm({ companyId: context.companyId, code, shared: shareAfterPair })); }}>
-      <label className="block space-y-2"><span className="text-sm font-medium">Confirm pairing code</span><input className={input} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={8} autoComplete="off" placeholder="8-character code" /></label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={shareAfterPair} onChange={(e) => setShareAfterPair(e.target.checked)} />Share sessions with this company after pairing</label>
-      <div className="flex justify-end border-t border-border pt-3"><button className={button} disabled={pending || code.length !== 8}>Confirm code</button></div>
-    </form>
+    {!paired && <PairingForm key={context.companyId} companyId={context.companyId} refresh={refresh} />}
     <div className="space-y-3"><h3 className="font-medium">Sharing</h3><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={data.shared} disabled={pending || !data.lastSeenAt} onChange={(e) => void act(() => share({ companyId: context.companyId, shared: e.target.checked }))} />Share sessions with this company</label><p className="text-sm text-muted-foreground">{data.shared ? `${data.sessionCount} sessions shared` : "No company can see your sessions yet. Choose one to share with."}</p><button className={button} disabled={pending} onClick={() => void act(() => disconnect({ companyId: context.companyId }))}>Disconnect</button></div>
     <div className="space-y-3 border-t border-border pt-4"><h3 className="font-medium">Agent actions</h3><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={data.policy.enabled} disabled={pending} onChange={(e) => void savePolicy({ ...data.policy, enabled: e.target.checked })} />Allow trusted agents to act in my browser</label><p className="text-sm text-muted-foreground">Agents will send messages and start sessions as you. Providers may forbid automated use of personal accounts.</p><p className="text-sm text-muted-foreground">Enable the same providers in ThreadStack. Both sides must allow each action.</p><div className="flex flex-wrap gap-4">{SUPPORTED_PROVIDERS.map((provider) => <label key={provider} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={data.policy.providers.includes(provider)} disabled={pending} onChange={(e) => void savePolicy({ ...data.policy, providers: e.target.checked ? [...data.policy.providers, provider] : data.policy.providers.filter((p) => p !== provider) })} />{label(provider)}</label>)}<label className="flex items-center gap-2 text-sm text-muted-foreground opacity-50"><input type="checkbox" checked={false} disabled />{label("gemini")} · Not supported yet</label></div><p className="text-sm text-muted-foreground">10 messages and 3 new sessions per agent per hour.</p></div>
     <fieldset className="space-y-3"><legend className="font-medium">Trusted agents</legend>{!data.agents.length && <Empty>No agents in this company.</Empty>}{data.agents.map((agent) => <div key={agent.id} className="flex items-center gap-3 text-sm"><span>{agent.name} · {agent.status}</span><label className="flex items-center gap-2"><input type="checkbox" checked={data.trustedAgentIds.includes(agent.id)} disabled={pending} onChange={(e) => void act(() => policy({ companyId: context.companyId, trustedAgentIds: e.target.checked ? [...data.trustedAgentIds, agent.id] : data.trustedAgentIds.filter((id) => id !== agent.id) }))} />Trusted</label></div>)}</fieldset>

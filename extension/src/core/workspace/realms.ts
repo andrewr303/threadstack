@@ -34,6 +34,7 @@ export interface RealmInfo {
   fixedReason?: string;
   /** Where a new account signs in. */
   signInUrl: string;
+  /** The sign-in commonly redirects through a separate identity provider. */
   preferBrowserSignIn?: boolean;
   /** Where "new tab" lands for this realm when no provider is chosen. */
   homeUrl: string;

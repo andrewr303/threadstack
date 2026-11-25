@@ -278,6 +278,7 @@ describe("AppDefinition catalog", () => {
         "linear",
         "google-sheets",
         "context7",
+        "treg",
         "composio",
         "oauth-generic",
         "api-key-generic",
@@ -905,7 +906,7 @@ describe("AppDefinition catalog", () => {
       "ticktick",
       "xero",
     ]);
-    expect(APP_STORE_DEFINITIONS).toHaveLength(89);
+    expect(APP_STORE_DEFINITIONS).toHaveLength(90);
     const connectableSlugs = new Set(
       CONNECTABLE_APP_DEFINITIONS.map((entry) => entry.slug),
     );

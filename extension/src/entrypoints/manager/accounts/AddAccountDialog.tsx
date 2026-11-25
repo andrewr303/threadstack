@@ -94,6 +94,7 @@ export function AddAccountDialog({ dialogRef, realmId, onClosed }: AddAccountDia
     const label = name.trim();
     setBusy(true);
     setFailure(null);
+    // Ask during the click. Most account sites are granted at install; Cursor's app is optional.
     const origins = info.preferBrowserSignIn
       ? [...new Set([...info.providers.flatMap(runtimePermissionOrigins), ...info.extraHostPatterns])]
       : info.extraHostPatterns;

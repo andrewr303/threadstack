@@ -139,7 +139,9 @@ export interface PendingSignIn {
   /** The account that was the browser's own before, restored when the sign-in ends. */
   returnToAccountId: string;
   startedAt: string;
+  /** Identifies this attempt across delayed replies and worker restarts. */
   attemptId?: string;
+  /** Identity confirmed by the tab opened for this sign-in. */
   identity?: AccountIdentity;
   wrongAccount?: true;
 }
@@ -435,6 +437,7 @@ export interface ProfileClaimResult {
   accountId: string;
   /** Addresses to load, in order, each in a hidden credentialless frame, before PROFILE_READY. */
   steps: string[];
+  /** Previous workspace tabs whose partitions were retired by an explicit move. */
   movedFrom?: number[];
   /** Whether the account has a saved sign-in (false: its pages will show the site's sign-in page). */
   signedIn: boolean;

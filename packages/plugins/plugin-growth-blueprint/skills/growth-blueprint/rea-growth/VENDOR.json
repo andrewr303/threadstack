@@ -1,0 +1,15 @@
+{
+  "source": "rea-growth",
+  "files": {
+    "SKILL.md": "1a6efd38e877b68f2e05cf5273d2bf70e06238e2f9b934b2648b0033cab4592d",
+    "assets/blueprint.template.html": "d31f0b9d6aa057f53ee0fe3571c098aa972320faaf0fa947267eeb3a973e35ac",
+    "scripts/analyze.py": "fc2fa22c40047c0ab4491c46144822745f9cdc6261044d09b33585f18b9d8e61",
+    "scripts/blueprint.py": "3a6c84247cd1b3546c1a775d900977c1ff3201a6b53c1e322d0108ae851be8a9",
+    "scripts/free_sources.py": "ead7034013e449cb341f9fd1e248a7ff5e31e267a31129181db6762ab1b05324",
+    "scripts/rea_math.py": "1dccd685aca3fa6851a68767fcbe08b652af66117e4fa77c6ebf58854bae3212",
+    "references/blueprint.md": "1132104f262f5bf0bf8e86392e10bc7f7e5e58e01832924f48165eda1e1f474e",
+    "references/channels.md": "c4cd75ecd252359586b913d068a18b2d733bc9b81c87485f17e83c3ee4bcdf87",
+    "references/endpoints.md": "e6777acd5578d64c69fc3ce8c64f3337feaaa09ba1ae5ed36fef07b3549631e0",
+    "references/methods.md": "5d3dd9b0717df684abaf6d515d627c159139618372720e52a289873b00099d59"
+  }
+}

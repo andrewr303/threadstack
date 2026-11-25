@@ -230,6 +230,7 @@ const COOKIE_MAIN_SUFFIX = '~cookie-main';
 const CURSOR_ACCOUNT_PROVIDER = 'cursor_agents';
 
 function needsProviderScripts(id: CaptureProviderId, authorized: boolean | undefined): boolean {
+  // Cursor needs its account observer and profile bridge even when conversation capture is off.
   return id === CURSOR_ACCOUNT_PROVIDER || authorized === true;
 }
 

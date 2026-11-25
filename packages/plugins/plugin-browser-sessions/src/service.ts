@@ -347,7 +347,7 @@ export class BrowserSessionsService {
       this.changed(companyId); await this.audit(companyId, "browser_sessions.settings_changed", { actor, policy: state.policy, trustedAgentIds: state.trustedAgentIds, eventsEnabled: state.eventsEnabled }); return this.settings(companyId);
     });
   }
-  async settings(companyId: string) { const state = await this.state(companyId); return { ...await this.status(companyId), trustedAgentIds: state.trustedAgentIds, eventsEnabled: state.eventsEnabled, agents: (await this.host.agents.list({ companyId, limit: 1000 })).map(({ id, name, status }) => ({ id, name, status })), credentials: await this.credentials(companyId), actions: await this.actions(companyId) }; }
+  async settings(companyId: string) { const state = await this.state(companyId); return { ...await this.status(companyId), paired: !!state.tokenHash, trustedAgentIds: state.trustedAgentIds, eventsEnabled: state.eventsEnabled, agents: (await this.host.agents.list({ companyId, limit: 1000 })).map(({ id, name, status }) => ({ id, name, status })), credentials: await this.credentials(companyId), actions: await this.actions(companyId) }; }
   async links(companyId: string, threadKey?: string, issueId?: string): Promise<SessionLink[]> {
     const state = await this.state(companyId); if (!state.shared) return [];
     const links = await this.store.list<SessionLink>("link", companyId, { where: { ...(threadKey ? { threadKey } : {}), ...(issueId ? { issueId } : {}) } });

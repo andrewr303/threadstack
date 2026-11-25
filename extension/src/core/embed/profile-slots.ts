@@ -265,6 +265,8 @@ export class ProfileSlots {
           code: 'profile_in_use',
         };
       }
+      // Freeze the old partition before reading the live jar. Previous writes have entered the
+      // jar queue, and responses arriving during the move cannot change the transferred sign-in.
       const retired: Array<{ slot: SlotRecord; status: SlotRecord['status'] }> = [];
       for (const other of others) {
         for (const slot of this.tabs.get(other)?.slots.values() ?? []) {

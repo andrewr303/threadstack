@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "slug": "treg",
+  "name": "Treg",
+  "description": "Live data from thousands of APIs, billed per call.",
+  "categories": [
+    "developer"
+  ],
+  "featured": false,
+  "urlPatterns": [
+    "https://treg.to/mcp/*"
+  ],
+  "docsUrl": "https://treg.to",
+  "redirectConstraints": "https-or-loopback-http",
+  "methods": [
+    {
+      "key": "mcp",
+      "transport": "mcp_remote",
+      "auth": "oauth",
+      "oauthClientRegistration": "dcr",
+      "ownershipModes": [
+        "dcr"
+      ],
+      "whenToUse": "Use browser sign-in to let agents search a catalog of data APIs and call them through one account.",
+      "defaults": {
+        "serverUrl": "https://treg.to/mcp/"
+      },
+      "guidanceMd": "Connect Treg to give agents one place to find and call data APIs. Sign in with your Treg account in the browser. Each call is billed to your Treg balance, and prices are shown in the catalog before a call is made.",
+      "riskTier": "S3",
+      "label": "Sign in with Treg",
+      "consoleLinks": {
+        "docs": "https://treg.to"
+      },
+      "warnings": [
+        "Calls spend real money from your Treg balance, usually a fraction of a cent each. Agents with this connection can run many calls in a loop, so keep your balance modest.",
+        "Request parameters are sent to the third-party API provider behind each catalog tool. Do not include secrets or personal data."
+      ]
+    }
+  ]
+}
