@@ -1,6 +1,6 @@
 // The background's decision on a capture sent by a content script. A content script runs inside
 // a website, so nothing it says is trusted on its own: the page it came from (sender.url, top
-// frame only, or a page embedded in Threadkeeper's own workspace tab) must be one of the claimed
+// frame only, or a page embedded in ThreadStack's own workspace tab) must be one of the claimed
 // provider's pages, or an enabled site the user added; capture must be on for that provider; and
 // "the user asked for this tab" counts only with a token the background itself handed to that
 // tab moments ago.
@@ -21,7 +21,7 @@ import { isAgentState, type AgentState } from './workspace/types.js';
 /** A one-time-ish permission for one tab: the overlay was opened there, or the user chose "Capture this tab". */
 export interface ExplicitGrant {
   token: string;
-  /** `capture`: the user asked to save this tab. `overlay`: the user opened Threadkeeper on it. */
+  /** `capture`: the user asked to save this tab. `overlay`: the user opened ThreadStack on it. */
   kind: 'capture' | 'overlay';
   expiresAt: number;
 }
@@ -55,7 +55,7 @@ export function decideCapture(input: {
   embed?: EmbedSenderContext | null;
 }): CaptureDecision {
   const page = captureSenderPage(input.sender, input.embed);
-  if (!page) return { ok: false, error: 'Captures are accepted only from the top frame of a web page or a page open in the Threadkeeper workspace.' };
+  if (!page) return { ok: false, error: 'Captures are accepted only from the top frame of a web page or a page open in the ThreadStack workspace.' };
   const pageUrl = page.url;
   const embedded = page.embedded;
   const raw = input.payload?.provider;
@@ -66,7 +66,7 @@ export function decideCapture(input: {
     return { ok: false, error: 'Missing conversation id' };
   }
 
-  // Grants belong to the tab the person invoked Threadkeeper on; a workspace tab never gets one,
+  // Grants belong to the tab the person invoked ThreadStack on; a workspace tab never gets one,
   // and a page embedded there never borrows one. Explicit-only capture stays explicit.
   const grant = embedded ? null : input.grant;
   const grantValid = Boolean(

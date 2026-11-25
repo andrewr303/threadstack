@@ -22,7 +22,7 @@ export function BrowserSessionResults({ companyId, query, quality = "fast", requ
       </div>
       <div aria-live="polite" className="mt-2 text-sm text-muted-foreground">
         {search.state === "loading" ? "Searching sessions…" : null}
-        {search.state === "offline" ? "Sessions can be searched while Threadkeeper is running." : null}
+        {search.state === "offline" ? "Sessions can be searched while ThreadStack is running." : null}
         {search.state === "unshared" ? <p>Sessions are not shared with this company. <a className="underline" href={sharingHref}>Share sessions</a></p> : null}
         {search.state === "error" ? <p>Session search did not answer. Try again. <Button variant="ghost" size="sm" onClick={() => setRetry((value) => value + 1)}>Retry</Button></p> : null}
         {search.state === "ready" && search.rows.length === 0 ? "No sessions match." : null}

@@ -336,7 +336,7 @@ describe('profile slots', () => {
     expect(slotOfTab(workTab, realms())).toBe('profile');
     expect(slotOfTab(workTab, realms('acct_work000001'))).toBe('plain');
     expect(slotOfTab(browserTab, realms('acct_work000001'))).toBe('profile');
-    // Sign-ins Threadkeeper keeps no accounts for, and accounts not known yet, use the browser's.
+    // Sign-ins ThreadStack keeps no accounts for, and accounts not known yet, use the browser's.
     expect(slotOfTab(geminiTab, [...realms(), { realm: google, accounts: [], activeAccountId: null }])).toBe('plain');
     expect(slotOfTab(workTab, [])).toBe('plain');
   });

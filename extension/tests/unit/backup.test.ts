@@ -1,14 +1,14 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { gunzipSync, strFromU8 } from 'fflate';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import { BACKUP_FORMAT, BackupFormatError, decodeRows, encodeRow, libraryFingerprint, restoreBackup, writeBackup } from '../../src/core/backup.js';
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`ThreadkeeperBackup_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`ThreadStackBackup_${Date.now()}_${++n}`);
 const info = { extensionVersion: '0.5.0', extensionId: 'a'.repeat(32), now: () => new Date('2026-01-02T03:04:05Z') };
 
-async function seed(db: ThreadkeeperDB, threads: number, prefix = 't') {
+async function seed(db: ThreadStackDB, threads: number, prefix = 't') {
   for (let i = 0; i < threads; i++) {
     const threadKey = `${prefix}${String(i).padStart(4, '0')}`;
     await db.table('conversations').put({ threadKey, provider: 'claude', title: `Thread ${i}`, updatedAt: `2026-01-01T00:00:${String(i % 60).padStart(2, '0')}Z` });
@@ -20,7 +20,7 @@ async function seed(db: ThreadkeeperDB, threads: number, prefix = 't') {
   }
 }
 
-async function backupBytes(db: ThreadkeeperDB): Promise<{ chunks: Uint8Array[]; all: Uint8Array }> {
+async function backupBytes(db: ThreadStackDB): Promise<{ chunks: Uint8Array[]; all: Uint8Array }> {
   const chunks: Uint8Array[] = [];
   await writeBackup(db, (c) => void chunks.push(c.slice()), info);
   const all = new Uint8Array(chunks.reduce((sum, c) => sum + c.length, 0));
@@ -174,7 +174,7 @@ describe('backup and restore', () => {
   it('refuses files that are not backups and reports a backup that was cut short', async () => {
     const to = freshDb();
     await expect(restoreBackup(to, pieces(new TextEncoder().encode('hello there, not gzip at all'), 8))).rejects.toBeInstanceOf(BackupFormatError);
-    await expect(restoreBackup(to, pieces(new Uint8Array(0), 8))).rejects.toThrow(/not a Threadkeeper backup/);
+    await expect(restoreBackup(to, pieces(new Uint8Array(0), 8))).rejects.toThrow(/not a ThreadStack backup/);
 
     const from = freshDb();
     await seed(from, 300);

@@ -9,7 +9,7 @@ import {
   upsertThread,
   applySummaryEnrichment,
   ensureStarterCollectionsAndSettings,
-  type ThreadkeeperDB,
+  type ThreadStackDB,
 } from './db.js';
 import type { ChatGPTExportConversation } from './adapters.js';
 import type { ProviderId } from './providers.js';
@@ -18,7 +18,7 @@ import type { AccountRecord, AgentState } from './workspace/types.js';
 import { primaryAccountId } from './workspace/realms.js';
 
 export async function seedSyntheticWorkbenchLibrary(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options?: { force?: boolean }
 ): Promise<void> {
   await ensureStarterCollectionsAndSettings(db);
@@ -1021,7 +1021,7 @@ function demoThreadKey(s: DemoSession, boundAccountId: string, workspaceId: stri
  * so the Browse, Threads and Dashboard views have something to show. Safe to run again: a
  * session that already exists is left alone, and account rows are only added when missing.
  */
-export async function seedWorkspaceDemoLibrary(db: ThreadkeeperDB): Promise<void> {
+export async function seedWorkspaceDemoLibrary(db: ThreadStackDB): Promise<void> {
   const settings = await ensureStarterCollectionsAndSettings(db);
   const now = Date.now();
   const written: string[] = [];

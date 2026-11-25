@@ -1,5 +1,5 @@
 // Reads a Session Control backup (its "Export" file) and plans how its accounts and sessions
-// become Threadkeeper accounts and threads. Pure: no storage, no chrome API. The caller applies
+// become ThreadStack accounts and threads. Pure: no storage, no chrome API. The caller applies
 // the plan, so importing the same backup twice produces the same ids and never duplicates.
 import { ACCOUNT_COLORS, type AccountColor, type AccountMode } from './workspace/types.js';
 import { primaryAccountId } from './workspace/realms.js';

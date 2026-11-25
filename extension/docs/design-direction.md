@@ -116,7 +116,7 @@ Row titles in the thread list are serif at 15px. Numerals use tabular figures.
 - **Rows** are rounded `--r-row` surfaces. Selected: `--accent-tint` inside an `--accent-line` hairline. Never a coloured stripe on the leading edge.
 - **Where you left off:** a `--surface-2` block with an `--r-row` corner and a `--line-2` edge, the serif line at 20px, then "Next step" after a dashed rule.
 - **Evidence margin:** every extracted claim keeps its marker: a hairline box with the message ordinal in mono, closed by a 2px accent rule on its right; filled pip for what the person committed to, hollow for what the assistant suggested. Opening it shows the captured passage.
-- **Run state** of a coding session is a dot and a word (Running, Needs approval, Needs your answer, Finished, Failed, Idle, Signed out), described as what the page showed when Threadkeeper last read it. The dot never pulses or glows. Not observed means nothing is shown.
+- **Run state** of a coding session is a dot and a word (Running, Needs approval, Needs your answer, Finished, Failed, Idle, Signed out), described as what the page showed when ThreadStack last read it. The dot never pulses or glows. Not observed means nothing is shown.
 - **Accounts:** a colour dot and the name. Filled when signed in, a hollow ring when not. Shown only when it says something (more than one account, or not the signed-in one).
 - **Notices** (empty, paused, blocked): a centred block with an icon, a title that says what happened, a sentence that says what to do, then the actions.
 - **Controls:** 32px tall at least (main actions 36 to 44), `--r-ctl`, distinct hover, pressed, selected and disabled states, `cursor: pointer` when enabled and `not-allowed` when disabled.

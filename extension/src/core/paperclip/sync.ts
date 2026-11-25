@@ -1,5 +1,5 @@
 /**
- * Incremental Paperclip → Threadkeeper sync. Read-only: nothing is ever written to Paperclip.
+ * Incremental Paperclip → ThreadStack sync. Read-only: nothing is ever written to Paperclip.
  *
  * Per company (all the user can see, or the ones chosen in Settings):
  *   1. Runs: the newest 100 runs (GET /companies/:id/heartbeat-runs?summary=true). A run that is new
@@ -19,7 +19,7 @@
 import {
   ensureStarterCollectionsAndSettings,
   upsertThread,
-  type ThreadkeeperDB,
+  type ThreadStackDB,
 } from '../db.js';
 import { buildThreadKey, type ConversationRecord, type SettingsRecord } from '../schema.js';
 import { processThreadsLocally } from '../pipeline.js';
@@ -201,14 +201,14 @@ export function failureBackoffMs(failures: number): number {
 export function describeSyncError(err: unknown): string {
   if (err instanceof PaperclipError) {
     if (err.kind === 'unauthorized') return 'Paperclip needs you to sign in again (Settings → Paperclip).';
-    if (err.kind === 'rate_limited') return 'Paperclip asked Threadkeeper to slow down; the sync will continue shortly.';
+    if (err.kind === 'rate_limited') return 'Paperclip asked ThreadStack to slow down; the sync will continue shortly.';
     return err.message;
   }
   return err instanceof Error ? err.message : String(err);
 }
 
 export interface SyncOptions {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   settings?: SettingsRecord;
   store?: SyncStateStore;
   fetch?: FetchLike;
@@ -269,7 +269,7 @@ function time(v: string | null | undefined): number {
 }
 
 export class PaperclipSync {
-  private readonly db: ThreadkeeperDB;
+  private readonly db: ThreadStackDB;
   private readonly client: PaperclipClient;
   private readonly settings: SettingsRecord;
   private readonly now: () => number;
@@ -278,7 +278,7 @@ export class PaperclipSync {
   /** Paperclip workflow state per stored thread, applied after organizing. */
   readonly states = new Map<string, ReturnType<typeof workflowStateForIssue>>();
 
-  constructor(db: ThreadkeeperDB, client: PaperclipClient, settings: SettingsRecord, now: () => number) {
+  constructor(db: ThreadStackDB, client: PaperclipClient, settings: SettingsRecord, now: () => number) {
     this.db = db;
     this.client = client;
     this.settings = settings;

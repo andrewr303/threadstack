@@ -1,11 +1,18 @@
-// Second row of the Browse bar: back, forward, reload, the address, the account switcher,
-// "Open in Chrome tab" and the Summary toggle.
+// Second row of the Browse bar: back, forward, reload, the address (with the session palette's
+// ⌘K chip), the account switcher, "Open in Chrome tab" and the Summary toggle. In split view the
+// buttons show icons only and a "move to the other pane" button joins them.
 import React, { useRef, useState } from 'react';
-import type { SessionTab } from '../../../core/workspace/types.js';
+import type { BrowsePane, SessionTab } from '../../../core/workspace/types.js';
 import { AccountMenuButton } from '../accounts/AccountMenu.js';
 import { Icon } from '../shell/icons.js';
 import { useWorkspaceContext } from '../workspace/context.js';
 import { resolveAddress, splitAddress } from './address.js';
+
+/** "⌘K" on a Mac, "Ctrl K" elsewhere: the palette's shortcut as the keyboard labels it. */
+export function paletteShortcutLabel(): string {
+  const platform = typeof navigator === 'undefined' ? '' : (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '';
+  return /mac|iphone|ipad/i.test(platform) ? '⌘K' : 'Ctrl K';
+}
 
 export interface AddressNotice {
   message: string;
@@ -20,7 +27,8 @@ function AddressField({
   tab: SessionTab | null;
   onNotice: (notice: AddressNotice | null) => void;
 }) {
-  const { workspace, announce } = useWorkspaceContext();
+  const { workspace, announce, openPalette, paletteEnabled } = useWorkspaceContext();
+  const palette = paletteEnabled === true && typeof openPalette === 'function';
   const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -52,7 +60,7 @@ function AddressField({
   };
 
   return (
-    <form className="tk-browse-addr" data-editing={editing ? 'true' : 'false'} onSubmit={submit}>
+    <form className="tk-browse-addr" data-editing={editing ? 'true' : 'false'} data-palette={palette ? 'true' : undefined} onSubmit={submit}>
       <Icon name="lock" size={13} className="tk-browse-addr-lock" />
       <span className="tk-browse-addr-view" aria-hidden="true">
         {tab ? (
@@ -91,12 +99,27 @@ function AddressField({
           event.currentTarget.select();
         }}
       />
+      {palette && (
+        <button
+          type="button"
+          className="tk-browse-addr-kbd"
+          aria-label={`Search sessions (${paletteShortcutLabel()})`}
+          title={`Search sessions or enter an address (${paletteShortcutLabel()})`}
+          // Keep the address field from taking focus first.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => openPalette?.()}
+        >
+          <kbd>{paletteShortcutLabel()}</kbd>
+        </button>
+      )}
     </form>
   );
 }
 
 export function Toolbar({
   tab,
+  compact = false,
+  pane = null,
   summaryOpen,
   summaryId,
   summaryButtonRef,
@@ -105,6 +128,10 @@ export function Toolbar({
 }: {
   /** The tab in the stage; null on the new tab page, where the controls rest. */
   tab: SessionTab | null;
+  /** Split view: buttons show icons only and the account button drops its realm name. */
+  compact?: boolean;
+  /** The split-view pane this toolbar belongs to; null when not split. */
+  pane?: BrowsePane | null;
   summaryOpen: boolean;
   summaryId: string;
   summaryButtonRef: React.RefObject<HTMLButtonElement>;
@@ -114,8 +141,9 @@ export function Toolbar({
   const { workspace, openInChromeTab } = useWorkspaceContext();
   const loaded = tab ? workspace.plan.live.includes(tab.id) : false;
   const runtime = tab ? workspace.runtime(tab.id) : null;
+  const otherPane: BrowsePane | null = pane === null ? null : pane === 0 ? 1 : 0;
   return (
-    <div className="tk-browse-row tk-browse-toolbar">
+    <div className="tk-browse-row tk-browse-toolbar" data-compact={compact ? 'true' : undefined}>
       <button
         type="button"
         className="tk-icon-btn"
@@ -171,6 +199,17 @@ export function Toolbar({
             <Icon name="summary" />
             <span className="tk-browse-btn-label">Summary</span>
           </button>
+          {otherPane !== null && (
+            <button
+              type="button"
+              className="tk-icon-btn tk-browse-move-btn"
+              aria-label={otherPane === 1 ? 'Move tab to the right pane' : 'Move tab to the left pane'}
+              title={otherPane === 1 ? 'Move to the right pane' : 'Move to the left pane'}
+              onClick={() => workspace.dispatch({ type: 'browse_move_tab', id: tab.id, pane: otherPane })}
+            >
+              <Icon name="swap" />
+            </button>
+          )}
         </>
       )}
     </div>

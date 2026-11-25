@@ -144,7 +144,7 @@ export function HeaderBar({
           ☰
         </button>
         <h1 className="tk-h1" data-page-hidden={isPage ? 'visually' : undefined}>
-          Threadkeeper
+          ThreadStack
         </h1>
         {counts && (
           <details className="tk-counts-details">
@@ -196,7 +196,7 @@ export function HeaderBar({
             <button type="button" className="tk-btn" onClick={onOpenFullPage}>
               Open full page ↗
             </button>
-            <button type="button" className="tk-btn tk-btn-primary" aria-label="Close Threadkeeper overlay" onClick={onCloseOverlay}>
+            <button type="button" className="tk-btn tk-btn-primary" aria-label="Close ThreadStack overlay" onClick={onCloseOverlay}>
               Close
             </button>
           </>

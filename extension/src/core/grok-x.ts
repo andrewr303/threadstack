@@ -1,5 +1,5 @@
 // Grok inside X (x.com/i/grok) has no known DOM selectors. X's own page loads every
-// conversation through the GrokConversationItemsByRestId GraphQL query, so Threadkeeper reads
+// conversation through the GrokConversationItemsByRestId GraphQL query, so ThreadStack reads
 // those responses passively (src/entrypoints/grok-x-main.ts, MAIN world) and parses them here.
 // The isolated content script re-validates the posted result before anything is stored.
 // This module is bundled into the page's MAIN world: keep it dependency-free and small.

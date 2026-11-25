@@ -1,4 +1,4 @@
-// Settings → Capture: which AI products are captured, host access for the ones Threadkeeper does
+// Settings → Capture: which AI products are captured, host access for the ones ThreadStack does
 // not hold from install, "Capture this tab", and "Any AI site" (origins the user adds).
 //
 // Host access must be requested inside the click (chrome.permissions.request needs the user
@@ -87,7 +87,7 @@ export function CaptureSettings({ settings, onPatch }: Props) {
     setSiteAccess(access);
   }, []);
 
-  // The address of the tab Threadkeeper was opened on, read ahead of time so "Add this site" can ask
+  // The address of the tab ThreadStack was opened on, read ahead of time so "Add this site" can ask
   // for access synchronously in its click. Available only where the browser lets us see the tab.
   const refreshTab = useCallback(async () => {
     if (!hasChrome() || !chrome.tabs?.query) return;
@@ -179,7 +179,7 @@ export function CaptureSettings({ settings, onPatch }: Props) {
     setResult(null);
     void sendToBackground<{ ok?: boolean; error?: string; status?: string; title?: string; messages?: number }>({ type: 'CAPTURE_TAB_NOW' })
       .then((resp) => {
-        if (!resp) setResult({ ok: false, text: 'Capture this tab works when Threadkeeper runs as an extension.' });
+        if (!resp) setResult({ ok: false, text: 'Capture this tab works when ThreadStack runs as an extension.' });
         else if (!resp.ok) setResult({ ok: false, text: resp.error ?? 'Nothing was captured.' });
         else {
           const what = resp.title ? `“${resp.title}”` : 'The conversation';
@@ -304,7 +304,7 @@ export function CaptureSettings({ settings, onPatch }: Props) {
       <section className="tk-settings-section">
         <h3 className="tk-settings-h3">Any AI site</h3>
         <p className="tk-settings-note">
-          Add a chat site Threadkeeper does not list, such as your own Open WebUI, LibreChat, LobeChat or AnythingLLM. Threadkeeper
+          Add a chat site ThreadStack does not list, such as your own Open WebUI, LibreChat, LobeChat or AnythingLLM. ThreadStack
           asks for access to that one site, recognises these apps by their pages, and otherwise finds messages by their roles.
           Plain http is allowed only for sites on this computer or your network.
         </p>

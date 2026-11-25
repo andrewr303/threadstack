@@ -98,7 +98,7 @@ describe('provider registry', () => {
     expect(CUSTOM_SITE_PROVIDER_IDS).toEqual(expect.arrayContaining(['custom_web', 'open_webui', 'librechat', 'anythingllm']));
   });
 
-  it('turns on only providers Threadkeeper can read from install; Grok Bot and new hosts start off', () => {
+  it('turns on only providers ThreadStack can read from install; Grok Bot and new hosts start off', () => {
     expect(DEFAULT_SETTINGS.authorizedHosts.chatgpt).toBe(true);
     expect(DEFAULT_SETTINGS.authorizedHosts.chatgpt_dots).toBe(true);
     expect(DEFAULT_SETTINGS.authorizedHosts.grok_bot).toBe(false);

@@ -73,7 +73,7 @@ export function hostPermissionPattern(serverUrl: string): string | null {
   return `${url.protocol}//${url.hostname}/*`;
 }
 
-/** True for loopback servers, the only ones Threadkeeper declares optional host access for up front. */
+/** True for loopback servers, the only ones ThreadStack declares optional host access for up front. */
 export function isLoopbackServer(serverUrl: string): boolean {
   const origin = normalizeServerUrl(serverUrl);
   if (!origin) return false;
@@ -121,7 +121,7 @@ export function parseHealth(body: unknown): PaperclipHealth | null {
 }
 
 // ---------------------------------------------------------------------------
-// API shapes (only the fields Threadkeeper reads; everything else is ignored)
+// API shapes (only the fields ThreadStack reads; everything else is ignored)
 // ---------------------------------------------------------------------------
 
 export interface PcCompany {
@@ -394,7 +394,7 @@ export class PaperclipClient {
         if (timedOut) throw new PaperclipError('timeout', `Paperclip at ${this.serverUrl} did not answer in time.`);
         throw new PaperclipError(
           'unreachable',
-          `Can't reach Paperclip at ${this.serverUrl}. Check that it is running and that Threadkeeper may access it.`
+          `Can't reach Paperclip at ${this.serverUrl}. Check that it is running and that ThreadStack may access it.`
         );
       } finally {
         clearTimeout(timer);
@@ -418,7 +418,7 @@ export class PaperclipClient {
           await this.sleep(wait);
           continue;
         }
-        throw new PaperclipError('rate_limited', 'Paperclip asked Threadkeeper to slow down.', { status: 429, retryAfterMs: wait });
+        throw new PaperclipError('rate_limited', 'Paperclip asked ThreadStack to slow down.', { status: 429, retryAfterMs: wait });
       }
       if (res.ok) return body as T;
       const detail = errorMessage(body);
@@ -542,8 +542,8 @@ export class PaperclipClient {
       method: 'POST',
       auth: false,
       body: {
-        command: 'Threadkeeper: sync tasks, manage paired browser sessions and model-key links',
-        clientName: 'Threadkeeper',
+        command: 'ThreadStack: sync tasks, manage paired browser sessions and model-key links',
+        clientName: 'ThreadStack',
         requestedAccess: 'board',
         ...(requestedCompanyId ? { requestedCompanyId } : {}),
       },

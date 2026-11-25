@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { zipSync } from 'fflate';
 import { describe, it, expect } from 'vitest';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings } from '../../src/core/db.js';
 import {
   isClaudeCodeSideFile,
   parseClaudeCodeSession,
@@ -13,15 +13,15 @@ import {
 import { detectImportKind, importFiles, readJsonlTree, type DirectoryHandleLike } from '../../src/core/importers.js';
 
 let dbCounter = 0;
-function freshDb(): ThreadkeeperDB {
+function freshDb(): ThreadStackDB {
   dbCounter += 1;
-  return new ThreadkeeperDB(`CliSessionsTestDB_${dbCounter}_${Date.now()}`);
+  return new ThreadStackDB(`CliSessionsTestDB_${dbCounter}_${Date.now()}`);
 }
 
 const ACCOUNT = { accountId: 'acct_test', workspaceId: 'ws_test' };
 const jsonl = (records: object[]) => records.map((r) => JSON.stringify(r)).join('\n');
 
-async function storedContents(db: ThreadkeeperDB, threadKey: string) {
+async function storedContents(db: ThreadStackDB, threadKey: string) {
   const rows = await db.messages.where('threadKey').equals(threadKey).sortBy('ordinal');
   return rows.map((m) => [m.role, m.content]);
 }

@@ -14,7 +14,7 @@ import {
   type ThreadInsight,
 } from '../../src/core/schema.js';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   ensureStarterCollectionsAndSettings,
   saveSettingsPatch,
   updateManualThreadFields,
@@ -57,9 +57,9 @@ import { exportThreadToMarkdown } from '../../src/core/adapters.js';
 import { ThreadOverview } from '../../src/entrypoints/manager/ThreadOverview.js';
 
 let dbCounter = 0;
-function freshDb(): ThreadkeeperDB {
+function freshDb(): ThreadStackDB {
   dbCounter += 1;
-  return new ThreadkeeperDB(`SummaryV2DB_${dbCounter}_${Date.now()}`);
+  return new ThreadStackDB(`SummaryV2DB_${dbCounter}_${Date.now()}`);
 }
 
 const ACCOUNT = { accountId: 'acct_test', workspaceId: 'ws_test' };
@@ -168,7 +168,7 @@ function anthropicFetch(output: unknown, calls: Array<{ body: any }>) {
   }) as typeof fetch;
 }
 
-async function seed(db: ThreadkeeperDB, input = deckThread()) {
+async function seed(db: ThreadStackDB, input = deckThread()) {
   const settings = await ensureStarterCollectionsAndSettings(db);
   await saveSettingsPatch(db, { anthropicApiKey: 'sk-ant-test', autoOrganize: { ...settings.autoOrganize, aiDebounceSeconds: 0 } });
   await upsertThread(db, input);
@@ -178,7 +178,7 @@ async function seed(db: ThreadkeeperDB, input = deckThread()) {
 }
 
 /** Store an AI insight the way analysis v1 wrote it (no overview, no analysisVersion). */
-async function storeV1Insight(db: ThreadkeeperDB, conv: ConversationRecord) {
+async function storeV1Insight(db: ThreadStackDB, conv: ConversationRecord) {
   const v1: ThreadInsight = {
     insightKey: insightKeyFor('ai', conv.threadKey),
     threadKey: conv.threadKey,

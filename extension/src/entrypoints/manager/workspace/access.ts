@@ -1,4 +1,4 @@
-// Host access for embedding. A provider on a host Threadkeeper does not hold from install
+// Host access for embedding. A provider on a host ThreadStack does not hold from install
 // (Cursor, Muse, Devin, ...) can be embedded only after the person grants that host, and its
 // sessions are saved only once capture is on for it. One click does both, because a page that is
 // shown but silently not saved would break the promise that sessions save themselves.

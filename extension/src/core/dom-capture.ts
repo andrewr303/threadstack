@@ -287,7 +287,7 @@ function messageTurn(el: Element, container: Element): RawTurn {
 }
 
 /**
- * Explicit role attributes shared by several providers and by Threadkeeper test fixtures.
+ * Explicit role attributes shared by several providers and by ThreadStack test fixtures.
  *
  * A ChatGPT turn can hold several messages (a preamble, a tool step, the final answer); each
  * is its own turn so none of them is lost behind the first one.

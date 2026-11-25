@@ -11,7 +11,7 @@ import {
 import {
   applySummaryEnrichment,
   ensureStarterCollectionsAndSettings,
-  type ThreadkeeperDB,
+  type ThreadStackDB,
 } from './db.js';
 import {
   StructuredSummaryOutputSchema,
@@ -52,7 +52,7 @@ export function currentUtcDateKey(): string {
 }
 
 export async function checkCloudEligibility(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   conv: ConversationRecord,
   settings?: SettingsRecord
 ): Promise<CloudEligibilityResult> {
@@ -103,7 +103,7 @@ export async function checkCloudEligibility(
 }
 
 async function reserveClientBudgetSlot(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   fallbackSettings: SettingsRecord
 ): Promise<
   | { allowed: true; settings: SettingsRecord }
@@ -150,7 +150,7 @@ async function reserveClientBudgetSlot(
 }
 
 async function refundClientBudgetSlot(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   fallbackSettings: SettingsRecord
 ): Promise<void> {
   await db.transaction('rw', db.settings, async () => {
@@ -170,7 +170,7 @@ async function refundClientBudgetSlot(
 }
 
 export async function requestThreadEnrichment(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   threadKey: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<{
@@ -416,7 +416,7 @@ export async function requestThreadEnrichment(
 }
 
 export async function requestQueryEmbedding(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   query: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<{
@@ -521,7 +521,7 @@ export async function requestQueryEmbedding(
 }
 
 export async function requestCandidateRerank(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   query: string,
   documents: string[],
   topK = 20,

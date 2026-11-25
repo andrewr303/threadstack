@@ -303,3 +303,55 @@
   .tk-acct-opt:has(input:checked) .tk-acct-radio { box-shadow: inset 0 0 0 5px Highlight; }
   .tk-acct-item[aria-checked="true"] { outline: 2px solid Highlight; }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Settings: the account each sign-in uses ("In use"), and the Paperclip connection row
+   --------------------------------------------------------------------------------------------- */
+.tk-settings-realms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tk-settings-realms > li > button {
+  width: 100%;
+  min-height: 38px;
+  border-radius: var(--r-row);
+}
+
+.tk-pc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+}
+
+.tk-pc-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-idle);
+}
+
+.tk-pc-dot[data-running="true"] {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-count);
+}
+
+.tk-pc-row-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--text);
+}
+
+@media (forced-colors: active) {
+  .tk-pc-dot {
+    background: CanvasText;
+  }
+}

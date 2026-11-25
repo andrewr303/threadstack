@@ -1,7 +1,7 @@
 // Offline retrieval evaluation over the synthetic fixtures (no network, no model calls).
 // A labelled query set over seedSyntheticWorkbenchLibrary + seedWorkspaceDemoLibrary, the
 // library the manager loads for ?seed=2, and the metrics used to compare ranking changes.
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import { processThreadsLocally } from '../../src/core/pipeline.js';
 import { resolveInsight } from '../../src/core/insights.js';
 import { MemorySearchIndex } from '../../src/core/search.js';
@@ -98,7 +98,7 @@ export const LABELLED_QUERIES: LabelledQuery[] = [
 ];
 
 export interface EvalLibrary {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   conversations: ConversationRecord[];
   messages: MessageRecord[];
   messagesByThread: Map<string, MessageRecord[]>;
@@ -114,7 +114,7 @@ let dbCounter = 0;
 
 /** Seed both fixtures, run the on-device pass, and build what the manager builds (useLibraryData). */
 export async function loadEvalLibrary(): Promise<EvalLibrary> {
-  const db = new ThreadkeeperDB(`RetrievalEval_${Date.now()}_${++dbCounter}`);
+  const db = new ThreadStackDB(`RetrievalEval_${Date.now()}_${++dbCounter}`);
   await seedSyntheticWorkbenchLibrary(db);
   await seedWorkspaceDemoLibrary(db);
   const keys = (await db.conversations.toCollection().primaryKeys()) as string[];

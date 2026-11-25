@@ -8,6 +8,7 @@ import type { AccountColor, AccountRecord, RealmAccounts } from '../../../core/w
 import { needsSignIn } from '../workspace/state.js';
 import { ACCOUNT_COLORS, COLOR_LABELS, MAX_ACCOUNT_NAME, openFullPage, useMounted } from './common.js';
 import { HelperPanel } from './HelperPanel.js';
+import { AccountMenuButton } from './AccountMenu.js';
 
 function identityLine(account: AccountRecord): string {
   if (account.identity?.display) return account.identity.display;
@@ -195,7 +196,7 @@ function AccountRow({
         </div>
         <div>
           <dt>Used</dt>
-          <dd>{active ? 'In Threadkeeper and in your ordinary tabs' : 'Inside Threadkeeper only'}</dd>
+          <dd>{active ? 'In ThreadStack and in your ordinary tabs' : 'Inside ThreadStack only'}</dd>
         </div>
       </dl>
       {account.primary && <p className="tk-acct-help">This is the sign-in your browser already had, so it cannot be removed.</p>}
@@ -215,7 +216,7 @@ function AccountRow({
         <div className="tk-acct-confirm" role="group" aria-label={`Make ${account.label} the browser's sign-in`}>
           <p>
             Sign this browser in to {realmName} as {account.label}? Every {realmName} tab changes to this account. The account the
-            browser uses now is kept and stays available inside Threadkeeper.
+            browser uses now is kept and stays available inside ThreadStack.
           </p>
           <div className="tk-acct-confirm-actions">
             <button type="button" className="tk-btn" disabled={busy} onClick={() => setConfirmingBrowser(false)}>
@@ -284,7 +285,7 @@ export function AccountsSettings() {
           Accounts
         </h3>
         <p className="tk-settings-note">
-          Accounts are managed from the full page, where provider sites open inside Threadkeeper. Open the full page, then come
+          Accounts are managed from the full page, where provider sites open inside ThreadStack. Open the full page, then come
           back to Settings, Accounts.
         </p>
         <div className="tk-field-row">
@@ -300,21 +301,36 @@ export function AccountsSettings() {
   const withAccounts = ctx.workspace.realms.filter((r) => r.accounts.length > 0);
   return (
     <>
+      {withAccounts.length > 0 && (
+        <section className="tk-settings-section" aria-labelledby="tk-acct-inuse-h">
+          <h3 className="tk-settings-h3" id="tk-acct-inuse-h">
+            In use
+          </h3>
+          {/* One row per sign-in: the account its pages open with. The menu switches, adds or signs in. */}
+          <ul className="tk-settings-realms">
+            {withAccounts.map((entry) => (
+              <li key={entry.realm.id}>
+                <AccountMenuButton realmId={entry.realm.id} variant="rail" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="tk-settings-section tk-acct-settings" aria-labelledby="tk-acct-how-h">
         <h3 className="tk-settings-h3" id="tk-acct-how-h">
           How accounts work
         </h3>
         <p className="tk-settings-note">
           Every sign-in has the account your browser itself is signed in to, plus any accounts you add. An added account is signed
-          in inside Threadkeeper only: its sign-in is kept on this device (encrypted, never exported or sent anywhere) and loaded
-          into a space of its own each time Threadkeeper opens. Nothing is signed out for it, so it works beside your browser’s
+          in inside ThreadStack only: its sign-in is kept on this device (encrypted, never exported or sent anywhere) and loaded
+          into a space of its own each time ThreadStack opens. Nothing is signed out for it, so it works beside your browser’s
           account, in tabs, in the sidebar and on the dashboard.
         </p>
         <p className="tk-settings-note">
           Two accounts of one sign-in can be open at the same moment: the browser’s own and one more. A third takes the second
-          place after Threadkeeper reloads its pages. An added account starts with fresh site storage each time Threadkeeper is
+          place after ThreadStack reloads its pages. An added account starts with fresh site storage each time ThreadStack is
           opened, so drafts a site keeps only in the browser are not carried over, and the browser holds about 10 KB of cookies
-          per site for it. Threadkeeper never sees or stores your passwords.
+          per site for it. ThreadStack never sees or stores your passwords.
         </p>
       </section>
 
@@ -324,7 +340,7 @@ export function AccountsSettings() {
         </h3>
         {withAccounts.length === 0 ? (
           <p className="tk-settings-note">
-            No accounts yet. Threadkeeper adds the account your browser is signed in to the first time it opens a sign-in.
+            No accounts yet. ThreadStack adds the account your browser is signed in to the first time it opens a sign-in.
           </p>
         ) : (
           withAccounts.map((entry) => (

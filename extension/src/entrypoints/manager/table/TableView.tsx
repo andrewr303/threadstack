@@ -32,6 +32,7 @@ import {
   rowMatchesQuery,
   setManualCell,
   sortTableRows,
+  tableProviderOptions,
   updateTableColumn,
   type BuiltinColumnId,
   type TableColumnDraft,
@@ -40,7 +41,7 @@ import {
 import { planColumnFill, runColumnFill, suggestTableColumns, type ColumnProposal, type FillMode, type FillPlan } from '../../../core/table-fill.js';
 import { WORKFLOW_LABELS, openModal, sharedDb } from '../shared.js';
 import { Icon } from '../shell/icons.js';
-import { Notice, ProviderMark } from '../shell/primitives.js';
+import { Notice, ProviderMark, Segmented, providerName } from '../shell/primitives.js';
 import { useWorkspaceContext } from '../workspace/context.js';
 import { ColumnDialog, FillConfirmDialog, SuggestColumnsDialog, type ColumnDialogSeed } from './TableDialogs.js';
 import { TableMenu } from './TableMenu.js';
@@ -151,13 +152,27 @@ export function TableView({ projectNames, aiReady, onThreadsEdited }: TableViewP
         : [],
     [active, conversations, insightsByThread, accountOfThread]
   );
-  const matching = useMemo(() => rows.filter((row) => rowMatchesQuery(row, query, cellIndex.get(row.conv.threadKey))), [rows, query, cellIndex]);
+  // Provider switch: All plus the providers the library holds most of. Not stored, like the search.
+  const [providerFilter, setProviderFilter] = useState<string>('all');
+  const providerOptions = useMemo(() => (active ? tableProviderOptions(conversations, providerName) : []), [active, conversations]);
+  useEffect(() => {
+    if (providerFilter !== 'all' && active && !providerOptions.some((o) => o.provider === providerFilter)) setProviderFilter('all');
+  }, [providerFilter, providerOptions, active]);
+  const matching = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          (providerFilter === 'all' || row.conv.provider === providerFilter) &&
+          rowMatchesQuery(row, query, cellIndex.get(row.conv.threadKey))
+      ),
+    [rows, query, cellIndex, providerFilter]
+  );
   const sorted = useMemo(
     () => sortTableRows(matching, layout.sort, columnById, (key) => cellIndex.get(key)),
     [matching, layout.sort, columnById, cellIndex]
   );
   const visible = sorted.slice(0, limit);
-  useEffect(() => setLimit(PAGE_ROWS), [query]);
+  useEffect(() => setLimit(PAGE_ROWS), [query, providerFilter]);
 
   // ---- Sorting and columns ----
   const sortBy = (id: string) => {
@@ -290,7 +305,7 @@ export function TableView({ projectNames, aiReady, onThreadsEdited }: TableViewP
     return (
       <div className="tk-table-view tk-table-none">
         <Notice icon="threads" title="No threads yet">
-          <p>Threads appear here as Threadkeeper captures or imports them, one row each.</p>
+          <p>Threads appear here as ThreadStack captures or imports them, one row each.</p>
         </Notice>
       </div>
     );
@@ -438,8 +453,17 @@ export function TableView({ projectNames, aiReady, onThreadsEdited }: TableViewP
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
+        {providerOptions.length > 1 && (
+          <Segmented
+            label="Provider"
+            className="tk-table-providers"
+            value={providerFilter}
+            options={[{ value: 'all', label: 'All' }, ...providerOptions.map((o) => ({ value: o.provider, label: o.label }))]}
+            onChange={setProviderFilter}
+          />
+        )}
         <span className="tk-table-count tk-tabular" role="status">
-          {sorted.length === conversations.length ? `${sorted.length} threads` : `${sorted.length} of ${conversations.length} threads`}
+          {tableCountText(sorted.length, conversations.length)}
         </span>
         {fill && (
           <span className="tk-table-progress" role="status">
@@ -760,4 +784,12 @@ function CellEditor({
       onBlur={() => finish(true, draft)}
     />
   );
+}
+
+/** "9 sessions of 1,214", or "7 sessions" when nothing is filtered out. */
+export function tableCountText(shown: number, total: number): string {
+  const noun = (n: number) => (n === 1 ? 'session' : 'sessions');
+  return shown === total
+    ? `${total.toLocaleString('en-US')} ${noun(total)}`
+    : `${shown.toLocaleString('en-US')} ${noun(shown)} of ${total.toLocaleString('en-US')}`;
 }

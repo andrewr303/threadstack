@@ -103,12 +103,12 @@ function ConnectApp() {
         allowRemoteModels: remoteModels,
       });
       if (res?.ok && res.status === 'paired') {
-        setPhase({ kind: 'done', title: 'Connected', body: `${pending.appName} can now receive the threads you choose in its settings. You can disconnect any time in Threadkeeper → Settings → Sidebar Dock.` });
+        setPhase({ kind: 'done', title: 'Connected', body: `${pending.appName} can now receive the threads you choose in its settings. You can disconnect any time in ThreadStack → Settings → Sidebar Dock.` });
         closeSoon();
       } else if (res?.ok && res.status === 'granted') {
         setPhase({ kind: 'waiting', pending });
       } else if (res?.ok && res.status === 'denied') {
-        setPhase({ kind: 'done', title: 'Denied', body: 'This extension cannot ask again until you unblock it in Threadkeeper → Settings → Sidebar Dock.' });
+        setPhase({ kind: 'done', title: 'Denied', body: 'This extension cannot ask again until you unblock it in ThreadStack → Settings → Sidebar Dock.' });
         closeSoon();
       } else if (res?.status === 'wrong_code') {
         setError(res.error ?? 'That code does not match.');
@@ -129,7 +129,7 @@ function ConnectApp() {
     return (
       <main className="cx">
         <h1 className="cx-title">No request is waiting</h1>
-        <p>Nothing is asking to connect to Threadkeeper right now. Requests expire after 10 minutes; if you were connecting Still, press Connect in Still again.</p>
+        <p>Nothing is asking to connect to ThreadStack right now. Requests expire after 10 minutes; if you were connecting Still, press Connect in Still again.</p>
         <div className="cx-actions"><button type="button" className="cx-btn" onClick={() => window.close()}>Close</button></div>
       </main>
     );
@@ -147,7 +147,7 @@ function ConnectApp() {
   const left = Math.max(0, Date.parse(p.expiresAt) - now);
   return (
     <main className="cx">
-      <p className="cx-eyebrow">Threadkeeper · Connection request</p>
+      <p className="cx-eyebrow">ThreadStack · Connection request</p>
       <h1 className="cx-title">An extension that calls itself “{p.appName}” wants to connect</h1>
       <dl className="cx-facts">
         <div><dt>Extension id</dt><dd className="cx-mono">{groupedId(p.senderId)}</dd></div>
@@ -160,7 +160,7 @@ function ConnectApp() {
         <ul>
           <li>receive the threads you choose to sync in its own settings, with their summaries and (if you share them) full transcripts;</li>
           <li>search and read your threads, for example when its assistant answers a question;</li>
-          <li>see the names of your Threadkeeper projects and providers.</li>
+          <li>see the names of your ThreadStack projects and providers.</li>
         </ul>
         <p className="cx-muted">It never receives local-only threads, threads in local-only projects or threads from providers you excluded from cloud processing. Still may send what it receives to the AI provider you chose in Still.</p>
       </section>
@@ -170,7 +170,7 @@ function ConnectApp() {
       </div>
 
       {phase.kind === 'waiting' ? (
-        <p className="cx-status" role="status">Allowed. Waiting for Still to confirm… keep Still open; Threadkeeper retries every 30 seconds.</p>
+        <p className="cx-status" role="status">Allowed. Waiting for Still to confirm… keep Still open; ThreadStack retries every 30 seconds.</p>
       ) : (
         <form
           className="cx-form"

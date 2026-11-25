@@ -1,12 +1,12 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import { ThreadkeeperDB, pairStoredWithIncoming, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
+import { ThreadStackDB, pairStoredWithIncoming, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
 import { buildThreadKey } from '../../src/core/schema.js';
 
 let dbCounter = 0;
-function freshDb(): ThreadkeeperDB {
+function freshDb(): ThreadStackDB {
   dbCounter += 1;
-  return new ThreadkeeperDB(`ThreadkeeperMessageIdentity_${Date.now()}_${dbCounter}`);
+  return new ThreadStackDB(`ThreadStackMessageIdentity_${Date.now()}_${dbCounter}`);
 }
 
 const conv = 'c0ffee00-0000-4000-8000-000000000001';

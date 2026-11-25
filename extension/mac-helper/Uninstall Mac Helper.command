@@ -2,7 +2,7 @@
 set -euo pipefail
 TASK_SUPPORT="$HOME/Library/Application Support"
 TASK_BRIDGE="$TASK_SUPPORT/Threadkeeper/Bridge"
-echo "This removes the Threadkeeper helper. Account profiles, their logins and library backups will be kept."
+echo "This removes the ThreadStack helper. Account profiles, their logins and library backups will be kept."
 read -r -p "Type REMOVE to continue: " TASK_ANSWER
 if [ "$TASK_ANSWER" != REMOVE ]; then exit 0; fi
 for TASK_BROWSER in "Google/Chrome" "Google/Chrome Beta" "Google/Chrome Dev" "Google/Chrome Canary" "Google/Chrome for Testing" "Chromium" "Microsoft Edge" "Microsoft Edge Beta" "Microsoft Edge Dev" "Microsoft Edge Canary" "BraveSoftware/Brave-Browser" "Arc/User Data" "Vivaldi" "com.operasoftware.Opera"; do

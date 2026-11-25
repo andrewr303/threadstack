@@ -5,7 +5,7 @@
 // - remote models are used only when allowed (capability remote_models) and the deadline allows;
 // - caches are per thread and per sourceRevision, so a changed thread is reloaded alone.
 
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import {
   THREAD_KIND_LABELS,
   type ConversationRecord,
@@ -35,7 +35,7 @@ import {
 
 
 export interface QueryEnv {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   settings: SettingsRecord;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -122,7 +122,7 @@ function toCachedTranscript(revision: number, list: MessageRecord[]): CachedTran
   return { revision, messages, lower: parts.join('\n'), offsets, chars: chars * 2 };
 }
 
-async function ensureTranscripts(db: ThreadkeeperDB, convs: ConversationRecord[], deadlineAt: number, now: () => number): Promise<void> {
+async function ensureTranscripts(db: ThreadStackDB, convs: ConversationRecord[], deadlineAt: number, now: () => number): Promise<void> {
   const missing = convs.filter((c) => cache.transcripts.get(c.threadKey)?.revision !== c.sourceRevision).map((c) => c.threadKey);
   const revision = new Map(convs.map((c) => [c.threadKey, c.sourceRevision]));
   for (let i = 0; i < missing.length; i += 100) {
@@ -135,7 +135,7 @@ async function ensureTranscripts(db: ThreadkeeperDB, convs: ConversationRecord[]
   }
 }
 
-async function ensureVectors(db: ThreadkeeperDB, space: string, convs: ConversationRecord[]): Promise<Map<string, Float32Array>> {
+async function ensureVectors(db: ThreadStackDB, space: string, convs: ConversationRecord[]): Promise<Map<string, Float32Array>> {
   const out = new Map<string, Float32Array>();
   const missing: ConversationRecord[] = [];
   for (const c of convs) {
@@ -191,7 +191,7 @@ function updatedMsOf(conv: ConversationRecord): number {
 }
 
 /** Every thread that may go to Still: never synthetic, never local-only, never in a local-only project. */
-export async function loadCorpus(db: ThreadkeeperDB, settings: SettingsRecord): Promise<Corpus> {
+export async function loadCorpus(db: ThreadStackDB, settings: SettingsRecord): Promise<Corpus> {
   const [convs, localOnly, insights, summaries] = await Promise.all([
     db.conversations.toArray(),
     localOnlyProjectNames(db),
@@ -250,7 +250,7 @@ export async function loadCorpus(db: ThreadkeeperDB, settings: SettingsRecord): 
 }
 
 /** Thread keys for full hashes and cite ids (cached per service-worker lifetime). */
-export async function resolveHashes(db: ThreadkeeperDB, values: string[]): Promise<Map<string, string>> {
+export async function resolveHashes(db: ThreadStackDB, values: string[]): Promise<Map<string, string>> {
   const keys = (await db.conversations.toCollection().primaryKeys()) as string[];
   for (const key of keys) {
     if (cache.hashedKeys.has(key)) continue;

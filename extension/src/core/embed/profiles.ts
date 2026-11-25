@@ -99,7 +99,7 @@ export type FrameAccount =
   /** A profile frame; `account` is null when its slot is not ready (nothing may be filed). */
   | { kind: 'profile'; account: AccountRecord | null };
 
-const UNAVAILABLE: WorkspaceFailure = { ok: false, error: 'Accounts are not available right now. Reload Threadkeeper and try again.' };
+const UNAVAILABLE: WorkspaceFailure = { ok: false, error: 'Accounts are not available right now. Reload ThreadStack and try again.' };
 
 function hostOf(url: string): string | null {
   try {
@@ -123,7 +123,7 @@ export class Profiles {
     const accounts = this.deps.accounts();
     if (!accounts) return UNAVAILABLE;
     const realm = realmById(realmId);
-    if (!realm || !realm.switchable) return { ok: false, error: realm?.fixedReason ?? 'Threadkeeper does not keep accounts for this sign-in.', code: 'not_switchable' };
+    if (!realm || !realm.switchable) return { ok: false, error: realm?.fixedReason ?? 'ThreadStack does not keep accounts for this sign-in.', code: 'not_switchable' };
     const account = await accounts.account(accountId);
     if (!account || account.realm !== realm.id) return { ok: false, error: 'That account no longer exists.', code: 'unknown_account' };
     const [entry] = await accounts.list([realm.id]);
@@ -132,7 +132,7 @@ export class Profiles {
       return { ok: false, error: 'This account is the one your browser is signed in to.', code: 'browser_account' };
     }
     const reachable = await this.deps.hasHostAccess(realm.cookieDomains.slice(0, 1).map((d) => `https://${d}/*`));
-    if (!reachable) return { ok: false, error: `Allow Threadkeeper to access ${realm.label} first.`, code: 'needs_host_access' };
+    if (!reachable) return { ok: false, error: `Allow ThreadStack to access ${realm.label} first.`, code: 'needs_host_access' };
 
     // A sign-in popup opened from a profile page lands in the browser's own cookies. With a copy
     // kept now, the browser account's sign-in survives being replaced that way.

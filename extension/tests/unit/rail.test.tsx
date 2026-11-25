@@ -88,6 +88,8 @@ interface MountOptions {
   children?: React.ReactNode;
   /** Settings the lens reads its saved group and sort from. */
   settings?: Partial<SettingsRecord>;
+  /** The session palette's opener, as App provides it when the palette is on. */
+  openPalette?: () => void;
 }
 
 let container: HTMLDivElement;
@@ -150,6 +152,8 @@ function mount(options: MountOptions = {}) {
     requestAddAccount,
     openSettings: vi.fn(),
     announce: vi.fn(),
+    openPalette: options.openPalette,
+    paletteEnabled: Boolean(options.openPalette),
   } as unknown as WorkspaceContextValue;
   const props: RailProps = {
     collapsed: false,
@@ -313,7 +317,7 @@ describe('Rail: sessions', () => {
     expect(personal.textContent).toContain('Personal');
     expect(personal.getAttribute('data-active')).toBe('false');
 
-    // A provider with no sign-in Threadkeeper knows about never shows one.
+    // A provider with no sign-in ThreadStack knows about never shows one.
     mount({
       conversations: [conv('x1', 'Somewhere else', 5, { provider: 'perplexity' })],
       accountOf: () => ({ realm: null, account: null, active: true, switchable: false }),
@@ -351,7 +355,18 @@ describe('Rail: views, tools and the collapsed strip', () => {
 
   it('keeps the brand, the collapse button and the tools, and renders the Threads navigation it is given', () => {
     mount({ children: <nav className="tk-nav" aria-label="Projects and resurfacing queues" /> });
-    expect(container.querySelector('.tk-rail-wordmark')?.textContent).toBe('Threadkeeper');
+    const wordmark = container.querySelector<HTMLImageElement>('img.tk-rail-wordmark')!;
+    expect(wordmark.getAttribute('alt')).toBe('ThreadStack');
+    expect(wordmark.getAttribute('src')).toBe('assets/brand/threadstack-wordmark.png');
+    expect(wordmark.getAttribute('height')).toBe('29');
+    // The tools sit in the header row, after the brand: theme, add account, Settings, collapse.
+    const head = container.querySelector('.tk-rail-head')!;
+    expect([...head.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Toggle color theme',
+      'Add account',
+      'Settings',
+      'Collapse navigation',
+    ]);
     const toggle = byName('Collapse navigation')!;
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     click(toggle);
@@ -368,20 +383,34 @@ describe('Rail: views, tools and the collapsed strip', () => {
     expect(container.querySelector('nav[aria-label="Projects and resurfacing queues"]')).not.toBeNull();
   });
 
-  it('lists a sign-in only when it has more than one account to choose between', () => {
-    // One account: nothing to choose, so no row and no heading; "Add account" is still there.
-    mount();
-    const heading = () => [...container.querySelectorAll('h2')].find((h) => h.textContent === 'Accounts') ?? null;
-    expect(heading()).toBeNull();
-    expect(container.querySelectorAll('.tk-rail-realms > li')).toHaveLength(0);
+  it('leaves accounts to Settings and the Browse toolbar, even with several accounts', () => {
+    mount({ realms: [{ realm: claudeRealm, accounts: [WORK, PERSONAL], activeAccountId: WORK.id }] });
+    expect([...container.querySelectorAll('h2')].some((h) => h.textContent === 'Accounts')).toBe(false);
+    expect(container.querySelector('.tk-rail-foot')).toBeNull();
+    // "Add account" is still one click away.
     expect(byName('Add account')).not.toBeNull();
+  });
+
+  it('offers the session palette from the header only when the palette is on', () => {
+    mount();
+    expect(byName('Search sessions')).toBeNull();
     act(() => root.unmount());
     root = createRoot(container);
-    mount({ realms: [{ realm: claudeRealm, accounts: [WORK, PERSONAL], activeAccountId: WORK.id }] });
-    // Every account stays signed in, so the list is "Accounts", not "Signed in".
-    expect(heading()).not.toBeNull();
-    expect(container.textContent).not.toContain('Signed in');
-    expect(container.querySelectorAll('.tk-rail-realms > li')).toHaveLength(1);
+    const openPalette = vi.fn();
+    mount({ openPalette });
+    const search = byName('Search sessions')!;
+    expect(search.getAttribute('aria-keyshortcuts')).toBe('Meta+K Control+K');
+    click(search);
+    expect(openPalette).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    root = createRoot(container);
+    // Collapsed: the mark, expand and search at the top; add account, Settings, theme at the foot.
+    mount({ openPalette, rail: { collapsed: true } });
+    expect(container.querySelector<HTMLImageElement>('img.tk-rail-mark')?.getAttribute('alt')).toBe('ThreadStack');
+    const top = container.querySelector('.tk-rail-head')!;
+    expect([...top.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Expand navigation', 'Search sessions']);
+    const foot = container.querySelector('.tk-rail-foot')!;
+    expect([...foot.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Toggle color theme', 'Add account', 'Settings']);
   });
 
   it('keeps an accessible name on every control when collapsed, and leaves the session lists out', () => {
@@ -411,10 +440,10 @@ describe('Rail: views, tools and the collapsed strip', () => {
   });
 
   it('says when embedded pages are unavailable', () => {
-    mount({ error: 'Threadkeeper could not register this tab.' });
+    mount({ error: 'ThreadStack could not register this tab.' });
     const notice = container.querySelector('[role="status"]')!;
     expect(notice.textContent).toContain('Embedded pages are unavailable');
-    expect(notice.textContent).toContain('Threadkeeper could not register this tab.');
+    expect(notice.textContent).toContain('ThreadStack could not register this tab.');
   });
 
   it('opens as a drawer in a small window, and Escape closes it', () => {

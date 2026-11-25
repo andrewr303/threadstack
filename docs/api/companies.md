@@ -9,7 +9,7 @@ Manage companies within your Paperclip instance.
 
 `GET /api/companies/{companyId}/events/stream` provides a same-origin
 `text/event-stream` alternative for an authenticated browser embedded in
-Threadkeeper. Ordinary pages retain the WebSocket transport. The endpoint uses
+ThreadStack. Ordinary pages retain the WebSocket transport. The endpoint uses
 the existing HTTP session or board API authentication and company access guard;
 it adds no cookie changes, authentication tickets, or URL credentials.
 

@@ -51,7 +51,7 @@ function transport(): SendFn | null {
 
 async function call<T extends { ok: true }>(command: WorkspaceCommand): Promise<T | WorkspaceFailure> {
   const send = transport();
-  if (!send) return { ok: false, error: 'Threadkeeper is not running as an extension here.' };
+  if (!send) return { ok: false, error: 'ThreadStack is not running as an extension here.' };
   try {
     const res = (await send(command)) as (Record<string, unknown> & { ok?: unknown }) | undefined;
     if (res && res.ok === true) return res as unknown as T;
@@ -61,7 +61,7 @@ async function call<T extends { ok: true }>(command: WorkspaceCommand): Promise<
   } catch (err) {
     return {
       ok: false,
-      error: `Threadkeeper's background did not answer (${err instanceof Error ? err.message : String(err)}).`,
+      error: `ThreadStack's background did not answer (${err instanceof Error ? err.message : String(err)}).`,
     };
   }
 }
@@ -98,7 +98,7 @@ export const workspaceApi = {
 
 /**
  * Ask one embedded page to go back, forward, reload or open an address. Resolves false when
- * the page has no listener (still loading, blocked, or not a site Threadkeeper reads).
+ * the page has no listener (still loading, blocked, or not a site ThreadStack reads).
  */
 export async function sendFrameCommand(tabId: number, frameId: number, command: EmbedFrameCommand): Promise<boolean> {
   try {

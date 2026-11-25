@@ -1,5 +1,5 @@
 // Login realms: which providers share one sign-in, which cookies carry it, and whether
-// Threadkeeper may swap those cookies to switch accounts.
+// ThreadStack may swap those cookies to switch accounts.
 //
 // A realm is one cookie jar from the browser's point of view. Claude and Claude Code are one
 // realm (both live on claude.ai); ChatGPT, Codex and dots are another. One Chrome profile holds
@@ -24,11 +24,11 @@ export interface RealmInfo {
    */
   cookieDomains: string[];
   /**
-   * Origin patterns Threadkeeper needs for cookie access and embedding beyond the providers'
+   * Origin patterns ThreadStack needs for cookie access and embedding beyond the providers'
    * own match patterns (sign-in hosts on another domain). Requested when an account is added.
    */
   extraHostPatterns: string[];
-  /** Whether Threadkeeper may swap this realm's cookies to switch accounts. */
+  /** Whether ThreadStack may swap this realm's cookies to switch accounts. */
   switchable: boolean;
   /** Shown instead of the account switcher when `switchable` is false. */
   fixedReason?: string;
@@ -41,7 +41,7 @@ export interface RealmInfo {
 }
 
 const ECOSYSTEM_REASON =
-  'This sign-in is shared with the rest of your account on that service, so Threadkeeper leaves it alone. Use the site’s own account switcher.';
+  'This sign-in is shared with the rest of your account on that service, so ThreadStack leaves it alone. Use the site’s own account switcher.';
 
 type RealmSeed = Omit<RealmInfo, 'extraHostPatterns' | 'switchable'> &
   Partial<Pick<RealmInfo, 'extraHostPatterns' | 'switchable'>>;
@@ -160,7 +160,7 @@ function soloRealm(provider: ProviderId): RealmInfo {
     cookieDomains: [],
     extraHostPatterns: [],
     switchable: false,
-    fixedReason: 'Threadkeeper uses the account this browser is signed in to on this site.',
+    fixedReason: 'ThreadStack uses the account this browser is signed in to on this site.',
     signInUrl: home,
     homeUrl: home,
   };
@@ -192,7 +192,7 @@ export function realmById(id: string): RealmInfo | null {
   return null;
 }
 
-/** Realms whose accounts Threadkeeper can switch, in display order. */
+/** Realms whose accounts ThreadStack can switch, in display order. */
 export function switchableRealms(): RealmInfo[] {
   return NAMED_REALMS.filter((r) => r.switchable);
 }

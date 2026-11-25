@@ -139,7 +139,7 @@ export class BrowserSessionsService {
   }
   async status(companyId: string) {
     const state = await this.state(companyId);
-    return { connected: !!state.tokenHash && !state.versionMismatch && this.online(state), shared: !!state.tokenHash && state.shared, lastSeenAt: state.lastSeenAt ? new Date(state.lastSeenAt).toISOString() : null, protocol: PROTOCOL, pluginVersion: PLUGIN_VERSION, pluginCommit: this.commit, extensionCommit: state.extensionCommit, browser: state.browser, sessionCount: state.shared && !state.versionMismatch ? (await this.store.list<SessionRow>("session", companyId)).length : 0, versionMismatch: state.versionMismatch, warning: state.extensionCommit && !sameCommit(state.extensionCommit, commitPart(this.commit)) ? `Threadkeeper and Paperclip were built from different commits (${state.extensionCommit} and ${this.commit}).` : null, policy: state.policy, effectivePolicy: this.effectivePolicy(state) };
+    return { connected: !!state.tokenHash && !state.versionMismatch && this.online(state), shared: !!state.tokenHash && state.shared, lastSeenAt: state.lastSeenAt ? new Date(state.lastSeenAt).toISOString() : null, protocol: PROTOCOL, pluginVersion: PLUGIN_VERSION, pluginCommit: this.commit, extensionCommit: state.extensionCommit, browser: state.browser, sessionCount: state.shared && !state.versionMismatch ? (await this.store.list<SessionRow>("session", companyId)).length : 0, versionMismatch: state.versionMismatch, warning: state.extensionCommit && !sameCommit(state.extensionCommit, commitPart(this.commit)) ? `ThreadStack and Paperclip were built from different commits (${state.extensionCommit} and ${this.commit}).` : null, policy: state.policy, effectivePolicy: this.effectivePolicy(state) };
   }
   private wake(companyId: string) { const wake = this.waiters.get(companyId); if (wake) { this.waiters.delete(companyId); wake(); } }
   async request(companyId: string, type: string, params: Record<string, unknown>, timeoutMs = REQUEST_TIMEOUT_MS, requestId: string = randomUUID()): Promise<unknown> {
@@ -287,6 +287,7 @@ export class BrowserSessionsService {
           const candidate = record(value); issueId = requiredString(candidate.issueId, "issueId"); threadKey = requiredString(candidate.threadKey, "threadKey");
           const tombstone = await this.store.get("notification", companyId, `auto-unlinked:${JSON.stringify([issueId, threadKey])}`);
           if (tombstone) continue;
+          // Stored link source; kept from the Threadkeeper name so existing links keep one value.
           await this.link(companyId, issueId, threadKey, "auto", "threadkeeper"); automaticLinksAccepted.push({ issueId, threadKey });
         } catch (error) { automaticLinksRejected.push({ issueId, threadKey, code: error instanceof SessionError ? error.code : "internal" }); }
       }
@@ -421,6 +422,7 @@ export class BrowserSessionsService {
       .catch((error: unknown) => { throw error instanceof Error && /not found|not bound|deleted|missing|does not exist/i.test(error.message) ? new SessionError("not_found", "Secret missing") : error; });
     await this.authenticate(companyId, token);
     if ((await this.host.config.get(companyId)).allowSecretTransfer !== true) throw new SessionError("denied", "Secret transfer to the paired extension is turned off.");
+    // Audit reader id kept from the Threadkeeper name so the activity history stays queryable by one value.
     await this.audit(companyId, "browser_sessions.secret_read", { keyName, reader: "threadkeeper-extension", extensionVersion: state.extensionVersion, browser: state.browser });
     return { value };
   }

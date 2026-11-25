@@ -1,8 +1,8 @@
 // Runs in the isolated world of every frame of the provider hosts at document_start: the
-// extension half of the cookie bridge for pages embedded in Threadkeeper's workspace
+// extension half of the cookie bridge for pages embedded in ThreadStack's workspace
 // (core/embed/cookie-shim.ts explains why it exists; embed-cookie-main.ts is the page half).
 //
-// Only in a frame directly inside Threadkeeper's own page (frameMode() === 'workspace'). Anywhere
+// Only in a frame directly inside ThreadStack's own page (frameMode() === 'workspace'). Anywhere
 // else it stays silent, and the page half then never leaves the native document.cookie.
 //
 // It asks the worker for the cookies a script on this address could read in an ordinary tab
@@ -179,7 +179,7 @@ export function startCookieBridge(env: CookieBridgeEnv): { stop(): void } {
 /**
  * Leave the marks the page-world half acts on (embed-cookie-main.ts runs right after this
  * script, before any script of the page). Only this world knows that the frame sits directly
- * inside Threadkeeper's own page, so only it may ask for those changes.
+ * inside ThreadStack's own page, so only it may ask for those changes.
  */
 export function markEmbeddedDocument(
   doc: Pick<Document, 'documentElement'>,

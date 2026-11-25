@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import type { AccountService, AccountsEnv } from '../../src/core/accounts/contract.js';
 import { cookieSlot, sameCookie } from '../../src/core/accounts/cookies.js';
 import { SWITCH_SETTLE_MS, createAccountService, type AccountsSwitchResult } from '../../src/core/accounts/service.js';
@@ -8,7 +8,7 @@ import { primaryAccountId, switchableRealms } from '../../src/core/workspace/rea
 import { KV_KEYS, type AccountsChangeResult, type StoredCookie, type WorkspaceFailure } from '../../src/core/workspace/types.js';
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`ThreadkeeperAccounts_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`ThreadStackAccounts_${Date.now()}_${++n}`);
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -615,9 +615,9 @@ describe('account service: credentials stay out of listings', () => {
 
 describe('device cookies stay put across switches', () => {
   it('neither saves, clears nor restores the bot-check clearance', async () => {
-    const { ThreadkeeperDB } = await import('../../src/core/db.js');
+    const { ThreadStackDB } = await import('../../src/core/db.js');
     const { createAccountService } = await import('../../src/core/accounts/service.js');
-    const db = new ThreadkeeperDB(`AccountsDevice_${Math.random().toString(36).slice(2)}`);
+    const db = new ThreadStackDB(`AccountsDevice_${Math.random().toString(36).slice(2)}`);
     const cookie = (name: string, value: string) => ({
       name, value, domain: 'claude.ai', hostOnly: true, path: '/', secure: true, httpOnly: true,
       sameSite: 'lax' as const, session: false, expirationDate: 4102444800,

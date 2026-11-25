@@ -4,7 +4,7 @@
 //   `tk.dock.pending.v1` (in-memory fallback), so a browser restart drops unanswered requests.
 // - Counters and cursors: the dockMeta table.
 
-import { ensureStarterCollectionsAndSettings, type ThreadkeeperDB } from '../db.js';
+import { ensureStarterCollectionsAndSettings, type ThreadStackDB } from '../db.js';
 import {
   DEFAULT_DOCK_PREFS,
   normalizeSettings,
@@ -64,7 +64,7 @@ export function sessionStore(): KeyValueStore {
 // Settings
 // ---------------------------------------------------------------------------
 
-export async function readDockSettings(db: ThreadkeeperDB): Promise<{ settings: SettingsRecord; dock: SidebarDockSettings }> {
+export async function readDockSettings(db: ThreadStackDB): Promise<{ settings: SettingsRecord; dock: SidebarDockSettings }> {
   const settings = await ensureStarterCollectionsAndSettings(db);
   return { settings, dock: settings.sidebarDock };
 }
@@ -74,7 +74,7 @@ export async function readDockSettings(db: ThreadkeeperDB): Promise<{ settings: 
  * worker's pairing writes and the manager's toggles never overwrite each other.
  */
 export async function patchDockSettings(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   patch: Partial<SidebarDockSettings> | ((current: SidebarDockSettings) => Partial<SidebarDockSettings>)
 ): Promise<SidebarDockSettings> {
   return db.transaction('rw', db.settings, async () => {
@@ -106,7 +106,7 @@ export function isPaired(dock: SidebarDockSettings): boolean {
   return dock.pairedId !== '';
 }
 
-/** Capabilities this Threadkeeper offers the paired Still right now. */
+/** Capabilities this ThreadStack offers the paired Still right now. */
 export function capabilitiesFor(settings: SettingsRecord): DockCapability[] {
   const dock = settings.sidebarDock;
   const caps: DockCapability[] = ['sync', 'open'];
@@ -122,7 +122,7 @@ export function remoteModelsAllowed(settings: SettingsRecord): boolean {
   return capabilitiesFor(settings).includes('remote_models');
 }
 
-/** Whether transcripts go to Still: both Still's pref and Threadkeeper's "Share full transcripts". */
+/** Whether transcripts go to Still: both Still's pref and ThreadStack's "Share full transcripts". */
 export function transcriptsShared(dock: SidebarDockSettings): boolean {
   return dock.shareTranscripts && dock.prefs.transcripts;
 }
@@ -239,19 +239,19 @@ export function sameHash(a: string, b: string): boolean {
 // dockMeta: counters, cursors, timestamps
 // ---------------------------------------------------------------------------
 
-export async function getMeta<T>(db: ThreadkeeperDB, key: string, fallback: T): Promise<T> {
+export async function getMeta<T>(db: ThreadStackDB, key: string, fallback: T): Promise<T> {
   const row = await db.dockMeta.get(key);
   return row === undefined ? fallback : (row.value as T);
 }
 
-export async function setMeta(db: ThreadkeeperDB, key: string, value: unknown): Promise<void> {
+export async function setMeta(db: ThreadStackDB, key: string, value: unknown): Promise<void> {
   await db.dockMeta.put({ key, value });
 }
 
 const SEQ_EPOCH_MS = 1_700_000_000_000;
 
-/** Reserve `count` consecutive values of the persisted, Threadkeeper-wide monotonic `seq`. */
-export async function allocateSeq(db: ThreadkeeperDB, count: number): Promise<number> {
+/** Reserve `count` consecutive values of the persisted, ThreadStack-wide monotonic `seq`. */
+export async function allocateSeq(db: ThreadStackDB, count: number): Promise<number> {
   return db.transaction('rw', db.dockMeta, async () => {
     const row = await db.dockMeta.get('seq');
     const current = typeof row?.value === 'number' && Number.isFinite(row.value) ? row.value : 0;

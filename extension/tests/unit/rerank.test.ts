@@ -27,7 +27,7 @@ import {
   rerankerHook,
   testReranker,
 } from '../../src/core/rerank.js';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
 import { runHybridSearch } from '../../src/core/search.js';
 
 interface Call {
@@ -358,7 +358,7 @@ describe('Local-only threads and reranking', () => {
   });
 
   it('reads local-only state fresh from the database', async () => {
-    const db = new ThreadkeeperDB(`RerankAllowedDB_${Date.now()}`);
+    const db = new ThreadStackDB(`RerankAllowedDB_${Date.now()}`);
     await ensureStarterCollectionsAndSettings(db);
     const keys = await seedThreads(db);
     const allowed = await remoteRerankAllowedKeys(db, DEFAULT_SETTINGS, Object.values(keys));
@@ -370,7 +370,7 @@ describe('Local-only threads and reranking', () => {
   });
 });
 
-async function seedThreads(db: ThreadkeeperDB) {
+async function seedThreads(db: ThreadStackDB) {
   const make = async (id: string, title: string, content: string, extra: Partial<UpsertThreadInput> = {}) => {
     const threadKey = buildThreadKey({ provider: 'chatgpt', accountId: 'a', workspaceId: 'w', sourceConversationId: id, branchId: 'main' });
     await upsertThread(db, {
@@ -402,7 +402,7 @@ async function seedThreads(db: ThreadkeeperDB) {
 
 describe('runHybridSearch reranker hook', () => {
   it('reranks only allowed candidates with short documents and blends with first-stage rank', async () => {
-    const db = new ThreadkeeperDB(`RerankHybridDB_${Date.now()}`);
+    const db = new ThreadStackDB(`RerankHybridDB_${Date.now()}`);
     await ensureStarterCollectionsAndSettings(db);
     const keys = await seedThreads(db);
     const baseline = await runHybridSearch(db, { query: 'webhook' });

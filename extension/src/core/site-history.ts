@@ -63,7 +63,7 @@ class SyncFailure extends Error {
   }
 }
 
-/** Conversations come back without a single message Threadkeeper can read: ends the run. */
+/** Conversations come back without a single message ThreadStack can read: ends the run. */
 const FORMAT_CHANGED = new SyncFailure('unsupported', 'conversations hold no messages');
 
 /** Pause between conversation reads: about three quarters of a second, never a burst. */

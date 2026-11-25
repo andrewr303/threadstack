@@ -1,25 +1,85 @@
 // Browse: provider sites embedded as pages, one tab per session. The bar (tab strip and
 // toolbar) is the only glass; the page, the summary panel and the new tab page are opaque.
 //
+// Split view shows two panes side by side, each with its own bar, tabs and page; sessions open
+// in the focused pane. The status board replaces both with the sessions by run state.
+//
 // The page itself is never rendered here. <FrameSlot> marks where the stage puts it, so opening
-// the summary panel changes the layout in one step and the page never reloads or drifts.
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+// the summary panel or splitting the view changes the layout in one step and no page reloads.
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { BrowsePane } from '../../../core/workspace/types.js';
 import { FrameSlot } from '../workspace/FrameStage.js';
 import { RestingPage } from '../workspace/RestingPage.js';
 import { useWorkspaceContext } from '../workspace/context.js';
+import { browseOf, paneOfTab, tabsInPane } from '../workspace/state.js';
 import { Icon } from '../shell/icons.js';
 import { NewTabPage } from './NewTabPage.js';
+import { StatusBoard } from './StatusBoard.js';
 import { SummaryPanel } from './SummaryPanel.js';
 import { TabStrip, tabDomId } from './TabStrip.js';
 import { Toolbar, type AddressNotice } from './Toolbar.js';
 
 export function BrowseView() {
+  const { workspace } = useWorkspaceContext();
+  const layout = browseOf(workspace.state);
+  const { dispatch } = workspace;
+
+  // Focus follows a click into an embedded page: the page's frame is not inside the pane's DOM
+  // (the stage owns every frame), so the click is seen as this window losing focus to that frame.
+  const stateRef = useRef(workspace.state);
+  stateRef.current = workspace.state;
+  useEffect(() => {
+    if (!layout.split) return;
+    const onBlur = () => {
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLIFrameElement) || !active.dataset.tab) return;
+        const state = stateRef.current;
+        const tab = state.tabs.find((t) => t.id === active.dataset.tab);
+        const current = browseOf(state);
+        if (tab && current.split && current.mode === 'tabs' && paneOfTab(tab) !== current.focusedPane) {
+          dispatch({ type: 'browse_focus', pane: paneOfTab(tab) });
+        }
+      }, 0);
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [layout.split, dispatch]);
+
+  if (layout.mode === 'board') {
+    return <StatusBoard onShowTabs={() => dispatch({ type: 'browse_mode', mode: 'tabs' })} />;
+  }
+
+  return (
+    <div className="tk-browse" data-split={layout.split ? 'true' : 'false'}>
+      {layout.split ? (
+        <>
+          <BrowsePaneView pane={0} />
+          <BrowsePaneView pane={1} />
+        </>
+      ) : (
+        <BrowsePaneView pane={null} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * One Browse pane: its bar, its page and its summary. `pane` null is the single, unsplit view
+ * over every tab; 0 or 1 is that side of the split view, over that pane's tabs only.
+ */
+function BrowsePaneView({ pane }: { pane: BrowsePane | null }) {
   const { workspace, openInChromeTab, announce } = useWorkspaceContext();
   const idPrefix = useId().replace(/:/g, '');
   const panelId = `${idPrefix}-stage`;
   const summaryId = `${idPrefix}-summary`;
-  const { tabs, activeTabId } = workspace.state;
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  const layout = browseOf(workspace.state);
+  const split = pane !== null;
+  const focused = !split || layout.focusedPane === pane;
+  const allTabs = workspace.state.tabs;
+  const tabs = useMemo(() => (pane === null ? allTabs : tabsInPane(allTabs, pane)), [allTabs, pane]);
+  const paneActiveId = split ? layout.paneActive[pane] : workspace.state.activeTabId;
+  const activeTab = tabs.find((t) => t.id === paneActiveId) ?? null;
 
   const [newTabOpen, setNewTabOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -34,11 +94,11 @@ export function BrowseView() {
   const showNewTab = newTabOpen || !activeTab;
   const tab = showNewTab ? null : activeTab;
 
-  // A tab that becomes the active one some other way (the side rail, another view) leaves the
+  // A tab that becomes this pane's tab some other way (the side rail, another view) leaves the
   // new tab page.
   useEffect(() => {
-    if (newTabOpen && activeTabId !== openedOver.current) setNewTabOpen(false);
-  }, [activeTabId, newTabOpen]);
+    if (newTabOpen && paneActiveId !== openedOver.current) setNewTabOpen(false);
+  }, [paneActiveId, newTabOpen]);
 
   // A message about one address belongs to the tab it was typed in.
   useEffect(() => {
@@ -52,8 +112,16 @@ export function BrowseView() {
     (target === 'launch' ? launchRef.current : newTabRef.current)?.focus();
   }, [newTabOpen]);
 
+  /** Sessions opened from here (the new tab page, an address) go to this pane. */
+  const focusPane = useCallback(() => {
+    if (pane !== null && browseOf(workspace.state).split && browseOf(workspace.state).focusedPane !== pane) {
+      workspace.dispatch({ type: 'browse_focus', pane });
+    }
+  }, [pane, workspace]);
+
   const openNewTab = () => {
-    openedOver.current = activeTabId;
+    focusPane();
+    openedOver.current = paneActiveId;
     setNotice(null);
     // Move into the page so Escape works from the keyboard.
     focusAfter.current = 'launch';
@@ -71,6 +139,7 @@ export function BrowseView() {
   };
 
   const launch = (url: string, accountId?: string) => {
+    focusPane();
     const result = workspace.openUrl(url, accountId ? { accountId } : undefined);
     if (result.ok) {
       setNotice(null);
@@ -82,18 +151,22 @@ export function BrowseView() {
     }
   };
 
-  const toggleSummary = () => {
-    setSummaryOpen((open) => !open);
-  };
-
   const closeSummary = () => {
     setSummaryOpen(false);
     summaryButtonRef.current?.focus();
   };
 
+  const label = pane === null ? undefined : pane === 0 ? 'Left pane' : 'Right pane';
+
   return (
-    <div
-      className="tk-browse"
+    <section
+      className="tk-browse-pane"
+      aria-label={label}
+      data-pane={pane ?? undefined}
+      data-focused={split && focused ? 'true' : undefined}
+      // Any click or keyboard focus inside a pane makes it the one sessions open in.
+      onPointerDownCapture={focusPane}
+      onFocusCapture={focusPane}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && newTabOpen && activeTab && !event.defaultPrevented) {
           event.preventDefault();
@@ -101,22 +174,28 @@ export function BrowseView() {
         }
       }}
     >
-      <div className="tk-browse-bar tk-glass" role="group" aria-label="Browser">
+      <div className="tk-browse-bar tk-glass" role="group" aria-label={label ? `Browser, ${label.toLowerCase()}` : 'Browser'}>
         <TabStrip
           idPrefix={idPrefix}
+          tabs={tabs}
+          activeId={paneActiveId}
           selectedId={tab?.id ?? null}
           panelId={panelId}
           onActivate={activate}
           onNewTab={openNewTab}
           newTabRef={newTabRef}
           newTabOpen={showNewTab}
+          // The board button sits once, in the single bar or the left pane's.
+          showBoard={pane === null || pane === 0}
         />
         <Toolbar
           tab={tab}
+          compact={split}
+          pane={pane}
           summaryOpen={summaryOpen && tab !== null}
           summaryId={summaryId}
           summaryButtonRef={summaryButtonRef}
-          onToggleSummary={toggleSummary}
+          onToggleSummary={() => setSummaryOpen((open) => !open)}
           onNotice={setNotice}
         />
       </div>
@@ -152,6 +231,6 @@ export function BrowseView() {
         )}
         {tab && summaryOpen && <SummaryPanel id={summaryId} tab={tab} onClose={closeSummary} />}
       </div>
-    </div>
+    </section>
   );
 }

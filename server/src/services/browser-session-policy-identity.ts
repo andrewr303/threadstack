@@ -1,4 +1,8 @@
-/** Narrow identity for the board's shared-session read grant. No action tools. */
+/**
+ * Narrow identity for the board's shared-session read grant. No action tools.
+ * The name is matched against policies already stored per company, so it keeps the pre-rename
+ * Threadkeeper wording; changing it would create a second grant beside the existing one.
+ */
 export const BROWSER_SESSION_READ_POLICY_NAME = "Threadkeeper shared session read access";
 export const BROWSER_SESSION_READ_POLICY_DESCRIPTION = "Created when the board shares browser sessions with this company. Explicit tool restrictions still apply.";
 export const BROWSER_SESSION_READ_TOOLS = ["sessions_list", "sessions_search", "session_get", "session_read", "sessions_context", "sessions_related"].map((name) => `browser-sessions:${name}`);

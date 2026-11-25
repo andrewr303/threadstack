@@ -192,7 +192,7 @@ import { adapterRoutes } from "./routes/adapters.js";
 import { managedAgentProfileRoutes } from "./routes/managed-agent-profiles.js";
 import { remoteAgentProfileRoutes } from "./routes/remote-agent-profiles.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
-import { applyThreadkeeperHostConfig, readBrandedStaticIndexHtml } from "./static-index-html.js";
+import { applyThreadStackHostConfig, readBrandedStaticIndexHtml } from "./static-index-html.js";
 import { staticUiCacheControl } from "./static-ui-cache.js";
 import { staticUiCompression } from "./middleware/static-ui-compression.js";
 import { applyUiBranding } from "./ui-branding.js";
@@ -1241,7 +1241,7 @@ export async function createApp(
     viteHtmlRenderer = createCachedViteHtmlRenderer({
       vite,
       uiRoot,
-      brandHtml: (html) => applyThreadkeeperHostConfig(applyUiBranding(html)),
+      brandHtml: (html) => applyThreadStackHostConfig(applyUiBranding(html)),
     });
     const renderViteHtml = viteHtmlRenderer;
 

@@ -1,4 +1,4 @@
-// Guard: Threadkeeper must never act on ordinary sites it does not read (Outlook, Microsoft sign-in,
+// Guard: ThreadStack must never act on ordinary sites it does not read (Outlook, Microsoft sign-in,
 // Office). Every manifest content script, install-time host permission and runtime-registered
 // provider script is built from these registry patterns, and the only network rule is the
 // tab-scoped embed rule, so asserting on them covers what reaches those sites.

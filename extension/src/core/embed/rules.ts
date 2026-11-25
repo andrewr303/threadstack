@@ -1,14 +1,14 @@
-// The declarativeNetRequest session rule that lets provider pages load inside Threadkeeper's
+// The declarativeNetRequest session rule that lets provider pages load inside ThreadStack's
 // workspace tab, and the bookkeeping of which rule id belongs to which tab.
 //
 // Accepted trade-off: declarativeNetRequest can only remove a whole response header, not edit
 // one directive of it. Without X-Frame-Options and CSP frame-ancestors every provider refuses
 // to be framed (measured in a real-Chromium spike), so documents loaded as sub-frames of a
 // workspace tab also lose the rest of their Content-Security-Policy (script-src and friends).
-// The rule is limited to sub-frame documents inside Threadkeeper's own manager tab (tabIds is
+// The rule is limited to sub-frame documents inside ThreadStack's own manager tab (tabIds is
 // only available to session rules, which also vanish when the browser restarts) and never
 // touches ordinary tabs, top-level documents or any other resource type. Frames are sandboxed
-// by the workspace page so an embedded page cannot navigate Threadkeeper away.
+// by the workspace page so an embedded page cannot navigate ThreadStack away.
 //
 // Pure: the chrome API is passed in, so the rule shape and id handling are unit-tested.
 

@@ -9,7 +9,7 @@ import {
   threadRepository,
 } from '../../src/core/repository.js';
 import { providerCategory } from '../../src/core/providers.js';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, upsertThread } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings, upsertThread } from '../../src/core/db.js';
 import { decideProject, type OrganizeContext } from '../../src/core/auto-organize.js';
 import { exportPortableBundle, exportThreadToMarkdown, importPortableBundle } from '../../src/core/adapters.js';
 import { MemorySearchIndex, matchesScopeFilter } from '../../src/core/search.js';
@@ -110,7 +110,7 @@ describe('groupByRepository', () => {
 // ---------------------------------------------------------------- where the repository flows
 
 let dbCounter = 0;
-const freshDb = () => new ThreadkeeperDB(`RepositoryTestDB_${++dbCounter}_${Date.now()}`);
+const freshDb = () => new ThreadStackDB(`RepositoryTestDB_${++dbCounter}_${Date.now()}`);
 const ids = { accountId: 'acct_test', workspaceId: 'ws_test' };
 const input = (id: string, extra: Record<string, unknown> = {}) => ({
   threadKey: buildThreadKey({ provider: 'codex', ...ids, sourceConversationId: id, branchId: 'main' }),

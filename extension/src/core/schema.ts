@@ -733,7 +733,7 @@ export interface AutoOrganizeSettings {
   dailyAiAnalysisLimit: number;
 }
 
-/** What Still asked to sync (protocol SyncPrefs), as Threadkeeper last received it. */
+/** What Still asked to sync (protocol SyncPrefs), as ThreadStack last received it. */
 export interface DockSyncPrefs {
   scope: 'all' | 'projects' | 'manual';
   projects: string[];
@@ -941,7 +941,7 @@ export interface SettingsRecord {
   maxLiveFrames: number;
   /**
    * The page the workspace lands on when it is opened: an https address of a provider
-   * Threadkeeper can show (Claude Code unless changed). Empty means "where I left off".
+   * ThreadStack can show (Claude Code unless changed). Empty means "where I left off".
    */
   startPage: string;
   /**
@@ -949,6 +949,11 @@ export interface SettingsRecord {
    * (core/embed/profile-page.ts presentAsTopLevel). On unless switched off in Settings.
    */
   embedFullNavigation: boolean;
+  /**
+   * The session palette (⌘K / Ctrl+K, the rail's search button and the address field's ⌘K chip).
+   * On unless switched off in Settings → Workspace; off removes the shortcut and both buttons.
+   */
+  commandBar: boolean;
   /** Where Claude requests go. */
   aiBackend: AiBackend;
   anthropicApiKey: string;
@@ -1106,7 +1111,7 @@ export const DEFAULT_AUTO_ORGANIZE: AutoOrganizeSettings = {
 export const DEFAULT_SETTINGS: SettingsRecord = {
   id: 'default',
   settingsVersion: 2,
-  // Providers on hosts Threadkeeper holds from install start on; the rest wait for the user to
+  // Providers on hosts ThreadStack holds from install start on; the rest wait for the user to
   // turn them on (and grant host access) in Settings → Capture. Grok Bot is explicit-only.
   authorizedHosts: Object.fromEntries(
     CAPTURE_PROVIDER_IDS.map((id) => [id, PROVIDERS[id].defaultEnabled])
@@ -1145,6 +1150,7 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   maxLiveFrames: DEFAULT_MAX_LIVE_FRAMES,
   startPage: DEFAULT_START_PAGE,
   embedFullNavigation: true,
+  commandBar: true,
   aiBackend: 'anthropic',
   anthropicApiKey: '',
   aws: { ...DEFAULT_AWS_SETTINGS },
@@ -1241,6 +1247,7 @@ export function normalizeSettings(raw: Partial<SettingsRecord> | null | undefine
         : DEFAULT_SETTINGS.maxLiveFrames,
     startPage: normalizeStartPage(base.startPage),
     embedFullNavigation: base.embedFullNavigation !== false,
+    commandBar: base.commandBar !== false,
   };
 }
 

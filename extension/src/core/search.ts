@@ -12,7 +12,7 @@ import {
   type WorkflowState,
   type ThreadVectorRecord,
 } from './schema.js';
-import type { ThreadkeeperDB } from './db.js';
+import type { ThreadStackDB } from './db.js';
 import {
   bestMatchingExcerpt,
   buildRerankDocument,
@@ -232,7 +232,7 @@ export function validateVectorCompatibility(params: {
 }
 
 export async function storeVectorEntries(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   params: {
     indexType: 'standard' | 'contextual';
     model: 'voyage-4' | 'voyage-4-large' | 'voyage-context-4';
@@ -697,7 +697,7 @@ export class MemorySearchIndex {
 }
 
 export async function runHybridSearch(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   options: HybridSearchOptions
 ): Promise<HybridSearchResponse> {
   const start = performance.now();

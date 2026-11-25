@@ -53,7 +53,7 @@ export function PendingSignInBanner() {
         <span>
           {pending.wrongAccount
             ? 'The site picked a different saved account. Choose the account you want in the sign-in tab, or cancel.'
-            : `Finish in the sign-in tab. Threadkeeper restores your browser’s usual ${realmName} account afterwards.`}
+            : `Finish in the sign-in tab. ThreadStack restores your browser’s usual ${realmName} account afterwards.`}
         </span>
         {problem && <span role="alert">{problem}</span>}
       </div>

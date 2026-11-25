@@ -1,11 +1,11 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import { ThreadkeeperDB, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
+import { ThreadStackDB, upsertThread, type UpsertThreadInput } from '../../src/core/db.js';
 import { alignMessages, looksDerivedTitle, mergeCapturedMessages, sameMessageText } from '../../src/core/merge.js';
 import { buildThreadKey, type CaptureSource, type CoverageState } from '../../src/core/schema.js';
 
 let n = 0;
-const freshDb = () => new ThreadkeeperDB(`ThreadkeeperMerge_${Date.now()}_${++n}`);
+const freshDb = () => new ThreadStackDB(`ThreadStackMerge_${Date.now()}_${++n}`);
 
 const conv = '7a1b2c3d-0000-4000-8000-00000000abcd';
 const threadKey = buildThreadKey({
@@ -56,7 +56,7 @@ function capture(
   };
 }
 
-async function stored(db: ThreadkeeperDB) {
+async function stored(db: ThreadStackDB) {
   return db.messages.where('threadKey').equals(threadKey).sortBy('ordinal');
 }
 

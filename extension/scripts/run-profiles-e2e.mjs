@@ -204,7 +204,7 @@ function startServer() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tk-profiles-cert-'));
   const key = path.join(dir, 'key.pem');
   const cert = path.join(dir, 'cert.pem');
-  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '2', '-subj', '/CN=threadkeeper-e2e'], { stdio: 'ignore' });
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '2', '-subj', '/CN=threadstack-e2e'], { stdio: 'ignore' });
   const server = https.createServer({ key: fs.readFileSync(key), cert: fs.readFileSync(cert) }, (req, res) => {
     const writeHead = res.writeHead.bind(res);
     // Empty header values mean "do not send this header".
@@ -218,16 +218,16 @@ function startServer() {
 
 const threads = (sw) =>
   sw.evaluate(async () =>
-    (await globalThis.__threadkeeperDb.conversations.toArray()).map((c) => ({ key: c.threadKey, accountId: c.accountId, id: c.sourceConversationId, messages: c.messageCount }))
+    (await globalThis.__threadStackDb.conversations.toArray()).map((c) => ({ key: c.threadKey, accountId: c.accountId, id: c.sourceConversationId, messages: c.messageCount }))
   );
 const claudeAccounts = (sw) =>
   sw.evaluate(async () =>
-    (await globalThis.__threadkeeperDb.accounts.toArray())
+    (await globalThis.__threadStackDb.accounts.toArray())
       .filter((a) => a.realm === 'anthropic')
       .map((a) => ({ id: a.id, label: a.label, primary: a.primary, mode: a.mode, hasJar: a.hasJar, signedIn: a.signedIn, identity: a.identity?.display ?? null }))
   );
 const jarOf = (sw, id) => sw.evaluate(async (accountId) => {
-  const jar = await globalThis.__threadkeeperDb.accountJars.get(accountId);
+  const jar = await globalThis.__threadStackDb.accountJars.get(accountId);
   return jar ? { cookieCount: jar.cookieCount, plaintext: new TextDecoder('latin1').decode(new Uint8Array(jar.data)).includes('sessionKey') } : null;
 }, id);
 const browserJar = (sw) =>
@@ -352,7 +352,7 @@ async function main() {
 
     // 3. Side by side on the Dashboard.
     await sw.evaluate(async (keys) => {
-      for (const key of keys) await globalThis.__threadkeeperDb.conversations.update(key, { pinned: true });
+      for (const key of keys) await globalThis.__threadStackDb.conversations.update(key, { pinned: true });
       chrome.runtime.sendMessage({ type: 'LIBRARY_CHANGED' }).catch(() => undefined);
     }, [a1.key, filed.key]);
     await page.getByRole('radio', { name: 'Dashboard', exact: true }).click();
@@ -404,11 +404,11 @@ async function main() {
     const secondWorkspace = await context.newPage();
     await secondWorkspace.goto(page.url());
     const dashboard = (workspace) => workspace.getByRole('region', { name: 'Dashboard', exact: true });
-    await dashboard(secondWorkspace).getByRole('heading', { name: 'Work is open in another Threadkeeper tab', exact: true }).waitFor();
+    await dashboard(secondWorkspace).getByRole('heading', { name: 'Work is open in another ThreadStack tab', exact: true }).waitFor();
     await secondWorkspace.screenshot({ path: path.join(out, '04-move-account.png') });
     await dashboard(secondWorkspace).getByRole('button', { name: 'Move account here', exact: true }).click();
     await until(() => textOf(paneFrame(secondWorkspace, bThreadTab), '#who'), (t) => t === 'Signed in as B', { label: 'Work in the second workspace' });
-    await dashboard(page).getByRole('heading', { name: 'Work moved to another Threadkeeper tab', exact: true }).waitFor();
+    await dashboard(page).getByRole('heading', { name: 'Work moved to another ThreadStack tab', exact: true }).waitFor();
     await until(() => Promise.resolve(paneFrame(page, bThreadTab)), (frame) => frame === null, { label: 'the previous Work frame to unmount' });
     check((await textOf(paneFrame(page, aThreadTab), '#who')) === 'Signed in as A', 'moving Work leaves A visible in the original workspace');
     await secondWorkspace.screenshot({ path: path.join(out, '05-account-after-move.png') });
@@ -433,7 +433,7 @@ async function main() {
     await until(() => claudeAccounts(sw), (list) => list.find((a) => a.id === clientId)?.hasJar === true, { label: "Client's saved sign-in", timeout: 30_000 });
     const afterClient = await until(() => browserJar(sw), (j) => j.sessionKey === 'A', { label: "the browser's own sign-in coming back" });
     check(afterClient.sessionKey === 'A', "once the site names Client, Client's sign-in is kept and the browser is A again", afterClient);
-    const pending = await sw.evaluate(async () => (await globalThis.__threadkeeperDb.kv.get('accounts.signIn'))?.value ?? null);
+    const pending = await sw.evaluate(async () => (await globalThis.__threadStackDb.kv.get('accounts.signIn'))?.value ?? null);
     check(pending === null, 'the sign-in is over', pending);
     const client = (await claudeAccounts(sw)).find((a) => a.id === clientId);
     check(client.identity === ACCOUNTS.C.email, 'Client records who signed in', client);
@@ -445,7 +445,7 @@ async function main() {
       (ids) => ids.includes('tk-provider-cursor_agents~site-data'), { label: 'the Cursor identity observer' });
     const cursor = await context.newPage();
     await cursor.goto('https://cursor.com/login?as=A');
-    const cursorAccounts = () => sw.evaluate(() => globalThis.__threadkeeperDb.accounts.where('realm').equals('cursor').toArray());
+    const cursorAccounts = () => sw.evaluate(() => globalThis.__threadStackDb.accounts.where('realm').equals('cursor').toArray());
     await until(cursorAccounts, (rows) => rows.some((row) => row.primary && row.identity?.display === ACCOUNTS.A.email), { label: 'Cursor’s primary identity' });
     check(true, 'Cursor account identity is observed with conversation capture disabled');
     await clickButton(page, 'Add account');
@@ -478,7 +478,7 @@ async function main() {
       { label: 'the saved second Cursor account' });
     await page.locator('iframe.tk-frame[src^="https://cursor.com/agents"]').contentFrame().getByText('Signed in as B').waitFor();
     await cursor.reload();
-    check((await cursor.textContent('#who')) === 'Signed in as A', 'the second Cursor login is visible in Threadkeeper and the original is restored in Chrome');
+    check((await cursor.textContent('#who')) === 'Signed in as A', 'the second Cursor login is visible in ThreadStack and the original is restored in Chrome');
     await page.screenshot({ path: path.join(out, '07-cursor-second-account.png') });
 
     // 6. Controls.
@@ -490,7 +490,7 @@ async function main() {
     await other.close();
 
     await sw.evaluate(async () => {
-      await globalThis.__threadkeeperDb.settings.update('default', { embedFullNavigation: false });
+      await globalThis.__threadStackDb.settings.update('default', { embedFullNavigation: false });
     });
     await page.getByRole('radio', { name: 'Dashboard', exact: true }).click();
     await page.reload();
@@ -499,10 +499,10 @@ async function main() {
     await until(() => textOf(plainA, '#framed'), (t) => t === 'framed', { label: 'the setting to take effect' });
     check(await plainA.evaluate(() => document.getElementById('sidebar').hidden), 'with "Show each site’s full navigation" off, the workspace leaves the check alone');
     await sw.evaluate(async () => {
-      await globalThis.__threadkeeperDb.settings.update('default', { embedFullNavigation: true });
+      await globalThis.__threadStackDb.settings.update('default', { embedFullNavigation: true });
     });
 
-    const rejections = await sw.evaluate(() => globalThis.__threadkeeperGetSecurityRejections?.() ?? []);
+    const rejections = await sw.evaluate(() => globalThis.__threadStackGetSecurityRejections?.() ?? []);
     log(`security rejections recorded during the run: ${rejections.length}`);
     for (const r of rejections.slice(-8)) log(`  ${r.reason}`);
   } finally {

@@ -1,5 +1,5 @@
 /** Worker-owned lifecycle and command integration. Shared dispatch never handles provider protocols. */
-import { ensureStarterCollectionsAndSettings, saveSettingsPatch, type ThreadkeeperDB } from '../db.js';
+import { ensureStarterCollectionsAndSettings, saveSettingsPatch, type ThreadStackDB } from '../db.js';
 import { chromeHelperEnv, helperPaperclip } from '../embed/helper.js';
 import { createPaperclipStartCoordinator } from './lifecycle.js';
 import { PaperclipBridge, type PaperclipBridgeDeps } from './bridge.js';
@@ -29,7 +29,7 @@ export function createManagerActionExecutor(deps: {
   return async (action: AgentAction, signal: AbortSignal): Promise<ActionOutcome> => {
     await deps.ready();
     const tabId = deps.tabId();
-    if (tabId === undefined) throw new BridgeActionError('browser_offline', 'Open the Threadkeeper window to act in browser sessions.');
+    if (tabId === undefined) throw new BridgeActionError('browser_offline', 'Open the ThreadStack window to act in browser sessions.');
     if (signal.aborted) throw abortedBeforeTyping(signal);
     if (action.deadlineAt <= (deps.now ?? Date.now)()) throw new BridgeActionError('timeout', ACTION_TEXT.timeout);
     const answer = deps.sendExecute(tabId, action);
@@ -72,7 +72,7 @@ export interface BridgeAlarms {
   clear(name: string): Promise<unknown>;
 }
 
-export function createPaperclipIntegrationRuntime(options: PaperclipBridgeDeps & { db: ThreadkeeperDB; alarms?: BridgeAlarms }) {
+export function createPaperclipIntegrationRuntime(options: PaperclipBridgeDeps & { db: ThreadStackDB; alarms?: BridgeAlarms }) {
   // Secrets cached for features are dropped the moment any company's bridge fails (REQ-14 NF-8).
   let dropCachedSecrets = () => undefined as void;
   const bridge = new PaperclipBridge({ ...options, onDisconnect: (companyId) => { dropCachedSecrets(); options.onDisconnect?.(companyId); } });

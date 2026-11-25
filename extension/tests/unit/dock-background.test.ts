@@ -81,13 +81,13 @@ describe('background wiring for the Still link', () => {
     expect(res).toMatchObject({ ok: false, error: { code: 'version_mismatch' } });
   });
 
-  it('routes DOCK_* from Threadkeeper pages and refuses them from websites', async () => {
+  it('routes DOCK_* from ThreadStack pages and refuses them from websites', async () => {
     const state = await call(listeners.internal, { type: 'DOCK_GET_STATE' }, manager);
     expect(state).toMatchObject({ ok: true, state: { ownId: TK, paired: false } });
     const fromSite = await call(listeners.internal, { type: 'DOCK_GET_STATE' }, { id: TK, url: 'https://claude.ai/chat/1', tab: { id: 4, url: 'https://claude.ai/chat/1' } });
     expect(fromSite.ok).toBe(false);
     const decideFromManager = await call(listeners.internal, { type: 'DOCK_DECIDE', requestId: 'x', allow: true }, manager);
-    expect(decideFromManager).toMatchObject({ ok: false, error: 'Open Threadkeeper in its own window to do this.' });
+    expect(decideFromManager).toMatchObject({ ok: false, error: 'Open ThreadStack in its own window to do this.' });
   });
 
   it('pairs end to end: request → consent window → code → pair.granted → paired', async () => {

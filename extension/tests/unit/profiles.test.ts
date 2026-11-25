@@ -132,7 +132,7 @@ describe('claim', () => {
     expect(slots.slot(5, 'anthropic')?.pending).toHaveLength(1);
   });
 
-  it('does not seed hosts Threadkeeper has no access to', async () => {
+  it('does not seed hosts ThreadStack has no access to', async () => {
     savedJars.acct_a = [cookie({ name: 'sessionKey', httpOnly: true })];
     hostAccess = () => false;
     expect(await profiles.claim(5, 'anthropic', 'acct_a')).toMatchObject({ ok: false, code: 'needs_host_access' });

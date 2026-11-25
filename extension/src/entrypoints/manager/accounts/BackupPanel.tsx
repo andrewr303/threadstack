@@ -81,7 +81,7 @@ export function BackupPanel({ connected }: { connected: boolean }) {
     } else {
       setAction({
         state: 'done',
-        text: `Restored ${threads(result.threadsAdded)}${result.settingsRestored ? ' and your settings' : ''}. Reload Threadkeeper to see them.${result.settingsRestored ? ' Accounts need signing in again.' : ''}`,
+        text: `Restored ${threads(result.threadsAdded)}${result.settingsRestored ? ' and your settings' : ''}. Reload ThreadStack to see them.${result.settingsRestored ? ' Accounts need signing in again.' : ''}`,
         reload: true,
       });
     }
@@ -98,7 +98,7 @@ export function BackupPanel({ connected }: { connected: boolean }) {
         Library backups
       </h4>
       <p className="tk-settings-note">
-        A browser keeps Threadkeeper's library under the extension's ID. Loading Threadkeeper from another folder, removing and
+        A browser keeps ThreadStack's library under the extension's ID. Loading ThreadStack from another folder, removing and
         adding it again, or moving to another browser starts with an empty library. With the Mac helper connected, the whole
         library (threads, messages, summaries, search data and settings, including any API keys you entered) is saved to a
         folder on this Mac about once an hour when it has changed, and can be restored from here. Saved sign-ins are never in
@@ -180,7 +180,7 @@ export function BackupPanel({ connected }: { connected: boolean }) {
             </ul>
           )}
           <p className="tk-settings-note">
-            Backups are in Library, Application Support, Threadkeeper, Backups in your home folder. The newest five are kept, and
+            Backups are in Library, Application Support, ThreadStack, Backups in your home folder. The newest five are kept, and
             the fullest one is never removed.
           </p>
         </>
@@ -190,7 +190,7 @@ export function BackupPanel({ connected }: { connected: boolean }) {
         {action.state !== 'idle' && <span data-state={action.state}>{action.text}</span>}
         {action.state === 'done' && action.reload && (
           <button type="button" className="tk-btn" onClick={() => window.location.reload()}>
-            Reload Threadkeeper
+            Reload ThreadStack
           </button>
         )}
       </div>

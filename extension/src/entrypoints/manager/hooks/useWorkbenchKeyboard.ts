@@ -1,6 +1,26 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { SearchHit } from '../../../core/search.js';
 import { hasOpenPopover } from '../shell/primitives.js';
+
+type KeyLike = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>;
+
+/** Command+K (macOS) or Control+K, with no other modifier. */
+export function isSessionPaletteKey(event: KeyLike): boolean {
+  return (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k';
+}
+
+/**
+ * Whether ⌘K opens ThreadStack's own session palette. Only on the full page, only while the
+ * palette is switched on (Settings → Workspace), never over another open dialog, and never in
+ * fused mode: there Paperclip's frame owns ⌘K (PaperclipFusion.ts forwards it to Paperclip's
+ * palette and skips a key a handler already claimed), so this handler must leave the key alone.
+ */
+export function shouldOpenSessionPalette(
+  event: KeyLike,
+  context: { surface: 'overlay' | 'page' | 'sidepanel'; enabled: boolean; fused: boolean; dialogOpen: boolean }
+): boolean {
+  return context.surface === 'page' && context.enabled && !context.fused && !context.dialogOpen && isSessionPaletteKey(event);
+}
 
 export interface WorkbenchKeyboardOptions {
   surface: 'overlay' | 'page' | 'sidepanel';
@@ -26,6 +46,12 @@ export interface WorkbenchKeyboardOptions {
    * and must not act on it while it is hidden. Escape keeps working. Default true.
    */
   listShortcuts?: boolean;
+  /** The session palette is switched on (settings.commandBar). Default false. */
+  paletteEnabled?: boolean;
+  /** Paperclip fused mode: ⌘K belongs to Paperclip's palette (see shouldOpenSessionPalette). */
+  fused?: boolean;
+  /** ⌘K / Ctrl+K: open the session palette. */
+  onOpenPalette?: () => void;
 }
 
 /** Escape (innermost dialog, then selection, then the overlay), "/" to search, j and k to move through the list. */
@@ -45,7 +71,12 @@ export function useWorkbenchKeyboard({
   onClearChecked,
   onCloseOverlay,
   listShortcuts = true,
+  paletteEnabled = false,
+  fused = false,
+  onOpenPalette,
 }: WorkbenchKeyboardOptions) {
+  const openPaletteRef = useRef(onOpenPalette);
+  openPaletteRef.current = onOpenPalette;
   useEffect(() => {
     const getOpenInnerModal = () =>
       dialogRefs
@@ -84,6 +115,14 @@ export function useWorkbenchKeyboard({
         e.preventDefault();
         e.stopPropagation();
         handleEscapeStep();
+        return;
+      }
+      if (
+        openPaletteRef.current &&
+        shouldOpenSessionPalette(e, { surface, enabled: paletteEnabled, fused, dialogOpen: Boolean(openModalEl) })
+      ) {
+        e.preventDefault();
+        openPaletteRef.current();
         return;
       }
       if (openModalEl || !listShortcuts) return;
@@ -140,5 +179,5 @@ export function useWorkbenchKeyboard({
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('message', onMessage);
     };
-  }, [surface, handshakeToken, listHits, selectedThreadKey, checkedCount, listShortcuts]);
+  }, [surface, handshakeToken, listHits, selectedThreadKey, checkedCount, listShortcuts, paletteEnabled, fused]);
 }

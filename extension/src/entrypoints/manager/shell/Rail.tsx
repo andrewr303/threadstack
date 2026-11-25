@@ -1,16 +1,20 @@
-// The side rail of the full page: the brand, the view switch, recent sessions, the Threads
-// navigation the app passes in, and (pinned to the bottom) the signed-in accounts, Settings and
-// the theme. A glass island over the canvas; a 64px icon strip when collapsed; below 900px wide
-// it is that strip, and opens as a drawer over the page.
+// The side rail of the full page: the ThreadStack brand and its tools (theme, add account,
+// Settings, the session palette, collapse), the view switch, recent sessions and the Threads
+// navigation the app passes in. A glass island over the canvas; a 64px icon strip when collapsed
+// (brand mark, expand, search, the five views, then add account, Settings and the theme at the
+// foot); below 900px wide it is that strip, and opens as a drawer over the page. Accounts and the
+// Paperclip connection live in Settings and in the Browse and Paperclip views.
 import React, { useCallback, useEffect, useState } from 'react';
 import type { WorkspaceView } from '../../../core/workspace/types.js';
 import type { SectionId } from '../SettingsDialog.js';
 import { useWorkspaceContext } from '../workspace/context.js';
 import { Icon, type IconName } from './icons.js';
 import { Segmented, hasOpenPopover } from './primitives.js';
-import { RailAccounts } from './RailAccounts.js';
 import { SessionsNav } from './SessionsNav.js';
-import { PaperclipStatus } from '../PaperclipConnection.js';
+
+/** Brand images, copied next to manager.html by scripts/build-extension.mjs. */
+export const BRAND_WORDMARK = 'assets/brand/threadstack-wordmark.png';
+export const BRAND_MARK = 'assets/brand/threadstack-mark.png';
 
 export interface RailProps {
   /** Narrow, icon-only rail. */
@@ -30,9 +34,14 @@ export interface RailProps {
   sessions?: React.ReactNode;
   /**
    * REQ-6 fused mode: Paperclip's sidebar is the only view switch, so this rail draws none and
-   * becomes the left column of the Threadkeeper view (sessions, accounts, Settings).
+   * becomes the left column of the ThreadStack view (sessions, accounts, Settings).
    */
   fused?: boolean;
+  /**
+   * Threads view only: receives the element at the top of the rail, beside the view switch, where
+   * the Threads list renders its search and grouping controls (a portal keeps them in its tree).
+   */
+  onThreadsTop?: (element: HTMLDivElement | null) => void;
 }
 
 const VIEWS: ReadonlyArray<{ value: WorkspaceView; label: string; icon: IconName }> = [
@@ -79,8 +88,10 @@ export function Rail({
   children,
   sessions,
   fused = false,
+  onThreadsTop,
 }: RailProps) {
-  const { workspace } = useWorkspaceContext();
+  const { workspace, requestAddAccount, openPalette, paletteEnabled } = useWorkspaceContext();
+  const paletteOn = Boolean(paletteEnabled && openPalette);
   const narrow = useMediaQuery(NARROW_QUERY);
   // In a small window the rail's own expand button opens the drawer; the app may open it too.
   const [ownDrawer, setOwnDrawer] = useState(false);
@@ -124,6 +135,69 @@ export function Rail({
   // drawer open; Escape or the scrim closes it.
   const changeView = (next: WorkspaceView) => onViewChange(next);
 
+  const themeHint = effectiveTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  const tools = (
+    <>
+      <button type="button" className="tk-icon-btn tk-rail-tool" aria-label="Toggle color theme" title={themeHint} onClick={onToggleTheme}>
+        <Icon name={effectiveTheme === 'dark' ? 'sun' : 'moon'} />
+      </button>
+      <button
+        type="button"
+        className="tk-icon-btn tk-rail-tool"
+        aria-label="Add account"
+        title="Add account"
+        aria-haspopup="dialog"
+        onClick={() => {
+          afterChoice();
+          requestAddAccount();
+        }}
+      >
+        <Icon name="userPlus" />
+      </button>
+      <button
+        type="button"
+        className="tk-icon-btn tk-rail-tool"
+        aria-label="Settings"
+        title="Settings"
+        aria-haspopup="dialog"
+        onClick={() => {
+          afterChoice();
+          onOpenSettings();
+        }}
+      >
+        <Icon name="settings" />
+      </button>
+    </>
+  );
+  const search = paletteOn ? (
+    <button
+      type="button"
+      className="tk-icon-btn tk-rail-tool"
+      aria-label="Search sessions"
+      title="Search sessions (⌘K)"
+      aria-haspopup="dialog"
+      aria-keyshortcuts="Meta+K Control+K"
+      onClick={() => {
+        afterChoice();
+        openPalette?.();
+      }}
+    >
+      <Icon name="search" />
+    </button>
+  ) : null;
+  const toggle = (
+    <button
+      type="button"
+      className="tk-icon-btn tk-rail-toggle"
+      aria-label={toggleLabel}
+      title={toggleLabel}
+      aria-expanded={!iconOnly}
+      onClick={onToggle}
+    >
+      <Icon name="panelLeft" />
+    </button>
+  );
+
   return (
     <>
       {drawer && <div className="tk-rail-scrim" aria-hidden="true" onClick={closeDrawer} />}
@@ -131,32 +205,40 @@ export function Rail({
         className="tk-rail tk-glass"
         data-collapsed={iconOnly ? 'true' : 'false'}
         data-drawer-open={drawer ? 'true' : 'false'}
+        data-view={view}
         aria-label="Workspace"
       >
-        <div className="tk-rail-head">
-          <div className="tk-rail-brand" title={iconOnly ? 'Threadkeeper' : undefined}>
-            <span className="tk-rail-mark" aria-hidden="true">
-              T
+        {iconOnly ? (
+          <div className="tk-rail-head">
+            <span className="tk-rail-brand" title="ThreadStack">
+              <img className="tk-rail-mark" src={BRAND_MARK} alt="ThreadStack" width={32} height={32} draggable={false} />
             </span>
-            {iconOnly ? (
-              <span className="tk-visually-hidden">Threadkeeper</span>
-            ) : (
-              <span className="tk-rail-wordmark">Threadkeeper</span>
-            )}
+            {toggle}
+            {search}
           </div>
-          <button
-            type="button"
-            className="tk-icon-btn tk-rail-toggle"
-            aria-label={toggleLabel}
-            title={toggleLabel}
-            aria-expanded={!iconOnly}
-            onClick={onToggle}
-          >
-            <Icon name="panelLeft" />
-          </button>
-        </div>
+        ) : (
+          <div className="tk-rail-top">
+            <div className="tk-rail-head">
+              <span className="tk-rail-brand">
+                <img className="tk-rail-wordmark" src={BRAND_WORDMARK} alt="ThreadStack" height={29} draggable={false} />
+              </span>
+              <div className="tk-rail-actions">
+                {tools}
+                {search}
+                {toggle}
+              </div>
+            </div>
+            {fused ? null : (
+              <div className="tk-rail-views">
+                <Segmented label="View" value={view} options={RAIL_SEGMENTS} onChange={changeView} className="tk-rail-seg" />
+              </div>
+            )}
+            {/* Threads lifts its search and grouping controls up here, beside the switch. */}
+            {sessions && view === 'threads' && <div className="tk-rail-threads-top" ref={onThreadsTop} />}
+          </div>
+        )}
 
-        {fused ? null : iconOnly ? (
+        {fused || !iconOnly ? null : (
           <nav aria-label="Views">
             <ul className="tk-rail-viewlist">
               {VIEWS.map((option) => (
@@ -175,10 +257,6 @@ export function Rail({
               ))}
             </ul>
           </nav>
-        ) : (
-          <div className="tk-rail-views">
-            <Segmented label="View" value={view} options={RAIL_SEGMENTS} onChange={changeView} className="tk-rail-seg" />
-          </div>
         )}
 
         {workspace.error && (
@@ -217,16 +295,7 @@ export function Rail({
           </div>
         )}
 
-        <PaperclipStatus compact={iconOnly} summary onConfigure={() => onOpenSettings('paperclip')} />
-        <RailAccounts
-          collapsed={iconOnly}
-          effectiveTheme={effectiveTheme}
-          onOpenSettings={(section) => {
-            afterChoice();
-            onOpenSettings(section);
-          }}
-          onToggleTheme={onToggleTheme}
-        />
+        {iconOnly && <div className="tk-rail-foot">{tools}</div>}
       </aside>
     </>
   );

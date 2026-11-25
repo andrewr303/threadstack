@@ -13,7 +13,7 @@ import { runApiSync, type ApiSyncParams } from '../../src/core/site-history.js';
 import { loadSidebarConversations, readSidebarConversations } from '../../src/core/sidebar-history.js';
 import { HistorySyncOrchestrator, SYNC_IDLE_TIMEOUT_MS, type SyncEnv } from '../../src/core/sync-orchestrator.js';
 import { validateSiteConversation, type SiteConversation } from '../../src/core/site-api.js';
-import { ThreadkeeperDB } from '../../src/core/db.js';
+import { ThreadStackDB } from '../../src/core/db.js';
 import { DEFAULT_SETTINGS, type ConversationRecord } from '../../src/core/schema.js';
 import { createChromeSyncEnv } from '../../src/core/sync-env.js';
 
@@ -379,7 +379,7 @@ describe('Claude history sync', () => {
 
 describe('sync helpers', () => {
   it('only skips full authoritative copies in the currently bound account and workspace', async () => {
-    const db = new ThreadkeeperDB('history-resume-account-test');
+    const db = new ThreadStackDB('history-resume-account-test');
     const bound = DEFAULT_SETTINGS.boundAccounts.chatgpt;
     try {
       await db.conversations.bulkPut([

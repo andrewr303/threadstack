@@ -2,7 +2,7 @@
 // epoch, tracked threads, a reconcile pass that catches every write path, and the drain that
 // pushes batches one at a time. Never uses the `jobs` table (processResumableJobs would swallow it).
 
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import { insightKeyFor, type ConversationRecord, type SettingsRecord, type SidebarDockSettings } from '../schema.js';
 import { isRemoteAllowed, localOnlyProjectNames } from '../privacy.js';
 import { buildThreadPayload, cheapDigestOf, isShareable, loadThreadRecords } from './payload.js';
@@ -80,7 +80,7 @@ export interface MarkOptions {
  * Mark threads for (re)evaluation. Coalesces into one row per thread and bumps its dirtySeq without
  * touching a lease. A remove is never downgraded to an upsert; a stronger remove reason wins.
  */
-export async function markDockDirty(db: ThreadkeeperDB, threadKeys: readonly string[], options: MarkOptions = {}): Promise<number> {
+export async function markDockDirty(db: ThreadStackDB, threadKeys: readonly string[], options: MarkOptions = {}): Promise<number> {
   const keys = Array.from(new Set(threadKeys.filter((k) => typeof k === 'string' && k)));
   if (keys.length === 0) return 0;
   const now = options.now ?? Date.now();
@@ -123,7 +123,7 @@ export async function markDockDirty(db: ThreadkeeperDB, threadKeys: readonly str
 }
 
 /** Forget everything sent to a peer: outbox, ledger and tracked threads (unpair). */
-export async function clearDockLink(db: ThreadkeeperDB): Promise<void> {
+export async function clearDockLink(db: ThreadStackDB): Promise<void> {
   await db.transaction('rw', [db.dockOutbox, db.dockSent, db.dockTracked, db.dockMeta], async () => {
     await db.dockOutbox.clear();
     await db.dockSent.clear();
@@ -133,14 +133,14 @@ export async function clearDockLink(db: ThreadkeeperDB): Promise<void> {
 }
 
 /** A new epoch: Still's copy may differ from the ledger, so the ledger is discarded. */
-export async function resetLedger(db: ThreadkeeperDB): Promise<void> {
+export async function resetLedger(db: ThreadStackDB): Promise<void> {
   await db.transaction('rw', [db.dockSent, db.dockMeta], async () => {
     await db.dockSent.clear();
     await db.dockMeta.bulkDelete(['reconcile.cursor', 'reconcile.lastAt']);
   });
 }
 
-export async function trackThreads(db: ThreadkeeperDB, threadKeys: readonly string[], now = Date.now()): Promise<void> {
+export async function trackThreads(db: ThreadStackDB, threadKeys: readonly string[], now = Date.now()): Promise<void> {
   if (threadKeys.length === 0) return;
   await db.dockTracked.bulkPut(threadKeys.map((threadKey) => ({ threadKey, trackedAt: isoAt(now), dismissed: false })));
 }
@@ -162,7 +162,7 @@ export interface ReconcileResult {
  * less than 10 minutes ago unless forced.
  */
 export async function reconcileDock(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   options: { force?: boolean; now?: () => number; budgetMs?: number } = {}
 ): Promise<ReconcileResult> {
@@ -225,7 +225,7 @@ export async function reconcileDock(
     }
   }
 
-  // Ledger entries whose thread no longer exists: deleted in Threadkeeper.
+  // Ledger entries whose thread no longer exists: deleted in ThreadStack.
   // A row held after a `deleted` removal was already answered and is not repeated.
   const sentKeys = (await db.dockSent.filter((r) => r.held !== 'deleted').primaryKeys()) as string[];
   for (let i = 0; i < sentKeys.length; i += 500) {
@@ -245,7 +245,7 @@ export async function reconcileDock(
  * running drain whose push may already be on its way) are marked dirty again, so their ack keeps
  * the row and it is re-decided with the new settings: dropped if it was never sent, removed if it was.
  */
-export async function queuePrivacyRemovals(db: ThreadkeeperDB, settings: SettingsRecord, now = Date.now()): Promise<number> {
+export async function queuePrivacyRemovals(db: ThreadStackDB, settings: SettingsRecord, now = Date.now()): Promise<number> {
   const dock = settings.sidebarDock;
   if (!dock.pairedId) return 0;
   const localOnly = await localOnlyProjectNames(db);
@@ -281,7 +281,7 @@ export async function queuePrivacyRemovals(db: ThreadkeeperDB, settings: Setting
 }
 
 /** Threads Still should hold under the current prefs (for sync.configure's `total`). */
-export async function countInScope(db: ThreadkeeperDB, settings: SettingsRecord): Promise<number> {
+export async function countInScope(db: ThreadStackDB, settings: SettingsRecord): Promise<number> {
   const dock = settings.sidebarDock;
   const localOnly = await localOnlyProjectNames(db);
   let total = 0;
@@ -330,10 +330,10 @@ export interface DrainOptions {
   onError?: (message: string) => Promise<void> | void;
 }
 
-const draining = new WeakMap<ThreadkeeperDB, Promise<DrainResult>>();
+const draining = new WeakMap<ThreadStackDB, Promise<DrainResult>>();
 
 /** One drain at a time per database and service-worker lifetime (in-memory mutex). */
-export function drainDock(db: ThreadkeeperDB, settings: SettingsRecord, send: DockSend, options: DrainOptions = {}): Promise<DrainResult> {
+export function drainDock(db: ThreadStackDB, settings: SettingsRecord, send: DockSend, options: DrainOptions = {}): Promise<DrainResult> {
   const running = draining.get(db);
   if (running) return running;
   const run = runDrain(db, settings, send, options).finally(() => {
@@ -343,7 +343,7 @@ export function drainDock(db: ThreadkeeperDB, settings: SettingsRecord, send: Do
   return run;
 }
 
-export function isDraining(db: ThreadkeeperDB): boolean {
+export function isDraining(db: ThreadStackDB): boolean {
   return draining.has(db);
 }
 
@@ -352,7 +352,7 @@ function backoffMs(row: DockOutboxRecord, attempts: number): number {
   return BACKOFF_MINUTES[Math.min(BACKOFF_MINUTES.length - 1, Math.max(0, attempts - 1))] * 60_000;
 }
 
-async function claimRows(db: ThreadkeeperDB, nowMs: number, onlyLocalOnly: boolean): Promise<DockOutboxRecord[]> {
+async function claimRows(db: ThreadStackDB, nowMs: number, onlyLocalOnly: boolean): Promise<DockOutboxRecord[]> {
   return db.transaction('rw', db.dockOutbox, async () => {
     const nowIso = isoAt(nowMs);
     const due = await db.dockOutbox.where('notBefore').belowOrEqual(nowIso).limit(400).toArray();
@@ -370,7 +370,7 @@ async function claimRows(db: ThreadkeeperDB, nowMs: number, onlyLocalOnly: boole
  * Settle a row after Still answered. Without a patch the row is deleted, unless it was marked dirty
  * again meanwhile (then it is released for re-evaluation). With a patch it is kept and re-queued.
  */
-async function ackRow(db: ThreadkeeperDB, row: DockOutboxRecord, patch: Partial<DockOutboxRecord> = {}): Promise<void> {
+async function ackRow(db: ThreadStackDB, row: DockOutboxRecord, patch: Partial<DockOutboxRecord> = {}): Promise<void> {
   await db.transaction('rw', db.dockOutbox, async () => {
     const current = await db.dockOutbox.get(row.threadKey);
     if (!current) return;
@@ -392,7 +392,7 @@ async function ackRow(db: ThreadkeeperDB, row: DockOutboxRecord, patch: Partial<
   });
 }
 
-async function failRows(db: ThreadkeeperDB, rows: DockOutboxRecord[], nowMs: number, message: string, options: { retryAfterMs?: number; penalty: boolean }): Promise<void> {
+async function failRows(db: ThreadStackDB, rows: DockOutboxRecord[], nowMs: number, message: string, options: { retryAfterMs?: number; penalty: boolean }): Promise<void> {
   await db.transaction('rw', db.dockOutbox, async () => {
     for (const row of rows) {
       const current = await db.dockOutbox.get(row.threadKey);
@@ -405,7 +405,7 @@ async function failRows(db: ThreadkeeperDB, rows: DockOutboxRecord[], nowMs: num
 }
 
 async function decide(
-  db: ThreadkeeperDB,
+  db: ThreadStackDB,
   settings: SettingsRecord,
   row: DockOutboxRecord,
   ledger: DockSentRecord | undefined,
@@ -449,7 +449,7 @@ async function decide(
 }
 
 /** Shrink an oversized payload's transcript to fit one message, or drop the transcript. */
-async function fitPayload(db: ThreadkeeperDB, settings: SettingsRecord, payload: ThreadPayload, localOnly: ReadonlySet<string>): Promise<ThreadPayload> {
+async function fitPayload(db: ThreadStackDB, settings: SettingsRecord, payload: ThreadPayload, localOnly: ReadonlySet<string>): Promise<ThreadPayload> {
   let bytes = jsonByteLength(payload);
   if (bytes <= RESPONSE_BUDGET_BYTES || !payload.transcript.included) return payload;
   const ratio = (RESPONSE_BUDGET_BYTES / bytes) * 0.85;
@@ -468,7 +468,7 @@ async function fitPayload(db: ThreadkeeperDB, settings: SettingsRecord, payload:
 }
 
 /** Give leased rows back at once, to be re-decided by the next claim. */
-async function releaseRows(db: ThreadkeeperDB, rows: DockOutboxRecord[], nowMs: number): Promise<void> {
+async function releaseRows(db: ThreadStackDB, rows: DockOutboxRecord[], nowMs: number): Promise<void> {
   await db.transaction('rw', db.dockOutbox, async () => {
     for (const row of rows) {
       const current = await db.dockOutbox.get(row.threadKey);
@@ -477,7 +477,7 @@ async function releaseRows(db: ThreadkeeperDB, rows: DockOutboxRecord[], nowMs: 
   });
 }
 
-async function runDrain(db: ThreadkeeperDB, initialSettings: SettingsRecord, send: DockSend, options: DrainOptions): Promise<DrainResult> {
+async function runDrain(db: ThreadStackDB, initialSettings: SettingsRecord, send: DockSend, options: DrainOptions): Promise<DrainResult> {
   let settings = initialSettings;
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));

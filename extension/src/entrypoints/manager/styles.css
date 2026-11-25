@@ -1,4 +1,4 @@
-/* Threadkeeper manager: tokens, themes and the library components.
+/* ThreadStack manager: tokens, themes and the library components.
    Dark is the default theme. Glass (translucent, blurred) is only for floating chrome; everything a
    person reads or works in is an opaque surface. Shared pieces live in styles/00-foundation.css,
    the full-page shell in styles/10-shell.css, and each view in its own file after those. */
@@ -97,6 +97,25 @@ html[data-theme="dark"] {
   --ac-blue: #86A8D8;
   --ac-gold: #D6B460;
 
+  /* Workbench redesign (design handoff): the view switch, the session palette, run states. */
+  --accent-hover: #7CCAC3;
+  --accent-wash: rgba(95, 184, 176, 0.14);   /* the selected row of a listbox */
+  --accent-count: rgba(95, 184, 176, 0.22);  /* count pill on the chosen filter */
+  --accent-count-text: #BFE6E1;
+  --warn-text: #E9C27A;                      /* "Needs you" labels */
+  --warn-text-2: #F0CF8E;
+  --warn-wash: rgba(217, 164, 65, 0.14);     /* the notice when a session needs the person */
+  --st-idle: #81796C;
+  --switch-track: rgba(0, 0, 0, 0.55);
+  --switch-thumb: #1A1816;
+  --switch-ring: rgba(237, 232, 223, 0.28);
+  --switch-idle: #8A8378;
+  --dialog-fill: rgba(32, 29, 26, 0.94);
+  --dialog-filter: blur(24px) saturate(150%);
+  --dialog-shadow: inset 0 1px 0 rgba(255, 244, 228, 0.18), 0 40px 80px -30px rgba(0, 0, 0, 0.9);
+  --card-fill: rgba(28, 26, 23, 0.78);
+  --stripe: rgba(237, 232, 223, 0.028);      /* placeholder stripes where a page will load */
+
   color-scheme: dark;
 }
 
@@ -158,6 +177,24 @@ html[data-theme="light"] {
   --ac-blue: #3D6BA8;
   --ac-gold: #8F6F12;
 
+  --accent-hover: #185A57;
+  --accent-wash: rgba(31, 111, 107, 0.10);
+  --accent-count: rgba(31, 111, 107, 0.16);
+  --accent-count-text: #164F4C;
+  --warn-text: #7A520C;
+  --warn-text-2: #6B470A;
+  --warn-wash: rgba(138, 93, 14, 0.10);
+  --st-idle: #857D71;
+  --switch-track: rgba(60, 46, 32, 0.08);
+  --switch-thumb: #FFFDF9;
+  --switch-ring: rgba(40, 32, 22, 0.18);
+  --switch-idle: #6E675D;
+  --dialog-fill: rgba(251, 249, 245, 0.96);
+  --dialog-filter: blur(20px) saturate(140%);
+  --dialog-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 40px 80px -30px rgba(70, 48, 28, 0.45);
+  --card-fill: rgba(251, 250, 247, 0.86);
+  --stripe: rgba(40, 32, 22, 0.035);
+
   color-scheme: light;
 }
 
@@ -193,6 +230,9 @@ html[data-theme="light"] {
 html[data-surfaces="solid"] {
   --glass-fill: var(--chrome-solid);
   --pop-fill: var(--chrome-solid);
+  --dialog-fill: var(--chrome-solid);
+  --dialog-filter: none;
+  --card-fill: var(--surface);
   --glass-filter: none;
   --glass-border: var(--border-solid);
   --glass-hi: transparent;
@@ -204,6 +244,9 @@ html[data-surfaces="solid"] {
   html[data-theme] {
     --glass-fill: var(--chrome-solid);
     --pop-fill: var(--chrome-solid);
+    --dialog-fill: var(--chrome-solid);
+    --dialog-filter: none;
+    --card-fill: var(--surface);
     --glass-filter: none;
     --glass-border: var(--border-solid);
     --glass-hi: transparent;
@@ -216,6 +259,9 @@ html[data-surfaces="solid"] {
   html[data-theme] {
     --glass-fill: var(--chrome-solid);
     --pop-fill: var(--chrome-solid);
+    --dialog-fill: var(--chrome-solid);
+    --dialog-filter: none;
+    --card-fill: var(--surface);
     --glass-filter: none;
     --glass-border: var(--field-border);
     --glass-hi: transparent;
@@ -236,6 +282,11 @@ html[data-surfaces="solid"] {
   html[data-theme] {
     --glass-fill: Canvas;
     --pop-fill: Canvas;
+    --dialog-fill: Canvas;
+    --dialog-filter: none;
+    --card-fill: Canvas;
+    --switch-track: Canvas;
+    --switch-thumb: Highlight;
     --glass-filter: none;
     --glass-border: CanvasText;
     --glass-hi: transparent;
@@ -251,6 +302,9 @@ html[data-surfaces="solid"] {
   html[data-theme] {
     --glass-fill: var(--chrome-solid);
     --pop-fill: var(--chrome-solid);
+    --dialog-fill: var(--chrome-solid);
+    --dialog-filter: none;
+    --card-fill: var(--surface);
     --glass-filter: none;
     --glass-border: var(--border-solid);
     --glass-hi: transparent;

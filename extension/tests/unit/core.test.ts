@@ -8,7 +8,7 @@ import {
   type ExtensionSummaryOutput,
 } from '../../src/core/schema.js';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   ensureStarterCollectionsAndSettings,
   upsertThread,
   updateManualThreadFields,
@@ -64,13 +64,13 @@ import {
 } from '../../src/core/messaging.js';
 
 let dbCounter = 0;
-function createTestDb(): ThreadkeeperDB {
+function createTestDb(): ThreadStackDB {
   dbCounter += 1;
-  return new ThreadkeeperDB(`ThreadkeeperTestDB_${Date.now()}_${dbCounter}`);
+  return new ThreadStackDB(`ThreadStackTestDB_${Date.now()}_${dbCounter}`);
 }
 
-describe('Threadkeeper Core Verification Suite (CAPTURE-04..PRIV-11)', () => {
-  let db: ThreadkeeperDB;
+describe('ThreadStack Core Verification Suite (CAPTURE-04..PRIV-11)', () => {
+  let db: ThreadStackDB;
 
   beforeEach(async () => {
     db = createTestDb();
@@ -956,7 +956,7 @@ describe('Threadkeeper Core Verification Suite (CAPTURE-04..PRIV-11)', () => {
       // Configure stale budget date from yesterday with exhausted count (50/50)
       await db.settings.update('default', {
         cloudEnabled: true,
-        workerEndpointUrl: 'https://worker.threadkeeper.example',
+        workerEndpointUrl: 'https://worker.threadstack.example',
         workerBearerToken: token,
         dailyCloudRequestBudget: 50,
         dailyCloudRequestsUsed: 50,

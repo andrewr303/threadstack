@@ -22,7 +22,7 @@ export function chromeAccountsEnv(): AccountsEnv {
   return {
     async getCookies(domain: string): Promise<StoredCookie[]> {
       // The ordinary jar, plus the two partitions a realm's own pages write to: the site as its
-      // own top-level page, and the site embedded in Threadkeeper's workspace page.
+      // own top-level page, and the site embedded in ThreadStack's workspace page.
       //
       // Deliberately not `partitionKey: {}` (every partition at once): in the embedding spike
       // that call crashed Chromium 153 whenever a credentialless iframe somewhere in the browser

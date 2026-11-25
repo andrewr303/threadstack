@@ -1,5 +1,5 @@
 // @vitest-environment-options {"url": "https://claude.ai/code/session_011CUabc"}
-// The content script inside a Claude Code page embedded directly in Threadkeeper's workspace,
+// The content script inside a Claude Code page embedded directly in ThreadStack's workspace,
 // and the frame test every content script starts with.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { embeddedInExtensionPage, frameMode, paneName, type FrameWindow } from '../../src/core/embed/frame.js';
@@ -35,7 +35,7 @@ describe('frameMode and paneName', () => {
     expect(embeddedInExtensionPage(fake('self', []))).toBe(false);
   });
 
-  it('is workspace only directly inside Threadkeeper\'s own page', () => {
+  it('is workspace only directly inside ThreadStack\'s own page', () => {
     expect(frameMode(fake({}, [EXT]))).toBe('workspace');
     expect(embeddedInExtensionPage(fake({}, [EXT]))).toBe(true);
   });

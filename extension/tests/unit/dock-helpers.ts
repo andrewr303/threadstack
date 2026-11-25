@@ -1,7 +1,7 @@
 // Shared fixtures for the Sidebar Dock (Still) link tests.
 import 'fake-indexeddb/auto';
 import {
-  ThreadkeeperDB,
+  ThreadStackDB,
   ensureStarterCollectionsAndSettings,
   upsertThread,
   type UpsertThreadInput,
@@ -12,9 +12,9 @@ import { memoryStore, patchDockSettings } from '../../src/core/dock/state.js';
 import { PROTO } from '../../src/core/dock/protocol.js';
 
 let counter = 0;
-export function freshDb(): ThreadkeeperDB {
+export function freshDb(): ThreadStackDB {
   counter += 1;
-  return new ThreadkeeperDB(`DockTestDB_${Date.now()}_${counter}`);
+  return new ThreadStackDB(`DockTestDB_${Date.now()}_${counter}`);
 }
 
 export const STILL_ID = 'abcdefghijklmnopabcdefghijklmnop';
@@ -47,13 +47,13 @@ export function thread(
   };
 }
 
-export async function seed(db: ThreadkeeperDB, input: UpsertThreadInput): Promise<string> {
+export async function seed(db: ThreadStackDB, input: UpsertThreadInput): Promise<string> {
   const res = await upsertThread(db, input);
   if (res.status !== 'stored') throw new Error('not stored');
   return input.threadKey;
 }
 
-export async function putInsight(db: ThreadkeeperDB, threadKey: string, patch: Partial<ThreadInsight> & Record<string, unknown> = {}): Promise<void> {
+export async function putInsight(db: ThreadStackDB, threadKey: string, patch: Partial<ThreadInsight> & Record<string, unknown> = {}): Promise<void> {
   const conv = await db.conversations.get(threadKey);
   if (!conv) throw new Error('no conv');
   const source = (patch.source as 'ai' | 'local' | undefined) ?? 'ai';
@@ -116,7 +116,7 @@ export function fakeStill(handlers: Partial<Record<string, (m: Record<string, un
 }
 
 export interface Harness {
-  db: ThreadkeeperDB;
+  db: ThreadStackDB;
   dock: DockService;
   still: ReturnType<typeof fakeStill>;
   clock: { t: number };

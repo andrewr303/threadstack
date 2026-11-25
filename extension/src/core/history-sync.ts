@@ -9,7 +9,7 @@ import { validateSiteConversation, type SiteConversation } from './site-api.js';
  * - "api": ChatGPT and Claude. The page's own signed-in session lists recent conversations and
  *   loads each one as JSON (complete, with ids, times and model), paced and cancellable.
  * - "sidebar": every other site, and the coding-agent pages (Claude Code on claude.ai/code, Codex
- *   on chatgpt.com/codex), whose session lists are not read through any endpoint Threadkeeper
+ *   on chatgpt.com/codex), whose session lists are not read through any endpoint ThreadStack
  *   knows. The list's links are read and each conversation is opened in a background tab, where
  *   normal capture reads it (for coding sessions that includes the repository, pull request and
  *   run state the page shows). Slower, and only as good as the site's DOM.
@@ -324,7 +324,7 @@ export interface SyncProviderState {
   message: string | null;
   /** The account this site's threads are filed under in this run (its label), when known. */
   account?: string | null;
-  /** Read but holding no message Threadkeeper could use; not stored, and never called up to date. */
+  /** Read but holding no message ThreadStack could use; not stored, and never called up to date. */
   empty?: number;
   /** The site has more than this run read (a cap, or a list that did not finish loading). */
   truncated?: boolean;
@@ -384,21 +384,21 @@ export function updateProvider(state: SyncState, provider: SyncProviderId, patch
 export function describeSyncError(code: SyncErrorCode | SyncStepErrorCode, label: string): string {
   switch (code) {
     case 'no_access':
-      return `Threadkeeper is not allowed to read ${label}. Turn ${label} on under Settings, Capture, allow access when asked, and try again.`;
+      return `ThreadStack is not allowed to read ${label}. Turn ${label} on under Settings, Capture, allow access when asked, and try again.`;
     case 'page_timeout':
       return `${label} did not finish loading in time. Check that ${label} opens in a normal tab, then try again.`;
     case 'no_reader':
-      return `Threadkeeper could not start reading the ${label} page. Reload any open ${label} tab and try again.`;
+      return `ThreadStack could not start reading the ${label} page. Reload any open ${label} tab and try again.`;
     case 'tab_closed':
       return `The ${label} tab was closed during the import. What was imported so far is kept.`;
     case 'account_changed':
       return `The ${label} account signed in changed during the import, so it stopped to keep each account's threads apart. Run the import again for the account now signed in.`;
     case 'capture_failed':
-      return `${label} did not show the conversations Threadkeeper opened. Check that you are signed in and that a conversation opens in a normal tab. What was imported so far is kept.`;
+      return `${label} did not show the conversations ThreadStack opened. Check that you are signed in and that a conversation opens in a normal tab. What was imported so far is kept.`;
     case 'step_timeout':
-      return `${label} stopped responding, so Threadkeeper moved on. What was imported so far is kept.`;
+      return `${label} stopped responding, so ThreadStack moved on. What was imported so far is kept.`;
     case 'account_unverified':
-      return `Threadkeeper could not confirm which ${label} account is signed in, so nothing more was imported from ${label}. Open ${label} in a tab, check you are signed in to the account you want, and try again.`;
+      return `ThreadStack could not confirm which ${label} account is signed in, so nothing more was imported from ${label}. Open ${label} in a tab, check you are signed in to the account you want, and try again.`;
     case 'interrupted':
       return `The browser stopped the extension during the import. What was imported is kept; continue the import to finish ${label}.`;
     case 'needs_login':
@@ -408,7 +408,7 @@ export function describeSyncError(code: SyncErrorCode | SyncStepErrorCode, label
     case 'rate_limited':
       return `${label} asked us to slow down. Wait a few minutes and run Catch up again; what was already imported is kept.`;
     case 'unsupported':
-      return `${label} did not answer in the format Threadkeeper reads. The site may have changed; use its data export instead.`;
+      return `${label} did not answer in the format ThreadStack reads. The site may have changed; use its data export instead.`;
     case 'network':
       return `Could not reach ${label}. Check your connection and try again.`;
     case 'no_conversations':

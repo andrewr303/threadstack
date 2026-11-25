@@ -47,7 +47,7 @@ export interface AccountRecord {
   /** Legacy isolated accounts: the Chrome profile directory id (a UUID) the Mac helper opened. */
   profileId?: string;
   /**
-   * The login the browser already had when Threadkeeper first saw this realm. Its threads keep
+   * The login the browser already had when ThreadStack first saw this realm. Its threads keep
    * the thread keys written before accounts existed (settings.boundAccounts).
    */
   primary: boolean;
@@ -230,7 +230,40 @@ export interface SessionTab {
   threadKey: string | null;
   createdAt: number;
   lastActiveAt: number;
+  /**
+   * Browse split view: the pane the tab belongs to (0 left, 1 right). Absent means the left pane.
+   * Every tab belongs to exactly one pane, whether or not the view is split right now.
+   */
+  pane?: BrowsePane;
 }
+
+/** A Browse split-view pane: 0 is the left one, 1 the right one. */
+export type BrowsePane = 0 | 1;
+
+/** What the Browse view shows: the open tabs, or the status board of sessions by run state. */
+export type BrowseMode = 'tabs' | 'board';
+
+/**
+ * How Browse is laid out. Added after WorkspaceState v1 shipped: a stored state without it (or
+ * with a malformed one) is read as the single-pane tab view by normalizeWorkspaceState, which is
+ * the whole migration, so the version stays 1.
+ */
+export interface BrowseLayout {
+  /** Two panes side by side, each with its own tab strip. */
+  split: boolean;
+  /** The tab each pane shows (remembered while not split too, so splitting again restores it). */
+  paneActive: [string | null, string | null];
+  /** The pane sessions open in. While split, `activeTabId` is this pane's tab. */
+  focusedPane: BrowsePane;
+  mode: BrowseMode;
+}
+
+export const DEFAULT_BROWSE_LAYOUT: BrowseLayout = {
+  split: false,
+  paneActive: [null, null],
+  focusedPane: 0,
+  mode: 'tabs',
+};
 
 export const DASHBOARD_LAYOUTS = [1, 2, 3, 4] as const;
 export type DashboardLayout = (typeof DASHBOARD_LAYOUTS)[number];
@@ -241,7 +274,7 @@ export const WORKSPACE_VIEWS: readonly WorkspaceView[] = ['browse', 'threads', '
 export interface WorkspaceState {
   version: 1;
   tabs: SessionTab[];
-  /** Tab shown in Browse. */
+  /** Tab shown in Browse (while split: the focused pane's tab, null when that pane is empty). */
   activeTabId: string | null;
   dashboard: {
     layout: DashboardLayout;
@@ -251,6 +284,8 @@ export interface WorkspaceState {
   };
   /** Side-navigation groups the person collapsed. */
   collapsedGroups: string[];
+  /** Split view and the status board (see BrowseLayout). */
+  browse: BrowseLayout;
 }
 
 export const EMPTY_WORKSPACE_STATE: WorkspaceState = {
@@ -259,6 +294,7 @@ export const EMPTY_WORKSPACE_STATE: WorkspaceState = {
   activeTabId: null,
   dashboard: { layout: 2, panes: [null, null], focusedPane: 0 },
   collapsedGroups: [],
+  browse: DEFAULT_BROWSE_LAYOUT,
 };
 
 /**
@@ -280,7 +316,7 @@ export const DEFAULT_MAX_LIVE_FRAMES = 6;
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Workspace page → service worker. Accepted only from Threadkeeper's own manager page running
+ * Workspace page → service worker. Accepted only from ThreadStack's own manager page running
  * as a top-level tab (never the in-page overlay, a frame, the side panel or a website).
  */
 export type WorkspaceCommand =
@@ -362,7 +398,7 @@ export const WORKSPACE_COMMAND_TYPES: ReadonlySet<string> = new Set<WorkspaceCom
 export type WorkspaceFailure = { ok: false; error: string; code?: WorkspaceErrorCode };
 
 export type WorkspaceErrorCode =
-  /** The realm's sign-in is not one Threadkeeper switches. */
+  /** The realm's sign-in is not one ThreadStack switches. */
   | 'not_switchable'
   /** Host access for the realm's sites has not been granted. */
   | 'needs_host_access'

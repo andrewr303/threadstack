@@ -11,7 +11,7 @@ import {
   remoteSpace,
   testEmbedding,
 } from '../../src/core/embeddings.js';
-import { ThreadkeeperDB, ensureStarterCollectionsAndSettings, saveSettingsPatch, upsertThread } from '../../src/core/db.js';
+import { ThreadStackDB, ensureStarterCollectionsAndSettings, saveSettingsPatch, upsertThread } from '../../src/core/db.js';
 import { analyzeThreadRemotely } from '../../src/core/pipeline.js';
 
 interface Call {
@@ -186,7 +186,7 @@ describe('testEmbedding', () => {
 
 describe('Bedrock embeddings and local-only threads', () => {
   it('never sends a local-only thread, or one filed in a local-only project, to Bedrock', async () => {
-    const db = new ThreadkeeperDB(`BedrockEmbedDB_${Date.now()}`);
+    const db = new ThreadStackDB(`BedrockEmbedDB_${Date.now()}`);
     await ensureStarterCollectionsAndSettings(db);
     const settings = await saveSettingsPatch(db, {
       embeddingProvider: 'bedrock',

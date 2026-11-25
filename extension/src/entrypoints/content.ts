@@ -37,7 +37,7 @@ const OVERLAY_DIALOG_ID = 'threadkeeper-overlay-root';
 
 /**
  * Content scripts run in every frame of the hosts they match. This one works in a top-level tab
- * and in a page embedded directly in Threadkeeper's workspace; in any other frame it registers
+ * and in a page embedded directly in ThreadStack's workspace; in any other frame it registers
  * nothing (see the guard at the bottom).
  */
 const FRAME_MODE = frameMode();
@@ -214,7 +214,7 @@ export function openOrToggleOverlay(handshakeToken: string): {
 
   const dialog = document.createElement('dialog');
   dialog.id = OVERLAY_DIALOG_ID;
-  dialog.setAttribute('aria-label', 'Threadkeeper Workbench');
+  dialog.setAttribute('aria-label', 'ThreadStack Workbench');
   dialog.style.cssText = [
     'padding: 0',
     'border: 1px solid rgba(22, 21, 20, 0.22)',
@@ -235,7 +235,7 @@ export function openOrToggleOverlay(handshakeToken: string): {
     `manager.html?surface=overlay&token=${encodeURIComponent(handshakeToken)}`
   );
   iframe.src = extUrl;
-  iframe.title = 'Threadkeeper Conversation Manager';
+  iframe.title = 'ThreadStack Conversation Manager';
   iframe.style.cssText =
     'width: 100%; height: 100%; border: 0; display: block; background: transparent;';
 
@@ -1040,7 +1040,7 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
         return true;
       }
       if (IN_WORKSPACE && message && (message.type === 'TOGGLE_THREADKEEPER_OVERLAY' || message.type === 'CLOSE_THREADKEEPER_OVERLAY')) {
-        // No overlay inside the workspace: the workspace is Threadkeeper already.
+        // No overlay inside the workspace: the workspace is ThreadStack already.
         return false;
       }
       if (
@@ -1059,7 +1059,7 @@ if (FRAME_MODE !== 'other' && !isolatedGlobal[ISOLATED_WORLD_GUARD]) {
       ) {
         const res = openOrToggleOverlay(message.handshakeToken);
         if (res.state === 'opened') {
-          // Opening Threadkeeper here counts as asking for this page (the background holds the same token).
+          // Opening ThreadStack here counts as asking for this page (the background holds the same token).
           schedulePassiveDomCapture(true, message.handshakeToken, 'overlay');
         }
         sendResponse({ ok: true, state: res.state });

@@ -78,7 +78,7 @@ export interface SeedStep {
 
 export interface SeedPlan {
   steps: SeedStep[];
-  /** Cookies on hosts that are not the realm's or that Threadkeeper may not reach. */
+  /** Cookies on hosts that are not the realm's or that ThreadStack may not reach. */
   skipped: number;
   /** Cookies left out because the site's share of the partition was full. */
   dropped: number;
@@ -91,7 +91,7 @@ export interface SeedPlanInput {
   cookies: readonly StoredCookie[];
   /** The browser's bot-check cookies for the realm, shared by every profile. */
   deviceCookies: readonly StoredCookie[];
-  /** Whether a host belongs to the realm and Threadkeeper holds access to it. */
+  /** Whether a host belongs to the realm and ThreadStack holds access to it. */
   hostAllowed: (host: string) => boolean;
   nonce: string;
   nowMs: number;

@@ -1,6 +1,6 @@
 /** Paperclip owns linked keys. Resolved values belong only to the current feature call. */
 import type { SettingsRecord } from '../schema.js';
-import type { ThreadkeeperDB } from '../db.js';
+import type { ThreadStackDB } from '../db.js';
 import { normalizeServerUrl, secretTransportAllowed, SECRET_TRANSPORT_REFUSED } from './client.js';
 import { isValidAwsRegion } from '../aws.js';
 
@@ -79,7 +79,7 @@ export class PaperclipCredentialError extends Error {
   constructor(readonly feature: string, readonly reason: CredentialFailure = 'unavailable') {
     super(reason === 'missing' ? `The linked Paperclip secret is missing, so ${feature} has no key.`
       : reason === 'disabled' ? `Model keys from Paperclip are turned off, so ${feature} is paused.`
-        : reason === 'not_paired' ? `Threadkeeper is not paired with Paperclip, so ${feature} is paused.`
+        : reason === 'not_paired' ? `ThreadStack is not paired with Paperclip, so ${feature} is paused.`
         : `Paperclip is not running, so ${feature} is paused.`);
     this.name = 'PaperclipCredentialError';
   }
@@ -191,10 +191,10 @@ export function createCredentialBackend(settings: SettingsRecord, companyId: str
     listSecrets,
     async saveSecret(key, value) {
       if (!secretTransportAllowed(origin)) throw new Error(SECRET_TRANSPORT_REFUSED);
-      const name = `Threadkeeper ${key}`;
+      const name = `ThreadStack ${key}`;
       const existing = (await listSecrets()).find((row) => row.name === name);
       if (existing) { await request(`/secrets/${encodeURIComponent(existing.id)}/rotate`, { value }); return existing.id; }
-      const created = await request(`/companies/${encodeURIComponent(companyId)}/secrets`, { name, value, description: 'Model credential moved from Threadkeeper by its owner.' });
+      const created = await request(`/companies/${encodeURIComponent(companyId)}/secrets`, { name, value, description: 'Model credential moved from ThreadStack by its owner.' });
       if (typeof created?.id !== 'string') throw new Error('Paperclip did not confirm the secret.');
       return created.id;
     },
@@ -220,7 +220,7 @@ export function createCredentialBackend(settings: SettingsRecord, companyId: str
 }
 
 /** In one fresh transaction: mark `key` linked and erase its stored value (IndexedDB and so backups). */
-async function commitLinkedKey(db: ThreadkeeperDB, key: ModelCredentialKey,
+async function commitLinkedKey(db: ThreadStackDB, key: ModelCredentialKey,
   unchanged: (current: SettingsRecord, config: PaperclipCredentialSettings) => boolean = () => true): Promise<void> {
   await db.transaction('rw', db.settings, async () => {
     const current = await db.settings.get('default');
@@ -234,7 +234,7 @@ async function commitLinkedKey(db: ThreadkeeperDB, key: ModelCredentialKey,
 
 export interface CredentialMoveResult { moved: ModelCredentialKey[]; notMoved: ModelCredentialKey[]; }
 /** Values are erased only in a fresh transaction, after exact readback, if the user has not edited them. */
-export async function moveModelKeys(db: ThreadkeeperDB, original: SettingsRecord, backend: CredentialBackend): Promise<CredentialMoveResult> {
+export async function moveModelKeys(db: ThreadStackDB, original: SettingsRecord, backend: CredentialBackend): Promise<CredentialMoveResult> {
   const config = normalizePaperclipCredentials(original.paperclipCredentials);
   if (!config.companyId || !config.allowSecretTransfer) throw new Error('Allow model keys from Paperclip before moving them.');
   const result: CredentialMoveResult = { moved: [], notMoved: [] };
@@ -270,7 +270,7 @@ type BackendFactory = typeof createCredentialBackend;
 let mutation = Promise.resolve();
 
 /** Called only after the worker validates the manager sender. Values stay out of status responses. */
-export async function handleCredentialCommand(db: ThreadkeeperDB,
+export async function handleCredentialCommand(db: ThreadStackDB,
   resolveSecret: (companyId: string, key: ModelCredentialKey) => Promise<string>, action: string,
   payload: unknown, factory: BackendFactory = createCredentialBackend,
   /** Feature reads may use the worker's short cache; link/move readbacks always use `resolveSecret`. */
@@ -281,7 +281,7 @@ export async function handleCredentialCommand(db: ThreadkeeperDB,
   if (action !== 'credentials.clear' && (!companyId || companyId.length > 200)) throw new Error('Choose a Paperclip company first.');
   const execute = async () => {
     const settings = await db.settings.get('default');
-    if (!settings) throw new Error('Threadkeeper settings are not ready.');
+    if (!settings) throw new Error('ThreadStack settings are not ready.');
     const current = normalizePaperclipCredentials(settings.paperclipCredentials);
     const save = async (next: PaperclipCredentialSettings) => {
       await db.settings.update('default', { paperclipCredentials: next });

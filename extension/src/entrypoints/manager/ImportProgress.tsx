@@ -43,8 +43,8 @@ export const TRUNCATED_NOTE = 'This site has more than were imported. Run the im
 function countsText(p: SyncProviderState): string {
   const parts = [`${p.stored} imported`];
   if (p.skipped) parts.push(`${p.skipped} already up to date`);
-  // Read, but with no message Threadkeeper could use: never counted as up to date.
-  if (p.empty) parts.push(`${p.empty} had no messages Threadkeeper could read`);
+  // Read, but with no message ThreadStack could use: never counted as up to date.
+  if (p.empty) parts.push(`${p.empty} had no messages ThreadStack could read`);
   if (p.failed) parts.push(`${p.failed} could not be read`);
   return parts.join(', ');
 }

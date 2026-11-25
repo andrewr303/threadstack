@@ -1,5 +1,5 @@
 /**
- * Pure mapping from Paperclip records to Threadkeeper threads.
+ * Pure mapping from Paperclip records to ThreadStack threads.
  *
  * One Paperclip issue is one thread: the issue description, its comment thread, and the
  * transcripts of the agent runs that worked on it, in time order. Run transcripts come from the
@@ -123,7 +123,7 @@ export function agentLabel(agent: PcAgent | null | undefined, adapterType?: stri
   return `${name} · ${runner}`.slice(0, 120);
 }
 
-/** Paperclip issue status → Threadkeeper workflow state. */
+/** Paperclip issue status → ThreadStack workflow state. */
 export function workflowStateForIssue(status: string | null | undefined): WorkflowState {
   switch (status) {
     case 'in_progress':
@@ -644,7 +644,7 @@ export function resumeCommandFor(block: RunBlock | undefined, companyId: string)
   return null;
 }
 
-/** The thread Threadkeeper stores for one Paperclip issue. */
+/** The thread ThreadStack stores for one Paperclip issue. */
 export function buildIssueThread(input: IssueThreadInput): UpsertThreadInput {
   const { issue, company, agents } = input;
   const identifier = str(issue.identifier).trim();

@@ -24,7 +24,7 @@ export interface ThreadAccount {
   account: AccountRecord | null;
   /** Whether that account is the one signed in to its realm right now. */
   active: boolean;
-  /** Whether Threadkeeper can switch this realm's accounts at all. */
+  /** Whether ThreadStack can switch this realm's accounts at all. */
   switchable: boolean;
 }
 
@@ -66,6 +66,13 @@ export interface WorkspaceContextValue {
   openPaperclip?: (path: string) => void;
   /** Say something through the page's polite live region. */
   announce: (message: string) => void;
+  /**
+   * Open the session palette (⌘K). Absent, or `paletteEnabled` false, when the palette is
+   * switched off in Settings (commandBar) or the surface has none: callers then hide their
+   * palette buttons and ⌘K chips.
+   */
+  openPalette?: () => void;
+  paletteEnabled?: boolean;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
